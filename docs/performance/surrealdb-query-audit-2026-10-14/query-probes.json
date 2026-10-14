@@ -1,0 +1,1099 @@
+{
+  "baseline_commit": "bb4e9208c3054811e4fb883f28ad2145c4be65e7",
+  "surrealdb": "3.3.2",
+  "probes": [
+    {
+      "case": "edge_cast",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 11.395,
+      "rows": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "status": "OK",
+      "sql_time": "10.833133ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "edge_constructed",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "edge_out"
+        }
+      ],
+      "wall_median_ms": 1.881,
+      "rows": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "status": "OK",
+      "sql_time": "786.63µs",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "facts_scan",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 143.923,
+      "rows": [
+        411,
+        411,
+        411,
+        411,
+        411
+      ],
+      "status": "OK",
+      "sql_time": "262.964625ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "facts_browse",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 108.389,
+      "rows": [
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "status": "OK",
+      "sql_time": "97.984995ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "facts_fts",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapFullTextScan",
+          "index": "fact_content_search"
+        },
+        {
+          "operator": "BitmapFullTextScan",
+          "index": "fact_index_keys_search"
+        }
+      ],
+      "wall_median_ms": 2.651,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "1.632475ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "entity_batch",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 2.164,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "793.851µs",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "episode_substring",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 2.518,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "1.608091ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "episode_scan",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 1.87,
+      "rows": [
+        52,
+        52,
+        52,
+        52,
+        52
+      ],
+      "status": "OK",
+      "sql_time": "1.000496ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "backfill_first",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "wall_median_ms": 185.522,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "136.929906ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "backfill_cursor",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 10.539,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "8.85312ms",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "artifacts_upper",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "wall_median_ms": 1.642,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "604.621µs",
+      "source": "surreal-read-audit-results.jsonl"
+    },
+    {
+      "case": "tasks_due",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "idx_tenant_task_state"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "idx_tenant_task_state"
+        }
+      ],
+      "wall_median_ms": 1.208,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "status": "OK",
+      "sql_time": "334.48µs",
+      "source": "surreal-read-audit-results.jsonl",
+      "limitations": "Simplified SELECT on empty queue; used lease_expires_at, not the product lease_expiry predicate. Not exact task-claim evidence."
+    },
+    {
+      "case": "graph_batch_cast",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 29.806,
+      "sql_median_ms": 18.839,
+      "rows": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "stable_result_sha256": "38cf0a981247ef802f1b76205a68d27a43d99787b82489f1f76f092ae0e9a804",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "graph_batch_constructed",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 2.787,
+      "sql_median_ms": 1.371,
+      "rows": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "stable_result_sha256": "38cf0a981247ef802f1b76205a68d27a43d99787b82489f1f76f092ae0e9a804",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "episode_id_lookup",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 1.882,
+      "sql_median_ms": 0.668,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "source_fact_lookup",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 10.147,
+      "sql_median_ms": 8.355,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "alias_lookup",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 2.039,
+      "sql_median_ms": 0.722,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "canonical_lookup",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "entity_canonical_name_normalized"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 1.824,
+      "sql_median_ms": 0.509,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "missing_vector_count",
+      "plan": [
+        {
+          "operator": "Aggregate",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 14.685,
+      "sql_median_ms": 10.679,
+      "rows": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "stable_result_sha256": "cd0e5efe267810586a780ddd18fc10f8c60b9328fa26879735dac63a8145fe4d",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "claim_by_id",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 3.366,
+      "sql_median_ms": 0.977,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "claim_by_source",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "claim_source_projection_idx"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 2.124,
+      "sql_median_ms": 0.614,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "claim_relations",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "claim_relation_left_active_idx"
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "claim_relation_right_active_idx"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 1.975,
+      "sql_median_ms": 0.506,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "fact_entity_links",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 16.35,
+      "sql_median_ms": 13.58,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "community_members",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 1.771,
+      "sql_median_ms": 0.378,
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "stable_result_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": "surreal-read-audit-deep-results.jsonl"
+    },
+    {
+      "case": "ann_k20_ef80",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "KnnScan",
+          "index": "fact_embedding_hnsw"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 85.84412498748861,
+      "sql_times": [
+        "123.057496ms",
+        "82.25377ms",
+        "70.135554ms",
+        "63.010219ms",
+        "98.094585ms"
+      ],
+      "rows": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "source": "surreal-read-audit-ann-results.jsonl"
+    },
+    {
+      "case": "ann_k50_ef200",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "KnnScan",
+          "index": "fact_embedding_hnsw"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 140.59066399931908,
+      "sql_times": [
+        "136.868188ms",
+        "102.727031ms",
+        "115.701735ms",
+        "137.274638ms",
+        "204.500792ms"
+      ],
+      "rows": [
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "source": "surreal-read-audit-ann-results.jsonl"
+    },
+    {
+      "case": "fts_full_visibility",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "FullTextScan",
+          "index": "fact_content_search"
+        },
+        {
+          "operator": "FullTextScan",
+          "index": "fact_index_keys_search"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 2.8086310194339603,
+      "sql_times": [
+        "1.9574ms",
+        "1.602823ms",
+        "1.557742ms",
+        "1.416828ms",
+        "1.420623ms"
+      ],
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "surreal-read-audit-ann-results.jsonl"
+    },
+    {
+      "case": "backfill_first_full",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 154.86811997834593,
+      "sql_times": [
+        "153.350925ms",
+        "128.055925ms",
+        "167.943913ms",
+        "148.474753ms",
+        "226.827681ms"
+      ],
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "surreal-read-audit-ann-results.jsonl"
+    },
+    {
+      "case": "backfill_first_full",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 144.63289998820983,
+      "sql_times": [
+        "179.175387ms",
+        "131.602973ms",
+        "138.274023ms",
+        "142.297711ms",
+        "223.692389ms"
+      ],
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "surreal-read-audit-backfill-results.jsonl"
+    },
+    {
+      "case": "backfill_noindex",
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "status": "OK",
+      "wall_median_ms": 17.59095600573346,
+      "sql_times": [
+        "19.745868ms",
+        "15.905521ms",
+        "17.791883ms",
+        "8.12733ms",
+        "7.721602ms"
+      ],
+      "rows": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "surreal-read-audit-backfill-results.jsonl"
+    }
+  ],
+  "batch_started_at_utc": [
+    "2026-10-14T12:26:45Z",
+    "2026-10-14T12:29:34Z",
+    "2026-10-14T12:31:04Z",
+    "2026-10-14T12:35:35Z"
+  ],
+  "capture_end_at_utc": null,
+  "timing_note": "Recorded batch starts; exact overall end was not captured. wall_median_ms is a diagnostic sample, not a service percentile. Singular sql_time is one reported statement time, not a median."
+}

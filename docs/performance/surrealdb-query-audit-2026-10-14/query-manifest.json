@@ -1,0 +1,1514 @@
+{
+  "schema": "memory-mcp-surreal-query-manifest/v1",
+  "baselineCommit": "bb4e9208c3054811e4fb883f28ad2145c4be65e7",
+  "surrealdbVersion": "3.3.2",
+  "productionImageDigest": "sha256:2a94eb283967c7751c88822084d92a496af8071fa99529c807ff165bde53443c",
+  "captureMode": "production-read-only-probes; never a full-service benchmark",
+  "captureWindowUtc": null,
+  "coverage": {
+    "probeCount": 30,
+    "distinctProbeForms": 29,
+    "sampleCountsAreSqlCallCounts": false,
+    "missingRowsBytesRpcSigninAreNull": true,
+    "fullPipelineBaseline": "unmeasured",
+    "sameHostAa": "unmeasured",
+    "remoteProviderQuality": "unmeasured",
+    "astInventory": {
+      "reportedCallSiteCountsIncludingTests": [
+        131,
+        47,
+        58
+      ],
+      "categoryMapping": "not preserved in original audit; do not interpret as production query-template counts"
+    }
+  },
+  "entries": [
+    {
+      "id": "edge_cast",
+      "owner": "knowledge.graph",
+      "caller": "graph expansion",
+      "scenario": "edge_cast",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 11.395,
+      "durationSqlMedianUs": 10833.133,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "keep until task 6"
+    },
+    {
+      "id": "edge_constructed",
+      "owner": "knowledge.graph",
+      "caller": "graph expansion",
+      "scenario": "edge_constructed",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 1.881,
+      "durationSqlMedianUs": 786.63,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "edge_out"
+        }
+      ],
+      "rowsPerSample": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "equivalent A/B probe; task 6 regression required"
+    },
+    {
+      "id": "facts_scan",
+      "owner": "memory.retrieval",
+      "caller": "lexical and temporal full-fact scan",
+      "scenario": "facts_scan",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 143.923,
+      "durationSqlMedianUs": 262964.625,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        411,
+        411,
+        411,
+        411,
+        411
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "retain required global/relative-date coverage; task 7"
+    },
+    {
+      "id": "facts_browse",
+      "owner": "memory.retrieval",
+      "caller": "browse/facet fact scan",
+      "scenario": "facts_browse",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 108.389,
+      "durationSqlMedianUs": 97984.995,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "legacy-schema table scan; task 7"
+    },
+    {
+      "id": "facts_fts",
+      "owner": "memory.retrieval",
+      "caller": "full-text lookup",
+      "scenario": "facts_fts",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 2.651,
+      "durationSqlMedianUs": 1632.475,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapFullTextScan",
+          "index": "fact_content_search"
+        },
+        {
+          "operator": "BitmapFullTextScan",
+          "index": "fact_index_keys_search"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "absent-term diagnostic only; task 8"
+    },
+    {
+      "id": "entity_batch",
+      "owner": "knowledge.identity",
+      "caller": "entity resolution",
+      "scenario": "entity_batch",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 2.164,
+      "durationSqlMedianUs": 793.851,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "empty result; not a representative hit workload"
+    },
+    {
+      "id": "episode_substring",
+      "owner": "memory.retrieval",
+      "caller": "episode lexical fallback",
+      "scenario": "episode_substring",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 2.518,
+      "durationSqlMedianUs": 1608.091,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "absent-term diagnostic only; task 8"
+    },
+    {
+      "id": "episode_scan",
+      "owner": "memory.retrieval",
+      "caller": "episode context scan",
+      "scenario": "episode_scan",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 1.87,
+      "durationSqlMedianUs": 1000.4960000000001,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        52,
+        52,
+        52,
+        52,
+        52
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "52-row projection probe; task 7"
+    },
+    {
+      "id": "backfill_first",
+      "owner": "embedding.backfill",
+      "caller": "missing-vector first-page query",
+      "scenario": "backfill_first",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 185.522,
+      "durationSqlMedianUs": 136929.906,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "profile by pending density and dimension; task 9"
+    },
+    {
+      "id": "backfill_cursor",
+      "owner": "embedding.backfill",
+      "caller": "missing-vector cursor query",
+      "scenario": "backfill_cursor",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 10.539,
+      "durationSqlMedianUs": 8853.12,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "retain cursor compatibility until task 9 proves otherwise"
+    },
+    {
+      "id": "artifacts_upper",
+      "owner": "http.tasks",
+      "caller": "artifact reconciliation upper-bound query",
+      "scenario": "artifacts_upper",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 1.642,
+      "durationSqlMedianUs": 604.621,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "empty production artifact table; task 5"
+    },
+    {
+      "id": "tasks_due",
+      "owner": "http.tasks",
+      "caller": "due-task query",
+      "scenario": "tasks_due",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 1.208,
+      "durationSqlMedianUs": 334.48,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "idx_tenant_task_state"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "idx_tenant_task_state"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-results.jsonl",
+      "disposition": "REJECT as product evidence: probe used the wrong lease field"
+    },
+    {
+      "id": "graph_batch_cast",
+      "owner": "knowledge.graph",
+      "caller": "multi-seed graph expansion",
+      "scenario": "graph_batch_cast",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 29.806,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "baseline shape; task 6"
+    },
+    {
+      "id": "graph_batch_constructed",
+      "owner": "knowledge.graph",
+      "caller": "multi-seed graph expansion",
+      "scenario": "graph_batch_constructed",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 2.787,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_in"
+        },
+        {
+          "operator": "IndexScan",
+          "index": "edge_out"
+        }
+      ],
+      "rowsPerSample": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "candidate shape; task 6 semantic regression required"
+    },
+    {
+      "id": "episode_id_lookup",
+      "owner": "knowledge.episode",
+      "caller": "episode identity lookup",
+      "scenario": "episode_id_lookup",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 1.882,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "source_fact_lookup",
+      "owner": "knowledge.provenance",
+      "caller": "source-fact lookup",
+      "scenario": "source_fact_lookup",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 10.147,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic; exact production predicate still required"
+    },
+    {
+      "id": "alias_lookup",
+      "owner": "knowledge.identity",
+      "caller": "alias membership lookup",
+      "scenario": "alias_lookup",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 2.039,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup; schema readiness affects plan"
+    },
+    {
+      "id": "canonical_lookup",
+      "owner": "knowledge.identity",
+      "caller": "canonical-name lookup",
+      "scenario": "canonical_lookup",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 1.824,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "entity_canonical_name_normalized"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "missing_vector_count",
+      "owner": "embedding.backfill",
+      "caller": "pending-vector count",
+      "scenario": "missing_vector_count",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 14.685,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "Aggregate",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "7 samples; test across density and dimensions"
+    },
+    {
+      "id": "claim_by_id",
+      "owner": "knowledge.claims",
+      "caller": "claim identity lookup",
+      "scenario": "claim_by_id",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 3.366,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "claim_by_source",
+      "owner": "knowledge.claims",
+      "caller": "claim provenance lookup",
+      "scenario": "claim_by_source",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 2.124,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "claim_source_projection_idx"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "claim_relations",
+      "owner": "knowledge.claims",
+      "caller": "claim relation lookup",
+      "scenario": "claim_relations",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 1.975,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "BitmapResolve",
+          "index": null
+        },
+        {
+          "operator": "BitmapOr",
+          "index": null
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "claim_relation_left_active_idx"
+        },
+        {
+          "operator": "BitmapIndexScan",
+          "index": "claim_relation_right_active_idx"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "fact_entity_links",
+      "owner": "knowledge.graph",
+      "caller": "fact/entity link lookup",
+      "scenario": "fact_entity_links",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 16.35,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "empty lookup diagnostic"
+    },
+    {
+      "id": "community_members",
+      "owner": "knowledge.communities",
+      "caller": "community membership query",
+      "scenario": "community_members",
+      "observed": true,
+      "sampleCount": 7,
+      "durationWallMedianMs": 1.771,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "SortByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-deep-results.jsonl",
+      "disposition": "legacy definition scan; upgrade then verify index plan"
+    },
+    {
+      "id": "ann_k20_ef80",
+      "owner": "embedding.retrieval",
+      "caller": "ANN retrieval",
+      "scenario": "ann_k20_ef80",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 85.84412498748861,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "KnnScan",
+          "index": "fact_embedding_hnsw"
+        }
+      ],
+      "rowsPerSample": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-ann-results.jsonl",
+      "disposition": "synthetic e0 vectors, dimension 2048; not a recall result"
+    },
+    {
+      "id": "ann_k50_ef200",
+      "owner": "embedding.retrieval",
+      "caller": "ANN retrieval",
+      "scenario": "ann_k50_ef200",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 140.59066399931908,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "KnnScan",
+          "index": "fact_embedding_hnsw"
+        }
+      ],
+      "rowsPerSample": [
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-ann-results.jsonl",
+      "disposition": "synthetic e0 vectors, dimension 2048; not a recall result"
+    },
+    {
+      "id": "fts_full_visibility",
+      "owner": "memory.retrieval",
+      "caller": "full-visibility FTS fallback",
+      "scenario": "fts_full_visibility",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 2.8086310194339603,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "Compute",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "UnionIndexScan",
+          "index": null
+        },
+        {
+          "operator": "FullTextScan",
+          "index": "fact_content_search"
+        },
+        {
+          "operator": "FullTextScan",
+          "index": "fact_index_keys_search"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-ann-results.jsonl",
+      "disposition": "absent-term diagnostic; not representative quality evidence"
+    },
+    {
+      "id": "backfill_first_full",
+      "owner": "embedding.backfill",
+      "caller": "missing-vector full-predicate query",
+      "scenario": "backfill_first_full",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 154.86811997834593,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-ann-results.jsonl",
+      "disposition": "read-only production probe; duplicated baseline retained as separate capture"
+    },
+    {
+      "id": "backfill_first_full",
+      "owner": "embedding.backfill",
+      "caller": "missing-vector full-predicate query",
+      "scenario": "backfill_first_full",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 144.63289998820983,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "Filter",
+          "index": null
+        },
+        {
+          "operator": "IndexScan",
+          "index": "fact_claim_backfill_cursor_idx"
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-backfill-results.jsonl",
+      "disposition": "read-only production probe; duplicated baseline retained as separate capture"
+    },
+    {
+      "id": "backfill_noindex",
+      "owner": "embedding.backfill",
+      "caller": "missing-vector full-predicate query with planner hint",
+      "scenario": "backfill_noindex",
+      "observed": true,
+      "sampleCount": 5,
+      "durationWallMedianMs": 17.59095600573346,
+      "durationSqlMedianUs": null,
+      "plan": [
+        {
+          "operator": "SelectProject",
+          "index": null
+        },
+        {
+          "operator": "Limit",
+          "index": null
+        },
+        {
+          "operator": "SortTopKByKey",
+          "index": null
+        },
+        {
+          "operator": "TableScan",
+          "index": null
+        }
+      ],
+      "rowsPerSample": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": "surreal-read-audit-backfill-results.jsonl",
+      "disposition": "diagnostic candidate only; task 9 must test dense and mixed workloads"
+    },
+    {
+      "id": "unmeasured:http.registry:tenant discovery and pagination",
+      "owner": "http.registry",
+      "caller": "tenant discovery and pagination",
+      "scenario": "ready/due tenant index and fairness at 1/100/>100 tenants",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "task 5"
+    },
+    {
+      "id": "unmeasured:http.registry:account/auth/OIDC/API-key/quota query variants",
+      "owner": "http.registry",
+      "caller": "account/auth/OIDC/API-key/quota query variants",
+      "scenario": "full request path, deny/revocation and contention",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "keep security semantics; no full-pipeline sample"
+    },
+    {
+      "id": "unmeasured:provisioning:create/upgrade/delete/suspend recovery",
+      "owner": "provisioning",
+      "caller": "create/upgrade/delete/suspend recovery",
+      "scenario": "disposable fresh and legacy039/HTTP44 fixtures",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "tasks 2-3; production mutation prohibited"
+    },
+    {
+      "id": "unmeasured:http.app_sessions:admission and expiry cleanup",
+      "owner": "http.app_sessions",
+      "caller": "admission and expiry cleanup",
+      "scenario": "active/expired sessions plus concurrent admission",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "task 5; no production session rows"
+    },
+    {
+      "id": "unmeasured:http.tasks:claim/lease/heartbeat/requeue/reconciliation",
+      "owner": "http.tasks",
+      "caller": "claim/lease/heartbeat/requeue/reconciliation",
+      "scenario": "exact lease_expiry predicate and durable fault cases",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "task 5; tasks_due probe is invalid"
+    },
+    {
+      "id": "unmeasured:http.subscriptions:poll/replay/outbox repair and mutation",
+      "owner": "http.subscriptions",
+      "caller": "poll/replay/outbox repair and mutation",
+      "scenario": "sequence gaps, fanout, retry and concurrent writer",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "tasks 2 and 5; production mutation prohibited"
+    },
+    {
+      "id": "unmeasured:knowledge.ingestion:ingest/extract/resolve/invalidate transactions",
+      "owner": "knowledge.ingestion",
+      "caller": "ingest/extract/resolve/invalidate transactions",
+      "scenario": "full provider path and durable output",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "production mutation prohibited; real provider/corpus A/A required"
+    },
+    {
+      "id": "unmeasured:memory.retrieval:non-empty lexical, temporal, facets and explain",
+      "owner": "memory.retrieval",
+      "caller": "non-empty lexical, temporal, facets and explain",
+      "scenario": "popular hits, relative dates, late rare facts, cache cold/warm",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "tasks 7-8; full quality cases required"
+    },
+    {
+      "id": "unmeasured:knowledge.graph:source siblings, hub, archival, community rebuild",
+      "owner": "knowledge.graph",
+      "caller": "source siblings, hub, archival, community rebuild",
+      "scenario": "high-degree, self-loop, invalidation and page-boundary cases",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "tasks 7-10"
+    },
+    {
+      "id": "unmeasured:embedding:reembed/backfill dimension and model transitions",
+      "owner": "embedding",
+      "caller": "reembed/backfill dimension and model transitions",
+      "scenario": "17/384/768/1536/2048/3072, off, mixed-signature and concurrent writes",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "tasks 3, 9 and 11"
+    },
+    {
+      "id": "unmeasured:surrealdb.session:RPC attach/use/signin/detach counters",
+      "owner": "surrealdb.session",
+      "caller": "RPC attach/use/signin/detach counters",
+      "scenario": "per-scenario remote protocol frame counts",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "Task 4 instrumentation/remote rig required"
+    },
+    {
+      "id": "unmeasured:full-pipeline:application and database CPU/RSS/I/O/latency/quality A/A",
+      "owner": "full-pipeline",
+      "caller": "application and database CPU/RSS/I/O/latency/quality A/A",
+      "scenario": "immutable parent/candidate, same host, provider, corpus and schema",
+      "observed": false,
+      "sampleCount": null,
+      "durationWallMedianMs": null,
+      "durationSqlMedianUs": null,
+      "plan": null,
+      "rowsPerSample": null,
+      "rowBytes": null,
+      "rpcCount": null,
+      "signinCount": null,
+      "source": null,
+      "disposition": "unmeasured; must precede numeric A/B claims"
+    }
+  ],
+  "sanitization": {
+    "source": "query-probes.json contains probe labels, aggregate timings, row counts, and EXPLAIN operator/index names only",
+    "rawSql": "not retained in this manifest",
+    "credentials": "not retained",
+    "memoryContentOrVectors": "not retained",
+    "recordIds": "not retained"
+  }
+}

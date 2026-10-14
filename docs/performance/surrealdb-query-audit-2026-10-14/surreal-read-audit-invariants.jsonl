@@ -1,0 +1,3 @@
+sequence [{'result': [{'id': 'tenant_change_sequence:default', 'value': 1341}], 'status': 'OK', 'time': '288.608µs', 'type': None}, {'result': [{'n': 1}], 'status': 'OK', 'time': '434.247µs', 'type': None}, {'result': [{'event_seq': 1341}], 'status': 'OK', 'time': '19.482236ms', 'type': None}]
+fields episode ['archived_at', 'content', 'episode_id', 'policy_tags', 'project', 'scope', 'source_id', 'source_lineage', 'source_type', 'status', 't_ingested', 't_ref', 'visibility_scope']
+fields tenant_task ['cancellation_intent', 'created_at', 'error', 'fingerprint', 'id', 'lease_expiry', 'lease_generation', 'lease_owner', 'params', 'progress', 'result', 'retention_expiry', 'state', 'tenant_id', 'updated_at', 'version']
