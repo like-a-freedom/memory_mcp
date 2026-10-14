@@ -21,6 +21,7 @@
 use std::sync::Arc;
 
 use memory_mcp::http::embedding::backfill_scheduler::backfill_scheduler_job;
+use memory_mcp::http::leases::scheduler::MaintenanceSchedule;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
 use memory_mcp::http::runtime::bootstrap::DeploymentPolicy;
@@ -271,7 +272,9 @@ async fn same_dimension_foreign_signature_requires_reembed() {
         embedding_policy_for(provider, 1536),
         true,
     ));
-    job(registry).await.expect("one backfill tick");
+    job.invoke(registry, Arc::new(MaintenanceSchedule::default()))
+        .await
+        .expect("one backfill tick");
 
     assert_eq!(
         calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -321,7 +324,9 @@ async fn one_backfill_tick_fills_every_missing_vector_at_the_deployment_dimensio
 
     let policy = embedding_policy(1536);
     let job = backfill_scheduler_job(deployment_policy(1536, true));
-    job(registry).await.expect("one backfill tick must succeed");
+    job.invoke(registry, Arc::new(MaintenanceSchedule::default()))
+        .await
+        .expect("one backfill tick must succeed");
 
     for fact_id in ["fact:one", "fact:two", "fact:three"] {
         let fact = provisioned
@@ -385,7 +390,9 @@ async fn the_tick_writes_nothing_when_auto_recovery_is_off() {
 
     let job = backfill_scheduler_job(deployment_policy(1536, false));
 
-    let observed = job(registry).await;
+    let observed = job
+        .invoke(registry, Arc::new(MaintenanceSchedule::default()))
+        .await;
 
     assert!(observed.is_ok(), "a disabled tick is a successful no-op");
     let fact = provisioned
@@ -440,7 +447,9 @@ async fn the_tick_declines_a_tenant_whose_vectors_are_at_another_dimension() {
     let policy = deployment_policy_from(embedding_policy_for(provider, 2048), true);
 
     let job = backfill_scheduler_job(policy);
-    job(registry).await.expect("one backfill tick");
+    job.invoke(registry, Arc::new(MaintenanceSchedule::default()))
+        .await
+        .expect("one backfill tick");
 
     assert_eq!(
         calls.load(std::sync::atomic::Ordering::SeqCst),
