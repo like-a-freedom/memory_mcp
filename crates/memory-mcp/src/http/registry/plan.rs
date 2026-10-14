@@ -7,9 +7,11 @@
 //! ADR-0066 records why the split is where it is.
 
 #[cfg(feature = "streamable-http")]
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
+#[cfg(feature = "streamable-http")]
 use crate::storage::client::DbClient;
 #[cfg(feature = "streamable-http")]
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
 
 use crate::operations::quota::{QuotaPlan, UsageCounter, usage_drift_report};
 
@@ -17,27 +19,22 @@ use crate::operations::quota::{QuotaPlan, UsageCounter, usage_drift_report};
 /// the admission authority; this pass repairs only the cumulative episode
 /// count/bytes derived from canonical tenant records.
 #[cfg(feature = "streamable-http")]
-pub fn scheduler_job() -> crate::http::leases::scheduler::SchedulerJob {
-    Arc::new(|registry| Box::pin(reconcile_all(registry)))
+pub fn scheduler_job() -> SchedulerJob {
+    SchedulerJob::new(MaintenanceJob::UsageReconcile, |registry, schedule| {
+        Box::pin(reconcile_all(registry, schedule))
+    })
 }
 
 #[cfg(feature = "streamable-http")]
 async fn reconcile_all(
     registry: crate::http::registry::RegistryHandle,
+    schedule: Arc<MaintenanceSchedule>,
 ) -> Result<(), crate::error::MemoryError> {
-    static LAST_RUN: OnceLock<Mutex<Option<std::time::Instant>>> = OnceLock::new();
-    {
-        let mut last = LAST_RUN
-            .get_or_init(|| Mutex::new(None))
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if last.is_some_and(|instant| instant.elapsed() < std::time::Duration::from_secs(60)) {
-            return Ok(());
-        }
-        *last = Some(std::time::Instant::now());
-    }
     let usage = registry.usage();
-    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
+    let store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::UsageReconcile, store.as_ref(), 100)
+        .await?;
     if registry.tenant_engine_optional().is_none() {
         return Ok(());
     }

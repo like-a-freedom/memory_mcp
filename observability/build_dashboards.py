@@ -544,13 +544,13 @@ def technical() -> dict:
         ),
         stat(
             "Frequent schedulers, since they last ran",
-            'memory:background_job:run_age_seconds{pass=~"task|lease|embedding_backfill"}',
+            'memory:background_job:run_age_seconds{pass=~"task|provisioning|embedding_backfill"}',
             "dtdurations",
             (7, 9, 5, 9),
-            "Lease renewal, durable tasks and embedding recovery on the budget "
+            "Provisioning leases, durable tasks and embedding recovery on the budget "
             "their cadence deserves: amber at fifteen minutes, red at two "
             "hours, against intervals of seconds and a minute.\n\n"
-            "**Without this tile, a stalled lease scheduler would take a day to "
+            "**Without this tile, a stalled provisioning scheduler would take a day to "
             "be noticed** — the budget above has to clear a daily pass, and a "
             "budget loose enough for that is useless for a per-second one. The "
             "three passes also appear in the tile beside this one; this is the "
@@ -776,6 +776,76 @@ def technical() -> dict:
         ),
     ]
     sections.append(("Saturation", saturation))
+
+    maintenance_pool = [
+        timeseries(
+            "Maintenance pool occupancy",
+            [
+                target("memory_http_maintenance_sessions", "resident sessions"),
+                target("memory_http_maintenance_bindings", "bindings in progress"),
+                target("memory_http_maintenance_active_leases", "active leases"),
+            ],
+            (0, 7, 8, 7),
+            "Sessions and binds share the configured capacity of 32. Active "
+            "leases pin their session while a pass is running; a rising binding "
+            "line that does not settle can indicate slow or repeatedly failing "
+            "namespace setup.",
+            unit="short",
+            legend_calcs=["max", "lastNotNull"],
+        ),
+        stat(
+            "Pool metadata",
+            "memory_http_maintenance_metadata_bytes",
+            "bytes",
+            (8, 7, 4, 7),
+            "Owner-accounted key and slot metadata, capped at 1 MiB. This excludes "
+            "the SurrealDB SDK clients themselves, whose process memory is measured "
+            "by the workload sampler.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "yellow", "value": 786432},
+                {"color": "red", "value": 1048576},
+            ],
+            decimals=0,
+        ),
+        timeseries(
+            "Session binds, reuse and evictions",
+            [
+                target("rate(memory_http_maintenance_binds_total[5m])", "binds / s"),
+                target("rate(memory_http_maintenance_reuse_total[5m])", "reuse / s"),
+                target("rate(memory_http_maintenance_evictions_total[5m])", "evictions / s"),
+            ],
+            (12, 7, 12, 7),
+            "After warmup, scheduler ticks should mostly reuse bound sessions. "
+            "Sustained bind or eviction rates show connection churn and explain "
+            "SurrealDB signin and attach traffic.",
+            unit="ops",
+            legend_calcs=["mean", "max", "lastNotNull"],
+        ),
+    ]
+    sections.append(("Maintenance client pool", maintenance_pool))
+
+    maintenance_events = [
+        timeseries(
+            "Maintenance scheduling and outcomes",
+            [
+                target(
+                    "sum by (category, event, outcome) "
+                    "(rate(memory_http_maintenance_events_total[5m]))",
+                    "{{category}} · {{event}} · {{outcome}}",
+                )
+            ],
+            (0, 8, 24, 8),
+            "Scheduler lifecycle by fixed maintenance category. Cadence skips are "
+            "expected for slower jobs; `runtime_shutdown` skips show work that was "
+            "dispatched but did not acquire a permit before shutdown. Categories "
+            "and outcomes are bounded; tenant, namespace and SQL values are not "
+            "labels.",
+            unit="ops",
+            legend_calcs=["mean", "max", "lastNotNull"],
+        )
+    ]
+    sections.append(("Maintenance cadence", maintenance_events))
 
     # The layer beneath every panel above it. A scrape that has stopped makes
     # all of them read empty, and empty is also what an idle service looks

@@ -11,9 +11,10 @@
 //! configuration error: there is no implicit "do nothing"
 //! scheduler.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::sync::Semaphore;
@@ -26,32 +27,160 @@ use crate::logging::LogLevel;
 use crate::observability::record_job_metric;
 
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
-pub type SchedulerJob = Arc<dyn Fn(RegistryHandle) -> JobFuture + Send + Sync>;
 
-/// Whether a cadenced job is due at `now`: the first call always opens the
-/// window, and later calls open it only once `cadence` has elapsed since the
-/// last one.
-///
-/// The scheduler ticks every second; a job that walks storage on each tick —
-/// backfill, the lifecycle passes — runs on its own slower cadence instead.
-/// The instant is a parameter rather than read here so both the opening and
-/// the closing of the window can be pinned without sleeping through a real
-/// interval: a gate tested only from the closed side would pass while being
-/// stuck shut. The state lives in the job's closure, not a `static`, so each
-/// job instance owns its own window and tests do not share one.
-pub(crate) fn cadence_due_at(
-    last_run: &std::sync::Mutex<Option<std::time::Instant>>,
-    cadence: Duration,
-    now: std::time::Instant,
-) -> bool {
-    let mut guard = last_run
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if guard.is_some_and(|previous| now.duration_since(previous) < cadence) {
-        return false;
+/// Fixed maintenance dimensions and their cadence. Parameterized lifecycle
+/// windows remain bounded because only the interval differs, never the label.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum MaintenanceJob {
+    Provisioning,
+    DeletionRecovery,
+    TaskDispatch,
+    RuntimeEviction,
+    AppSessionCleanup,
+    PhysicalCleanup,
+    SubscriptionOutbox,
+    UsageReconcile,
+    RegistryNamespaceAudit,
+    RegistryRateBucketCleanup,
+    EmbeddingBackfill,
+    LifecycleDecay(u64),
+    LifecycleArchival(u64),
+}
+
+impl MaintenanceJob {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Provisioning => "provisioning",
+            Self::DeletionRecovery => "deletion_recovery",
+            Self::TaskDispatch => "task_dispatch",
+            Self::RuntimeEviction => "runtime_eviction",
+            Self::AppSessionCleanup => "app_session_cleanup",
+            Self::PhysicalCleanup => "physical_cleanup",
+            Self::SubscriptionOutbox => "subscription_outbox",
+            Self::UsageReconcile => "usage_reconcile",
+            Self::RegistryNamespaceAudit => "registry_namespace_audit",
+            Self::RegistryRateBucketCleanup => "registry_rate_bucket_cleanup",
+            Self::EmbeddingBackfill => "embedding_backfill",
+            Self::LifecycleDecay(_) => "lifecycle_decay",
+            Self::LifecycleArchival(_) => "lifecycle_archival",
+        }
     }
-    *guard = Some(now);
-    true
+
+    pub const fn cadence(self) -> Duration {
+        match self {
+            Self::Provisioning
+            | Self::DeletionRecovery
+            | Self::TaskDispatch
+            | Self::RuntimeEviction
+            | Self::SubscriptionOutbox => Duration::from_secs(1),
+            Self::LifecycleDecay(seconds) | Self::LifecycleArchival(seconds) => {
+                Duration::from_secs(seconds)
+            }
+            Self::AppSessionCleanup
+            | Self::PhysicalCleanup
+            | Self::UsageReconcile
+            | Self::RegistryNamespaceAudit
+            | Self::EmbeddingBackfill => Duration::from_secs(60),
+            Self::RegistryRateBucketCleanup => Duration::from_secs(300),
+        }
+    }
+
+    /// These multi-tenant passes report their own duration and degraded
+    /// tenant outcome. The scheduler still records dispatch lifecycle events,
+    /// but must not add a second background-pass sample for the same work.
+    const fn records_background_pass(self) -> bool {
+        matches!(
+            self,
+            Self::TaskDispatch
+                | Self::PhysicalCleanup
+                | Self::EmbeddingBackfill
+                | Self::LifecycleDecay(_)
+                | Self::LifecycleArchival(_)
+        )
+    }
+}
+
+/// Instance-owned cadence and fair tenant-page cursors. A process restart
+/// resets both: the first pass is due and tenant discovery starts at page one.
+#[derive(Default)]
+pub struct MaintenanceSchedule {
+    completed_at: Mutex<HashMap<MaintenanceJob, std::time::Instant>>,
+    tenant_cursors: Mutex<HashMap<MaintenanceJob, Option<String>>>,
+}
+
+impl MaintenanceSchedule {
+    pub fn due(&self, job: MaintenanceJob, now: std::time::Instant) -> bool {
+        let completed_at = self
+            .completed_at
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        completed_at.get(&job).is_none_or(|previous| {
+            now.checked_duration_since(*previous)
+                .is_none_or(|elapsed| elapsed >= job.cadence())
+        })
+    }
+
+    pub fn record_completed(&self, job: MaintenanceJob, now: std::time::Instant) {
+        self.completed_at
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .insert(job, now);
+    }
+
+    pub async fn next_ready_tenants(
+        &self,
+        job: MaintenanceJob,
+        store: &dyn crate::http::registry::storage::TenantStore,
+        page_size: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let limit = page_size.clamp(1, 100);
+        let cursor = self
+            .tenant_cursors
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(&job)
+            .cloned()
+            .flatten();
+        let mut page = store.list_ready_tenants(cursor.as_deref(), limit).await?;
+        if page.is_empty() && cursor.is_some() {
+            page = store.list_ready_tenants(None, limit).await?;
+        }
+        let next_cursor = page.last().map(|tenant| tenant.id.clone());
+        self.tenant_cursors
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .insert(job, next_cursor);
+        Ok(page)
+    }
+}
+
+type SchedulerAction =
+    Arc<dyn Fn(RegistryHandle, Arc<MaintenanceSchedule>) -> JobFuture + Send + Sync>;
+
+#[derive(Clone)]
+pub struct SchedulerJob {
+    category: MaintenanceJob,
+    action: SchedulerAction,
+}
+
+impl SchedulerJob {
+    pub fn new<F>(category: MaintenanceJob, action: F) -> Self
+    where
+        F: Fn(RegistryHandle, Arc<MaintenanceSchedule>) -> JobFuture + Send + Sync + 'static,
+    {
+        Self {
+            category,
+            action: Arc::new(action),
+        }
+    }
+
+    pub async fn invoke(
+        &self,
+        registry: RegistryHandle,
+        schedule: Arc<MaintenanceSchedule>,
+    ) -> Result<(), MemoryError> {
+        (self.action)(registry, schedule).await
+    }
 }
 
 /// Stable owner identity shared by all fenced workers in one process. Deployments
@@ -68,6 +197,7 @@ pub fn replica_id() -> String {
 pub struct SchedulerHooks {
     jobs: Arc<Vec<SchedulerJob>>,
     maintenance_parallelism: usize,
+    schedule: Arc<MaintenanceSchedule>,
 }
 
 impl SchedulerHooks {
@@ -83,6 +213,7 @@ impl SchedulerHooks {
         Ok(Self {
             jobs: Arc::new(jobs),
             maintenance_parallelism,
+            schedule: Arc::new(MaintenanceSchedule::default()),
         })
     }
 
@@ -95,7 +226,7 @@ impl SchedulerHooks {
         fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
     ) -> Result<Self, MemoryError> {
         let provisioning_injector = Arc::clone(&fault_injector);
-        let provisioning: SchedulerJob = Arc::new(move |registry| {
+        let provisioning = SchedulerJob::new(MaintenanceJob::Provisioning, move |registry, _| {
             let migrations = Arc::clone(&migrations);
             let injector = Arc::clone(&provisioning_injector);
             Box::pin(crate::http::leases::migration::run_due_provisioning(
@@ -129,6 +260,7 @@ impl SchedulerHooks {
         Self {
             jobs: Arc::new(jobs),
             maintenance_parallelism: self.maintenance_parallelism,
+            schedule: self.schedule,
         }
     }
 }
@@ -185,7 +317,10 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
         let semaphore = semaphore.clone();
         let registry = registry.clone();
         let shutdown = shutdown.clone();
+        let schedule = Arc::clone(&hooks.schedule);
         jobs.spawn(async move {
+            let category = job.category;
+            crate::observability::record_maintenance_scheduled(category.label());
             let permit = tokio::select! {
                 // Shutdown wins, deterministically. Without `biased` this
                 // picks a ready branch at random, and after the token is
@@ -201,6 +336,7 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                     // scheduled, then skipped on shutdown, looked exactly like
                     // a job that was never scheduled.
                     log_scheduler("http.job.not_run", "reason", "runtime_shutdown", LogLevel::Debug);
+                    crate::observability::record_maintenance_skipped(category.label(), "runtime_shutdown");
                     return;
                 }
                 permit = semaphore.acquire_owned() => match permit {
@@ -208,16 +344,22 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                     Err(_) => {
                         // The semaphore is closed, which happens on shutdown.
                         log_scheduler("http.job.not_run", "reason", "runtime_shutdown", LogLevel::Debug);
+                        crate::observability::record_maintenance_skipped(category.label(), "runtime_shutdown");
                         return;
                     }
                 },
             };
             let _permit = permit;
+            let now = std::time::Instant::now();
+            if !schedule.due(category, now) {
+                crate::observability::record_maintenance_skipped(category.label(), "cadence");
+                return;
+            }
             // Measured from the moment the job actually starts running, not
             // from when it was scheduled: a job that waited on the semaphore
             // would otherwise report the queue's delay as its own work.
             let started = std::time::Instant::now();
-            let outcome = match job(registry).await {
+            let outcome = match (job.action)(registry, Arc::clone(&schedule)).await {
                 Ok(()) => "ok",
                 // A scheduled job that fails is the one failure class with
                 // nobody watching: no request, no status, no response to point
@@ -233,7 +375,16 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                     "error"
                 }
             };
-            record_job_metric("lease", outcome, started.elapsed().as_secs_f64());
+            // Cadence limits attempts, not only successful work. Otherwise a
+            // failed slow job (for example a 60-second audit) is retried on
+            // every one-second scheduler tick and can amplify a database
+            // outage. Recording after the attempt preserves the full interval
+            // between both successful runs and retries.
+            schedule.record_completed(category, std::time::Instant::now());
+            crate::observability::record_maintenance_executed(category.label(), outcome);
+            if !category.records_background_pass() {
+                record_job_metric(category.label(), outcome, started.elapsed().as_secs_f64());
+            }
         });
     }
     while let Some(result) = jobs.join_next().await {
@@ -288,9 +439,12 @@ mod tests {
         let registry = test_registry().await;
         let sink = crate::logging::capture::install();
         let hooks = SchedulerHooks::new(
-            vec![Arc::new(|_registry| {
-                Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
-            })],
+            vec![SchedulerJob::new(
+                MaintenanceJob::Provisioning,
+                |_registry, _schedule| {
+                    Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
+                },
+            )],
             1,
         )
         .expect("non-empty hooks");
@@ -324,9 +478,12 @@ mod tests {
         let registry = test_registry().await;
         let sink = crate::logging::capture::install();
         let hooks = SchedulerHooks::new(
-            vec![Arc::new(|_registry| {
-                Box::pin(async { Err(MemoryError::Validation("bad dimension".into())) })
-            })],
+            vec![SchedulerJob::new(
+                MaintenanceJob::Provisioning,
+                |_registry, _schedule| {
+                    Box::pin(async { Err(MemoryError::Validation("bad dimension".into())) })
+                },
+            )],
             1,
         )
         .expect("non-empty hooks");
@@ -357,9 +514,12 @@ mod tests {
     async fn a_failing_job_is_counted_for_the_exporter() {
         let registry = test_registry().await;
         let hooks = SchedulerHooks::new(
-            vec![Arc::new(|_registry| {
-                Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
-            })],
+            vec![SchedulerJob::new(
+                MaintenanceJob::Provisioning,
+                |_registry, _schedule| {
+                    Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
+                },
+            )],
             1,
         )
         .expect("non-empty hooks");
@@ -381,6 +541,124 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn failed_slow_job_respects_its_maintenance_cadence() {
+        let registry = test_registry().await;
+        let runs = Arc::new(AtomicUsize::new(0));
+        let runs_for_job = Arc::clone(&runs);
+        let hooks = SchedulerHooks::new(
+            vec![SchedulerJob::new(
+                MaintenanceJob::RegistryNamespaceAudit,
+                move |_registry, _schedule| {
+                    let runs = Arc::clone(&runs_for_job);
+                    Box::pin(async move {
+                        runs.fetch_add(1, Ordering::SeqCst);
+                        Err(MemoryError::Storage("temporary audit failure".into()))
+                    })
+                },
+            )],
+            1,
+        )
+        .expect("non-empty hooks");
+        let shutdown = CancellationToken::new();
+
+        run_cycle(registry.clone(), &hooks, shutdown.clone()).await;
+        run_cycle(registry, &hooks, shutdown).await;
+
+        assert_eq!(
+            runs.load(Ordering::SeqCst),
+            1,
+            "a failed maintenance attempt must wait for the category cadence before retrying"
+        );
+    }
+
+    #[cfg(feature = "prometheus")]
+    #[tokio::test]
+    async fn cadence_events_are_wired_and_owner_passes_are_not_double_counted() {
+        let registry = test_registry().await;
+        let provisioning_runs = Arc::new(AtomicUsize::new(0));
+        let runs_for_provisioning = Arc::clone(&provisioning_runs);
+        let hooks = SchedulerHooks::new(
+            vec![
+                SchedulerJob::new(MaintenanceJob::Provisioning, move |_registry, _schedule| {
+                    let runs = Arc::clone(&runs_for_provisioning);
+                    Box::pin(async move {
+                        runs.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                }),
+                SchedulerJob::new(MaintenanceJob::TaskDispatch, |_registry, _schedule| {
+                    Box::pin(async {
+                        // The task owner records its whole multi-tenant
+                        // pass; the scheduler must not add another sample.
+                        crate::observability::record_job_metric("task", "ok", 0.01);
+                        Ok(())
+                    })
+                }),
+            ],
+            2,
+        )
+        .expect("non-empty hooks");
+        let shutdown = CancellationToken::new();
+
+        let (before, after) = crate::observability::tests::exposed(|| async {
+            let before = crate::observability::tests::render();
+            run_cycle(registry.clone(), &hooks, shutdown.clone()).await;
+            // Both jobs completed successfully, so the same cycle is a
+            // cadence skip and must not look like a second execution.
+            run_cycle(registry, &hooks, shutdown).await;
+            (before, crate::observability::tests::render())
+        })
+        .await;
+
+        let delta = |metric, labels| {
+            let before =
+                crate::observability::tests::sample_series(before.as_str(), metric, labels)
+                    .unwrap_or(0.0);
+            let after = crate::observability::tests::sample_series(after.as_str(), metric, labels)
+                .unwrap_or(0.0);
+            after - before
+        };
+        let events = crate::shared::observability::METRIC_HTTP_MAINTENANCE_EVENTS_TOTAL;
+        assert_eq!(
+            delta(
+                events,
+                "category=\"provisioning\",event=\"scheduled\",outcome=\"none\""
+            ),
+            2.0
+        );
+        assert_eq!(
+            delta(
+                events,
+                "category=\"provisioning\",event=\"skipped\",outcome=\"cadence\""
+            ),
+            1.0
+        );
+        assert_eq!(
+            delta(
+                events,
+                "category=\"provisioning\",event=\"executed\",outcome=\"ok\""
+            ),
+            1.0
+        );
+        assert_eq!(
+            delta(
+                crate::observability::METRIC_BACKGROUND_JOBS_TOTAL,
+                "pass=\"provisioning\",outcome=\"ok\""
+            ),
+            1.0
+        );
+        assert_eq!(
+            delta(
+                crate::observability::METRIC_BACKGROUND_JOBS_TOTAL,
+                "pass=\"task\",outcome=\"ok\""
+            ),
+            1.0,
+            "the task pass has one owner-level duration sample"
+        );
+        assert_eq!(provisioning_runs.load(Ordering::SeqCst), 1);
+    }
+
     /// A job that does not run because the runtime is shutting down is not a
     /// failure, so it stays at `debug` — but it is recorded, because "the job
     /// was scheduled and then nothing" is otherwise indistinguishable from a
@@ -399,13 +677,16 @@ mod tests {
             let ran = Arc::new(AtomicUsize::new(0));
             let ran_for_job = ran.clone();
             let hooks = SchedulerHooks::new(
-                vec![Arc::new(move |_registry| {
-                    let ran = ran_for_job.clone();
-                    Box::pin(async move {
-                        ran.fetch_add(1, Ordering::SeqCst);
-                        Ok(())
-                    })
-                })],
+                vec![SchedulerJob::new(
+                    MaintenanceJob::Provisioning,
+                    move |_registry, _schedule| {
+                        let ran = ran_for_job.clone();
+                        Box::pin(async move {
+                            ran.fetch_add(1, Ordering::SeqCst);
+                            Ok(())
+                        })
+                    },
+                )],
                 1,
             )
             .expect("non-empty hooks");
@@ -440,13 +721,16 @@ mod tests {
         let runs = Arc::new(AtomicUsize::new(0));
         let runs_for_job = runs.clone();
         let hooks = SchedulerHooks::new(
-            vec![Arc::new(move |_registry| {
-                let runs = runs_for_job.clone();
-                Box::pin(async move {
-                    runs.fetch_add(1, Ordering::SeqCst);
-                    Ok(())
-                })
-            })],
+            vec![SchedulerJob::new(
+                MaintenanceJob::Provisioning,
+                move |_registry, _schedule| {
+                    let runs = runs_for_job.clone();
+                    Box::pin(async move {
+                        runs.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                },
+            )],
             1,
         )
         .expect("non-empty hooks");
@@ -486,7 +770,9 @@ mod tests {
     #[tokio::test]
     async fn zero_parallelism_hooks_are_rejected() {
         assert!(SchedulerHooks::new(Vec::new(), 0).is_err());
-        let noop: SchedulerJob = Arc::new(|_registry| Box::pin(async { Ok(()) }));
+        let noop = SchedulerJob::new(MaintenanceJob::TaskDispatch, |_registry, _schedule| {
+            Box::pin(async { Ok(()) })
+        });
         assert!(SchedulerHooks::new(vec![noop], 0).is_err());
     }
 }

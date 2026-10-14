@@ -134,10 +134,13 @@ async fn main() -> ExitCode {
             // reembed rows then fail loudly rather than running degraded.
             .with_additional_job(
                 memory_mcp::http::tasks::scheduler::scheduler_job_with_policy(
-                    task_options,
+                    task_options.clone(),
                     Some(backfill_policy.clone()),
                 ),
             )
+            .with_additional_job(memory_mcp::http::tasks::scheduler::retention_scheduler_job(
+                task_options,
+            ))
             .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
             .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
             .with_additional_job(
@@ -164,11 +167,12 @@ async fn main() -> ExitCode {
         // `LIFECYCLE_ENABLED` gets the same treatment as the embedding gate:
         // not registered at all when off, rather than registered-and-gated, so
         // a deployment that opted out carries no lifecycle job to reason about.
-        match backfill_policy.lifecycle.enabled {
-            true => hooks.with_additional_job(
-                memory_mcp::http::lifecycle::lifecycle_scheduler_job(backfill_policy),
-            ),
-            false => hooks,
+        if backfill_policy.lifecycle.enabled {
+            memory_mcp::http::lifecycle::lifecycle_scheduler_jobs(backfill_policy)
+                .into_iter()
+                .fold(hooks, |hooks, job| hooks.with_additional_job(job))
+        } else {
+            hooks
         }
     })
     .and_then(|hooks| hooks.with_maintenance_parallelism(cfg.maintenance_parallelism))

@@ -42,9 +42,12 @@ pub fn provisioning_scheduler_hooks(
         migrations,
         Arc::clone(&fault_injector),
     )?;
-    let deletion_job: crate::http::leases::scheduler::SchedulerJob = Arc::new(move |registry| {
-        let fault_injector = Arc::clone(&fault_injector);
-        Box::pin(async move { run_deletion_recovery_pass(registry, fault_injector).await })
-    });
+    let deletion_job = crate::http::leases::scheduler::SchedulerJob::new(
+        crate::http::leases::scheduler::MaintenanceJob::DeletionRecovery,
+        move |registry, _schedule| {
+            let fault_injector = Arc::clone(&fault_injector);
+            Box::pin(async move { run_deletion_recovery_pass(registry, fault_injector).await })
+        },
+    );
     Ok(hooks.with_additional_job(deletion_job))
 }

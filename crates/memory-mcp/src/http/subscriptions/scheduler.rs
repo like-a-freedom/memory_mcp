@@ -7,17 +7,15 @@
 //! log for ready tenants; lost wakeups are therefore repaired by the next
 //! listener poll, without fabricating a second delivery channel.
 
-use std::sync::Arc;
-
 use crate::error::MemoryError;
-use crate::http::leases::scheduler::SchedulerJob;
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::platform::persistence::outbox::ensure_tenant_sequence;
 use crate::storage::client::BoundDbClient;
 
 pub fn scheduler_job() -> SchedulerJob {
-    Arc::new(|registry: RegistryHandle| {
-        Box::pin(async move { poll_and_repair_all(&registry).await })
+    SchedulerJob::new(MaintenanceJob::SubscriptionOutbox, |registry, schedule| {
+        Box::pin(async move { poll_and_repair_all_with_schedule(&registry, &schedule).await })
     })
 }
 
@@ -25,7 +23,17 @@ pub fn scheduler_job() -> SchedulerJob {
 /// outbox probe. The event log itself is authoritative; no volatile subscriber
 /// state is written here.
 pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
-    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
+    poll_and_repair_all_with_schedule(registry, &MaintenanceSchedule::default()).await
+}
+
+async fn poll_and_repair_all_with_schedule(
+    registry: &RegistryHandle,
+    schedule: &MaintenanceSchedule,
+) -> Result<(), MemoryError> {
+    let store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::SubscriptionOutbox, store.as_ref(), 100)
+        .await?;
     if registry.tenant_engine_optional().is_none() {
         return Ok(());
     }
@@ -72,7 +80,12 @@ mod tests {
     async fn the_job_entry_point_runs_against_an_empty_registry() {
         let registry = empty_registry().await;
 
-        let observed = (scheduler_job())(registry).await;
+        let observed = scheduler_job()
+            .invoke(
+                registry,
+                std::sync::Arc::new(MaintenanceSchedule::default()),
+            )
+            .await;
 
         assert!(observed.is_ok());
     }

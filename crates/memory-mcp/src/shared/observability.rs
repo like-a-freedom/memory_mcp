@@ -93,6 +93,9 @@ pub const METRIC_PIPELINE_STAGE_DURATION_SECONDS: &str = "memory_pipeline_stage_
 /// metrics because it is not a request.
 pub const METRIC_BACKGROUND_JOBS_TOTAL: &str = "memory_background_jobs_total";
 
+/// Counter: scheduler dispatch lifecycle by bounded maintenance category.
+pub const METRIC_HTTP_MAINTENANCE_EVENTS_TOTAL: &str = "memory_http_maintenance_events_total";
+
 /// Histogram: background job duration in seconds, by pass family.
 pub const METRIC_BACKGROUND_JOB_DURATION_SECONDS: &str = "memory_background_job_duration_seconds";
 
@@ -407,6 +410,15 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
                grouping to one target. Timed from \
                when the job started running, not when it was scheduled, so \
                queue wait is not counted as work.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_EVENTS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "HTTP maintenance scheduler events by fixed category, event \
+               (scheduled, skipped, or executed), and execution outcome. No \
+               tenant, namespace, SQL, or record identifier is present; the \
+               category label avoids Prometheus' reserved `job` label.",
     },
     MetricDescription {
         name: METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,

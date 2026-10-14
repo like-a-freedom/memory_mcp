@@ -402,7 +402,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Lease renewal, durable tasks and embedding recovery on the budget their cadence deserves: amber at fifteen minutes, red at two hours, against intervals of seconds and a minute.\n\n**Without this tile, a stalled lease scheduler would take a day to be noticed** \u2014 the budget above has to clear a daily pass, and a budget loose enough for that is useless for a per-second one. The three passes also appear in the tile beside this one; this is the one that answers within minutes.\n\nAbsent when a pass has never run, which is a deployment that has not enabled it rather than one that has lost it.",
+          "description": "Provisioning leases, durable tasks and embedding recovery on the budget their cadence deserves: amber at fifteen minutes, red at two hours, against intervals of seconds and a minute.\n\n**Without this tile, a stalled provisioning scheduler would take a day to be noticed** \u2014 the budget above has to clear a daily pass, and a budget loose enough for that is useless for a per-second one. The three passes also appear in the tile beside this one; this is the one that answers within minutes.\n\nAbsent when a pass has never run, which is a deployment that has not enabled it rather than one that has lost it.",
           "fieldConfig": {
             "defaults": {
               "unit": "dtdurations",
@@ -460,7 +460,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "memory:background_job:run_age_seconds{pass=~\"task|lease|embedding_backfill\"}",
+              "expr": "memory:background_job:run_age_seconds{pass=~\"task|provisioning|embedding_backfill\"}",
               "legendFormat": "",
               "range": true,
               "refId": "A"
@@ -1426,6 +1426,413 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "description": "Sessions and binds share the configured capacity of 32. Active leases pin their session while a pass is running; a rising binding line that does not settle can indicate slow or repeatedly failing namespace setup.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_maintenance_sessions",
+              "legendFormat": "resident sessions",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_maintenance_bindings",
+              "legendFormat": "bindings in progress",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_maintenance_active_leases",
+              "legendFormat": "active leases",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Maintenance pool occupancy",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Owner-accounted key and slot metadata, capped at 1 MiB. This excludes the SurrealDB SDK clients themselves, whose process memory is measured by the workload sampler.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 786432
+                  },
+                  {
+                    "color": "red",
+                    "value": 1048576
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 4,
+            "x": 8,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_maintenance_metadata_bytes",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Pool metadata",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "After warmup, scheduler ticks should mostly reuse bound sessions. Sustained bind or eviction rates show connection churn and explain SurrealDB signin and attach traffic.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(memory_http_maintenance_binds_total[5m])",
+              "legendFormat": "binds / s",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(memory_http_maintenance_reuse_total[5m])",
+              "legendFormat": "reuse / s",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(memory_http_maintenance_evictions_total[5m])",
+              "legendFormat": "evictions / s",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Session binds, reuse and evictions",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Maintenance client pool",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Scheduler lifecycle by fixed maintenance category. Cadence skips are expected for slower jobs; `runtime_shutdown` skips show work that was dispatched but did not acquire a permit before shutdown. Categories and outcomes are bounded; tenant, namespace and SQL values are not labels.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (category, event, outcome) (rate(memory_http_maintenance_events_total[5m]))",
+              "legendFormat": "{{category}} \u00b7 {{event}} \u00b7 {{outcome}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Maintenance scheduling and outcomes",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Maintenance cadence",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "description": "Whether the last scrape of `job=\"memory_mcp\"` succeeded: 1 answered, 0 did not. `up` is generated by the collector, not by the service, so this panel reads **No data** where no scrape configuration is installed (`observability/vmagent/vmagent.yml` or `observability/prometheus.yml`) \u2014 No data means 'not collected', which is not the same as healthy.",
           "fieldConfig": {
             "defaults": {
@@ -1649,7 +2056,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 10
       },
       "id": 0,
       "panels": [
@@ -1837,7 +2244,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 11
       },
       "id": 0,
       "panels": [
@@ -2043,7 +2450,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 12
       },
       "id": 0,
       "panels": [
@@ -2155,7 +2562,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 13
       },
       "id": 0,
       "panels": [
@@ -2354,7 +2761,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 14
       },
       "id": 0,
       "panels": [
@@ -2703,7 +3110,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 15
       },
       "id": 0,
       "panels": [
@@ -2743,7 +3150,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 16
       },
       "id": 0,
       "panels": [
@@ -3018,7 +3425,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 17
       },
       "id": 0,
       "panels": [
@@ -3207,7 +3614,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 18
       },
       "id": 0,
       "panels": [
@@ -3334,7 +3741,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 19
       },
       "id": 0,
       "panels": [
@@ -3522,7 +3929,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 20
       },
       "id": 0,
       "panels": [
@@ -3902,7 +4309,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 21
       },
       "id": 0,
       "panels": [

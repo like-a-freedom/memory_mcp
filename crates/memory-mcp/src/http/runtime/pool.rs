@@ -637,13 +637,16 @@ impl Pool {
 
     /// Tracked scheduler job for idle runtime eviction.
     pub fn eviction_scheduler_job(pool: Arc<Self>) -> crate::http::leases::scheduler::SchedulerJob {
-        Arc::new(move |_registry| {
-            let pool = pool.clone();
-            Box::pin(async move {
-                let _ = pool.evict_idle().await;
-                Ok(())
-            })
-        })
+        crate::http::leases::scheduler::SchedulerJob::new(
+            crate::http::leases::scheduler::MaintenanceJob::RuntimeEviction,
+            move |_registry, _schedule| {
+                let pool = pool.clone();
+                Box::pin(async move {
+                    let _ = pool.evict_idle().await;
+                    Ok(())
+                })
+            },
+        )
     }
 
     async fn acquire_tenant_permit(

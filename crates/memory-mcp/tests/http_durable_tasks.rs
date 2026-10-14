@@ -130,6 +130,7 @@ async fn two_drivers_one_engine(
 struct ArtifactReadMetrics {
     query_count: AtomicUsize,
     max_rows: AtomicUsize,
+    update_count: AtomicUsize,
     page_query_count: AtomicUsize,
     fail_page_once_at: AtomicUsize,
     malformed_page_once: AtomicBool,
@@ -143,6 +144,7 @@ impl Default for ArtifactReadMetrics {
         Self {
             query_count: AtomicUsize::new(0),
             max_rows: AtomicUsize::new(0),
+            update_count: AtomicUsize::new(0),
             page_query_count: AtomicUsize::new(0),
             fail_page_once_at: AtomicUsize::new(0),
             malformed_page_once: AtomicBool::new(false),
@@ -206,6 +208,9 @@ impl DbClient for ArtifactReadDb {
         vars: Option<serde_json::Value>,
         namespace: &str,
     ) -> Result<serde_json::Value, memory_mcp::MemoryError> {
+        if sql.trim_start().starts_with("UPDATE tenant_task") {
+            self.metrics.update_count.fetch_add(1, Ordering::Relaxed);
+        }
         let mut result = self.inner.query(sql, vars, namespace).await?;
         if sql.trim_start().starts_with("SELECT")
             && sql.contains("FROM task_artifact")
@@ -217,7 +222,7 @@ impl DbClient for ArtifactReadDb {
             self.metrics
                 .max_rows
                 .fetch_max(rows.len(), Ordering::Relaxed);
-            if sql.contains("LIMIT $limit") {
+            if sql.contains("LIMIT $limit") && !sql.contains("FROM tenant_task") {
                 let page = self
                     .metrics
                     .page_query_count
@@ -446,7 +451,22 @@ async fn reconcile_pending_artifacts_across_pages_without_cross_tenant_changes()
 
     assert_eq!(harness.driver_a.count_committed_artifacts().await?, 129);
     assert_eq!(harness.driver_b.count_committed_artifacts().await?, 1);
-    let reconciled = harness.driver_a.reconcile_artifacts().await?;
+    let mut reconciled = 0;
+    for _ in 0..4 {
+        let pass = harness.driver_a.reconcile_artifacts().await?;
+        assert!(pass <= 64, "one pass cannot reconcile more than 64 tasks");
+        reconciled += pass;
+        let mut all_completed = true;
+        for task_id in &pending_ids {
+            let task = harness.driver_a.load(task_id).await?;
+            if task.is_none_or(|record| record.state != TaskState::Completed) {
+                all_completed = false;
+            }
+        }
+        if all_completed {
+            break;
+        }
+    }
     assert_eq!(reconciled, 125);
     assert!(harness.read_metrics.query_count.load(Ordering::Relaxed) > 1);
     assert!(harness.read_metrics.max_rows.load(Ordering::Relaxed) <= 64);
@@ -566,6 +586,221 @@ async fn repeated_pass_does_not_increment_task_versions() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn terminal_artifacts_do_not_emit_updates_each_tick() -> Result<(), Box<dyn std::error::Error>>
+{
+    let harness = artifact_harness("ns_artifact_terminal_noop").await;
+    let namespace = "ns_artifact_terminal_noop";
+    let task_id = harness
+        .driver_a
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "terminal-noop-fingerprint",
+            serde_json::json!({}),
+        )
+        .await?;
+    let handle = harness
+        .driver_a
+        .claim_next_due("terminal-noop-test")
+        .await?
+        .expect("task is due");
+    harness
+        .driver_a
+        .complete_fenced(&handle, serde_json::json!({"done": true}), false)
+        .await?;
+    seed_committed_artifact(
+        harness.db_a.as_ref(),
+        namespace,
+        "tenant-artifact-a",
+        "terminal-noop-artifact",
+        &task_id,
+    )
+    .await?;
+    harness
+        .read_metrics
+        .update_count
+        .store(0, Ordering::Relaxed);
+
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 0);
+    assert_eq!(harness.read_metrics.update_count.load(Ordering::Relaxed), 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn artifact_page_budget_bounds_one_pass() -> Result<(), Box<dyn std::error::Error>> {
+    let harness = artifact_harness("ns_artifact_pass_budget").await;
+    let namespace = "ns_artifact_pass_budget";
+    for index in 0..65 {
+        let task_id = harness
+            .driver_a
+            .enqueue(
+                TASK_KIND_EXTRACT,
+                &format!("pass-budget-fingerprint-{index}"),
+                serde_json::json!({}),
+            )
+            .await?;
+        seed_committed_artifact(
+            harness.db_a.as_ref(),
+            namespace,
+            "tenant-artifact-a",
+            &format!("pass-budget-artifact-{index:03}"),
+            &task_id,
+        )
+        .await?;
+    }
+    harness
+        .read_metrics
+        .update_count
+        .store(0, Ordering::Relaxed);
+
+    let reconciled = harness.driver_a.reconcile_artifacts().await?;
+
+    assert!(reconciled <= 64);
+    assert!(harness.read_metrics.update_count.load(Ordering::Relaxed) <= 64);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn recoverable_artifact_is_repaired_before_terminal_history()
+-> Result<(), Box<dyn std::error::Error>> {
+    let harness = artifact_harness("ns_artifact_recoverable_priority").await;
+    let namespace = "ns_artifact_recoverable_priority";
+
+    for index in 0..64 {
+        let task_id = harness
+            .driver_a
+            .enqueue(
+                TASK_KIND_EXTRACT,
+                &format!("terminal-history-fingerprint-{index}"),
+                serde_json::json!({}),
+            )
+            .await?;
+        let handle = harness
+            .driver_a
+            .claim_next_due("terminal-history-priority-test")
+            .await?
+            .expect("terminal history task is due");
+        harness
+            .driver_a
+            .complete_fenced(&handle, serde_json::json!({"done": true}), false)
+            .await?;
+        seed_committed_artifact(
+            harness.db_a.as_ref(),
+            namespace,
+            "tenant-artifact-a",
+            &format!("00000000-0000-0000-0000-{index:012}"),
+            &task_id,
+        )
+        .await?;
+    }
+
+    let recoverable_task_id = harness
+        .driver_a
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "recoverable-after-terminal-history",
+            serde_json::json!({}),
+        )
+        .await?;
+    seed_committed_artifact(
+        harness.db_a.as_ref(),
+        namespace,
+        "tenant-artifact-a",
+        &recoverable_task_id,
+        &recoverable_task_id,
+    )
+    .await?;
+    harness.read_metrics.query_count.store(0, Ordering::Relaxed);
+    harness
+        .read_metrics
+        .update_count
+        .store(0, Ordering::Relaxed);
+
+    let reconciled = harness.driver_a.reconcile_artifacts().await?;
+
+    assert_eq!(reconciled, 1);
+    let repaired = harness
+        .driver_a
+        .load(&recoverable_task_id)
+        .await?
+        .expect("recoverable task remains present");
+    assert_eq!(repaired.state, TaskState::Completed);
+    assert_eq!(
+        repaired.result,
+        Some(serde_json::json!({
+            "episode_id": format!("episode:{recoverable_task_id}"),
+            "fact_ids": [format!("fact:{recoverable_task_id}")],
+        }))
+    );
+    assert_eq!(
+        harness.read_metrics.update_count.load(Ordering::Relaxed),
+        1,
+        "terminal history must not consume the recovery update budget"
+    );
+    assert_eq!(
+        harness.read_metrics.query_count.load(Ordering::Relaxed),
+        1,
+        "targeted recovery must not scan the historical artifact page"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn cancellation_after_artifact_commit_preserves_the_committed_result()
+-> Result<(), Box<dyn std::error::Error>> {
+    let harness = artifact_harness("ns_artifact_cancel_after_commit").await;
+    let namespace = "ns_artifact_cancel_after_commit";
+    let driver_b = DurableTaskTestDriver::new(
+        Arc::new(BoundDbClient::new(
+            harness.db_b.clone(),
+            namespace.to_owned(),
+        )),
+        "tenant-artifact-a".to_string(),
+    );
+    let task_id = harness
+        .driver_a
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "cancel-after-artifact-commit",
+            serde_json::json!({}),
+        )
+        .await?;
+    harness
+        .driver_a
+        .claim_next_due("artifact-commit-before-cancel")
+        .await?
+        .expect("queued task is claimed before artifact commit");
+    driver_b.set_cancellation_intent(&task_id).await?;
+    seed_committed_artifact(
+        harness.db_a.as_ref(),
+        namespace,
+        "tenant-artifact-a",
+        &task_id,
+        &task_id,
+    )
+    .await?;
+
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 1);
+
+    let repaired = driver_b
+        .load(&task_id)
+        .await?
+        .expect("task row remains available from the second database handle");
+    assert_eq!(repaired.state, TaskState::CompletedBeforeCancel);
+    assert_eq!(
+        repaired.result,
+        Some(serde_json::json!({
+            "episode_id": format!("episode:{task_id}"),
+            "fact_ids": [format!("fact:{task_id}")],
+        })),
+        "recovery keeps the already committed memory result after cancellation"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn expired_task_artifacts_remain_audit_records() -> Result<(), Box<dyn std::error::Error>> {
     let harness = artifact_harness("ns_artifact_expired").await;
     let namespace = "ns_artifact_expired";
@@ -637,6 +872,7 @@ async fn later_pass_after_page_failure_reconciles_all_pending_rows()
         .fail_page_once_at
         .store(2, Ordering::Relaxed);
 
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 64);
     let first_pass = harness.driver_a.reconcile_artifacts().await;
     assert!(matches!(
         first_pass,
@@ -803,6 +1039,57 @@ async fn insert_after_upper_key_is_seen_on_next_pass() -> Result<(), Box<dyn std
             .state,
         TaskState::Completed
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn artifact_arriving_behind_cursor_is_eventually_repaired()
+-> Result<(), Box<dyn std::error::Error>> {
+    let harness = artifact_harness("ns_artifact_behind_cursor").await;
+    let namespace = "ns_artifact_behind_cursor";
+    let initial_task_id = harness
+        .driver_a
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "initial-cursor-task",
+            serde_json::json!({}),
+        )
+        .await?;
+    seed_committed_artifact(
+        harness.db_a.as_ref(),
+        namespace,
+        "tenant-artifact-a",
+        "artifact-m",
+        &initial_task_id,
+    )
+    .await?;
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 1);
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 0);
+
+    let late_task_id = harness
+        .driver_a
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "late-artifact-behind-cursor",
+            serde_json::json!({}),
+        )
+        .await?;
+    seed_committed_artifact(
+        harness.db_a.as_ref(),
+        namespace,
+        "tenant-artifact-a",
+        "artifact-a",
+        &late_task_id,
+    )
+    .await?;
+
+    assert_eq!(harness.driver_a.reconcile_artifacts().await?, 1);
+    let repaired = harness
+        .driver_a
+        .load(&late_task_id)
+        .await?
+        .expect("late task remains present");
+    assert_eq!(repaired.state, TaskState::Completed);
     Ok(())
 }
 
@@ -1038,4 +1325,56 @@ async fn retention_cleanup_deletes_only_expired_rows() {
     assert!(purged >= 1, "expired task must be purged, got {purged}");
     assert!(short_store.load(&short_id).await.unwrap().is_none());
     assert!(long_store.load(&long_id).await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn expired_tasks_are_not_admitted_before_cleanup() {
+    let (store, _) =
+        single_driver_with_options("tenant_expired_admission", "ns_expired_admission", 1, 256)
+            .await;
+    let task_id = store
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp_expired_admission",
+            serde_json::json!({}),
+        )
+        .await
+        .unwrap();
+    store.set_cancellation_intent(&task_id).await.unwrap();
+    store
+        .force_expire_for_test(&task_id, "ns_expired_admission")
+        .await
+        .unwrap();
+
+    assert!(
+        store.load(&task_id).await.unwrap().is_none(),
+        "an expired task must be hidden even while the 60-second cleanup is pending"
+    );
+    assert_eq!(store.delete_expired().await.unwrap(), 1);
+    assert!(store.load(&task_id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn active_tasks_remain_admitted_after_retention_timestamp() {
+    let (store, _) =
+        single_driver_with_options("tenant_active_retention", "ns_active_retention", 1, 256).await;
+    let task_id = store
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp_active_retention",
+            serde_json::json!({}),
+        )
+        .await
+        .unwrap();
+    store
+        .force_expire_for_test(&task_id, "ns_active_retention")
+        .await
+        .unwrap();
+
+    let loaded = store
+        .load(&task_id)
+        .await
+        .unwrap()
+        .expect("active work must remain admitted for recovery");
+    assert_eq!(loaded.state, TaskState::Queued);
 }

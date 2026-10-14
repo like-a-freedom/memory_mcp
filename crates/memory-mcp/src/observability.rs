@@ -19,11 +19,11 @@ pub(crate) use crate::shared::observability::{DECLARED_REFUSAL_BRANCHES, DECLARE
 pub use crate::shared::observability::{
     METRIC_AUTH_REFUSALS_TOTAL, METRIC_AUTH_SIGNINS_TOTAL, METRIC_BACKGROUND_JOB_DURATION_SECONDS,
     METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS, METRIC_BACKGROUND_JOBS_TOTAL,
-    METRIC_BUILD_INFO, METRIC_HTTP_REQUEST_DURATION_SECONDS, METRIC_HTTP_REQUESTS_INFLIGHT,
-    METRIC_HTTP_REQUESTS_TOTAL, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS,
-    METRIC_OPERATION_DURATION_SECONDS, METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATION_STOCK,
-    METRIC_OPERATIONS_TOTAL, METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL,
-    StageTimer,
+    METRIC_BUILD_INFO, METRIC_HTTP_MAINTENANCE_EVENTS_TOTAL, METRIC_HTTP_REQUEST_DURATION_SECONDS,
+    METRIC_HTTP_REQUESTS_INFLIGHT, METRIC_HTTP_REQUESTS_TOTAL,
+    METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS, METRIC_OPERATION_DURATION_SECONDS,
+    METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATION_STOCK, METRIC_OPERATIONS_TOTAL,
+    METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL, StageTimer,
 };
 
 /// Filesystem-watch metric family: revision outcomes.
@@ -44,9 +44,10 @@ pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
 
 /// Record one background job: its outcome and how long it ran.
 ///
-/// Shared by every scheduler so a failing job is counted the same way wherever
-/// it runs, and so adding a scheduler cannot introduce a third spelling of
-/// "this failed".
+/// Shared by scheduler jobs that do not already measure their bounded
+/// multi-tenant pass at the owner boundary. Owner-measured passes call this
+/// once after their page so their duration and degraded outcome are not counted
+/// a second time by the process scheduler.
 ///
 /// The label is `pass`, not `job`, and that is not a style choice. `job` is the
 /// collector's own label: a scrape of this exposition with `job_name:
@@ -91,6 +92,73 @@ pub(crate) fn record_job_metric(pass: &'static str, outcome: &'static str, secon
         )
         .set(unix_seconds());
     }
+}
+
+#[cfg_attr(
+    not(feature = "streamable-http"),
+    allow(
+        dead_code,
+        reason = "HTTP scheduler is absent without the SaaS profile"
+    )
+)]
+pub(crate) fn record_maintenance_scheduled(job: &'static str) {
+    record_maintenance_event(job, "scheduled", "none");
+}
+
+#[cfg_attr(
+    not(feature = "streamable-http"),
+    allow(
+        dead_code,
+        reason = "HTTP scheduler is absent without the SaaS profile"
+    )
+)]
+pub(crate) fn record_maintenance_skipped(job: &'static str, reason: &'static str) {
+    record_maintenance_event(job, "skipped", reason);
+}
+
+#[cfg_attr(
+    not(feature = "streamable-http"),
+    allow(
+        dead_code,
+        reason = "HTTP scheduler is absent without the SaaS profile"
+    )
+)]
+pub(crate) fn record_maintenance_executed(job: &'static str, outcome: &'static str) {
+    record_maintenance_event(job, "executed", outcome);
+}
+
+fn record_maintenance_event(category: &'static str, event: &'static str, outcome: &'static str) {
+    let category = match category {
+        "provisioning"
+        | "deletion_recovery"
+        | "task_dispatch"
+        | "runtime_eviction"
+        | "app_session_cleanup"
+        | "physical_cleanup"
+        | "subscription_outbox"
+        | "usage_reconcile"
+        | "registry_namespace_audit"
+        | "registry_rate_bucket_cleanup"
+        | "embedding_backfill"
+        | "lifecycle_decay"
+        | "lifecycle_archival" => category,
+        _ => "other",
+    };
+    let event = match event {
+        "scheduled" | "skipped" | "executed" => event,
+        _ => "other",
+    };
+    let outcome = match outcome {
+        "none" | "cadence" | "runtime_shutdown" | "ok" | "degraded" | "error" => outcome,
+        _ => "other",
+    };
+    metrics::counter!(
+        METRIC_HTTP_MAINTENANCE_EVENTS_TOTAL,
+        "category" => category,
+        "event" => event,
+        "outcome" => outcome,
+    )
+    .increment(1);
 }
 
 /// Record one authentication refusal on the identity callback.
@@ -1179,17 +1247,17 @@ pub(crate) mod tests {
         let (exposition, before, after) = exposed(|| async {
             // One successful pass first, so the comparison is between two
             // readings rather than between an absence and an absence.
-            record_job_metric("lease", "ok", 0.01);
+            record_job_metric("provisioning", "ok", 0.01);
             let before = sample_series(
                 &render(),
                 METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
-                r#"pass="lease""#,
+                r#"pass="provisioning""#,
             );
-            record_job_metric("lease", "error", 0.01);
+            record_job_metric("provisioning", "error", 0.01);
             let after = sample_series(
                 &render(),
                 METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
-                r#"pass="lease""#,
+                r#"pass="provisioning""#,
             );
             (render(), before, after)
         })
@@ -1345,7 +1413,10 @@ pub(crate) mod tests {
 
             let _ = crate::shared::observability::StageTimer::new("ingest", "store_write");
 
-            record_job_metric("lease", "ok", 0.01);
+            record_job_metric("provisioning", "ok", 0.01);
+            record_maintenance_scheduled("provisioning");
+            record_maintenance_skipped("provisioning", "cadence");
+            record_maintenance_executed("provisioning", "ok");
             record_auth_refusal("oidc", "nonce");
             record_runtime_refusal("quota");
             record_signin_success();
@@ -1974,7 +2045,7 @@ mod without_a_recorder {
     fn every_recorder_is_safe_without_a_recorder_installed() {
         record_auth_refusal("oidc", "nonce");
         record_runtime_refusal("quota");
-        record_job_metric("lease", "ok", 0.01);
+        record_job_metric("provisioning", "ok", 0.01);
         shift_gauge("memory_test_gauge", 1.0);
         count_timed(
             "memory_test_counter",

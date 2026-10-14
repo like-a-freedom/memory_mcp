@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::http::leases::scheduler::SchedulerJob;
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
@@ -65,8 +65,11 @@ pub fn scheduler_job_with_policy(
 ) -> SchedulerJob {
     let options_for_job = options.clone();
     let policy_for_job = policy.clone();
-    Arc::new(move |registry| {
+    let artifact_cursors =
+        Arc::new(crate::http::tasks::worker::ArtifactReconcileCursors::default());
+    SchedulerJob::new(MaintenanceJob::TaskDispatch, move |registry, schedule| {
         let mut options = options_for_job.clone();
+        let artifact_cursors = Arc::clone(&artifact_cursors);
         let embedding = policy_for_job
             .as_ref()
             .and_then(|policy| policy.embedding.as_ref())
@@ -79,9 +82,31 @@ pub fn scheduler_job_with_policy(
         }
         let injector = options.fault_injector.clone();
         Box::pin(async move {
-            retry_reconcile_and_retain_with_policy(&registry, options, injector, embedding).await
+            retry_reconcile_and_retain_with_policy(
+                &registry,
+                options,
+                injector,
+                embedding,
+                schedule,
+                artifact_cursors,
+            )
+            .await
         })
     })
+}
+
+/// Physical task retention is deliberately a separate, slower maintenance
+/// category; queue recovery and dispatch keep their one-second deadline.
+pub fn retention_scheduler_job(
+    options: crate::http::runtime::storage::RuntimeOptions,
+) -> SchedulerJob {
+    SchedulerJob::new(
+        MaintenanceJob::PhysicalCleanup,
+        move |registry, schedule| {
+            let options = options.clone();
+            Box::pin(async move { delete_expired_for_page(&registry, &options, &schedule).await })
+        },
+    )
 }
 
 /// Walk a bounded ready-tenant batch, recover expired tasks, execute one due
@@ -93,8 +118,13 @@ async fn retry_reconcile_and_retain_with_policy(
     options: crate::http::runtime::storage::RuntimeOptions,
     fault_injector: Arc<dyn FaultInjector>,
     embedding: Option<crate::http::runtime::storage::EmbeddingPolicy>,
+    schedule: Arc<MaintenanceSchedule>,
+    artifact_cursors: Arc<crate::http::tasks::worker::ArtifactReconcileCursors>,
 ) -> Result<(), MemoryError> {
-    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
+    let tenant_store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::TaskDispatch, tenant_store.as_ref(), 100)
+        .await?;
     if registry.tenant_engine_optional().is_none() {
         return Ok(());
     }
@@ -124,11 +154,12 @@ async fn retry_reconcile_and_retain_with_policy(
             db.clone(),
             tenant.namespace_binding.namespace.clone(),
         ));
-        let task_store = DurableTaskStore::new_with_options(
+        let task_store = DurableTaskStore::new_with_options_and_reconcile_cursors(
             bound_db,
             tenant.id.clone(),
             options.task_retention_secs,
             options.task_queue_capacity,
+            Arc::clone(&artifact_cursors),
         );
         if let Err(error) = task_store.requeue_expired_running().await {
             if error.to_string().contains("tenant_task")
@@ -177,7 +208,58 @@ async fn retry_reconcile_and_retain_with_policy(
                 );
             }
         }
+    }
+    crate::observability::record_job_metric(
+        "task",
+        if degraded { "degraded" } else { "ok" },
+        started.elapsed().as_secs_f64(),
+    );
+    Ok(())
+}
+
+async fn delete_expired_for_page(
+    registry: &RegistryHandle,
+    options: &crate::http::runtime::storage::RuntimeOptions,
+    schedule: &MaintenanceSchedule,
+) -> Result<(), MemoryError> {
+    let tenant_store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::PhysicalCleanup, tenant_store.as_ref(), 100)
+        .await?;
+    if registry.tenant_engine_optional().is_none() {
+        return Ok(());
+    }
+    let started = std::time::Instant::now();
+    let mut degraded = false;
+    for tenant in tenants {
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => continue,
+            Err(error) => {
+                degraded = true;
+                crate::http::logging::log_warn(
+                    "http.task.bind_failed",
+                    &format!("tenant {}: {error}", tenant.id),
+                );
+                continue;
+            }
+        };
+        let bound_db = Arc::new(BoundDbClient::new(
+            lease.client(),
+            tenant.namespace_binding.namespace.clone(),
+        ));
+        let task_store = DurableTaskStore::new_with_options(
+            bound_db,
+            tenant.id.clone(),
+            options.task_retention_secs,
+            options.task_queue_capacity,
+        );
         if let Err(error) = task_store.delete_expired().await {
+            if error.to_string().contains("tenant_task")
+                && error.to_string().contains("does not exist")
+            {
+                continue;
+            }
             degraded = true;
             crate::http::logging::log_warn(
                 "http.task.delete_expired_failed",
@@ -186,7 +268,7 @@ async fn retry_reconcile_and_retain_with_policy(
         }
     }
     crate::observability::record_job_metric(
-        "task",
+        "physical_cleanup",
         if degraded { "degraded" } else { "ok" },
         started.elapsed().as_secs_f64(),
     );
@@ -639,8 +721,7 @@ where
     F: std::future::Future<Output = Result<T, MemoryError>> + Send,
     T: Send + 'static,
 {
-    let base_interval =
-        std::time::Duration::from_secs(u64::try_from((ttl_secs / 3).max(1)).unwrap_or(u64::MAX));
+    let base_interval = task_heartbeat_base_interval(ttl_secs);
     // Apply ±20% jitter from the process clock without adding a random-number
     // dependency to this path: two replicas that started together must not
     // renew on the same instant forever.
@@ -692,6 +773,10 @@ where
     heartbeat_cancel.cancel();
     let _ = heartbeat.await;
     result
+}
+
+fn task_heartbeat_base_interval(ttl_secs: i64) -> std::time::Duration {
+    std::time::Duration::from_secs(u64::try_from((ttl_secs / 3).max(1)).unwrap_or(u64::MAX))
 }
 
 /// Test-only seam over [`run_task_heartbeated`]. Claims nothing and commits
@@ -805,4 +890,20 @@ pub async fn execute_one_task_with_policy(
         },
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::task_heartbeat_base_interval;
+    use std::time::Duration;
+
+    #[test]
+    fn task_lease_heartbeat_base_remains_twenty_seconds() {
+        assert_eq!(task_heartbeat_base_interval(60), Duration::from_secs(20));
+    }
+
+    #[test]
+    fn task_lease_heartbeat_interval_has_a_one_second_floor() {
+        assert_eq!(task_heartbeat_base_interval(0), Duration::from_secs(1));
+    }
 }
