@@ -242,10 +242,17 @@ async fn archival_existence_does_not_read_fact_payload() {
         .lock()
         .expect("query recorder lock")
         .iter()
-        .find(|sql| sql.contains("source_episode = $episode_id"))
+        .find(|sql| {
+            sql.to_ascii_lowercase()
+                .contains("select source_episode from fact where source_episode in $episode_ids")
+        })
         .cloned()
-        .expect("observe the active-fact existence query");
+        .expect("observe the grouped active-fact query");
     let normalized = archival_query.to_ascii_lowercase();
+    assert!(
+        normalized.contains("group by source_episode"),
+        "archival existence should group by episode: {archival_query}"
+    );
     assert!(
         !normalized.contains("select *"),
         "archival only needs existence, not the fact payload: {archival_query}"
