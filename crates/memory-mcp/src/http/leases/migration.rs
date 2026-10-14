@@ -205,18 +205,46 @@ impl ApplyMigrations for SurrealTenantMigrations {
     }
 
     async fn apply_migrations(&self, namespace: &str, database: &str) -> Result<u32, MemoryError> {
-        let client = self.bound_client(namespace, database).await?;
+        let client = Arc::new(self.bound_client(namespace, database).await?);
         client.apply_migrations_impl(namespace).await?;
-        const HTTP_MIGRATIONS: &[&str] = &[
-            include_str!("../../../migrations/040_app_sessions.surql"),
-            include_str!("../../../migrations/041_tenant_tasks.surql"),
-            include_str!("../../../migrations/042_tenant_change_event.surql"),
-            include_str!("../../../migrations/043_tenant_task_unique_fingerprint.surql"),
-            include_str!("../../../migrations/044_task_artifacts.surql"),
-            include_str!("../../../migrations/045_tenant_task_kind.surql"),
+        const HTTP_MIGRATIONS: &[(&str, &str)] = &[
+            (
+                "040_app_sessions.surql",
+                include_str!("../../../migrations/040_app_sessions.surql"),
+            ),
+            (
+                "041_tenant_tasks.surql",
+                include_str!("../../../migrations/041_tenant_tasks.surql"),
+            ),
+            (
+                "042_tenant_change_event.surql",
+                include_str!("../../../migrations/042_tenant_change_event.surql"),
+            ),
+            (
+                "043_tenant_task_unique_fingerprint.surql",
+                include_str!("../../../migrations/043_tenant_task_unique_fingerprint.surql"),
+            ),
+            (
+                "044_task_artifacts.surql",
+                include_str!("../../../migrations/044_task_artifacts.surql"),
+            ),
+            (
+                "045_tenant_task_kind.surql",
+                include_str!("../../../migrations/045_tenant_task_kind.surql"),
+            ),
         ];
-        for sql in HTTP_MIGRATIONS {
+        for (migration_name, sql) in HTTP_MIGRATIONS {
             client.execute_migration_script(sql, namespace).await?;
+            if *migration_name == "042_tenant_change_event.surql" {
+                // Migration 042 remains immutable and initializes the outbox
+                // sequence to zero. Replaying its idempotent DDL must not
+                // lower an existing high-water mark, so reconcile it from the
+                // durable event history immediately after the script.
+                let outbox_client: Arc<dyn crate::storage::client::DbClient> = client.clone();
+                let outbox =
+                    crate::storage::client::BoundDbClient::new(outbox_client, namespace.to_owned());
+                crate::platform::persistence::outbox::ensure_tenant_sequence(&outbox).await?;
+            }
         }
         Ok(CURRENT_SCHEMA_VERSION)
     }

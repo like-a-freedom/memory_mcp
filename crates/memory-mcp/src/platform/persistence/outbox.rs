@@ -18,6 +18,44 @@ use crate::error::MemoryError;
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 use crate::storage::client::BoundDbClient;
 
+const REPAIR_MISSING_SEQUENCE: &str = concat!(
+    "LET $current_sequence = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1); ",
+    "IF array::len($current_sequence) = 0 { ",
+    "LET $latest_event = (SELECT VALUE event_seq FROM tenant_change_event ",
+    "ORDER BY event_seq DESC LIMIT 1); ",
+    "CREATE tenant_change_sequence:default SET value = $latest_event[0] ?? 0; };"
+);
+
+/// Repair a missing or lagging tenant sequence from the indexed durable event
+/// history. This bounded maintenance operation preserves the existing
+/// high-water mark and always uses the fixed default record identity.
+pub async fn ensure_tenant_sequence(db: &BoundDbClient) -> Result<(), MemoryError> {
+    let script = concat!(
+        "BEGIN TRANSACTION; ",
+        "LET $current_sequence = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1); ",
+        "LET $latest_event = (SELECT VALUE event_seq FROM tenant_change_event ",
+        "ORDER BY event_seq DESC LIMIT 1); ",
+        "LET $current_value = $current_sequence[0] ?? 0; ",
+        "LET $latest_value = $latest_event[0] ?? 0; ",
+        "IF $current_value < $latest_value OR array::len($current_sequence) = 0 { ",
+        "UPSERT tenant_change_sequence:default ",
+        "SET value = math::max([$current_value, $latest_value]); }; ",
+        "COMMIT TRANSACTION;"
+    );
+    for attempt in 0..5u64 {
+        match db.query(script, None).await {
+            Ok(_) => return Ok(()),
+            Err(error) if is_retryable_transaction_conflict(&error) && attempt < 4 => {
+                tokio::time::sleep(std::time::Duration::from_millis(10 * (attempt + 1))).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(MemoryError::Unavailable(
+        "outbox sequence repair retry budget exhausted".into(),
+    ))
+}
+
 /// A durable change event committed atomically with the
 /// mutation that produced it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +145,7 @@ pub async fn commit_tenant_mutation_with_event(
     );
 
     let script = format!(
-        "BEGIN TRANSACTION; UPDATE tenant_change_sequence:default SET value = value + 1; LET $outbox_event_seq = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1)[0]; {}; CREATE tenant_change_event SET event_seq = $outbox_event_seq, resource_id = $__outbox_resource_id, rev = $__outbox_revision, change_kind = $__outbox_kind, created_at = time::now(); COMMIT TRANSACTION;",
+        "BEGIN TRANSACTION; {REPAIR_MISSING_SEQUENCE} UPDATE tenant_change_sequence:default SET value = value + 1; LET $outbox_event_seq = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1)[0]; {}; CREATE tenant_change_event SET event_seq = $outbox_event_seq, resource_id = $__outbox_resource_id, rev = $__outbox_revision, change_kind = $__outbox_kind, created_at = time::now(); COMMIT TRANSACTION;",
         mutation.sql
     );
     let vars = serde_json::Value::Object(vars);

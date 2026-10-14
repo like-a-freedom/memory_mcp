@@ -12,7 +12,8 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
-use crate::storage::client::DbClient;
+use crate::platform::persistence::outbox::ensure_tenant_sequence;
+use crate::storage::client::BoundDbClient;
 
 pub fn scheduler_job() -> SchedulerJob {
     Arc::new(|registry: RegistryHandle| {
@@ -29,16 +30,10 @@ pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), Memory
         return Ok(());
     };
     for tenant in tenants {
-        let db = engine.bind(&tenant).await?;
-        let sequence = match db
-            .query(
-                "SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1",
-                None,
-                &tenant.namespace_binding.namespace,
-            )
-            .await
-        {
-            Ok(sequence) => sequence,
+        let client = engine.bind(&tenant).await?;
+        let db = BoundDbClient::new(client, tenant.namespace_binding.namespace.clone());
+        match ensure_tenant_sequence(&db).await {
+            Ok(()) => {}
             Err(error)
                 if (error.to_string().contains("tenant_change_sequence")
                     || error.to_string().contains("tenant_change_event"))
@@ -46,32 +41,6 @@ pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), Memory
             {
                 continue;
             }
-            Err(error) => return Err(error),
-        };
-        let rows: Vec<serde_json::Value> = serde_json::from_value(sequence)
-            .map_err(|error| MemoryError::Storage(format!("outbox sequence probe: {error}")))?;
-        if rows.is_empty() {
-            db.query(
-                "CREATE tenant_change_sequence SET value = 0",
-                None,
-                &tenant.namespace_binding.namespace,
-            )
-            .await?;
-        }
-        // A bounded read makes the repair pass exercise the same durable
-        // index the listener uses and surfaces a corrupt event log early.
-        match db
-            .query(
-                "SELECT event_seq FROM tenant_change_event ORDER BY event_seq DESC LIMIT 1",
-                None,
-                &tenant.namespace_binding.namespace,
-            )
-            .await
-        {
-            Ok(_) => {}
-            Err(error)
-                if error.to_string().contains("tenant_change_event")
-                    && error.to_string().contains("does not exist") => {}
             Err(error) => return Err(error),
         }
     }
