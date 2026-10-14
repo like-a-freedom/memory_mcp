@@ -41,11 +41,12 @@
 
 **Interfaces:** Existing `QueryObserver::observe(&SqlObservation)` remains unchanged. New evidence types: `RemoteEvidence { server_digest: String, commit: String, schema_digest: String, model_digest: String, corpus_digest: String, native: bool, scenarios: Vec<RemoteScenarioEvidence> }`; `RemoteScenarioEvidence` contains scenario/dimension/cache-mode IDs, sample counts, paired app/DB resource snapshots, RPC/session counters, latency samples, quality case results. `validate_remote_evidence(parent: &RemoteEvidence, candidate: &RemoteEvidence) -> Result<(), PerfError>` rejects identity/coverage gaps. Existing embedded `PerfEnv::connect()` must not silently become a remote measurement. Remote orchestration belongs to the opt-in integration harness; no automatic network in unit/default tests.
 
-- [ ] Write `remote_evidence_rejects_missing_db_cpu`, `remote_evidence_rejects_cross_schema_comparison`, `remote_evidence_rejects_lost_quality_case`, `remote_evidence_rejects_emulated_as_native`: literal missing values/digest mismatches must be INVALID, not zeros/PASS. Assertion examples: `assert!(verdict.is_err()); assert_eq!(candidate.scenarios[0].successful_samples, 10_000);` (fixture inputs independent of tested validator).
-- [ ] Run `rtk cargo test -p eval-harness --test surreal_query_efficiency --locked`. Observe RED caused by missing validation after minimal fixture type wiring; do not use noncompilation as evidence of performance defect.
-- [ ] Implement validator, isolated remote fixture runner and sanitizing recorder. Exact mutation/capability experiments only in disposable namespace/container. Freeze manifest of **all owner SQL templates** including dynamic predicate variants, transactions, registry `query_json`, typed selects/upserts and low-frequency paths; each row names owner/caller/scenario, observed/not-observed, count, duration, plan, rows/bytes and disposition. Source inventory is an audit/lint artifact, not production scenario coverage. Observe RPC/session attach/signin separately: eval SQL observer does not see SDK auth or registry handle work automatically.
+- [x] Write `remote_evidence_rejects_missing_db_cpu`, `remote_evidence_rejects_cross_schema_comparison`, `remote_evidence_rejects_lost_quality_case`, `remote_evidence_rejects_emulated_as_native`: literal missing values/digest mismatches must be INVALID, not zeros/PASS. Assertion examples: `assert!(verdict.is_err()); assert_eq!(candidate.scenarios[0].successful_samples, 10_000);` (fixture inputs independent of tested validator).
+- [x] Run `rtk cargo test -p eval-harness --test surreal_query_efficiency --locked`. Observe RED caused by missing validation after minimal fixture type wiring; do not use noncompilation as evidence of performance defect.
+- [x] Implement strict versioned evidence schema, paired app/DB resource windows, exact scenario/quality manifests, latency/throughput/counter validation, and persisted artifact read/write. RED tests confirmed missing-value, inconsistent-quality, zero-throughput, unpaired-window, and unsupported-schema failures.
+- [ ] Implement isolated remote fixture runner and sanitizing recorder. Exact mutation/capability experiments only in disposable namespace/container. Freeze manifest of **all owner SQL templates** including dynamic predicate variants, transactions, registry `query_json`, typed selects/upserts and low-frequency paths; each row names owner/caller/scenario, observed/not-observed, count, duration, plan, rows/bytes and disposition. Source inventory is an audit/lint artifact, not production scenario coverage. Observe RPC/session attach/signin separately: eval SQL observer does not see SDK auth or registry handle work automatically.
 - [ ] Establish baseline contracts for stdio + HTTP full pipeline, fresh/current-schema and legacy039/HTTP44 fixtures separately. Cases cover ingest/extract/resolve/invalidate/explain/assemble views, tasks, app sessions/subscriptions, registry/auth/quota, startup/backfill/reembed, deletion/provisioning and all lifecycle jobs. Counts of unavailable data cannot be inferred as0. Capture actual provider/corpus/model hashes, fixed as_of, query-cache cold/warm split, app+DB counters and exact SQL errors.
-- [ ] Run new tests + `rtk cargo test -p eval-harness --test perf_runner --test storage_release_gates --locked`; PASS. Same-host A/A according to G4 precedes any numeric A/B decision. Capture RED/fixture/integrity evidence distinctly from real measurement.
+- [x] Run new tests + `rtk cargo test -p eval-harness --test perf_runner --test storage_release_gates --locked`; PASS. Same-host A/A according to G4 precedes any numeric A/B decision. Capture RED/fixture/integrity evidence distinctly from real measurement.
 - [ ] Commit only task files/evidence manifest: `test(perf): add remote query and session evidence contracts`.
 
 ### Task 2: Monotonic outbox repair and safe replay
@@ -101,7 +102,7 @@
 - [ ] Measure slow-tenant bounded delay across pages and declare the scale fairness envelope while retaining one-tenant production deadlines.
 - [x] Update bounded scheduled/skipped/executed/outcome and session reuse/create metrics without tenant/SQL labels; fix dashboard aggregation and avoid duplicate task timing. Run the maintenance/durable task/app session/subscription suites and `rtk cargo run -p xtask -- check-observability`; GREEN.
 - [ ] Compare steady idle SQL/RPC/session counts and deadlines against the task1 baseline.
-- [ ] Commit `perf(maintenance): bound housekeeping and preserve fair dispatch`.
+- [x] Commit `perf(maintenance): bound housekeeping and preserve fair dispatch`.
 
 ### Task 6: Make batched graph endpoints indexable
 
@@ -109,12 +110,13 @@
 
 **Interfaces:** Keep `build_select_edge_neighbors_for_entities_query(entity_ids: &[String], cutoff: &str) -> (String, Value)` and store signature unchanged. Reuse record operand construction logic used by single-node builders; split table/key, bind parts, never interpolate IDs. Empty batch remains empty. Batch32/hops/rows/provenance unchanged.
 
-- [ ] RED real DB fixture2970+ unrelated edges, both directions, four seeds: identical literal expected edge IDs, structured EXPLAIN rejects edge TableScan for ordinary split IDs. Add parameterized hostile IDs (`entity:a:b`, spaces, Unicode, `⟩`), self-loop and duplicate seed rows; assert literal graph path/provenance results, not just count.
-- [ ] Run `rtk cargo test -p memory_mcp --test graph_batch_query_regression --locked`; RED TableScan and/or cast ID truncation; capture baseline plan/hash.
-- [ ] Implement two-part type::record batch operands via shared binder, retaining temporal predicate and sort. Ambiguous/legacy ID fallback must preserve supported parsing semantics; tests identify unsupported IDs as typed validation rather than silently querying another record.
-- [ ] Add historical invalidation boundary cases and32/33seed batching; compare full graph candidate results/path provenance to independent fixture oracle. No new edge cap or per-batch limit.
-- [ ] Run new target + `rtk cargo test -p memory_mcp --lib memory::retrieval::graph --locked`; GREEN. Execute same-host small/large/skewed-degree A/B; result equivalence and G4, no ingestion write-cost change. Production probe medians are motivation, not acceptance result.
-- [ ] Commit `perf(graph): index batched endpoint lookups`.
+- [x] RED real DB fixture2970+ unrelated edges, both directions, four seeds: identical literal expected edge rows, structured EXPLAIN rejects edge TableScan for ordinary split IDs. Added hostile IDs (`entity:a:b`, spaces, Unicode, `⟩`), self-loop and duplicate seed rows; assertions pin literal rows.
+- [x] Run `rtk cargo test -p memory_mcp --test graph_batch_query_regression --locked`; RED reproduced cast truncation on `⟩`; the legacy EXPLAIN plan used `edge_t_valid` without endpoint indexes.
+- [x] Implement two-part type::record batch operands via shared binder, retaining temporal predicate and sort. Unsplit legacy IDs retain the existing cast fallback.
+- [x] Add historical invalidation boundary cases and32/33seed batching; graph retrieval tests pin the exact path, anchor and provenance results. No new edge cap or per-batch limit.
+- [x] Run new target + `rtk cargo test -p memory_mcp --lib memory::retrieval::graph --locked`; GREEN.
+- [ ] Execute same-host small/large/skewed-degree A/B; result equivalence and G4, no ingestion write-cost change. Production probe medians are motivation, not acceptance result.
+- [x] Commit `perf(graph): index batched endpoint lookups`.
 
 ### Task 7: Narrow source/existence reads and protect fallback semantics
 

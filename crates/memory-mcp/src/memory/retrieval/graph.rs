@@ -383,7 +383,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn graph_neighbor_reads_batch_seed_nodes_into_one_store_call() {
+    async fn graph_neighbor_reads_batch_33_seed_nodes_into_two_store_calls() {
         let namespaces = vec!["org".to_string()];
         let db = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces(
@@ -406,12 +406,14 @@ mod tests {
         )
         .expect("setup service");
 
-        for (entity_id, name) in [
-            ("entity:seedone", "Seed One"),
-            ("entity:seedtwo", "Seed Two"),
-            ("entity:seedthree", "Seed Three"),
-            ("entity:target", "Target"),
-        ] {
+        let seed_ids: Vec<_> = (0..33)
+            .map(|index| format!("entity:seed_{index:02}"))
+            .collect();
+        for (entity_id, name) in seed_ids
+            .iter()
+            .map(|id| (id.as_str(), id.as_str()))
+            .chain(std::iter::once(("entity:target", "Target")))
+        {
             db.create(
                 entity_id,
                 json!({
@@ -427,7 +429,7 @@ mod tests {
             .await
             .expect("seed graph entity");
         }
-        for entity_id in ["entity:seedone", "entity:seedtwo", "entity:seedthree"] {
+        for entity_id in &seed_ids {
             setup_service
                 .relate(
                     entity_id,
@@ -444,7 +446,7 @@ mod tests {
             crate::memory::retrieval_deps::AssembleContextDeps::from(&setup_service);
         let outgoing = setup_retrieval
             .knowledge_store()
-            .select_edge_neighbors("entity:seedone", &cutoff_iso, GraphDirection::Outgoing)
+            .select_edge_neighbors("entity:seed_00", &cutoff_iso, GraphDirection::Outgoing)
             .await
             .expect("read seeded graph edge");
         assert_eq!(
@@ -467,11 +469,11 @@ mod tests {
         )
         .expect("retrieval service with query counter");
         let retrieval = crate::memory::retrieval_deps::AssembleContextDeps::from(&service);
-        let anchors = ["entity:seedone", "entity:seedtwo", "entity:seedthree"]
-            .into_iter()
+        let anchors = seed_ids
+            .iter()
             .map(|entity_id| {
                 (
-                    entity_id.to_string(),
+                    entity_id.clone(),
                     GraphAnchor {
                         canonical_name: entity_id.to_string(),
                         origin: GraphAnchorOrigin::QueryEntity {
@@ -491,9 +493,16 @@ mod tests {
             Some(1)
         );
         assert_eq!(
+            traces
+                .get("entity:target")
+                .map(|trace| { trace.path.iter().map(String::as_str).collect::<Vec<_>>() }),
+            Some(vec!["entity:seed_00", "entity:target"]),
+            "the independent shortest-path oracle must retain the first sorted anchor"
+        );
+        assert_eq!(
             edge_query_count.load(Ordering::Relaxed),
-            1,
-            "three anchor nodes must be fetched as one batch, not two reads per node"
+            2,
+            "33 anchor nodes must be fetched in one 32-seed batch and one remainder batch"
         );
     }
 
@@ -797,6 +806,11 @@ mod tests {
                 .contains("Atlas launch checklist")
         );
         assert_eq!(candidates[0].trace.anchor_entity_id, "entity:alice");
+        assert_eq!(candidates[0].trace.path, vec!["entity:alice", "entity:bob"]);
+        assert_eq!(
+            candidates[0].fact.provenance.source_episode_id.as_deref(),
+            Some("episode:bob")
+        );
         assert_eq!(
             candidates[0].trace.anchor_origin,
             GraphAnchorOrigin::QueryEntity {

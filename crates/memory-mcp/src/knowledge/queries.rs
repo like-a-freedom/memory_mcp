@@ -323,9 +323,8 @@ pub fn build_select_edge_neighbors_for_entities_query(
         .iter()
         .enumerate()
         .map(|(index, entity_id)| {
-            let variable = format!("entity_{index}");
-            vars.insert(variable.clone(), json!(entity_id));
-            format!("(in = <record> ${variable} OR out = <record> ${variable})")
+            let operand = bind_record_operand(entity_id, &format!("entity_{index}"), &mut vars);
+            format!("(in = {operand} OR out = {operand})")
         })
         .collect::<Vec<_>>()
         .join(" OR ");
