@@ -565,7 +565,7 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
     MetricDescription {
         name: METRIC_HTTP_MAINTENANCE_METADATA_BYTES,
         kind: MetricKind::Gauge,
-        unit: Some(metrics::Unit::Bytes),
+        unit: None,
         help: "Accounted key and slot metadata retained by maintenance sessions",
     },
     MetricDescription {

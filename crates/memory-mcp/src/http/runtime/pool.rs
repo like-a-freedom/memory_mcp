@@ -294,7 +294,7 @@ impl Pool {
             per_tenant_concurrency,
             Arc::new(
                 crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory::new(
-                    registry,
+                    Arc::clone(&registry),
                     crate::http::runtime::storage::RuntimeOptions::default(),
                 ),
             ),
@@ -921,6 +921,36 @@ mod tests {
         }
     }
 
+    fn tenant_for_spec(spec: &crate::tenancy::api::TenantRuntimeSpec) -> Tenant {
+        let status = match spec.status {
+            crate::tenancy::api::TenantLifecycleStatus::Ready => TenantStatus::Ready,
+            crate::tenancy::api::TenantLifecycleStatus::Deleting => TenantStatus::Deleting,
+            crate::tenancy::api::TenantLifecycleStatus::Purged => TenantStatus::Purged,
+        };
+        Tenant {
+            id: spec.tenant_id.clone(),
+            status,
+            namespace_binding: NamespaceBinding {
+                namespace: spec.namespace.clone(),
+                database: spec.database.clone(),
+            },
+            plan_version: spec.plan_version,
+            schema_version: spec.schema_version,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        }
+    }
+
+    async fn register_test_tenant(registry: &RegistryHandle, tenant: &Tenant) {
+        registry
+            .tenants()
+            .write_tenant(tenant)
+            .await
+            .expect("register test tenant");
+    }
+
     async fn assert_pending_once<F: Future>(mut future: Pin<&mut F>) {
         let observed = std::future::poll_fn(|cx| Poll::Ready(future.as_mut().poll(cx))).await;
         assert!(observed.is_pending(), "the acquisition must be waiting");
@@ -931,6 +961,7 @@ mod tests {
     /// notifications: a permit set before the test waits is not missed.
     struct BlockingFactory {
         inner: crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory,
+        registry: Arc<RegistryHandle>,
         entered: Arc<tokio::sync::Semaphore>,
         release: Arc<tokio::sync::Semaphore>,
         calls: Arc<std::sync::atomic::AtomicU64>,
@@ -946,6 +977,11 @@ mod tests {
             &self,
             spec: crate::tenancy::api::TenantRuntimeSpec,
         ) -> Result<Self::Runtime, crate::tenancy::api::RuntimeFactoryError> {
+            self.registry
+                .tenants()
+                .write_tenant(&tenant_for_spec(&spec))
+                .await
+                .map_err(crate::tenancy::api::RuntimeFactoryError::Storage)?;
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.entered.add_permits(1);
             let should_panic = self.panic_next.swap(false, Ordering::SeqCst);
@@ -1011,9 +1047,10 @@ mod tests {
         let factory = Arc::new(BlockingFactory {
             inner:
                 crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory::new(
-                    registry,
+                    Arc::clone(&registry),
                     crate::http::runtime::storage::RuntimeOptions::default(),
                 ),
+            registry: Arc::clone(&registry),
             entered: Arc::clone(&entered),
             release: Arc::clone(&release),
             calls: Arc::clone(&calls),
@@ -1347,7 +1384,9 @@ mod tests {
         let registry = Arc::new(state.registry.clone());
         let (factory, harness) = blocking_factory(registry);
         let state_mut = Arc::get_mut(&mut state).expect("test state has one owner");
-        state_mut.config.request_deadline = Duration::from_millis(30);
+        // Keep the real request deadline active while leaving enough time for
+        // the post-cancellation schema activation on slower CI hosts.
+        state_mut.config.request_deadline = Duration::from_secs(1);
         state_mut.pool = Arc::new(Pool::with_factory(
             4,
             Duration::ZERO,
@@ -1491,19 +1530,22 @@ mod tests {
     #[tokio::test]
     async fn capacity_wait_retries_when_a_pin_is_released() {
         let registry = mem_registry().await;
+        let held_tenant = ready_tenant("ten_capacity_held", "tns_capacity_held");
+        let waiting_tenant = ready_tenant("ten_capacity_waiter", "tns_capacity_waiter");
+        register_test_tenant(&registry, &held_tenant).await;
+        register_test_tenant(&registry, &waiting_tenant).await;
         let pool = Arc::new(Pool::new(
             1,
             Duration::ZERO,
             Duration::from_secs(2),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
+            Arc::clone(&registry),
         ));
         let held = pool
-            .acquire_or_wait(&ready_tenant("ten_capacity_held", "tns_capacity_held"))
+            .acquire_or_wait(&held_tenant)
             .await
             .expect("first runtime");
-        let waiting_tenant = ready_tenant("ten_capacity_waiter", "tns_capacity_waiter");
         let mut waiter = Box::pin(pool.acquire_or_wait(&waiting_tenant));
         assert_pending_once(waiter.as_mut()).await;
         drop(held);
@@ -1880,9 +1922,8 @@ mod tests {
     }
 
     async fn test_pool() -> Arc<Pool> {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let registry = mem_registry().await;
+        register_test_tenant(&registry, &ready_tenant("ten_bind", "tns_bind_a")).await;
         Arc::new(Pool::with_defaults(registry))
     }
 
@@ -1964,24 +2005,26 @@ mod tests {
 
     #[tokio::test]
     async fn idle_runtime_is_evicted_to_recover_capacity() {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let registry = mem_registry().await;
+        let tenant_x = ready_tenant("ten_x", "tns_x");
+        let tenant_y = ready_tenant("ten_y", "tns_y");
+        register_test_tenant(&registry, &tenant_x).await;
+        register_test_tenant(&registry, &tenant_y).await;
         let pool = Arc::new(Pool::new(
             1,
             Duration::ZERO,
             Duration::from_millis(20),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
+            Arc::clone(&registry),
         ));
         let guard = pool
-            .acquire_or_wait(&ready_tenant("ten_x", "tns_x"))
+            .acquire_or_wait(&tenant_x)
             .await
             .expect("first runtime acquires");
         drop(guard);
         let second = pool
-            .acquire_or_wait(&ready_tenant("ten_y", "tns_y"))
+            .acquire_or_wait(&tenant_y)
             .await
             .expect("idle runtime makes capacity available");
         assert_eq!(second.runtime().tenant_id, "ten_y");
@@ -2204,21 +2247,19 @@ mod tests {
 
     #[tokio::test]
     async fn a_pinned_runtime_causes_capacity_timeout_for_a_distinct_tenant() {
-        let db = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
-            .await
-            .unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let registry = mem_registry().await;
+        let t1 = ready_tenant("ten_cap_1", "tns_cap_1");
+        let t2 = ready_tenant("ten_cap_2", "tns_cap_2");
+        register_test_tenant(&registry, &t1).await;
+        register_test_tenant(&registry, &t2).await;
         let pool = Arc::new(Pool::new(
             1,
             DEFAULT_IDLE_TTL,
             std::time::Duration::from_millis(50),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
+            Arc::clone(&registry),
         ));
-        let t1 = ready_tenant("ten_cap_1", "tns_cap_1");
-        let t2 = ready_tenant("ten_cap_2", "tns_cap_2");
         let _first = pool.acquire_or_wait(&t1).await.expect("first acquire");
         let r = pool.acquire_or_wait(&t2).await;
         assert!(
@@ -2248,30 +2289,34 @@ mod tests {
 
     #[tokio::test]
     async fn a_reclaimed_slot_can_serve_a_later_tenant() {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let registry = mem_registry().await;
+        let tenant_a = ready_tenant("ten_a", "tns_a");
+        let tenant_b = ready_tenant("ten_b", "tns_b");
+        let tenant_c = ready_tenant("ten_c", "tns_c");
+        register_test_tenant(&registry, &tenant_a).await;
+        register_test_tenant(&registry, &tenant_b).await;
+        register_test_tenant(&registry, &tenant_c).await;
         let pool = Arc::new(Pool::new(
             2,
             Duration::ZERO,
             Duration::from_millis(50),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
+            Arc::clone(&registry),
         ));
 
         let tenant_a = pool
-            .acquire_or_wait(&ready_tenant("ten_a", "tns_a"))
+            .acquire_or_wait(&tenant_a)
             .await
             .expect("first tenant activates");
         drop(tenant_a);
         let tenant_b = pool
-            .acquire_or_wait(&ready_tenant("ten_b", "tns_b"))
+            .acquire_or_wait(&tenant_b)
             .await
             .expect("second tenant activates");
         drop(tenant_b);
         let tenant_c = pool
-            .acquire_or_wait(&ready_tenant("ten_c", "tns_c"))
+            .acquire_or_wait(&tenant_c)
             .await
             .expect("a reclaimed slot activates for the next tenant");
         assert_eq!(tenant_c.runtime().tenant_id, "ten_c");

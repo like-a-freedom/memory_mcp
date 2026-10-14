@@ -15,7 +15,7 @@ fn spec(tenant_id: &str, namespace: &str) -> TenantRuntimeSpec {
         namespace: namespace.into(),
         database: "memory".into(),
         plan_version: 1,
-        schema_version: 7,
+        schema_version: memory_mcp::http::leases::migration::CURRENT_SCHEMA_VERSION,
         status: TenantLifecycleStatus::Ready,
     }
 }
