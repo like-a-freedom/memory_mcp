@@ -12,7 +12,7 @@
 //! `graph_community_from_value` are pure parsers over knowledge's own rows,
 //! so they live here too; the write paths import them back.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
@@ -24,7 +24,6 @@ use crate::knowledge::graph_store::KnowledgeGraphStore;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::platform::traversal_budget::GraphTraversalBudget;
 use crate::shared::temporal::normalize_dt;
-use crate::storage::GraphDirection;
 
 /// A detected community of related entities, as the map view renders it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,45 +117,60 @@ pub(crate) async fn find_hub_entities(
         ),
         LogLevel::Debug,
     );
-    let entity_records = ctx.knowledge_graph_store().select_entities().await?;
-    let mut hubs = Vec::new();
     let candidate_scan_limit =
         (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
+    let store = ctx.knowledge_graph_store();
+    let entity_records = store.select_hub_candidates(candidate_scan_limit).await?;
+    let candidates = entity_records
+        .into_iter()
+        .take(candidate_scan_limit)
+        .filter_map(|record| {
+            let map = record.as_object()?;
+            let entity_id = map
+                .get("entity_id")
+                .and_then(crate::storage::value_helpers::unwrap_record_string)
+                .or_else(|| {
+                    map.get("id")
+                        .and_then(crate::storage::value_helpers::unwrap_record_string)
+                })?;
+            let canonical_name = map
+                .get("canonical_name")
+                .and_then(crate::storage::value_helpers::unwrap_record_string)
+                .filter(|name| !name.trim().is_empty())
+                .unwrap_or_else(|| entity_id.clone());
+            Some((entity_id, canonical_name))
+        })
+        .collect::<Vec<_>>();
+    let mut edge_identities_by_entity = candidates
+        .iter()
+        .map(|(entity_id, _)| (entity_id.clone(), HashSet::new()))
+        .collect::<HashMap<_, _>>();
 
-    for record in entity_records.into_iter().take(candidate_scan_limit) {
-        let Some(map) = record.as_object() else {
+    let candidate_ids = candidates
+        .iter()
+        .map(|(entity_id, _)| entity_id.clone())
+        .collect::<Vec<_>>();
+    for edge in store
+        .select_hub_neighbor_edges(&candidate_ids, &cutoff_iso)
+        .await?
+    {
+        let Some(edge_key) = edge_identity(&edge) else {
             continue;
         };
-        let Some(entity_id) = map
-            .get("entity_id")
-            .and_then(crate::storage::value_helpers::unwrap_record_string)
-            .or_else(|| {
-                map.get("id")
-                    .and_then(crate::storage::value_helpers::unwrap_record_string)
-            })
-        else {
-            continue;
-        };
-
-        let canonical_name = map
-            .get("canonical_name")
-            .and_then(crate::storage::value_helpers::unwrap_record_string)
-            .filter(|name| !name.trim().is_empty())
-            .unwrap_or_else(|| entity_id.clone());
-
-        let mut unique_edges = HashSet::new();
-        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            for edge in ctx
-                .knowledge_graph_store()
-                .select_edge_neighbors(&entity_id, &cutoff_iso, direction)
-                .await?
+        for endpoint in [edge.get("in"), edge.get("out")].into_iter().flatten() {
+            if let Some(entity_id) = crate::storage::value_helpers::unwrap_record_string(endpoint)
+                && let Some(identities) = edge_identities_by_entity.get_mut(&entity_id)
             {
-                if let Some(edge_key) = edge_identity(&edge) {
-                    unique_edges.insert(edge_key);
-                }
+                identities.insert(edge_key.clone());
             }
         }
+    }
 
+    let mut hubs = Vec::new();
+    for (entity_id, canonical_name) in candidates {
+        let unique_edges = edge_identities_by_entity
+            .remove(&entity_id)
+            .unwrap_or_default();
         if unique_edges.is_empty() {
             continue;
         }
