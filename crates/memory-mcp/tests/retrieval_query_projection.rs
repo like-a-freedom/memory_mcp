@@ -1,3 +1,5 @@
+#![cfg(feature = "eval-support")]
+
 mod common;
 
 use std::sync::Arc;
