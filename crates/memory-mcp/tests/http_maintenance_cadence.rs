@@ -1,4 +1,4 @@
-#![cfg(feature = "test-fixtures")]
+#![cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
 
 use memory_mcp::http::{
     leases::scheduler::{MaintenanceJob, MaintenanceSchedule},
