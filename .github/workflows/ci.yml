@@ -343,7 +343,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || inputs.release }}
+            type=raw,value=latest,enable=${{ (github.ref == 'refs/heads/master' || inputs.release) && 'true' || 'false' }}
       - name: Build distroless image
         uses: docker/build-push-action@v7
         with:
