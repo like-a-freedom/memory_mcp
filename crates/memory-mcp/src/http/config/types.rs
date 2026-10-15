@@ -17,10 +17,12 @@ pub use crate::models::auth::{AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthMe
 
 use super::parse::{
     DEFAULT_BIND, DEFAULT_BODY_LIMIT_BYTES, DEFAULT_GLOBAL_REQUEST_LIMIT,
-    DEFAULT_HEAP_DUMP_ENABLED, DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP,
-    DEFAULT_PREFLIGHT_BYTES, DEFAULT_PREFLIGHT_REQUEST_LIMIT, DEFAULT_REQUEST_DEADLINE,
-    DEFAULT_RUNTIME_ACTIVATION_TIMEOUT, DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL,
-    DEFAULT_SHUTDOWN_GRACE, DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
+    DEFAULT_HEAP_DUMP_ENABLED, DEFAULT_MAINTENANCE_CLIENT_CAPACITY,
+    DEFAULT_MAINTENANCE_CLIENT_IDLE_TTL, DEFAULT_MAINTENANCE_CLIENT_METADATA_BYTES,
+    DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP, DEFAULT_PREFLIGHT_BYTES,
+    DEFAULT_PREFLIGHT_REQUEST_LIMIT, DEFAULT_REQUEST_DEADLINE, DEFAULT_RUNTIME_ACTIVATION_TIMEOUT,
+    DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL, DEFAULT_SHUTDOWN_GRACE,
+    DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr, deserialize_duration_secs, deserialize_hex_32,
     load_signup_plan_limits, optional_env, parse_csv, parse_env_or, parse_hex_32_env, require_env,
@@ -138,6 +140,10 @@ pub struct HttpConfig {
     pub global_request_limit: u32,
     pub subscription_limit: u32,
     pub maintenance_parallelism: usize,
+    pub maintenance_client_capacity: usize,
+    pub maintenance_client_metadata_bytes: usize,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub maintenance_client_idle_ttl: Duration,
     pub subscription_queue_capacity: usize,
     #[serde(deserialize_with = "deserialize_duration_secs")]
     pub subscription_auth_recheck: Duration,
@@ -202,6 +208,18 @@ impl fmt::Debug for HttpConfig {
             .field("global_request_limit", &self.global_request_limit)
             .field("subscription_limit", &self.subscription_limit)
             .field("maintenance_parallelism", &self.maintenance_parallelism)
+            .field(
+                "maintenance_client_capacity",
+                &self.maintenance_client_capacity,
+            )
+            .field(
+                "maintenance_client_metadata_bytes",
+                &self.maintenance_client_metadata_bytes,
+            )
+            .field(
+                "maintenance_client_idle_ttl",
+                &self.maintenance_client_idle_ttl,
+            )
             .field(
                 "subscription_queue_capacity",
                 &self.subscription_queue_capacity,
@@ -431,6 +449,18 @@ impl HttpConfig {
             "MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM",
             DEFAULT_MAINTENANCE_PARALLELISM,
         )?;
+        let maintenance_client_capacity = parse_env_or(
+            "MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_CAPACITY",
+            DEFAULT_MAINTENANCE_CLIENT_CAPACITY,
+        )?;
+        let maintenance_client_metadata_bytes = parse_env_or(
+            "MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_METADATA_BYTES",
+            DEFAULT_MAINTENANCE_CLIENT_METADATA_BYTES,
+        )?;
+        let maintenance_client_idle_ttl = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_IDLE_TTL_SECS",
+            DEFAULT_MAINTENANCE_CLIENT_IDLE_TTL.as_secs(),
+        )?);
         let subscription_queue_capacity = parse_env_or(
             "MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY",
             DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
@@ -691,6 +721,9 @@ impl HttpConfig {
             global_request_limit,
             subscription_limit,
             maintenance_parallelism,
+            maintenance_client_capacity,
+            maintenance_client_metadata_bytes,
+            maintenance_client_idle_ttl,
             subscription_queue_capacity,
             subscription_auth_recheck,
             task_retention_secs,
@@ -765,6 +798,9 @@ impl HttpConfig {
             global_request_limit: DEFAULT_GLOBAL_REQUEST_LIMIT,
             subscription_limit: DEFAULT_SUBSCRIPTION_LIMIT,
             maintenance_parallelism: DEFAULT_MAINTENANCE_PARALLELISM,
+            maintenance_client_capacity: DEFAULT_MAINTENANCE_CLIENT_CAPACITY,
+            maintenance_client_metadata_bytes: DEFAULT_MAINTENANCE_CLIENT_METADATA_BYTES,
+            maintenance_client_idle_ttl: DEFAULT_MAINTENANCE_CLIENT_IDLE_TTL,
             subscription_queue_capacity: DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
             subscription_auth_recheck: DEFAULT_SUBSCRIPTION_AUTH_RECHECK,
             task_retention_secs: DEFAULT_TASK_RETENTION_SECS,
@@ -1174,6 +1210,15 @@ mod tests {
         let mut vars = base_required_env();
         vars.extend([
             ("MEMORY_MCP_HTTP_POOL_CAP", "8".into()),
+            ("MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_CAPACITY", "12".into()),
+            (
+                "MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_METADATA_BYTES",
+                "262144".into(),
+            ),
+            (
+                "MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_IDLE_TTL_SECS",
+                "90".into(),
+            ),
             ("MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS", "60".into()),
             ("MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS", "250".into()),
             (
@@ -1200,6 +1245,9 @@ mod tests {
             let cfg = HttpConfig::from_env().expect("config loads");
             cfg.validate().expect("operational limits are valid");
             assert_eq!(cfg.pool_cap, 8);
+            assert_eq!(cfg.maintenance_client_capacity, 12);
+            assert_eq!(cfg.maintenance_client_metadata_bytes, 262_144);
+            assert_eq!(cfg.maintenance_client_idle_ttl, Duration::from_secs(90));
             assert_eq!(cfg.runtime_capacity_wait, Duration::from_millis(250));
             assert_eq!(cfg.global_request_limit, 20);
             assert_eq!(cfg.subscription_limit, 3);
@@ -1279,6 +1327,30 @@ mod tests {
         assert!(matches!(
             validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("deadline")
+        ));
+    }
+
+    #[test]
+    fn http_config_rejects_zero_maintenance_client_limits() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.maintenance_client_capacity = 0;
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("maintenance client")
+        ));
+
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.maintenance_client_metadata_bytes = 0;
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("maintenance client")
+        ));
+
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.maintenance_client_idle_ttl = Duration::ZERO;
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("maintenance client")
         ));
     }
 

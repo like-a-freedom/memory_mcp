@@ -35,7 +35,10 @@ pub async fn enqueue_provisioning(
 /// reports missing/orphan bindings; it never deletes or rebinds a namespace.
 #[cfg(feature = "streamable-http")]
 pub fn reconciliation_scheduler_job() -> crate::http::leases::scheduler::SchedulerJob {
-    Arc::new(|registry| Box::pin(reconcile_namespaces(registry)))
+    crate::http::leases::scheduler::SchedulerJob::new(
+        crate::http::leases::scheduler::MaintenanceJob::RegistryNamespaceAudit,
+        |registry, _schedule| Box::pin(reconcile_namespaces(registry)),
+    )
 }
 
 /// Classify a set of registered tenants against the namespaces
@@ -97,18 +100,6 @@ struct NamespaceDiff<'a> {
 async fn reconcile_namespaces(
     registry: crate::http::registry::RegistryHandle,
 ) -> Result<(), MemoryError> {
-    static LAST_RUN: std::sync::OnceLock<std::sync::Mutex<Option<std::time::Instant>>> =
-        std::sync::OnceLock::new();
-    {
-        let mut last = LAST_RUN
-            .get_or_init(|| std::sync::Mutex::new(None))
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if last.is_some_and(|instant| instant.elapsed() < std::time::Duration::from_secs(60)) {
-            return Ok(());
-        }
-        *last = Some(std::time::Instant::now());
-    }
     let tenant_store = registry.tenants();
     let registered = tenant_store.list_tenants(10_000).await?;
     let Some(engine) = registry.tenant_engine_optional() else {

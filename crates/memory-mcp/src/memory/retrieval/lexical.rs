@@ -58,20 +58,17 @@ pub(crate) async fn select_fact_records_for_query(
 
     let fallback_terms = build_lexical_fallback_queries(&query_terms);
 
-    let mut fallback_records = Vec::new();
-    for term in &fallback_terms {
-        let term_records = service
-            .knowledge_store()
-            .select_facts_filtered(ContextFactQuery {
-                cutoff: params.cutoff_iso,
-                query_contains: Some(term.as_str()),
-                limit: candidate_limit,
-                fact_types: params.fact_types,
-            })
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-        fallback_records.extend(term_records);
-    }
+    let term_groups = service
+        .knowledge_store()
+        .select_facts_for_lexical_terms(
+            params.cutoff_iso,
+            &fallback_terms,
+            candidate_limit,
+            params.fact_types,
+        )
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
 
     let mut seen_fact_ids = HashSet::new();
     fallback_records.retain(|record| {
@@ -266,24 +263,12 @@ async fn scan_fact_records_by_query_terms(
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
         .knowledge_store()
-        .scan_facts()
+        .scan_facts_as_of(params.cutoff_iso)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
     let filtered = records
         .into_iter()
-        .filter(|record| {
-            raw_object(record)
-                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_valid"))
-                .and_then(json_string)
-                .is_some_and(|value| value <= params.cutoff_iso)
-        })
-        .filter(|record| {
-            raw_object(record)
-                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_invalid"))
-                .and_then(json_string)
-                .is_none_or(|value| value > params.cutoff_iso)
-        })
         .filter(|record| fact_record_matches_type(record, params.fact_types))
         .filter(|record| record_query_overlap(record, query_terms) > 0)
         .map(|mut record| {
@@ -762,15 +747,12 @@ pub(crate) async fn select_episode_records_for_query(
         return Ok(initial);
     }
 
-    let mut fallback_records = Vec::new();
-    for term in fallback_terms {
-        let term_records = service
-            .episode_context_store()
-            .select_episodes_by_content(cutoff_iso, Some(term.as_str()), limit)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-        fallback_records.extend(term_records);
-    }
+    let term_groups = service
+        .episode_context_store()
+        .select_episodes_for_terms(cutoff_iso, &fallback_terms, limit)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
 
     let mut seen_episode_ids = HashSet::new();
     fallback_records.retain(|record| {
@@ -790,12 +772,14 @@ pub(crate) async fn select_episode_records_for_query(
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeSet, HashMap, HashSet};
+    use std::sync::Arc;
 
     use serde_json::{Value, json};
 
     use super::{
-        LexicalAnchorProfile, build_lexical_fallback_queries, lexical_record_metrics,
-        rank_lexical_records,
+        FactQueryParams, LexicalAnchorProfile, build_lexical_fallback_queries,
+        lexical_record_metrics, rank_lexical_records, search_query_terms,
+        select_fact_records_for_query,
     };
 
     fn test_record(fact_id: &str, content: &str, t_valid: &str) -> Value {
@@ -983,11 +967,10 @@ mod tests {
     // select_fact_records_for_query DB-backed fallback behavior.
     // -----------------------------------------------------------------------
 
-    use super::{FactQueryParams, lexical_candidate_limit, select_fact_records_for_query};
+    use super::lexical_candidate_limit;
     use crate::error::MemoryError;
     use crate::storage::DbClient;
     use async_trait::async_trait;
-    use std::sync::Arc;
 
     #[test]
     fn rank_lexical_records_promotes_more_specific_query_overlap() {
@@ -1068,7 +1051,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn select_fact_records_for_query_deduplicates_term_fallback_records() {
+    async fn term_order_preserves_dedup_winner() {
         struct DedupFallbackDbClient;
 
         #[async_trait]
@@ -1119,6 +1102,64 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
+                    if sql.starts_with("RETURN [") {
+                        return Ok(json!([
+                            [],
+                            [],
+                            [],
+                            [
+                                {
+                                    "fact_id": "fact:shared",
+                                    "fact_type": "note",
+                                    "content": "Atlas launch is scheduled.",
+                                    "quote": "Atlas launch is scheduled.",
+                                    "source_episode": "episode:first-term",
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z",
+                                    "scope": "org"
+                                },
+                                {
+                                    "fact_id": "fact:atlas-only",
+                                    "fact_type": "note",
+                                    "content": "Atlas has a risk review.",
+                                    "quote": "Atlas has a risk review.",
+                                    "source_episode": "episode:2",
+                                    "t_valid": "2026-01-09T10:30:00Z",
+                                    "t_ingested": "2026-01-09T10:30:00Z",
+                                    "scope": "org"
+                                }
+                            ],
+                            [{
+                                "fact_id": "fact:shared",
+                                "fact_type": "note",
+                                "content": "Atlas launch is scheduled.",
+                                "quote": "Atlas launch is scheduled.",
+                                "source_episode": "episode:later-term",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org"
+                            }, {
+                                "fact_id": "fact:launch-only",
+                                "fact_type": "note",
+                                "content": "Launch checklist is ready.",
+                                "quote": "Launch checklist is ready.",
+                                "source_episode": "episode:3",
+                                "t_valid": "2026-01-08T10:30:00Z",
+                                "t_ingested": "2026-01-08T10:30:00Z",
+                                "scope": "org"
+                            }],
+                            [{
+                                "fact_id": "fact:launch-only",
+                                "fact_type": "note",
+                                "content": "Launch checklist is ready.",
+                                "quote": "Launch checklist is ready.",
+                                "source_episode": "episode:3",
+                                "t_valid": "2026-01-08T10:30:00Z",
+                                "t_ingested": "2026-01-08T10:30:00Z",
+                                "scope": "org"
+                            }]
+                        ]));
+                    }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
                         Some("atlas launch checklist") => vec![],
@@ -1223,6 +1264,15 @@ mod tests {
             fact_ids,
             vec!["fact:shared", "fact:launch-only", "fact:atlas-only"]
         );
+        let shared = lexical_result
+            .records
+            .iter()
+            .find(|record| record["fact_id"] == "fact:shared")
+            .expect("shared fact survives fallback deduplication");
+        assert_eq!(
+            shared["source_episode"], "episode:first-term",
+            "the earliest term group remains the source of a deduplicated record"
+        );
     }
 
     #[tokio::test]
@@ -1277,6 +1327,49 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
+                    if sql.starts_with("RETURN [") {
+                        let support_group = json!({
+                            "fact_id": "fact:support-group",
+                            "fact_type": "note",
+                            "content": "Caroline attended the LGBTQ support group recently.",
+                            "quote": "Caroline attended the LGBTQ support group recently.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 5.0
+                        });
+                        let generic_support = json!({
+                            "fact_id": "fact:generic-support",
+                            "fact_type": "note",
+                            "content": "Customer support team added a new channel.",
+                            "quote": "Customer support team added a new channel.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-08T10:30:00Z",
+                            "t_ingested": "2026-01-08T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 3.0
+                        });
+                        let generic_group = json!({
+                            "fact_id": "fact:generic-group",
+                            "fact_type": "note",
+                            "content": "Project group met to finalize the roadmap.",
+                            "quote": "Project group met to finalize the roadmap.",
+                            "source_episode": "episode:3",
+                            "t_valid": "2026-01-07T10:30:00Z",
+                            "t_ingested": "2026-01-07T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 3.0
+                        });
+                        return Ok(json!([
+                            [support_group.clone()],
+                            [support_group.clone()],
+                            [support_group],
+                            [],
+                            [generic_support],
+                            [generic_group]
+                        ]));
+                    }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
                         Some("lgbtq support group") => vec![json!({
@@ -1366,6 +1459,146 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lexical_scan_fallback_observes_bitemporal_ingestion_and_invalidation() {
+        let query = "Orion launch mission";
+        let cutoff = "2026-01-15T00:00:00Z";
+        let fallback_group_count = build_lexical_fallback_queries(&search_query_terms(query)).len();
+        let future_ingested = json!({
+            "fact_id": "fact:future-ingested",
+            "fact_type": "note",
+            "content": "Orion launch mission begins soon.",
+            "quote": "Orion launch mission begins soon.",
+            "t_valid": "2025-12-01T00:00:00Z",
+            "t_ingested": "2026-04-01T00:00:00Z",
+            "t_invalid": null,
+            "t_invalid_ingested": null,
+        });
+        let invalidation_ingested_later = json!({
+            "fact_id": "fact:late-invalidation",
+            "fact_type": "note",
+            "content": "Orion launch mission remains valid until its invalidation is known.",
+            "quote": "Orion launch mission remains valid until its invalidation is known.",
+            "t_valid": "2025-12-01T00:00:00Z",
+            "t_ingested": "2025-12-01T00:00:00Z",
+            "t_invalid": "2026-01-10T00:00:00Z",
+            "t_invalid_ingested": "2026-04-01T00:00:00Z",
+        });
+        let scan_rows = vec![future_ingested, invalidation_ingested_later.clone()];
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("FROM fact"),
+            move |sql, _vars| {
+                if sql.starts_with("RETURN [") {
+                    return Ok(Value::Array(
+                        (0..fallback_group_count)
+                            .map(|_| Value::Array(Vec::new()))
+                            .collect(),
+                    ));
+                }
+                if sql.contains("search::score") {
+                    return Ok(Value::Array(Vec::new()));
+                }
+                if sql.contains("t_ingested IS NONE")
+                    && sql.contains("t_invalid_ingested > type::datetime($cutoff)")
+                {
+                    return Ok(json!([invalidation_ingested_later]));
+                }
+                Ok(json!(scan_rows))
+            },
+        );
+        let service = crate::service::MemoryService::new(
+            Arc::new(db),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+        let retrieval = crate::memory::retrieval_deps::AssembleContextDeps::from(&service);
+
+        let result = select_fact_records_for_query(
+            &retrieval,
+            FactQueryParams {
+                cutoff_iso: cutoff,
+                query_opt: Some(query),
+                limit: 10,
+                fact_types: &[],
+            },
+        )
+        .await
+        .expect("select temporal lexical fallback");
+
+        let fact_ids = result
+            .records
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        assert_eq!(fact_ids, vec!["fact:late-invalidation"]);
+    }
+
+    #[tokio::test]
+    async fn initial_and_fallback_ties_keep_same_tier() {
+        let query = "Orion launch July";
+        let query_terms = search_query_terms(query);
+        let fallback_group_count = build_lexical_fallback_queries(&query_terms).len();
+        assert!(fallback_group_count > 0);
+
+        let record = json!({
+            "fact_id": "fact:tie",
+            "fact_type": "note",
+            "content": query,
+            "quote": query,
+            "source_episode": "episode:tie",
+            "t_valid": "2026-01-10T10:30:00Z",
+            "t_ingested": "2026-01-10T10:30:00Z",
+            "scope": "org",
+            "ft_score": 1.0
+        });
+        let initial_record = record.clone();
+        let fallback_record = record;
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_query_with(
+                |sql| sql.contains("search::score") && !sql.starts_with("RETURN ["),
+                move |_, _| Ok(json!([initial_record.clone()])),
+            )
+            .expect_query_with(
+                |sql| sql.starts_with("RETURN [") && sql.contains("search::score"),
+                move |_, _| {
+                    Ok(Value::Array(vec![
+                        Value::Array(vec![
+                            fallback_record.clone()
+                        ]);
+                        fallback_group_count
+                    ]))
+                },
+            );
+        let service = crate::service::MemoryService::new(
+            Arc::new(db),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+        let retrieval = crate::memory::retrieval_deps::AssembleContextDeps::from(&service);
+
+        let result = select_fact_records_for_query(
+            &retrieval,
+            FactQueryParams {
+                cutoff_iso: "2026-01-15T10:30:00Z",
+                query_opt: Some(query),
+                limit: 10,
+                fact_types: &[],
+            },
+        )
+        .await
+        .expect("tied lexical channels should be ranked");
+
+        assert_eq!(result.retrieval_tier, super::RetrievalTier::Direct);
+        assert_eq!(result.records.len(), 1);
+        assert_eq!(result.records[0]["fact_id"], "fact:tie");
+    }
+
+    #[tokio::test]
     async fn select_fact_records_for_short_query_uses_term_fallback() {
         struct ShortQueryFallbackDbClient;
 
@@ -1417,6 +1650,35 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
+                    if sql.starts_with("RETURN [") {
+                        let answer = json!({
+                            "fact_id": "fact:answer",
+                            "fact_type": "note",
+                            "content": "I will graduate with a degree in Business Administration.",
+                            "quote": "I will graduate with a degree in Business Administration.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 4.0
+                        });
+                        let generic = json!({
+                            "fact_id": "fact:generic",
+                            "fact_type": "note",
+                            "content": "The degree committee met to review course requirements.",
+                            "quote": "The degree committee met to review course requirements.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 8.0
+                        });
+                        return Ok(json!([
+                            [answer.clone()],
+                            [generic, answer.clone()],
+                            [answer]
+                        ]));
+                    }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
                         Some("What degree did I graduate with?") => vec![],

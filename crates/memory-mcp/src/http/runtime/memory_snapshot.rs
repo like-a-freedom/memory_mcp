@@ -14,6 +14,13 @@ pub(crate) struct HttpMemorySnapshot {
     pub(crate) background_embedding_admitted_tasks: usize,
     pub(crate) background_embedding_running_tasks: usize,
     pub(crate) background_embedding_retained_bytes: usize,
+    pub(crate) maintenance_resident_sessions: usize,
+    pub(crate) maintenance_creating_bindings: usize,
+    pub(crate) maintenance_active_leases: usize,
+    pub(crate) maintenance_metadata_accounted_bytes: usize,
+    pub(crate) maintenance_bind_attempts: usize,
+    pub(crate) maintenance_reuse_hits: usize,
+    pub(crate) maintenance_evictions: usize,
     /// The allocator's own accounting and the `[heap]` extent. Every field is
     /// `None` off Linux/glibc; the recorder skips a `None` rather than writing
     /// a zero.
@@ -25,6 +32,7 @@ pub struct HttpMemorySnapshotSource {
     pool: Arc<Pool>,
     preflight_budget: Arc<PreflightBudget>,
     background_task_runner: Arc<BackgroundTaskRunner>,
+    registry: crate::http::registry::RegistryHandle,
 }
 
 impl HttpMemorySnapshotSource {
@@ -32,11 +40,13 @@ impl HttpMemorySnapshotSource {
         pool: Arc<Pool>,
         preflight_budget: Arc<PreflightBudget>,
         background_task_runner: Arc<BackgroundTaskRunner>,
+        registry: crate::http::registry::RegistryHandle,
     ) -> Self {
         Self {
             pool,
             preflight_budget,
             background_task_runner,
+            registry,
         }
     }
 
@@ -54,6 +64,10 @@ impl HttpMemorySnapshotSource {
                 query_cache_accounted_bytes.saturating_add(retained.query_cache_accounted_bytes);
         }
         let background = self.background_task_runner.resource_snapshot();
+        let maintenance = self
+            .registry
+            .maintenance_client_snapshot()
+            .unwrap_or_default();
 
         HttpMemorySnapshot {
             reserved_requests: preflight.reserved_requests,
@@ -64,6 +78,13 @@ impl HttpMemorySnapshotSource {
             background_embedding_admitted_tasks: background.admitted_tasks,
             background_embedding_running_tasks: background.running_tasks,
             background_embedding_retained_bytes: background.retained_bytes,
+            maintenance_resident_sessions: maintenance.resident_sessions,
+            maintenance_creating_bindings: maintenance.creating_bindings,
+            maintenance_active_leases: maintenance.active_leases,
+            maintenance_metadata_accounted_bytes: maintenance.metadata_accounted_bytes,
+            maintenance_bind_attempts: maintenance.bind_attempts,
+            maintenance_reuse_hits: maintenance.reuse_hits,
+            maintenance_evictions: maintenance.evictions,
             alloc: crate::platform::process_memory::read_alloc(),
         }
     }
@@ -80,12 +101,11 @@ impl HttpMemorySnapshotTestFixture {
     pub async fn new() -> Result<Self, crate::error::MemoryError> {
         let config = crate::http::config::HttpConfig::default_for_test();
         let background_task_runner = Arc::new(BackgroundTaskRunner::new());
-        let registry = Arc::new(
-            crate::http::registry::RegistryHandle::in_memory_with_default_mem_engine().await,
-        );
+        let registry =
+            crate::http::registry::RegistryHandle::in_memory_with_default_mem_engine().await;
         let pool = Arc::new(Pool::from_http_config_with_shutdown(
             &config,
-            registry,
+            Arc::new(registry.clone()),
             crate::http::shutdown::ShutdownState::new(),
             None,
             Arc::clone(&background_task_runner),
@@ -98,6 +118,7 @@ impl HttpMemorySnapshotTestFixture {
             pool,
             Arc::clone(&preflight_budget),
             background_task_runner,
+            registry,
         );
 
         Ok(Self {
@@ -131,6 +152,7 @@ mod tests {
     use crate::http::config::HttpConfig;
     use crate::http::middleware::preflight_budget::PreflightBudget;
     use crate::http::registry::RegistryHandle;
+    use crate::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
     use crate::http::runtime::pool::{DEFAULT_PER_TENANT_CONCURRENCY, Pool};
     use crate::http::runtime::storage::TenantRuntime;
     use crate::http::shutdown::ShutdownState;
@@ -147,6 +169,7 @@ mod tests {
         Arc<Pool>,
         HttpMemorySnapshotSource,
         Arc<BackgroundTaskRunner>,
+        RegistryHandle,
     ) {
         harness_with_idle_ttl(capacity, Duration::from_secs(60)).await
     }
@@ -158,22 +181,28 @@ mod tests {
         Arc<Pool>,
         HttpMemorySnapshotSource,
         Arc<BackgroundTaskRunner>,
+        RegistryHandle,
     ) {
         let mut config = HttpConfig::default_for_test();
         config.pool_cap = capacity;
         config.runtime_idle_ttl = idle_ttl;
         let runner = Arc::new(BackgroundTaskRunner::new());
-        let registry = Arc::new(RegistryHandle::in_memory_with_default_mem_engine().await);
+        let registry = RegistryHandle::in_memory_with_default_mem_engine().await;
         let pool = Arc::new(Pool::from_http_config_with_shutdown(
             &config,
-            registry,
+            Arc::new(registry.clone()),
             ShutdownState::new(),
             None,
             Arc::clone(&runner),
         ));
         let budget = Arc::new(PreflightBudget::new(capacity, 1_024).expect("valid budget"));
-        let source = HttpMemorySnapshotSource::new(Arc::clone(&pool), budget, Arc::clone(&runner));
-        (pool, source, runner)
+        let source = HttpMemorySnapshotSource::new(
+            Arc::clone(&pool),
+            budget,
+            Arc::clone(&runner),
+            registry.clone(),
+        );
+        (pool, source, runner, registry)
     }
 
     fn runtime_spec(tenant: &str, namespace: &str) -> TenantRuntimeSpec {
@@ -187,7 +216,30 @@ mod tests {
         }
     }
 
-    async fn acquire(pool: &Arc<Pool>, tenant: &str, namespace: &str) -> Arc<TenantRuntime> {
+    async fn acquire(
+        registry: &RegistryHandle,
+        pool: &Arc<Pool>,
+        tenant: &str,
+        namespace: &str,
+    ) -> Arc<TenantRuntime> {
+        registry
+            .tenants()
+            .write_tenant(&Tenant {
+                id: tenant.to_owned(),
+                status: TenantStatus::Ready,
+                namespace_binding: NamespaceBinding {
+                    namespace: namespace.to_owned(),
+                    database: "memory".to_owned(),
+                },
+                plan_version: 1,
+                schema_version: 0,
+                retry_stage: None,
+                provisioning_lease: None,
+                created_at: chrono::Utc::now(),
+                version: 0,
+            })
+            .await
+            .expect("test runtime is registered as ready");
         let spec = runtime_spec(tenant, namespace);
         let guard = pool
             .acquire_spec_with_limit(&spec, DEFAULT_PER_TENANT_CONCURRENCY)
@@ -240,10 +292,10 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_sums_two_resident_runtime_cache_estimates() {
-        let (pool, source, _) = harness(2).await;
-        let first = acquire(&pool, "snapshot-a", "namespace-a").await;
+        let (pool, source, _, registry) = harness(2).await;
+        let first = acquire(&registry, &pool, "snapshot-a", "namespace-a").await;
         let first_bytes = retain_cache_entries(&first, "query-a").await;
-        let second = acquire(&pool, "snapshot-b", "namespace-b").await;
+        let second = acquire(&registry, &pool, "snapshot-b", "namespace-b").await;
         let second_bytes = retain_cache_entries(&second, "query-b").await;
         drop((first, second));
 
@@ -260,9 +312,9 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_counts_shared_coordinator_once() {
-        let (pool, source, runner) = harness(2).await;
-        let first = acquire(&pool, "snapshot-a", "namespace-a").await;
-        let second = acquire(&pool, "snapshot-b", "namespace-b").await;
+        let (pool, source, runner, registry) = harness(2).await;
+        let first = acquire(&registry, &pool, "snapshot-a", "namespace-a").await;
+        let second = acquire(&registry, &pool, "snapshot-b", "namespace-b").await;
         let reservation = runner
             .try_admit("snapshot-task", 37)
             .expect("task admitted");
@@ -277,11 +329,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn snapshot_includes_bounded_maintenance_session_resources() {
+        let (_, source, _, _) = harness(1).await;
+        let first = source
+            .registry
+            .acquire_maintenance_namespace("tns_snapshot_maintenance", "memory")
+            .await
+            .expect("maintenance binding succeeds")
+            .expect("test registry has a tenant engine");
+        let second = source
+            .registry
+            .acquire_maintenance_namespace("tns_snapshot_maintenance", "memory")
+            .await
+            .expect("reused binding succeeds")
+            .expect("test registry has a tenant engine");
+
+        let snapshot = source.capture().await;
+
+        assert_eq!(snapshot.maintenance_resident_sessions, 1);
+        assert_eq!(snapshot.maintenance_creating_bindings, 0);
+        assert_eq!(snapshot.maintenance_active_leases, 2);
+        assert!(snapshot.maintenance_metadata_accounted_bytes > 0);
+        assert_eq!(snapshot.maintenance_bind_attempts, 1);
+        assert_eq!(snapshot.maintenance_reuse_hits, 1);
+        assert_eq!(snapshot.maintenance_evictions, 0);
+        drop((first, second));
+    }
+
+    #[tokio::test]
     async fn snapshot_exposes_no_tenant_identity_or_cache_payload() {
-        let (pool, source, _) = harness(1).await;
+        let (pool, source, _, registry) = harness(1).await;
         let tenant_identity = "tenant-private-snapshot-identity";
         let cache_payload = "cache-private-snapshot-payload";
-        let runtime = acquire(&pool, tenant_identity, "namespace-private").await;
+        let runtime = acquire(&registry, &pool, tenant_identity, "namespace-private").await;
         retain_cache_entries(&runtime, cache_payload).await;
         drop(runtime);
 
@@ -294,8 +374,8 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_reflects_runtime_eviction_on_next_capture() {
-        let (pool, source, _) = harness_with_idle_ttl(1, Duration::ZERO).await;
-        let runtime = acquire(&pool, "snapshot-eviction", "namespace-eviction").await;
+        let (pool, source, _, registry) = harness_with_idle_ttl(1, Duration::ZERO).await;
+        let runtime = acquire(&registry, &pool, "snapshot-eviction", "namespace-eviction").await;
         retain_cache_entries(&runtime, "query-eviction").await;
         drop(runtime);
 
@@ -313,8 +393,8 @@ mod tests {
 
     #[tokio::test]
     async fn pool_eviction_proceeds_while_snapshot_waits_for_cache_lock() {
-        let (pool, source, _) = harness_with_idle_ttl(1, Duration::ZERO).await;
-        let runtime = acquire(&pool, "snapshot-lock", "namespace-lock").await;
+        let (pool, source, _, registry) = harness_with_idle_ttl(1, Duration::ZERO).await;
+        let runtime = acquire(&registry, &pool, "snapshot-lock", "namespace-lock").await;
         let service = runtime.mcp_service.service();
         let context_guard = service.context_cache.write().await;
         let mut capture = Box::pin(source.capture());

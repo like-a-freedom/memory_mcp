@@ -2,6 +2,7 @@
 //!
 //! Periodically marks old episodes as archived when they have no active facts.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -109,17 +110,32 @@ pub(crate) async fn run_archival_pass(
         .select_episodes_for_archival(&cutoff_str, ARCHIVAL_BATCH_LIMIT)
         .await?;
 
-    for record in episodes {
-        let episode_id = record
-            .get("episode_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
+    let episode_ids = episodes
+        .iter()
+        .map(|record| {
+            record
+                .get("episode_id")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned)
+                .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let visibility_cutoff = crate::shared::temporal::normalize_dt(now);
+    let active_episode_ids = service
+        .knowledge_graph_store()
+        .episode_ids_with_active_facts(&episode_ids, &visibility_cutoff)
+        .await?
+        .into_iter()
+        .collect::<HashSet<_>>();
+    let hot_episode_ids = service
+        .fact_access_store()
+        .episode_ids_with_recent_fact_access(&episode_ids, &cutoff_str)
+        .await?
+        .into_iter()
+        .collect::<HashSet<_>>();
 
-        let has_active_facts = check_episode_has_active_facts(service, episode_id).await?;
-        let has_recent_heat =
-            check_episode_has_recent_fact_access(service, episode_id, age_days).await?;
-
-        if !has_active_facts && !has_recent_heat {
+    for episode_id in episode_ids {
+        if !active_episode_ids.contains(&episode_id) && !hot_episode_ids.contains(&episode_id) {
             let payload = json!({
                 "status": "archived",
                 "archived_at": crate::shared::temporal::normalize_dt(now),
@@ -127,7 +143,7 @@ pub(crate) async fn run_archival_pass(
 
             service
                 .episode_store()
-                .update_episode(episode_id, payload)
+                .update_episode(&episode_id, payload)
                 .await?;
 
             archived += 1;
@@ -135,33 +151,6 @@ pub(crate) async fn run_archival_pass(
     }
 
     Ok(archived)
-}
-
-/// Checks if an episode has any active (non-invalidated) facts.
-async fn check_episode_has_active_facts(
-    service: &LifecycleHandles<'_>,
-    episode_id: &str,
-) -> Result<bool, MemoryError> {
-    let cutoff = crate::shared::temporal::normalize_dt(Utc::now());
-    let facts = service
-        .knowledge_graph_store()
-        .select_active_facts_by_episode(episode_id, &cutoff, 1)
-        .await?;
-
-    Ok(!facts.is_empty())
-}
-
-async fn check_episode_has_recent_fact_access(
-    service: &LifecycleHandles<'_>,
-    episode_id: &str,
-    age_days: u32,
-) -> Result<bool, MemoryError> {
-    let hot_cutoff =
-        crate::shared::temporal::normalize_dt(Utc::now() - chrono::Duration::days(age_days as i64));
-    service
-        .fact_access_store()
-        .has_recent_fact_access(episode_id, &hot_cutoff)
-        .await
 }
 
 #[cfg(test)]

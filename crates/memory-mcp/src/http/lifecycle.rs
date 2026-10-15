@@ -10,14 +10,16 @@
 //! tenants and lifecycle maintenance must outlive any one runtime.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+#[cfg(test)]
+use std::time::Duration;
+use std::time::Instant;
 
 use crate::error::MemoryError;
-use crate::http::leases::scheduler::{SchedulerJob, cadence_due_at};
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::Tenant;
 use crate::http::runtime::bootstrap::DeploymentPolicy;
-use crate::storage::client::SurrealDbClient;
+use crate::storage::client::DbClient;
 
 /// How many ready tenants one walk visits — the same bound every other
 /// maintenance job uses, so a pass never holds the maintenance semaphore for
@@ -29,6 +31,17 @@ const TENANT_BATCH: usize = 100;
 enum Pass {
     Decay,
     ArchivalAndCommunity,
+}
+
+impl Pass {
+    fn job(self, policy: &DeploymentPolicy) -> MaintenanceJob {
+        match self {
+            Self::Decay => MaintenanceJob::LifecycleDecay(policy.lifecycle.decay_interval_secs),
+            Self::ArchivalAndCommunity => {
+                MaintenanceJob::LifecycleArchival(policy.lifecycle.archival_interval_secs)
+            }
+        }
+    }
 }
 
 impl Pass {
@@ -60,39 +73,33 @@ impl Pass {
 /// stdio runs on the same interval) on `LIFECYCLE_ARCHIVAL_INTERVAL_SECS`.
 /// Each gate lives in the closure, so every job instance owns its own window
 /// and tests do not share one.
-pub fn lifecycle_scheduler_job(policy: DeploymentPolicy) -> SchedulerJob {
-    let decay_last = Arc::new(std::sync::Mutex::new(None));
-    let archival_last = Arc::new(std::sync::Mutex::new(None));
-    Arc::new(move |registry| {
-        let policy = policy.clone();
-        let decay_last = Arc::clone(&decay_last);
-        let archival_last = Arc::clone(&archival_last);
-        Box::pin(async move {
-            // Belt-and-suspenders with the registration gate: a disabled
-            // deployment must do nothing even if the job is somehow invoked.
-            if !policy.lifecycle.enabled {
-                return Ok(());
-            }
-            let now = Instant::now();
-            let decay_due = cadence_due_at(
-                &decay_last,
-                Duration::from_secs(policy.lifecycle.decay_interval_secs),
-                now,
-            );
-            let archival_due = cadence_due_at(
-                &archival_last,
-                Duration::from_secs(policy.lifecycle.archival_interval_secs),
-                now,
-            );
-            if decay_due {
-                run_walk(&registry, &policy, Pass::Decay).await?;
-            }
-            if archival_due {
-                run_walk(&registry, &policy, Pass::ArchivalAndCommunity).await?;
-            }
-            Ok(())
-        })
-    })
+pub fn lifecycle_scheduler_jobs(policy: DeploymentPolicy) -> [SchedulerJob; 2] {
+    let decay_policy = policy.clone();
+    let decay = SchedulerJob::new(
+        MaintenanceJob::LifecycleDecay(policy.lifecycle.decay_interval_secs),
+        move |registry, schedule| {
+            let policy = decay_policy.clone();
+            Box::pin(async move {
+                if policy.lifecycle.enabled {
+                    run_walk(&registry, &policy, Pass::Decay, &schedule).await?;
+                }
+                Ok(())
+            })
+        },
+    );
+    let archival = SchedulerJob::new(
+        MaintenanceJob::LifecycleArchival(policy.lifecycle.archival_interval_secs),
+        move |registry, schedule| {
+            let policy = policy.clone();
+            Box::pin(async move {
+                if policy.lifecycle.enabled {
+                    run_walk(&registry, &policy, Pass::ArchivalAndCommunity, &schedule).await?;
+                }
+                Ok(())
+            })
+        },
+    );
+    [decay, archival]
 }
 
 /// One bounded pass over the ready tenants for a single lifecycle work.
@@ -104,23 +111,25 @@ async fn run_walk(
     registry: &RegistryHandle,
     policy: &DeploymentPolicy,
     pass: Pass,
+    schedule: &MaintenanceSchedule,
 ) -> Result<(), MemoryError> {
-    let tenants = registry
-        .tenants()
-        .list_ready_tenants(None, TENANT_BATCH)
+    let store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(pass.job(policy), store.as_ref(), TENANT_BATCH)
         .await?;
     // The conformance suite's in-memory registry has no privileged engine;
     // nothing can be bound, so there is nothing to maintain — and saying so
     // quietly is better than reporting a failed pass.
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     let started = Instant::now();
     let mut degraded = false;
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
                 crate::http::logging::log_warn(
@@ -130,7 +139,8 @@ async fn run_walk(
                 continue;
             }
         };
-        if let Err(error) = run_tenant(&db, &tenant, policy, pass).await {
+        let db = lease.client();
+        if let Err(error) = run_tenant(db, &tenant, policy, pass).await {
             degraded = true;
             crate::http::logging::log_warn(
                 pass.failed_op(),
@@ -153,13 +163,13 @@ async fn run_walk(
 /// needs storage, logging, policy, and the claim store for decay, but not NER,
 /// embedding, retrieval, or request caches.
 async fn run_tenant(
-    db: &Arc<SurrealDbClient>,
+    db: Arc<dyn DbClient>,
     tenant: &Tenant,
     policy: &DeploymentPolicy,
     pass: Pass,
 ) -> Result<(), MemoryError> {
     let namespace = tenant.namespace_binding.namespace.clone();
-    let db_client = Arc::clone(db) as Arc<dyn crate::storage::DbClient>;
+    let db_client = db;
     let log_level = crate::logging::StdoutLogger::directives_from_env();
     let logger = crate::logging::StdoutLogger::new(&log_level);
     let handles = match pass {
@@ -322,7 +332,7 @@ mod tests {
             seed_decayed_fact(&db, namespace, "fact:lifecycle_no_ner").await;
 
             let result = run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::Decay,
@@ -403,7 +413,7 @@ mod tests {
             }
 
             let result = run_tenant(
-                &db_a,
+                db_a.clone(),
                 &tenant("ns_archive_a"),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -507,7 +517,7 @@ mod tests {
             }
 
             let result = run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -530,7 +540,7 @@ mod tests {
             assert_eq!(summary, "Alice Smith, Bob Jones, Carol White");
 
             run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -574,8 +584,16 @@ mod tests {
         let (registry, db) = provision(namespace).await;
         seed_decayed_fact(&db, namespace, "fact:old1").await;
 
-        let job = lifecycle_scheduler_job(policy(decay_enabled()));
-        job(registry.clone()).await.expect("first tick");
+        let jobs = lifecycle_scheduler_jobs(policy(decay_enabled()));
+        let schedule = Arc::new(MaintenanceSchedule::default());
+        let job = &jobs[0];
+        let category = MaintenanceJob::LifecycleDecay(decay_enabled().decay_interval_secs);
+        let t0 = Instant::now();
+        assert!(schedule.due(category, t0));
+        job.invoke(registry.clone(), Arc::clone(&schedule))
+            .await
+            .expect("first tick");
+        schedule.record_attempt_started(category, t0);
 
         assert!(
             fact_is_invalid(&db, namespace, "fact:old1").await,
@@ -585,9 +603,7 @@ mod tests {
         // A second decayable fact appearing immediately must wait for the
         // cadence window, exactly as backfill's does.
         seed_decayed_fact(&db, namespace, "fact:old2").await;
-        job(registry)
-            .await
-            .expect("second tick is a successful no-op");
+        assert!(!schedule.due(category, t0 + Duration::from_secs(1)));
         assert!(
             !fact_is_invalid(&db, namespace, "fact:old2").await,
             "the second tick inside the decay interval must not run decay"
@@ -604,7 +620,8 @@ mod tests {
 
         let mut disabled = decay_enabled();
         disabled.enabled = false;
-        lifecycle_scheduler_job(policy(disabled))(registry)
+        lifecycle_scheduler_jobs(policy(disabled))[0]
+            .invoke(registry, Arc::new(MaintenanceSchedule::default()))
             .await
             .expect("a disabled tick is a successful no-op");
 
@@ -621,7 +638,8 @@ mod tests {
     async fn a_registry_without_an_engine_is_a_quiet_no_op() {
         let registry = RegistryHandle::in_memory();
 
-        lifecycle_scheduler_job(policy(decay_enabled()))(registry)
+        lifecycle_scheduler_jobs(policy(decay_enabled()))[0]
+            .invoke(registry, Arc::new(MaintenanceSchedule::default()))
             .await
             .expect("a registry with no engine is a successful no-op");
     }

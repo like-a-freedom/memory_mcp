@@ -82,6 +82,8 @@ jobs:
           python3 -m pip install --quiet pyyaml
           cargo run --locked -p xtask -- check-observability
       - name: Default workspace tests
+        # Includes eval-harness/tests/storage_release_gates.rs; do not run that
+        # target a second time in a dedicated step below.
         run: cargo test --workspace --lib --bins --tests --locked
       - name: Filesystem-disabled process tests
         # `tests/fs_watch_process_disabled.rs` is gated by
@@ -107,10 +109,6 @@ jobs:
         # not part of the ordinary feature matrix above. Keep them in PR CI
         # even when the long native resource matrix is unavailable.
         run: cargo test -p memory_mcp --test http_storage_memory --features streamable-http,mcp-apps,eval-support,test-fixtures --locked -- --test-threads=1
-      - name: Storage release performance and quality evidence validators
-        # Exercise the pairwise A/A and A/B comparator and immutable native
-        # quality-artifact validator as a visible required gate.
-        run: cargo test -p eval-harness --test storage_release_gates --locked
       - name: Check the HTTP profile and its internal back-compat name
         run: |
           set -euo pipefail
@@ -345,7 +343,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || inputs.release }}
+            type=raw,value=latest,enable=${{ (github.ref == 'refs/heads/master' || inputs.release) && 'true' || 'false' }}
       - name: Build distroless image
         uses: docker/build-push-action@v7
         with:

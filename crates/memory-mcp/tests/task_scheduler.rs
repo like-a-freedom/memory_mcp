@@ -18,6 +18,7 @@
 use std::sync::Arc;
 
 use memory_mcp::error::MemoryError;
+use memory_mcp::http::leases::scheduler::MaintenanceSchedule;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
 use memory_mcp::http::tasks::scheduler::{
@@ -376,7 +377,9 @@ async fn a_scheduler_job_runs_against_an_empty_registry() {
     let job =
         scheduler_job_with_options(memory_mcp::http::runtime::storage::RuntimeOptions::default());
 
-    let observed = job(registry).await;
+    let observed = job
+        .invoke(registry, Arc::new(MaintenanceSchedule::default()))
+        .await;
 
     assert!(observed.is_ok(), "a tick with no tenants must succeed");
 }

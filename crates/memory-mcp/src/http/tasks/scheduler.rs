@@ -8,13 +8,16 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::http::leases::scheduler::SchedulerJob;
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
 use crate::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskStore};
 use crate::http::tasks::worker::DurableTaskStore;
-use crate::storage::client::{BoundDbClient, SurrealDbClient};
+use crate::storage::client::BoundDbClient;
+
+#[cfg(any(test, feature = "test-fixtures"))]
+use crate::storage::client::SurrealDbClient;
 
 /// The future an [`ExtractorFn`] produces.
 ///
@@ -65,8 +68,11 @@ pub fn scheduler_job_with_policy(
 ) -> SchedulerJob {
     let options_for_job = options.clone();
     let policy_for_job = policy.clone();
-    Arc::new(move |registry| {
+    let artifact_cursors =
+        Arc::new(crate::http::tasks::worker::ArtifactReconcileCursors::default());
+    SchedulerJob::new(MaintenanceJob::TaskDispatch, move |registry, schedule| {
         let mut options = options_for_job.clone();
+        let artifact_cursors = Arc::clone(&artifact_cursors);
         let embedding = policy_for_job
             .as_ref()
             .and_then(|policy| policy.embedding.as_ref())
@@ -79,9 +85,31 @@ pub fn scheduler_job_with_policy(
         }
         let injector = options.fault_injector.clone();
         Box::pin(async move {
-            retry_reconcile_and_retain_with_policy(&registry, options, injector, embedding).await
+            retry_reconcile_and_retain_with_policy(
+                &registry,
+                options,
+                injector,
+                embedding,
+                schedule,
+                artifact_cursors,
+            )
+            .await
         })
     })
+}
+
+/// Physical task retention is deliberately a separate, slower maintenance
+/// category; queue recovery and dispatch keep their one-second deadline.
+pub fn retention_scheduler_job(
+    options: crate::http::runtime::storage::RuntimeOptions,
+) -> SchedulerJob {
+    SchedulerJob::new(
+        MaintenanceJob::PhysicalCleanup,
+        move |registry, schedule| {
+            let options = options.clone();
+            Box::pin(async move { delete_expired_for_page(&registry, &options, &schedule).await })
+        },
+    )
 }
 
 /// Walk a bounded ready-tenant batch, recover expired tasks, execute one due
@@ -93,11 +121,16 @@ async fn retry_reconcile_and_retain_with_policy(
     options: crate::http::runtime::storage::RuntimeOptions,
     fault_injector: Arc<dyn FaultInjector>,
     embedding: Option<crate::http::runtime::storage::EmbeddingPolicy>,
+    schedule: Arc<MaintenanceSchedule>,
+    artifact_cursors: Arc<crate::http::tasks::worker::ArtifactReconcileCursors>,
 ) -> Result<(), MemoryError> {
-    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
-    let Some(engine) = registry.tenant_engine_optional() else {
+    let tenant_store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::TaskDispatch, tenant_store.as_ref(), 100)
+        .await?;
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     // Measured around the whole pass rather than each step inside it: a tenant
     // loop that grows slow shows up here as one rising series, and the per-step
@@ -107,26 +140,26 @@ async fn retry_reconcile_and_retain_with_policy(
     let mut degraded = false;
 
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
-                crate::http::logging::log_warn(
-                    "http.task.bind_failed",
-                    &format!("tenant {}: {error}", tenant.id),
-                );
+                log_retention_error("http.task.bind_failed", &tenant.id, &error);
                 continue;
             }
         };
+        let db = lease.client();
         let bound_db = Arc::new(BoundDbClient::new(
             db.clone(),
             tenant.namespace_binding.namespace.clone(),
         ));
-        let task_store = DurableTaskStore::new_with_options(
+        let task_store = DurableTaskStore::new_with_options_and_reconcile_cursors(
             bound_db,
             tenant.id.clone(),
             options.task_retention_secs,
             options.task_queue_capacity,
+            Arc::clone(&artifact_cursors),
         );
         if let Err(error) = task_store.requeue_expired_running().await {
             if error.to_string().contains("tenant_task")
@@ -175,13 +208,6 @@ async fn retry_reconcile_and_retain_with_policy(
                 );
             }
         }
-        if let Err(error) = task_store.delete_expired().await {
-            degraded = true;
-            crate::http::logging::log_warn(
-                "http.task.delete_expired_failed",
-                &format!("tenant {}: {error}", tenant.id),
-            );
-        }
     }
     crate::observability::record_job_metric(
         "task",
@@ -191,8 +217,72 @@ async fn retry_reconcile_and_retain_with_policy(
     Ok(())
 }
 
+async fn delete_expired_for_page(
+    registry: &RegistryHandle,
+    options: &crate::http::runtime::storage::RuntimeOptions,
+    schedule: &MaintenanceSchedule,
+) -> Result<(), MemoryError> {
+    let tenant_store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(MaintenanceJob::PhysicalCleanup, tenant_store.as_ref(), 100)
+        .await?;
+    if registry.tenant_engine_optional().is_none() {
+        return Ok(());
+    }
+    let started = std::time::Instant::now();
+    let mut degraded = false;
+    for tenant in tenants {
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => continue,
+            Err(error) => {
+                degraded = true;
+                crate::http::logging::log_warn(
+                    "http.task.bind_failed",
+                    &format!("tenant {}: {error}", tenant.id),
+                );
+                continue;
+            }
+        };
+        let bound_db = Arc::new(BoundDbClient::new(
+            lease.client(),
+            tenant.namespace_binding.namespace.clone(),
+        ));
+        let task_store = DurableTaskStore::new_with_options(
+            bound_db,
+            tenant.id.clone(),
+            options.task_retention_secs,
+            options.task_queue_capacity,
+        );
+        if let Err(error) = task_store.delete_expired().await {
+            if error.to_string().contains("tenant_task")
+                && error.to_string().contains("does not exist")
+            {
+                continue;
+            }
+            degraded = true;
+            log_retention_error("http.task.delete_expired_failed", &tenant.id, &error);
+        }
+    }
+    crate::observability::record_job_metric(
+        "physical_cleanup",
+        if degraded { "degraded" } else { "ok" },
+        started.elapsed().as_secs_f64(),
+    );
+    Ok(())
+}
+
+fn log_retention_error(op: &'static str, tenant_id: &str, error: &MemoryError) {
+    let event = std::collections::HashMap::from([
+        ("op".to_string(), serde_json::json!(op)),
+        ("tenant_id".to_string(), serde_json::json!(tenant_id)),
+        ("error".to_string(), serde_json::json!(error.to_string())),
+    ]);
+    crate::logging::emit(event, error.log_level());
+}
+
 struct TaskExecutionContext<'a> {
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &'a str,
     fault_injector: &'a dyn FaultInjector,
     embedding: Option<&'a crate::http::runtime::storage::EmbeddingPolicy>,
@@ -381,7 +471,7 @@ async fn execute_extract_task(
 /// than have them silently treated as fatal.
 async fn execute_reembed_task(
     task_store: &DurableTaskStore,
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &str,
     handle: &crate::http::tasks::state::TaskHandle,
     record: &crate::http::tasks::state::TenantTaskRecord,
@@ -460,18 +550,15 @@ async fn execute_reembed_task(
 /// deployment's GLiNER checkpoint here would cost a model load per pass and
 /// change nothing about the vectors written.
 fn build_force_enabled_reembed_service(
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &str,
     policy: &crate::http::runtime::storage::EmbeddingPolicy,
 ) -> Result<crate::service::MemoryService, MemoryError> {
     let extractor =
         std::sync::Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
             as std::sync::Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>;
-    // `Arc<SurrealDbClient>` coerces to `Arc<dyn DbClient>`; the client itself
-    // is neither `Clone` nor able to lend its engine, so the `Arc` handle the
-    // caller already owns is the only conversion available (ADR-0042).
     let service = crate::service::MemoryService::new_with_embedding_provider(
-        db as Arc<dyn crate::storage::client::DbClient>,
+        db,
         namespace.to_owned(),
         crate::logging::StdoutLogger::directives_from_env(),
         // Rate limits are request-path policy; a maintenance pass is not

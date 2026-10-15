@@ -1,0 +1,46 @@
+{
+  "tenant_status": "ready",
+  "tenant_schema_version": 44,
+  "application_schema_version": 45,
+  "base_ledger_last": "039_filesystem_ingestion.surql",
+  "base_ledger_missing": [
+    "053_context_lookup_indexes.surql",
+    "054_query_index_coverage.surql",
+    "055_episode_source_context.surql"
+  ],
+  "missing_indexes": [
+    "episode_episode_id",
+    "episode_t_ref",
+    "episode_source_context",
+    "fact_source_episode",
+    "fact_t_valid",
+    "edge_t_valid"
+  ],
+  "wrong_index_definitions": {
+    "entity_aliases": "FIELDS aliases",
+    "community_members": "FIELDS member_entities"
+  },
+  "missing_episode_fields": [
+    "source_group",
+    "source_position"
+  ],
+  "missing_task_fields": [
+    "kind"
+  ],
+  "sequence": 1341,
+  "last_event_sequence": 1341,
+  "sequence_rows": 1,
+  "inventory": {
+    "episodes": 52,
+    "facts": 411,
+    "fact_dimension": 2048,
+    "edges": 2970,
+    "entities": 823,
+    "communities": 2,
+    "claims": 324,
+    "claim_relations": 129,
+    "tasks": 0,
+    "artifacts": 0,
+    "app_sessions": 0
+  }
+}

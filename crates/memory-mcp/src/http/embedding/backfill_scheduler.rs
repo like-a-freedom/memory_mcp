@@ -26,11 +26,12 @@
 //!   environment the parallel test harness shares.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+#[cfg(test)]
+use std::time::Duration;
+use std::time::Instant;
 
 use crate::error::MemoryError;
-use crate::http::leases::scheduler::SchedulerJob;
-use crate::http::leases::scheduler::cadence_due_at;
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::Tenant;
 use crate::http::runtime::bootstrap::DeploymentPolicy;
@@ -49,15 +50,6 @@ const FACT_BATCH: i32 = 100;
 /// one tenant's pass failed and the pass continued past it.
 const JOB_METRIC: &str = "embedding_backfill";
 
-/// How often the backfill job actually walks the registry.
-///
-/// The scheduler ticks every second; backfill is not a per-second job. It
-/// reads the tenant list, binds each namespace and probes its HNSW index —
-/// work a small box pays for on every tick if it is ungated, and whose only
-/// observable output was a line an operator could not pace. 60s is the same
-/// cadence the plan-reconcile and provisioning passes already use.
-const BACKFILL_CADENCE: Duration = Duration::from_secs(60);
-
 /// The backfill job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
 ///
@@ -73,19 +65,15 @@ const BACKFILL_CADENCE: Duration = Duration::from_secs(60);
 /// tick would be skipped because the first test opened it. Production builds
 /// one job, so one window governs it.
 pub fn backfill_scheduler_job(policy: DeploymentPolicy) -> SchedulerJob {
-    let last_run: Arc<std::sync::Mutex<Option<Instant>>> = Arc::new(std::sync::Mutex::new(None));
-    Arc::new(move |registry| {
-        let policy = policy.clone();
-        let last_run = Arc::clone(&last_run);
-        Box::pin(async move {
-            // Cheapest check first: a tick inside the window must not even
-            // read the registry, which is the cost this gate exists to avoid.
-            if !cadence_due_at(&last_run, BACKFILL_CADENCE, Instant::now()) {
-                return Ok(());
-            }
-            run_backfill_pass(&registry, &policy).await
-        })
-    })
+    SchedulerJob::new(
+        MaintenanceJob::EmbeddingBackfill,
+        move |registry, schedule| {
+            let policy = policy.clone();
+            Box::pin(
+                async move { run_backfill_pass_with_schedule(&registry, &policy, &schedule).await },
+            )
+        },
+    )
 }
 
 /// One bounded pass over the ready tenants.
@@ -97,6 +85,14 @@ pub fn backfill_scheduler_job(policy: DeploymentPolicy) -> SchedulerJob {
 pub async fn run_backfill_pass(
     registry: &RegistryHandle,
     policy: &DeploymentPolicy,
+) -> Result<(), MemoryError> {
+    run_backfill_pass_with_schedule(registry, policy, &MaintenanceSchedule::default()).await
+}
+
+async fn run_backfill_pass_with_schedule(
+    registry: &RegistryHandle,
+    policy: &DeploymentPolicy,
+    schedule: &MaintenanceSchedule,
 ) -> Result<(), MemoryError> {
     let Some(embedding) = policy.embedding.as_ref() else {
         // No embedding policy means the deployment serves lexical retrieval
@@ -110,16 +106,20 @@ pub async fn run_backfill_pass(
         return Ok(());
     }
 
-    let tenants = registry
-        .tenants()
-        .list_ready_tenants(None, TENANT_BATCH)
+    let tenant_store = registry.tenants();
+    let tenants = schedule
+        .next_ready_tenants(
+            MaintenanceJob::EmbeddingBackfill,
+            tenant_store.as_ref(),
+            TENANT_BATCH,
+        )
         .await?;
     // The in-memory registry used by the conformance suite has no privileged
     // tenant engine. Nothing can be bound, so there is nothing to backfill —
     // and saying so is better than reporting an empty pass as a successful one.
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     // Measured around the whole pass, like every other maintenance job: a
     // growing backlog shows up here as one rising series rather than as one
@@ -128,14 +128,16 @@ pub async fn run_backfill_pass(
     let mut degraded = false;
 
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
                 log_tenant_failure("http.embedding.backfill_bind_failed", &tenant, &error);
                 continue;
             }
         };
+        let db = lease.client();
         if let Err(error) = backfill_tenant(db, &tenant, embedding, policy).await {
             degraded = true;
             log_tenant_failure("http.embedding.backfill_failed", &tenant, &error);
@@ -157,7 +159,7 @@ pub async fn run_backfill_pass(
 /// a fact's new vector is visible to the next read, which a bare client has no
 /// cache to invalidate.
 async fn backfill_tenant(
-    db: Arc<crate::storage::client::SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     tenant: &Tenant,
     embedding: &EmbeddingPolicy,
     policy: &DeploymentPolicy,
@@ -181,9 +183,12 @@ async fn backfill_tenant(
     // tolerates an unreadable index because lexical retrieval does not need
     // it; backfill cannot, because it is about to *write vectors*. The two
     // callers share one reading and draw different consequences from it.
-    let gate =
-        crate::http::runtime::storage::reconcile_tenant_index_dimension(&db, &namespace, embedding)
-            .await;
+    let gate = crate::http::runtime::storage::reconcile_tenant_index_dimension(
+        Arc::clone(&db),
+        &namespace,
+        embedding,
+    )
+    .await;
     if let Some(reason) = declined_reason(gate) {
         log_declined(tenant, embedding.dimension, reason);
         return Ok(());
@@ -194,7 +199,7 @@ async fn backfill_tenant(
             as Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
     };
     let service = crate::service::MemoryService::new_with_embedding_provider(
-        Arc::clone(&db) as Arc<dyn crate::storage::DbClient>,
+        Arc::clone(&db),
         namespace.clone(),
         crate::logging::StdoutLogger::directives_from_env(),
         100, // rate_limit_rps; the maintenance pass is not request traffic
@@ -231,15 +236,12 @@ async fn backfill_tenant(
 async fn write_bootstrap_ready(
     namespace: &str,
     embedding: &EmbeddingPolicy,
-    db: &Arc<crate::storage::client::SurrealDbClient>,
+    db: &Arc<dyn crate::storage::client::DbClient>,
 ) -> Result<(), MemoryError> {
     // `BoundDbClient` pins the namespace as an invariant rather than a
     // per-call argument, so this write physically cannot reach another
     // tenant's rows.
-    let bound_db = BoundDbClient::new(
-        Arc::clone(db) as Arc<dyn crate::storage::DbClient>,
-        namespace,
-    );
+    let bound_db = BoundDbClient::new(Arc::clone(db), namespace);
     crate::service::startup::write_bootstrap_ready_state(
         &bound_db,
         &embedding.signature,
@@ -450,7 +452,9 @@ mod tests {
     async fn the_job_entry_point_runs_a_disabled_pass() {
         let registry = empty_registry().await;
 
-        let observed = backfill_scheduler_job(policy(false))(registry).await;
+        let observed = backfill_scheduler_job(policy(false))
+            .invoke(registry, Arc::new(MaintenanceSchedule::default()))
+            .await;
 
         assert!(observed.is_ok(), "an empty pass is a valid pass");
     }
@@ -502,8 +506,9 @@ mod tests {
             .expect("register the tenant as ready");
 
         let sink = crate::logging::capture::install();
+        let job = backfill_scheduler_job(policy(true));
         crate::logging::capture::with_level("warn", || {
-            backfill_scheduler_job(policy(true))(registry)
+            job.invoke(registry, Arc::new(MaintenanceSchedule::default()))
         })
         .await
         .expect("a tick under a quiet level still succeeds");
@@ -528,33 +533,35 @@ mod tests {
     /// no test should sleep through a real minute to prove it.
     #[test]
     fn the_cadence_gate_opens_when_the_window_has_elapsed() {
-        let last_run = std::sync::Mutex::new(None);
+        let schedule = MaintenanceSchedule::default();
         let t0 = Instant::now();
 
         assert!(
-            cadence_due_at(&last_run, Duration::from_secs(60), t0),
+            schedule.due(MaintenanceJob::EmbeddingBackfill, t0),
             "the first run always opens the gate"
         );
+        schedule.record_attempt_started(MaintenanceJob::EmbeddingBackfill, t0);
         assert!(
-            !cadence_due_at(
-                &last_run,
-                Duration::from_secs(60),
+            !schedule.due(
+                MaintenanceJob::EmbeddingBackfill,
                 t0 + Duration::from_secs(30)
             ),
             "a run inside the window is gated"
         );
         assert!(
-            cadence_due_at(
-                &last_run,
-                Duration::from_secs(60),
+            schedule.due(
+                MaintenanceJob::EmbeddingBackfill,
                 t0 + Duration::from_secs(60)
             ),
             "a run at the boundary opens the gate again"
         );
+        schedule.record_attempt_started(
+            MaintenanceJob::EmbeddingBackfill,
+            t0 + Duration::from_secs(60),
+        );
         assert!(
-            !cadence_due_at(
-                &last_run,
-                Duration::from_secs(60),
+            !schedule.due(
+                MaintenanceJob::EmbeddingBackfill,
                 t0 + Duration::from_secs(90)
             ),
             "and the window closes from the new anchor"
@@ -632,7 +639,13 @@ mod tests {
         let job = backfill_scheduler_job(policy(true));
 
         // The first tick must run: it fills fact:a.
-        job(registry.clone()).await.expect("the first tick runs");
+        let schedule = Arc::new(MaintenanceSchedule::default());
+        let t0 = Instant::now();
+        assert!(schedule.due(MaintenanceJob::EmbeddingBackfill, t0));
+        job.invoke(registry.clone(), Arc::clone(&schedule))
+            .await
+            .expect("the first tick runs");
+        schedule.record_attempt_started(MaintenanceJob::EmbeddingBackfill, t0);
         let a = db
             .select_one("fact:a", namespace)
             .await
@@ -645,9 +658,10 @@ mod tests {
 
         // A gap that appears immediately after must wait for the cadence.
         seed_fact_without_vector(&db, namespace, "fact:b").await;
-        job(registry)
-            .await
-            .expect("a gated tick is still a successful no-op");
+        assert!(!schedule.due(
+            MaintenanceJob::EmbeddingBackfill,
+            t0 + Duration::from_secs(1)
+        ));
         let b = db
             .select_one("fact:b", namespace)
             .await

@@ -28,6 +28,7 @@ const SOURCE_CONTEXT_ANCHOR_LIMIT: usize = 50;
 pub(crate) const SOURCE_CONTEXT_RADIUS: i64 = 4;
 const SOURCE_CONTEXT_EPISODE_LIMIT: i64 =
     (SOURCE_CONTEXT_ANCHOR_LIMIT * (SOURCE_CONTEXT_RADIUS as usize * 2 + 1)) as i64;
+const EPISODE_CONTEXT_PROJECTION: &str = "episode_id, source_type, source_id, content, t_ref, t_ingested, scope, visibility_scope, policy_tags, source_lineage, source_group, source_position";
 
 #[derive(Debug, Clone)]
 struct SourcePositionWindow {
@@ -60,6 +61,13 @@ impl EpisodeContextStore {
         self.db.select_table(MemoryTables::table("episode")).await
     }
 
+    /// Episode fields consumed by the facets view, including the parser's
+    /// required fields so malformed historical rows keep the same behavior.
+    pub async fn select_facet_inputs(&self) -> Result<Vec<Value>, MemoryError> {
+        let sql = format!("SELECT {EPISODE_CONTEXT_PROJECTION}, project FROM episode");
+        self.db.query_rows(&sql, None).await
+    }
+
     /// Episode contents matching a query, bi-temporally scoped.
     pub async fn select_episodes_by_content(
         &self,
@@ -70,6 +78,46 @@ impl EpisodeContextStore {
         let (sql, vars) =
             crate::memory::queries::build_select_episodes_by_content_query(cutoff, query, limit);
         self.db.query_rows(&sql, Some(vars)).await
+    }
+
+    /// Selects one independently limited literal-substring result group for
+    /// each lexical fallback term, preserving the order used by retrieval.
+    pub async fn select_episodes_for_terms(
+        &self,
+        cutoff: &str,
+        terms: &[String],
+        limit_per_term: i32,
+    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        const MAX_TERMS_PER_RPC: usize = 8;
+
+        let mut result_groups = Vec::with_capacity(terms.len());
+        for term_batch in terms.chunks(MAX_TERMS_PER_RPC) {
+            let mut vars = serde_json::Map::from_iter([
+                ("cutoff".to_string(), json!(cutoff)),
+                ("limit".to_string(), json!(limit_per_term)),
+            ]);
+            let mut subqueries = Vec::with_capacity(term_batch.len());
+            for (index, term) in term_batch.iter().enumerate() {
+                let (sql, term_vars) =
+                    crate::memory::queries::build_select_episodes_by_content_query(
+                        cutoff,
+                        Some(term),
+                        limit_per_term,
+                    );
+                if let Some(query) = term_vars.get("query") {
+                    vars.insert(format!("query_{index}"), query.clone());
+                }
+                let sql = sql.replace("$query", &format!("$query_{index}"));
+                subqueries.push(format!("({sql})"));
+            }
+            let sql = format!("RETURN [{}]", subqueries.join(", "));
+            let groups = self
+                .db
+                .query_row_groups(&sql, Some(Value::Object(vars)), term_batch.len())
+                .await?;
+            result_groups.extend(groups);
+        }
+        Ok(result_groups)
     }
 
     /// Read one source episode and a bounded, ordered neighborhood from its
@@ -93,11 +141,13 @@ impl EpisodeContextStore {
             .map_err(|_| MemoryError::Validation("source position exceeds storage range".into()))?;
         self.db
             .query_rows(
-                "SELECT * FROM episode WHERE source_group = $group \
-                 AND source_position >= $first AND source_position <= $last \
-                 AND t_ref <= type::datetime($cutoff) \
-                 AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
-                 ORDER BY source_position ASC LIMIT 9",
+                &format!(
+                    "SELECT {EPISODE_CONTEXT_PROJECTION} FROM episode WHERE source_group = $group \
+                     AND source_position >= $first AND source_position <= $last \
+                     AND t_ref <= type::datetime($cutoff) \
+                     AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
+                     ORDER BY source_position ASC LIMIT 9"
+                ),
                 Some(json!({
                     "group": group,
                     "first": position.saturating_sub(SOURCE_CONTEXT_RADIUS),
@@ -137,10 +187,12 @@ impl EpisodeContextStore {
         let anchors = self
             .db
             .query_rows(
-                "SELECT * FROM episode WHERE episode_id INSIDE $episode_ids \
-                 AND t_ref <= type::datetime($cutoff) \
-                 AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
-                 ORDER BY episode_id ASC LIMIT $limit",
+                &format!(
+                    "SELECT {EPISODE_CONTEXT_PROJECTION} FROM episode WHERE episode_id INSIDE $episode_ids \
+                     AND t_ref <= type::datetime($cutoff) \
+                     AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
+                     ORDER BY episode_id ASC LIMIT $limit"
+                ),
                 Some(json!({
                     "episode_ids": candidate_ids,
                     "cutoff": cutoff,
@@ -205,7 +257,7 @@ impl EpisodeContextStore {
             time_predicates.push("t_ref <= type::datetime($window_end)".to_string());
         }
         let sql = format!(
-            "SELECT * FROM episode WHERE ({}) AND {} ORDER BY source_group ASC, source_position ASC LIMIT $limit",
+            "SELECT {EPISODE_CONTEXT_PROJECTION} FROM episode WHERE ({}) AND {} ORDER BY source_group ASC, source_position ASC LIMIT $limit",
             range_predicates.join(" OR "),
             time_predicates.join(" AND "),
         );

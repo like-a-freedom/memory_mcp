@@ -40,9 +40,10 @@ type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 
 /// Configurable mock database client for tests.
 ///
-/// By default, every method returns `Ok(vec![])`, `Ok(None)` or
-/// `Ok(Value::Null)`. Use the `expect_*` builder methods to override specific
-/// calls.
+/// By default, reads return empty values. Unconfigured scalar `query` calls
+/// return `Value::Null`; grouped `RETURN [...]` calls return one empty row
+/// array per subquery so strict grouped-query consumers see a valid empty result.
+/// Use the `expect_*` builder methods to override specific calls.
 pub struct MockDbClient {
     select_one_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     select_table_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
@@ -132,7 +133,7 @@ impl MockDbClient {
     /// name, because those are the queries the production code actually
     /// dispatches on. Rules are tried in the order they were added and the
     /// first match wins; a SQL that matches none returns `Ok(Value::Null)`,
-    /// which is the same default an unconfigured client gives.
+    /// except grouped `RETURN [...]` which defaults to empty row groups.
     /// Every namespace a read or write was issued against, in order.
     pub fn seen_namespaces(&self) -> Vec<String> {
         self.seen_namespaces
@@ -342,6 +343,12 @@ impl DbClient for MockDbClient {
                 return (rule.respond)(sql, vars.as_ref());
             }
         }
+        if sql.starts_with("RETURN [") {
+            let group_count = sql.matches("(SELECT").count();
+            return Ok(Value::Array(
+                (0..group_count).map(|_| Value::Array(Vec::new())).collect(),
+            ));
+        }
         Ok(Value::Null)
     }
 
@@ -445,6 +452,21 @@ mod tests {
             db.query("SELECT * FROM task", None, "org").await.unwrap(),
             Value::Null
         );
+    }
+
+    #[tokio::test]
+    async fn unconfigured_grouped_query_defaults_to_one_empty_row_array_per_subquery() {
+        let db = MockDbClient::new();
+        let result = db
+            .query(
+                "RETURN [(SELECT * FROM fact), (SELECT * FROM fact)]",
+                None,
+                "org",
+            )
+            .await
+            .expect("empty grouped response");
+
+        assert_eq!(result, json!([[], []]));
     }
 
     #[tokio::test]

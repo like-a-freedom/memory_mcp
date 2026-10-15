@@ -15,14 +15,16 @@ use std::sync::Arc;
 
 use crate::error::MemoryError;
 use crate::http::app_sessions::store::AppSessionStore;
-use crate::http::leases::scheduler::SchedulerJob;
+use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 use crate::http::registry::RegistryHandle;
 use crate::storage::client::BoundDbClient;
 
 /// The cleanup job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
 pub fn scheduler_job() -> SchedulerJob {
-    Arc::new(|registry| Box::pin(async move { cleanup_expired_for_all(&registry).await }))
+    SchedulerJob::new(MaintenanceJob::AppSessionCleanup, |registry, schedule| {
+        Box::pin(async move { cleanup_expired_for_all_with_schedule(&registry, &schedule).await })
+    })
 }
 
 /// Walk at most 100 ready tenants per cycle, binding
@@ -31,8 +33,18 @@ pub fn scheduler_job() -> SchedulerJob {
 /// The job is short-lived; it does not hold a per-tenant
 /// runtime pin while iterating.
 pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
+    cleanup_expired_for_all_with_schedule(registry, &MaintenanceSchedule::default()).await
+}
+
+async fn cleanup_expired_for_all_with_schedule(
+    registry: &RegistryHandle,
+    schedule: &MaintenanceSchedule,
+) -> Result<(), MemoryError> {
     // Tenant listing is tenancy's; the sweeper never needed the rest of the registry.
-    let due = registry.tenants().list_ready_tenants(None, 100).await?;
+    let store = registry.tenants();
+    let due = schedule
+        .next_ready_tenants(MaintenanceJob::AppSessionCleanup, store.as_ref(), 100)
+        .await?;
     for tenant in due {
         // Production path: bind the tenant namespace
         // through the privileged engine and issue the
@@ -41,11 +53,9 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
         // engine; we skip the delete for tenants whose
         // engine is None (the test path does not seed
         // app_session rows).
-        let Some(engine) = registry.tenant_engine_optional() else {
-            continue;
-        };
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => continue,
             Err(error) => {
                 crate::http::logging::log_warn(
                     "http.app_session.bind_failed",
@@ -54,6 +64,7 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
                 continue;
             }
         };
+        let db = lease.client();
         // `BoundDbClient` pins the namespace as an invariant rather than a
         // per-call argument, so this store physically cannot reach another
         // tenant's rows. `delete_expired` owns the statement and the
@@ -91,7 +102,9 @@ mod tests {
     async fn the_job_entry_point_runs_against_an_empty_registry() {
         let registry = empty_registry().await;
 
-        let observed = (scheduler_job())(registry).await;
+        let observed = scheduler_job()
+            .invoke(registry, Arc::new(MaintenanceSchedule::default()))
+            .await;
 
         assert!(observed.is_ok());
     }

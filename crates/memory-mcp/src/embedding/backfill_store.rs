@@ -8,6 +8,7 @@ use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 
 const DEFAULT_BACKFILL_BATCH_SIZE: i32 = 100;
+const BACKFILL_FACT_PROJECTION: &str = "fact_id, fact_type, content, quote";
 
 #[derive(Clone)]
 pub(crate) struct EmbeddingBackfillStoreClient {
@@ -51,13 +52,21 @@ impl EmbeddingBackfillStoreClient {
         } else {
             DEFAULT_BACKFILL_BATCH_SIZE
         };
+        // Keep SurrealDB's planner choice until the controlled density/scale
+        // matrix proves that a forced full scan wins across realistic stores.
+        // The projection is the measured, semantics-preserving part of this
+        // query change; WITH NOINDEX remains an isolated experiment only.
         let sql = if last_completed_fact_id.is_some() {
-            "SELECT * FROM (SELECT * FROM fact WHERE embedding IS NONE) \
-             WHERE fact_id > $last_completed_fact_id ORDER BY fact_id ASC LIMIT $limit"
-                .to_string()
+            format!(
+                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact \
+                 WHERE embedding IS NONE AND fact_id > $last_completed_fact_id \
+                 ORDER BY fact_id ASC LIMIT $limit"
+            )
         } else {
-            "SELECT * FROM fact WHERE embedding IS NONE ORDER BY fact_id ASC LIMIT $limit"
-                .to_string()
+            format!(
+                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact \
+                 WHERE embedding IS NONE ORDER BY fact_id ASC LIMIT $limit"
+            )
         };
         self.db
             .query_rows(

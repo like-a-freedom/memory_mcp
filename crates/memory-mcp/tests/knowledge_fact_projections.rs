@@ -834,8 +834,11 @@ async fn lexical_fallback_runs_the_nonsemantic_fact_scan() {
     assert!(observer.observations().iter().any(|observation| {
         let sql = observation.sql.to_ascii_lowercase();
         sql.starts_with("select id, fact_id")
-            && sql.contains("from fact")
-            && !sql.contains(" where ")
+            && sql.contains("from fact where")
+            && sql.contains("t_valid <= type::datetime($cutoff)")
+            && sql.contains("t_ingested <= type::datetime($cutoff)")
+            && sql.contains("t_invalid_ingested > type::datetime($cutoff)")
+            && !sql.contains(" limit ")
     }));
 }
 

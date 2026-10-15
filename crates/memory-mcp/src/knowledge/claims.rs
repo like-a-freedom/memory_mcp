@@ -639,9 +639,11 @@ impl ClaimStore for SurrealClaimStore {
         }
         let sql = match q.after_fact_id {
             Some(_) => {
-                "SELECT * FROM fact WHERE fact_id IS NOT NONE AND fact_id > $after ORDER BY fact_id LIMIT $limit"
+                "SELECT fact_id FROM fact WHERE fact_id IS NOT NONE AND fact_id > $after ORDER BY fact_id LIMIT $limit"
             }
-            None => "SELECT * FROM fact WHERE fact_id IS NOT NONE ORDER BY fact_id LIMIT $limit",
+            None => {
+                "SELECT fact_id FROM fact WHERE fact_id IS NOT NONE ORDER BY fact_id LIMIT $limit"
+            }
         };
         let mut vars = serde_json::json!({"limit": q.limit});
         if let Some(after) = q.after_fact_id {
@@ -2099,5 +2101,61 @@ mod tests {
             query_count.load(Ordering::SeqCst),
             crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH * 4
         );
+    }
+
+    #[tokio::test]
+    async fn fact_backfill_reads_only_the_cursor_and_projection_key() {
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("FROM fact"),
+            |sql, vars| {
+                assert!(sql.contains("SELECT fact_id FROM fact"), "{sql}");
+                assert!(!sql.contains("SELECT *"), "{sql}");
+                assert!(sql.contains("fact_id > $after ORDER BY fact_id LIMIT $limit"));
+                let vars = vars.expect("bound cursor variables");
+                assert_eq!(vars["after"], "fact:cursor");
+                assert_eq!(vars["limit"], 4);
+                Ok(serde_json::json!([{"fact_id": "fact:next"}]))
+            },
+        );
+        let store = SurrealClaimStore::new(Arc::new(db), "org");
+        let cursor = FactId::from("fact:cursor");
+
+        let rows = store
+            .select_facts_for_backfill(BackfillFactQuery {
+                after_fact_id: Some(&cursor),
+                limit: 4,
+            })
+            .await
+            .expect("select backfill page");
+
+        assert_eq!(rows, vec![serde_json::json!({"fact_id": "fact:next"})]);
+    }
+
+    #[tokio::test]
+    async fn fact_backfill_first_page_reads_only_the_projection_key() {
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("FROM fact"),
+            |sql, vars| {
+                assert_eq!(
+                    sql,
+                    "SELECT fact_id FROM fact WHERE fact_id IS NOT NONE ORDER BY fact_id LIMIT $limit"
+                );
+                let vars = vars.expect("first-page variables");
+                assert_eq!(vars["limit"], 3);
+                assert!(vars.get("after").is_none());
+                Ok(serde_json::json!([{"fact_id": "fact:first"}]))
+            },
+        );
+        let store = SurrealClaimStore::new(Arc::new(db), "org");
+
+        let rows = store
+            .select_facts_for_backfill(BackfillFactQuery {
+                after_fact_id: None,
+                limit: 3,
+            })
+            .await
+            .expect("select first backfill page");
+
+        assert_eq!(rows, vec![serde_json::json!({"fact_id": "fact:first"})]);
     }
 }

@@ -93,6 +93,14 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "MEMORY_MCP_HTTP_BODY_LIMIT must be positive".into(),
         ));
     }
+    if cfg.maintenance_client_capacity == 0
+        || cfg.maintenance_client_metadata_bytes == 0
+        || cfg.maintenance_client_idle_ttl.is_zero()
+    {
+        return Err(MemoryError::ConfigInvalid(
+            "maintenance client capacity, metadata budget, and idle TTL must be positive".into(),
+        ));
+    }
     if cfg.preflight_request_limit == 0
         || cfg.preflight_request_limit > tokio::sync::Semaphore::MAX_PERMITS
         || cfg.preflight_bytes == 0

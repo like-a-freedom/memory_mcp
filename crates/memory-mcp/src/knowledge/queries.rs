@@ -28,6 +28,15 @@ pub fn build_scan_nonsemantic_facts_query() -> String {
     format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact")
 }
 
+/// Selects every nonsemantic fact visible at a bi-temporal cutoff without returning its vector payload.
+pub fn build_scan_nonsemantic_facts_as_of_query(cutoff: &str) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
+    (
+        format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {visibility}"),
+        json!({ "cutoff": cutoff }),
+    )
+}
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -196,6 +205,78 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
     )
 }
 
+/// Selects the original table-scan prefix used by the map-view hub ranking.
+pub fn build_select_hub_candidates_query(limit: usize) -> (String, Value) {
+    (
+        "SELECT * FROM entity LIMIT $limit".to_string(),
+        json!({ "limit": limit }),
+    )
+}
+
+pub fn build_select_active_facts_by_episode_query(
+    episode_id: &str,
+    cutoff: &str,
+    limit: i32,
+) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    let sql = format!(
+        "SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
+    );
+    (
+        sql,
+        json!({ "episode_id": episode_id, "cutoff": cutoff, "limit": limit }),
+    )
+}
+
+/// Selects one independently limited active-fact group for each source episode.
+pub fn build_select_active_facts_by_episodes_query(
+    episode_ids: &[String],
+    cutoff: &str,
+    limit: i32,
+) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    let mut vars = serde_json::Map::from_iter([
+        ("cutoff".to_string(), json!(cutoff)),
+        ("limit".to_string(), json!(limit)),
+    ]);
+    let groups = episode_ids
+        .iter()
+        .enumerate()
+        .map(|(index, episode_id)| {
+            vars.insert(format!("episode_{index}"), json!(episode_id));
+            format!(
+                "(SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE source_episode = $episode_{index} AND {visibility} LIMIT $limit)"
+            )
+        })
+        .collect::<Vec<_>>();
+    (
+        format!("RETURN [{}]", groups.join(", ")),
+        Value::Object(vars),
+    )
+}
+
+pub fn build_has_active_facts_by_episode_query(episode_id: &str, cutoff: &str) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    let sql = format!(
+        "SELECT VALUE id FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT 1"
+    );
+    (sql, json!({ "episode_id": episode_id, "cutoff": cutoff }))
+}
+
+/// Selects source episodes with at least one fact visible at the temporal cutoff.
+pub fn build_episode_ids_with_active_facts_query(
+    episode_ids: &[String],
+    cutoff: &str,
+) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    (
+        format!(
+            "SELECT source_episode FROM fact WHERE source_episode IN $episode_ids AND {visibility} GROUP BY source_episode"
+        ),
+        json!({ "episode_ids": episode_ids, "cutoff": cutoff }),
+    )
+}
+
 /// Selects the fields consumed by the confidence-decay lifecycle pass.
 pub fn build_select_decay_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
     let visibility = build_fact_visibility_clause("$cutoff");
@@ -323,9 +404,8 @@ pub fn build_select_edge_neighbors_for_entities_query(
         .iter()
         .enumerate()
         .map(|(index, entity_id)| {
-            let variable = format!("entity_{index}");
-            vars.insert(variable.clone(), json!(entity_id));
-            format!("(in = <record> ${variable} OR out = <record> ${variable})")
+            let operand = bind_record_operand(entity_id, &format!("entity_{index}"), &mut vars);
+            format!("(in = {operand} OR out = {operand})")
         })
         .collect::<Vec<_>>()
         .join(" OR ");
@@ -470,6 +550,35 @@ mod tests {
     }
 
     #[test]
+    fn hub_candidate_query_limits_the_existing_unordered_entity_prefix() {
+        let (sql, vars) = build_select_hub_candidates_query(36);
+
+        assert_eq!(sql, "SELECT * FROM entity LIMIT $limit");
+        assert_eq!(vars["limit"], json!(36));
+    }
+
+    #[test]
+    fn archival_active_episode_query_preserves_full_bitemporal_visibility() {
+        let ids = vec!["episode:one".to_string(), "episode:two".to_string()];
+        let cutoff = "2026-06-01T00:00:00Z";
+        let (sql, vars) = build_episode_ids_with_active_facts_query(&ids, cutoff);
+
+        assert!(sql.contains("source_episode IN $episode_ids"), "{sql}");
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"), "{sql}");
+        assert!(
+            sql.contains("t_ingested <= type::datetime($cutoff)"),
+            "{sql}"
+        );
+        assert!(
+            sql.contains("t_invalid_ingested > type::datetime($cutoff)"),
+            "{sql}"
+        );
+        assert!(sql.contains("GROUP BY source_episode"), "{sql}");
+        assert_eq!(vars["episode_ids"], json!(ids));
+        assert_eq!(vars["cutoff"], cutoff);
+    }
+
+    #[test]
     fn build_select_edges_filtered_page_query_uses_limit_and_start_bindings() {
         let (sql, vars) = build_select_edges_filtered_page_query("2026-05-13T00:00:00Z", 250, 500);
 
@@ -602,6 +711,33 @@ mod tests {
         assert!(sql.ends_with("ORDER BY t_valid ASC LIMIT $limit"), "{sql}");
         assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
         assert_eq!(vars["limit"], 5);
+    }
+
+    #[test]
+    fn source_fact_query_uses_shared_nonsemantic_projection_and_preserves_limit() {
+        let cutoff = "2026-05-13T00:00:00Z";
+        let (sql, vars) = build_select_active_facts_by_episode_query("episode:source", cutoff, 7);
+
+        assert!(sql.starts_with(&format!("SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact")));
+        assert!(sql.contains("source_episode = $episode_id"));
+        assert!(sql.contains("t_invalid_ingested"));
+        assert!(sql.ends_with("LIMIT $limit"));
+        assert_eq!(vars["episode_id"], "episode:source");
+        assert_eq!(vars["cutoff"], cutoff);
+        assert_eq!(vars["limit"], 7);
+    }
+
+    #[test]
+    fn active_fact_existence_query_returns_only_a_bounded_record_id() {
+        let cutoff = "2026-05-13T00:00:00Z";
+        let (sql, vars) = build_has_active_facts_by_episode_query("episode:source", cutoff);
+
+        assert!(sql.starts_with("SELECT VALUE id FROM fact"));
+        assert!(sql.contains("source_episode = $episode_id"));
+        assert!(sql.contains("t_invalid_ingested"));
+        assert!(sql.ends_with("LIMIT 1"));
+        assert_eq!(vars["episode_id"], "episode:source");
+        assert_eq!(vars["cutoff"], cutoff);
     }
 
     #[test]

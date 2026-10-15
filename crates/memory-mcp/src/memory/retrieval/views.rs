@@ -218,7 +218,7 @@ pub(crate) async fn build_facets_view(
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .episode_context_store()
-        .scan_episodes()
+        .select_facet_inputs()
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 

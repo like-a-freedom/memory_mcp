@@ -2015,6 +2015,42 @@ impl TenantStore for SurrealRegistryStore {
         Ok(new_version)
     }
 
+    async fn update_ready_tenant_schema_version(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        expected_schema_version: u32,
+        new_schema_version: u32,
+    ) -> Result<u64, MemoryError> {
+        if new_schema_version < expected_schema_version {
+            return Err(MemoryError::Validation(
+                "ready tenant schema version cannot move backwards".to_owned(),
+            ));
+        }
+        let rows = self
+            .handle()
+            .query_json(
+                "UPDATE type::record($table, $id) SET schema_version = $new, version = version + 1 \
+                 WHERE status = 'ready' AND version = $expected AND schema_version = $current \
+                 RETURN AFTER",
+                Some(json!({
+                    "table": "tenant",
+                    "id": tenant_id,
+                    "new": new_schema_version,
+                    "current": expected_schema_version,
+                    "expected": expected_version,
+                })),
+            )
+            .await
+            .map_err(|err| map_storage_error("update_ready_tenant_schema_version", err))?;
+        if rows.is_empty() {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} ready schema-version CAS failed"
+            )));
+        }
+        returned_version(&rows, "update_ready_tenant_schema_version")
+    }
+
     async fn list_tenants(&self, limit: usize) -> Result<Vec<Tenant>, MemoryError> {
         let rows = self
             .handle()
@@ -3658,6 +3694,46 @@ mod tests {
             .begin_account_deletion("verifier_delete", "acct_delete", "session_delete", now)
             .await;
         assert!(matches!(replay, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn tenant_deletion_wins_over_durable_ready_schema_version_cas() {
+        let db = Arc::new(Surreal::new::<Mem>(()).await.expect("mem engine"));
+        let store = SurrealRegistryStore::from_local_db(db, "control", "registry")
+            .await
+            .expect("bind registry store");
+        store
+            .apply_migrations()
+            .await
+            .expect("apply registry schema");
+        let mut ready = tenant();
+        ready.status = TenantStatus::Ready;
+        ready.schema_version = 44;
+        ready.version = 7;
+        store.write_tenant(&ready).await.expect("seed ready tenant");
+
+        store
+            .update_tenant_state(
+                &ready.id,
+                ready.version,
+                TenantStatus::Ready,
+                TenantStatus::Deleting,
+            )
+            .await
+            .expect("deletion transitions tenant first");
+
+        let upgrade = store
+            .update_ready_tenant_schema_version(&ready.id, ready.version, 44, 45)
+            .await;
+        assert!(matches!(upgrade, Err(MemoryError::Conflict(_))));
+        let persisted = store
+            .find_tenant_by_id(&ready.id)
+            .await
+            .expect("read tenant after competing transition")
+            .expect("tenant remains stored");
+        assert_eq!(persisted.status, TenantStatus::Deleting);
+        assert_eq!(persisted.schema_version, 44);
+        assert_eq!(persisted.version, ready.version + 1);
     }
 
     /// A tenant that fails provisioning must remember which stage it failed in.

@@ -13,7 +13,6 @@
 //! touches is `expires_at`, which every bucket row sets.
 
 use serde_json::json;
-use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::error::MemoryError;
 use crate::http::registry::RegistryHandle;
@@ -24,11 +23,6 @@ use super::SurrealRegistryStore;
 /// Maximum rows a single cleanup pass may remove. Keeps the maintenance
 /// statement bounded so it cannot hold a long write transaction.
 pub const RATE_BUCKET_CLEANUP_BATCH: u64 = 512;
-
-/// Minimum spacing between cleanup passes in one process. Expiry is enforced
-/// by database time on every reservation, so this delay cannot admit an
-/// extra attempt; it only bounds how often the maintenance pass runs.
-const RATE_BUCKET_CLEANUP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// Convert a `MemoryError` to `LocalAdminError::Infrastructure`.
 fn infra(e: MemoryError) -> LocalAdminError {
@@ -96,30 +90,10 @@ impl SurrealRegistryStore {
 /// and expiry is compared against database time. The job does nothing when
 /// the deployment has no durable local-admin store (data-plane-only builds).
 pub fn rate_bucket_cleanup_scheduler_job() -> crate::http::leases::scheduler::SchedulerJob {
-    Arc::new(|registry| Box::pin(cleanup_expired(registry)))
-}
-
-async fn cleanup_expired(registry: RegistryHandle) -> Result<(), MemoryError> {
-    if !due_now() {
-        return Ok(());
-    }
-    cleanup_expired_now(registry).await
-}
-
-/// Whether this process should run a pass now. Keeps a multi-replica
-/// deployment from issuing the maintenance statement on every scheduler
-/// tick; correctness never depends on it.
-fn due_now() -> bool {
-    static LAST_RUN: OnceLock<Mutex<Option<std::time::Instant>>> = OnceLock::new();
-    let mut last = LAST_RUN
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if last.is_some_and(|instant| instant.elapsed() < RATE_BUCKET_CLEANUP_INTERVAL) {
-        return false;
-    }
-    *last = Some(std::time::Instant::now());
-    true
+    crate::http::leases::scheduler::SchedulerJob::new(
+        crate::http::leases::scheduler::MaintenanceJob::RegistryRateBucketCleanup,
+        |registry, _schedule| Box::pin(cleanup_expired_now(registry)),
+    )
 }
 
 /// One bounded pass, without the interval gate.

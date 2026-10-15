@@ -180,6 +180,40 @@ impl BoundDbClient {
         }
     }
 
+    /// Runs one query that returns an ordered array of independent row groups.
+    /// A malformed or incomplete response is an error: callers must not treat
+    /// an omitted group as an empty result because that changes retrieval order.
+    pub(crate) async fn query_row_groups(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        expected_groups: usize,
+    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        match self.db.query(sql, vars, &self.namespace).await {
+            Ok(Value::Array(groups)) if groups.len() == expected_groups => groups
+                .into_iter()
+                .enumerate()
+                .map(|(index, group)| match group {
+                    Value::Array(rows) => Ok(rows),
+                    _ => Err(MemoryError::Storage(format!(
+                        "grouped query result {index} is not a row array"
+                    ))),
+                })
+                .collect(),
+            Ok(Value::Array(groups)) => Err(MemoryError::Storage(format!(
+                "grouped query returned {} groups; expected {expected_groups}",
+                groups.len()
+            ))),
+            Ok(_) => Err(MemoryError::Storage(
+                "grouped query returned a non-array result".to_string(),
+            )),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                Ok(vec![Vec::new(); expected_groups])
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     /// Runs a query and returns its first result row, if any.
     ///
     /// Same missing-table degradation as [`Self::query_rows`].
@@ -1264,6 +1298,7 @@ mod tests {
         Rows(Value),
         MissingTable,
         OtherError,
+        ErrorOnLaterGroup,
     }
 
     struct ScriptedQueryClient {
@@ -1310,7 +1345,7 @@ mod tests {
 
         async fn query(
             &self,
-            _sql: &str,
+            sql: &str,
             _vars: Option<Value>,
             _namespace: &str,
         ) -> Result<Value, MemoryError> {
@@ -1322,6 +1357,13 @@ mod tests {
                 QueryBehavior::OtherError => {
                     Err(MemoryError::Storage("connection lost".to_string()))
                 }
+                QueryBehavior::ErrorOnLaterGroup if sql.contains("later-group") => Err(
+                    MemoryError::Storage("later grouped term failed".to_string()),
+                ),
+                QueryBehavior::ErrorOnLaterGroup => Ok(serde_json::json!([
+                    [{"id": "first"}],
+                    [{"id": "later"}]
+                ])),
             }
         }
 
@@ -1382,6 +1424,67 @@ mod tests {
             .expect_err("non-missing-table errors must propagate");
 
         assert!(matches!(error, MemoryError::Storage(message) if message == "connection lost"));
+    }
+
+    #[tokio::test]
+    async fn query_row_groups_preserves_group_order() {
+        let groups = serde_json::json!([[{"id": "first"}], [{"id": "second"}]]);
+        let bound = scripted_bound_client(QueryBehavior::Rows(groups));
+
+        let result = bound
+            .query_row_groups("RETURN [(SELECT first), (SELECT second)]", None, 2)
+            .await
+            .expect("both ordered groups should be returned");
+
+        assert_eq!(result[0][0]["id"], "first");
+        assert_eq!(result[1][0]["id"], "second");
+    }
+
+    #[tokio::test]
+    async fn query_row_groups_rejects_a_missing_group() {
+        let groups = serde_json::json!([[{"id": "first"}]]);
+        let bound = scripted_bound_client(QueryBehavior::Rows(groups));
+
+        let error = bound
+            .query_row_groups("RETURN [(SELECT first), (SELECT second)]", None, 2)
+            .await
+            .expect_err("a missing group must not become an empty result");
+
+        assert!(matches!(error, MemoryError::Storage(message) if message.contains("expected 2")));
+    }
+
+    #[tokio::test]
+    async fn query_row_groups_propagates_error_in_a_later_group() {
+        let bound = scripted_bound_client(QueryBehavior::ErrorOnLaterGroup);
+
+        let error = bound
+            .query_row_groups(
+                "RETURN [(SELECT first), (SELECT 'later-group' AS marker)]",
+                None,
+                2,
+            )
+            .await
+            .expect_err("a later group failure must fail the whole grouped read");
+
+        assert!(
+            matches!(error, MemoryError::Storage(message) if message == "later grouped term failed")
+        );
+    }
+
+    #[tokio::test]
+    async fn query_row_groups_keeps_missing_table_compatibility_for_every_group() {
+        let bound = scripted_bound_client(QueryBehavior::MissingTable);
+
+        let result = bound
+            .query_row_groups(
+                "RETURN [(SELECT * FROM fact), (SELECT * FROM fact)]",
+                None,
+                2,
+            )
+            .await
+            .expect("lazy missing table should degrade to empty result groups");
+
+        assert_eq!(result, vec![Vec::<Value>::new(), Vec::<Value>::new()]);
     }
 
     #[tokio::test]

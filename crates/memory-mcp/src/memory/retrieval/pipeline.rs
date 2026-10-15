@@ -669,6 +669,37 @@ async fn append_source_answers(
             }
         }
 
+        let mut source_fact_episode_seen = HashSet::new();
+        let source_fact_episode_ids = supplemental
+            .iter()
+            .filter(|&(episode, _, _, _, _)| {
+                !super::admission::source_episode_has_hard_query_conflict(
+                    &query_evidence,
+                    &episode.content,
+                ) && !params
+                    .window_start
+                    .is_some_and(|start| episode.t_ref < start)
+                    && !params.window_end.is_some_and(|end| episode.t_ref > end)
+                    && !items
+                        .iter()
+                        .any(|item| item.source_episode == episode.episode_id)
+                    && source_fact_episode_seen.insert(episode.episode_id.clone())
+            })
+            .map(|(episode, _, _, _, _)| episode.episode_id.clone())
+            .collect::<Vec<_>>();
+        let source_fact_groups = service
+            .graph_store
+            .select_active_facts_by_episodes(
+                &source_fact_episode_ids,
+                params.cutoff_iso,
+                retrieval_candidate_limit(service, params.budget),
+            )
+            .await?;
+        let source_facts_by_episode = source_fact_episode_ids
+            .into_iter()
+            .zip(source_fact_groups)
+            .collect::<HashMap<_, _>>();
+
         for (episode, replaces_episode_id, question_key, relation, relevance_anchor_id) in
             supplemental
         {
@@ -722,14 +753,12 @@ async fn append_source_answers(
                 }
                 continue;
             }
-            let answer_facts = service
-                .graph_store
-                .select_active_facts_by_episode(
-                    &episode.episode_id,
-                    params.cutoff_iso,
-                    retrieval_candidate_limit(service, params.budget),
-                )
-                .await?;
+            let answer_facts = source_facts_by_episode
+                .get(&episode.episode_id)
+                .cloned()
+                .ok_or_else(|| {
+                    MemoryError::Storage("batched source-answer fact group is missing".to_string())
+                })?;
             let answer_facts =
                 filter_facts_by_constraints(answer_facts, params.access, params.fact_types);
             let mut answer_items = answer_facts
@@ -1089,15 +1118,15 @@ async fn append_source_episode_fact_candidates(
         .collect::<HashSet<_>>();
     let mut siblings = Vec::new();
 
-    for episode_id in episode_ids {
-        let records = service
-            .graph_store
-            .select_active_facts_by_episode(
-                &episode_id,
-                params.cutoff_iso,
-                per_episode_limit.min(i32::MAX as usize) as i32,
-            )
-            .await?;
+    let fact_groups = service
+        .graph_store
+        .select_active_facts_by_episodes(
+            &episode_ids,
+            params.cutoff_iso,
+            per_episode_limit.min(i32::MAX as usize) as i32,
+        )
+        .await?;
+    for records in fact_groups {
         let facts = super::filtering::filter_facts_by_constraints(
             records,
             params.access,

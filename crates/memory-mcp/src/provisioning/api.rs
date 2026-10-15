@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use crate::MemoryError;
 use crate::http::leases::ProvisioningLease;
 use crate::identity::api::AuthMethod;
-use crate::models::registry::TenantStatus;
+use crate::models::registry::{NamespaceBinding, TenantStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientAuthority {
@@ -566,6 +566,28 @@ pub async fn transition_tenant_fenced(
     }
     port.update_tenant_state_fenced(tenant_id, expected_version, from, to, lease)
         .await
+}
+
+/// The infrastructure operation that brings a tenant's durable schema
+/// catalog up to the version required by this process before a runtime is
+/// admitted.
+#[async_trait::async_trait]
+pub trait ReadySchemaUpgradePort: Send + Sync {
+    async fn upgrade_ready_schema(
+        &self,
+        binding: &NamespaceBinding,
+        dimension: Option<usize>,
+    ) -> Result<(), MemoryError>;
+}
+
+/// Ensure the ready-schema policy delegates the immutable binding and current
+/// embedding dimension to the storage adapter.
+pub async fn ensure_ready_schema(
+    port: &(impl ReadySchemaUpgradePort + ?Sized),
+    binding: &NamespaceBinding,
+    dimension: Option<usize>,
+) -> Result<(), MemoryError> {
+    port.upgrade_ready_schema(binding, dimension).await
 }
 
 #[cfg(test)]

@@ -285,7 +285,7 @@ pub async fn reembed_tenant(
         .find_tenant_by_id(&tenant_id)
         .await?
         .ok_or(super::error::ApiError::NotFound)?;
-    let task_store = reembed_task_store(&state, &tenant).await?;
+    let (task_store, _maintenance_lease) = reembed_task_store(&state, &tenant).await?;
     let fingerprint = reembed_tenant_fingerprint(&tenant.id);
     // The dedupe probe runs BEFORE the enqueue. `enqueue` returns the existing
     // id for a live fingerprint and a fresh id for a new one, but both are
@@ -327,23 +327,34 @@ pub async fn reembed_tenant(
 async fn reembed_task_store(
     state: &Arc<crate::http::HttpState>,
     tenant: &crate::http::registry::models::Tenant,
-) -> Result<crate::http::tasks::worker::DurableTaskStore, super::error::ApiError> {
-    let engine = state.registry.tenant_engine_optional().ok_or_else(|| {
-        super::error::ApiError::from(crate::error::MemoryError::Unavailable(
-            "tenant storage engine unavailable".into(),
-        ))
-    })?;
-    let db = engine
-        .bind(tenant)
+) -> Result<
+    (
+        crate::http::tasks::worker::DurableTaskStore,
+        crate::http::registry::maintenance_clients::MaintenanceClientLease,
+    ),
+    super::error::ApiError,
+> {
+    let lease = state
+        .registry
+        .acquire_maintenance_namespace(
+            &tenant.namespace_binding.namespace,
+            &tenant.namespace_binding.database,
+        )
         .await
-        .map_err(super::error::ApiError::from)?;
+        .map_err(super::error::ApiError::from)?
+        .ok_or_else(|| {
+            super::error::ApiError::from(crate::error::MemoryError::Unavailable(
+                "tenant storage engine unavailable".into(),
+            ))
+        })?;
+    let db = lease.client();
     let bound_db = Arc::new(crate::storage::client::BoundDbClient::new(
         db,
         tenant.namespace_binding.namespace.clone(),
     ));
-    Ok(crate::http::tasks::worker::DurableTaskStore::new(
-        bound_db,
-        tenant.id.clone(),
+    Ok((
+        crate::http::tasks::worker::DurableTaskStore::new(bound_db, tenant.id.clone()),
+        lease,
     ))
 }
 

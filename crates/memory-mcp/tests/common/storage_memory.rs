@@ -16,7 +16,7 @@ use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 
 const SURREALDB_IMAGE: &str =
-    "surrealdb/surrealdb@sha256:ced63befc2ba46d97b922fa388aafcd6c81778760df2ba4aaae72bc00266d9ba";
+    "surrealdb/surrealdb@sha256:58944c284296507fd3cb343e7568a08dd38f397f7e763f9f54a71c5562c5839f";
 const SURREALDB_CONTAINER_PORT: &str = "8000/tcp";
 const CHILD_TIMEOUT: Duration = Duration::from_secs(120);
 const REPORT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -678,6 +678,8 @@ impl DockerContainer {
         let output = Command::new("docker")
             .args([
                 "run",
+                "--platform",
+                "linux/amd64",
                 "--detach",
                 "--rm",
                 "--name",

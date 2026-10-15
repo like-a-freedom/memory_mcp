@@ -5,6 +5,7 @@
 //! explicitly; there is no silent in-memory fallback.
 
 pub mod account;
+pub mod maintenance_clients;
 pub mod migrations;
 pub use crate::models::registry as models;
 pub mod control_impl;
@@ -22,12 +23,21 @@ pub use storage::{
 #[cfg(any(test, feature = "test-fixtures"))]
 pub use storage::InMemoryStore;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{
+    Arc, OnceLock,
+    atomic::{AtomicU64, Ordering},
+};
 
 use serde_json::Value;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::ws::Client;
+
+static NEXT_ENGINE_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+fn next_engine_generation() -> u64 {
+    NEXT_ENGINE_GENERATION.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Privileged SurrealDB engine held by the registry. The
 /// provisioning worker and the runtime factory both dispatch on
@@ -161,7 +171,26 @@ impl PrivilegedEngine {
         namespace: &str,
         database: &str,
     ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
+        self.bind_namespace_with_dimension(namespace, database, None)
+            .await
+    }
+
+    /// Bind a namespace with the migration dimension that identifies the
+    /// tenant schema this client is allowed to operate against. `None` keeps
+    /// the historical default for deployments with embeddings disabled.
+    pub async fn bind_namespace_with_dimension(
+        &self,
+        namespace: &str,
+        database: &str,
+        migration_dimension: Option<usize>,
+    ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
         use crate::storage::client::SurrealDbClient;
+        if migration_dimension == Some(0) {
+            return Err(crate::error::MemoryError::ConfigInvalid(
+                "tenant migration dimension must be greater than zero".to_owned(),
+            ));
+        }
+        let dimension = migration_dimension.unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
         // `use_ns/use_db` is a connection-session mutation. Surreal clones
         // isolate the resulting bound adapter, but concurrent binds on the
         // same underlying local/remote engine can conflict while the session
@@ -182,9 +211,11 @@ impl PrivilegedEngine {
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
-                Ok(Arc::new(SurrealDbClient::from_prebound_remote(
-                    ns_client, namespace, "info",
-                )))
+                Ok(Arc::new(
+                    SurrealDbClient::from_prebound_remote_with_dimension(
+                        ns_client, namespace, "info", dimension,
+                    ),
+                ))
             }
             PrivilegedEngine::Local(privileged) => {
                 let ns_client = (**privileged).clone();
@@ -195,8 +226,8 @@ impl PrivilegedEngine {
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
-                Ok(Arc::new(SurrealDbClient::from_prebound(
-                    ns_client, namespace, "info",
+                Ok(Arc::new(SurrealDbClient::from_prebound_with_dimension(
+                    ns_client, namespace, "info", dimension,
                 )))
             }
             PrivilegedEngine::LocalMem(privileged) => {
@@ -208,8 +239,8 @@ impl PrivilegedEngine {
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
-                Ok(Arc::new(SurrealDbClient::from_prebound_mem(
-                    ns_client, namespace, "info",
+                Ok(Arc::new(SurrealDbClient::from_prebound_mem_with_dimension(
+                    ns_client, namespace, "info", dimension,
                 )))
             }
         }
@@ -345,6 +376,10 @@ pub struct RegistryHandle {
     pub(crate) local_admin_store:
         Option<Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>>,
     engine: Option<Arc<PrivilegedEngine>>,
+    engine_generation: u64,
+    maintenance_dimension: Option<usize>,
+    maintenance_client_pool_config: maintenance_clients::MaintenanceClientPoolConfig,
+    maintenance_clients: Option<Arc<maintenance_clients::MaintenanceClients>>,
 }
 
 impl RegistryHandle {
@@ -404,6 +439,11 @@ impl RegistryHandle {
             #[cfg(feature = "control-plane")]
             local_admin_store,
             engine: None,
+            engine_generation: 0,
+            maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
+            maintenance_clients: None,
         }
     }
 
@@ -412,12 +452,25 @@ impl RegistryHandle {
         backend: Arc<dyn RegistryBackend>,
         engine: PrivilegedEngine,
     ) -> Self {
+        let engine = Arc::new(engine);
+        let engine_generation = next_engine_generation();
+        let maintenance_clients = Arc::new(
+            maintenance_clients::MaintenanceClients::with_engine_for_test(
+                (*engine).clone(),
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
+            ),
+        );
         Self {
             stores: RegistryStores::from_backend(backend.clone()),
             health: backend,
             #[cfg(feature = "control-plane")]
             local_admin_store: None,
-            engine: Some(Arc::new(engine)),
+            engine: Some(engine),
+            engine_generation,
+            maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
+            maintenance_clients: Some(maintenance_clients),
         }
     }
 
@@ -462,8 +515,119 @@ impl RegistryHandle {
     /// `HttpState::new` to wire the production engine without
     /// exposing the field publicly.
     pub fn with_engine(mut self, engine: Arc<PrivilegedEngine>) -> Self {
+        self.engine_generation = next_engine_generation();
+        self.maintenance_dimension = None;
+        self.maintenance_clients = Some(Arc::new(
+            maintenance_clients::MaintenanceClients::for_engine(
+                (*engine).clone(),
+                self.engine_generation,
+                None,
+                self.maintenance_client_pool_config,
+            ),
+        ));
         self.engine = Some(engine);
         self
+    }
+
+    /// Bind the process-owned maintenance pool to the deployment's embedding
+    /// migration identity. `None` is the lexical-only/default-schema profile.
+    pub(crate) fn with_maintenance_dimension(mut self, dimension: Option<usize>) -> Self {
+        self.maintenance_dimension = dimension;
+        self.maintenance_clients = self.engine.as_ref().map(|engine| {
+            Arc::new(maintenance_clients::MaintenanceClients::for_engine(
+                (**engine).clone(),
+                self.engine_generation,
+                dimension,
+                self.maintenance_client_pool_config,
+            ))
+        });
+        self
+    }
+
+    /// Apply the deployment's bounded maintenance-session limits and rebuild
+    /// the engine-owned pool with the same immutable engine/dimension identity.
+    pub(crate) fn with_maintenance_client_pool_config(
+        mut self,
+        config: maintenance_clients::MaintenanceClientPoolConfig,
+    ) -> Self {
+        self.maintenance_client_pool_config = config;
+        self.maintenance_clients = self.engine.as_ref().map(|engine| {
+            Arc::new(maintenance_clients::MaintenanceClients::for_engine(
+                (**engine).clone(),
+                self.engine_generation,
+                self.maintenance_dimension,
+                config,
+            ))
+        });
+        self
+    }
+
+    /// Acquire a short-lived lease over the bounded maintenance binding.
+    /// Tenant and database identity are derived from the durable registry row;
+    /// callers cannot choose a table or mutable session name.
+    pub(crate) async fn acquire_maintenance_client(
+        &self,
+        tenant: &models::Tenant,
+    ) -> Result<Option<maintenance_clients::MaintenanceClientLease>, crate::error::MemoryError>
+    {
+        self.acquire_maintenance_binding(
+            &tenant.namespace_binding.namespace,
+            &tenant.namespace_binding.database,
+            true,
+        )
+        .await
+    }
+
+    /// Bind a namespace for maintenance workflows that only receive the
+    /// persisted namespace binding, such as recovery of a deleting tenant.
+    pub(crate) async fn acquire_maintenance_namespace(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<Option<maintenance_clients::MaintenanceClientLease>, crate::error::MemoryError>
+    {
+        self.acquire_maintenance_binding(namespace, database, false)
+            .await
+    }
+
+    async fn acquire_maintenance_binding(
+        &self,
+        namespace: &str,
+        database: &str,
+        requires_ready_schema: bool,
+    ) -> Result<Option<maintenance_clients::MaintenanceClientLease>, crate::error::MemoryError>
+    {
+        let Some(clients) = self.maintenance_clients.as_ref() else {
+            return Ok(None);
+        };
+        let key = maintenance_clients::MaintenanceClientKey {
+            namespace: namespace.to_owned(),
+            database: database.to_owned(),
+            engine_generation: self.engine_generation,
+            migration_dimension: self.maintenance_dimension,
+            requires_ready_schema,
+        };
+        clients.acquire(key).await.map(Some)
+    }
+
+    pub(crate) fn maintenance_client_snapshot(
+        &self,
+    ) -> Option<maintenance_clients::MaintenanceClientSnapshot> {
+        self.maintenance_clients
+            .as_ref()
+            .map(|clients| clients.snapshot())
+    }
+
+    pub(crate) async fn shutdown_maintenance_clients(&self) {
+        if let Some(clients) = self.maintenance_clients.as_ref() {
+            clients.shutdown().await;
+        }
+    }
+
+    pub(crate) fn begin_maintenance_shutdown(&self) {
+        if let Some(clients) = self.maintenance_clients.as_ref() {
+            clients.begin_shutdown();
+        }
     }
 
     /// Replace the underlying backend. Used by tests that need
@@ -562,12 +726,25 @@ impl RegistryHandle {
         >,
         engine: PrivilegedEngine,
     ) -> Self {
+        let engine = Arc::new(engine);
+        let engine_generation = next_engine_generation();
+        let maintenance_clients = Arc::new(maintenance_clients::MaintenanceClients::for_engine(
+            (*engine).clone(),
+            engine_generation,
+            None,
+            maintenance_clients::MaintenanceClientPoolConfig::default(),
+        ));
         Self {
             stores: RegistryStores::from_backend(store.clone()),
             health: store,
             #[cfg(feature = "control-plane")]
             local_admin_store,
-            engine: Some(Arc::new(engine)),
+            engine: Some(engine),
+            engine_generation,
+            maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
+            maintenance_clients: Some(maintenance_clients),
         }
     }
 }

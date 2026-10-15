@@ -56,6 +56,49 @@ impl KnowledgeStoreClient {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Selects one independently limited FTS result group for each lexical
+    /// fallback term. Groups stay in input order so retrieval deduplication
+    /// keeps the same winning occurrence as the sequential reads.
+    pub async fn select_facts_for_lexical_terms(
+        &self,
+        cutoff: &str,
+        terms: &[String],
+        limit_per_term: i32,
+        fact_types: &[String],
+    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        const MAX_TERMS_PER_RPC: usize = 8;
+
+        let mut result_groups = Vec::with_capacity(terms.len());
+        for term_batch in terms.chunks(MAX_TERMS_PER_RPC) {
+            let first_term = term_batch.first().ok_or_else(|| {
+                MemoryError::Storage("empty lexical fact query batch".to_string())
+            })?;
+            let (_, vars) = crate::knowledge::queries::build_select_facts_filtered_query(
+                cutoff,
+                Some(first_term),
+                limit_per_term,
+                fact_types,
+            );
+            let mut subqueries = Vec::with_capacity(term_batch.len());
+            for term in term_batch {
+                let (sql, _) = crate::knowledge::queries::build_select_facts_filtered_query(
+                    cutoff,
+                    Some(term),
+                    limit_per_term,
+                    fact_types,
+                );
+                subqueries.push(format!("({sql})"));
+            }
+            let sql = format!("RETURN [{}]", subqueries.join(", "));
+            let groups = self
+                .db
+                .query_row_groups(&sql, Some(vars), term_batch.len())
+                .await?;
+            result_groups.extend(groups);
+        }
+        Ok(result_groups)
+    }
+
     /// Facts linked to a set of normalized entity ids.
     pub async fn select_facts_by_entity_links(
         &self,
@@ -173,6 +216,13 @@ impl KnowledgeStoreClient {
     pub async fn scan_facts(&self) -> Result<Vec<Value>, MemoryError> {
         let sql = crate::knowledge::queries::build_scan_nonsemantic_facts_query();
         self.db.query_rows(&sql, None).await
+    }
+
+    /// Scans the same complete nonsemantic fact set after applying the shared bi-temporal visibility rule.
+    pub async fn scan_facts_as_of(&self, cutoff: &str) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) =
+            crate::knowledge::queries::build_scan_nonsemantic_facts_as_of_query(cutoff);
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.

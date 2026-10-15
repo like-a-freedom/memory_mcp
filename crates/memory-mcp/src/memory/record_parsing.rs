@@ -96,6 +96,20 @@ mod tests {
     }
 
     #[test]
+    fn episode_from_record_returns_none_for_malformed_reference_timestamp() {
+        let record = json!({
+            "episode_id": "episode:malformed-time",
+            "source_type": "document",
+            "source_id": "malformed-time",
+            "content": "an episode with an invalid stored timestamp",
+            "t_ref": "not-a-datetime",
+            "t_ingested": "2026-10-14T10:00:00Z",
+        });
+
+        assert!(episode_from_record(record.as_object().expect("object record")).is_none());
+    }
+
+    #[test]
     fn episode_from_record_handles_wrapped_string_values() {
         let mut record = serde_json::Map::new();
         record.insert(
