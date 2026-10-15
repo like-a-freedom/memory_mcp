@@ -25,6 +25,16 @@ use crate::memory::episode_store::EpisodeStoreClient;
 /// tenant that cannot be bound or read is skipped with a warning; the walk
 /// itself never fails, so a metric can neither stop nor delay a boot.
 pub(crate) async fn restore_knowledge_clock(registry: &RegistryHandle) {
+    restore_knowledge_clock_with(registry, crate::observability::restore_knowledge_clock).await;
+}
+
+// Keep the durable scan independent from the process-global metrics recorder.
+// This lets storage tests assert the selected timestamp without racing
+// unrelated metric writers.
+async fn restore_knowledge_clock_with(
+    registry: &RegistryHandle,
+    restore: impl FnOnce(Option<f64>),
+) {
     let tenants = match registry.tenants().list_tenants(10_000).await {
         Ok(tenants) => tenants,
         Err(error) => {
@@ -78,10 +88,10 @@ pub(crate) async fn restore_knowledge_clock(registry: &RegistryHandle) {
             }
         }
     }
-    crate::observability::restore_knowledge_clock(newest);
+    restore(newest);
 }
 
-#[cfg(all(test, feature = "prometheus"))]
+#[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
@@ -143,58 +153,40 @@ mod tests {
             .expect("seed episode should succeed");
     }
 
-    fn gauge_sample(exposition: &str) -> Option<f64> {
-        exposition.lines().find_map(|line| {
-            let (sample_name, value) = line.split_once(' ')?;
-            (sample_name
-                == crate::shared::observability::METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS)
-                .then(|| value.parse().ok())
-                .flatten()
-        })
-    }
-
     /// A stored episode restores the clock to its ingest moment.
     ///
-    /// The handle comes first, mirroring boot order: the recorder is
-    /// installed before the walk runs, and a stamp set with no recorder
-    /// installed would be lost unnoticed.
+    /// This checks the durable scan's selected timestamp. The recorder's
+    /// effect is covered separately by the observability unit tests.
     #[tokio::test]
     async fn boot_restores_the_clock_from_stored_episodes() {
         const STORED: &str = "2026-03-10T10:00:00Z";
-        let handle = crate::observability::shared_test_handle().expect("prometheus enabled");
         let (registry, db) = provision("tns_clock_seed").await;
         seed_episode(&db, "tns_clock_seed", STORED).await;
+        let mut restored = None;
 
-        super::restore_knowledge_clock(&registry).await;
+        super::restore_knowledge_clock_with(&registry, |moment| restored = moment).await;
 
-        let exposition = handle.render();
         let expected = chrono::DateTime::parse_from_rfc3339(STORED)
             .expect("seed literal is RFC 3339")
             .timestamp() as f64;
         assert_eq!(
-            gauge_sample(&exposition),
+            restored,
             Some(expected),
-            "boot must put the stored ingest moment back on the clock: {exposition}"
+            "boot must restore the newest stored ingest moment"
         );
     }
 
-    /// No episodes restores nothing: the clock stays exactly where it was.
-    ///
-    /// The shared recorder outlives any one test, so this asserts the walk
-    /// is a no-op rather than absence, which a sibling test's stamp would
-    /// break.
+    /// An empty store produces no timestamp for the recorder to restore.
     #[tokio::test]
-    async fn boot_without_episodes_leaves_the_clock_alone() {
-        let handle = crate::observability::shared_test_handle().expect("prometheus enabled");
+    async fn boot_without_episodes_restores_no_timestamp() {
         let (registry, _db) = provision("tns_clock_empty").await;
-        let before = handle.render();
+        let mut restored = Some(1.0);
 
-        super::restore_knowledge_clock(&registry).await;
+        super::restore_knowledge_clock_with(&registry, |moment| restored = moment).await;
 
         assert_eq!(
-            gauge_sample(&before),
-            gauge_sample(&handle.render()),
-            "a walk over an empty store must not move the clock"
+            restored, None,
+            "an empty store must not synthesize a knowledge timestamp"
         );
     }
 }

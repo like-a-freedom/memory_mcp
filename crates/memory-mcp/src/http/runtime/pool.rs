@@ -967,6 +967,9 @@ mod tests {
         calls: Arc<std::sync::atomic::AtomicU64>,
         panic_next: Arc<std::sync::atomic::AtomicBool>,
         fail_next: Arc<std::sync::atomic::AtomicBool>,
+        // A prepared success path keeps the retry test focused on pool backoff,
+        // rather than the duration of SurrealDB runtime construction.
+        prebuilt_runtime: std::sync::Mutex<Option<crate::http::runtime::storage::TenantRuntime>>,
     }
 
     #[async_trait::async_trait]
@@ -977,11 +980,20 @@ mod tests {
             &self,
             spec: crate::tenancy::api::TenantRuntimeSpec,
         ) -> Result<Self::Runtime, crate::tenancy::api::RuntimeFactoryError> {
-            self.registry
-                .tenants()
-                .write_tenant(&tenant_for_spec(&spec))
-                .await
-                .map_err(crate::tenancy::api::RuntimeFactoryError::Storage)?;
+            let has_prebuilt_runtime = self
+                .prebuilt_runtime
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_some();
+            // The test registers the tenant while preparing this runtime, so
+            // the timed path does not spend its 100 ms deadline on another DB write.
+            if !has_prebuilt_runtime {
+                self.registry
+                    .tenants()
+                    .write_tenant(&tenant_for_spec(&spec))
+                    .await
+                    .map_err(crate::tenancy::api::RuntimeFactoryError::Storage)?;
+            }
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.entered.add_permits(1);
             let should_panic = self.panic_next.swap(false, Ordering::SeqCst);
@@ -998,6 +1010,14 @@ mod tests {
             permit.forget();
             if should_panic {
                 panic!("factory panicked on purpose");
+            }
+            let prebuilt_runtime = self
+                .prebuilt_runtime
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            if let Some(runtime) = prebuilt_runtime {
+                return Ok(runtime);
             }
             crate::tenancy::api::TenantRuntimeFactory::activate(&self.inner, spec).await
         }
@@ -1056,6 +1076,7 @@ mod tests {
             calls: Arc::clone(&calls),
             panic_next: Arc::clone(&panic_next),
             fail_next: Arc::clone(&fail_next),
+            prebuilt_runtime: std::sync::Mutex::new(None),
         });
         (
             factory,
@@ -1433,15 +1454,27 @@ mod tests {
 
     #[tokio::test]
     async fn timed_out_activation_retries_after_backoff() {
-        let (pool, harness) = pool_with_blocking_factory(
+        let tenant = spec("ten_timeout_backoff", "tns_timeout_backoff");
+        let registry = mem_registry().await;
+        register_test_tenant(&registry, &tenant_for_spec(&tenant)).await;
+        let (factory, harness) = blocking_factory(Arc::clone(&registry));
+        let prebuilt_runtime =
+            crate::tenancy::api::TenantRuntimeFactory::activate(&factory.inner, tenant.clone())
+                .await
+                .expect("the retry runtime is prepared before the timeout scenario");
+        *factory
+            .prebuilt_runtime
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(prebuilt_runtime);
+        let pool = Arc::new(Pool::with_factory(
             4,
             Duration::ZERO,
             Duration::from_secs(2),
             Duration::from_millis(100),
             DEFAULT_PER_TENANT_CONCURRENCY,
-        )
-        .await;
-        let tenant = spec("ten_timeout_backoff", "tns_timeout_backoff");
+            factory,
+            harness.shutdown.clone(),
+        ));
         let leader = tokio::spawn({
             let pool = Arc::clone(&pool);
             let tenant = tenant.clone();
@@ -1483,12 +1516,13 @@ mod tests {
             .await
             .expect("the activation backoff deadline must be finite");
         let recovered = tokio::time::timeout(
-            Duration::from_secs(2),
+            Duration::from_secs(10),
             pool.acquire_spec_with_limit(&tenant, 4),
         )
         .await
         .expect("activation must be retryable after the backoff expires");
-        assert!(recovered.is_ok());
+        let recovered = recovered.expect("tenant runtime activation must succeed");
+        assert_eq!(recovered.runtime().tenant_id, tenant.tenant_id);
         assert_eq!(harness.calls(), 2);
     }
 
