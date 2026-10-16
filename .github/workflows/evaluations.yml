@@ -20,7 +20,7 @@ env:
 jobs:
   eval-nightly:
     name: Evaluation nightly profile
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v7.0.1
@@ -55,7 +55,7 @@ jobs:
 
   benchmark-nightly:
     name: CPU benchmark profiles
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v7.0.1

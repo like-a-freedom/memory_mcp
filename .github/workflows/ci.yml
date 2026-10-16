@@ -42,7 +42,7 @@ env:
 jobs:
   quality:
     name: Lint, tests and evaluation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7.0.1
@@ -130,7 +130,7 @@ jobs:
           cargo check -p memory_mcp --all-targets --no-default-features \
             --features "prometheus,test-fixtures" --locked
       - name: Cache immutable evaluation models
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/eval-models
           key: eval-models-${{ runner.os }}-${{ hashFiles('evals/models/multilingual-e5-small.json', 'evals/models/mmarco-minilm.json') }}
@@ -188,7 +188,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
           # TEMPORARILY DISABLED. The `ubuntu-24.04-arm` runner was SIGTERM'd
           # mid-build (exit 143, "runner has received a shutdown signal") partway
@@ -279,7 +279,7 @@ jobs:
     # pull requests build and smoke-test without publishing.
     if: github.event_name != 'push'
     name: Docker linux/amd64
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
       contents: read
@@ -592,7 +592,7 @@ jobs:
     name: CI passed
     if: always()
     needs: [quality, native, docker]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require every check this event is supposed to run
         env:
