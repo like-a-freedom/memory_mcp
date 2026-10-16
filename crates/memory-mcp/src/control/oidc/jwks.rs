@@ -1,9 +1,7 @@
-//! JWKS cache used by [`crate::control::oidc::OidcClient`].
-//!
-//! The cache is shared via `Arc` so concurrent ID-token validations
-//! hit the in-memory `HashMap`; a refresh is serialized through a
-//! `tokio::sync::Mutex` and only re-fetches when the cached keys
-//! are older than the configured TTL.
+use super::diagnostics::{
+    ProviderComponent, ProviderDiagnostics, ProviderOutcome, ProviderStage, ProviderState,
+    RequestObservation,
+};
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -30,6 +28,7 @@ pub struct JwksCache {
     source: Arc<dyn JwksSource>,
     clock: Arc<dyn super::retry::OidcClock>,
     ttl: Duration,
+    diagnostics: Arc<ProviderDiagnostics>,
 }
 
 struct JwksState {
@@ -57,10 +56,22 @@ impl JwksState {
 impl JwksCache {
     pub(crate) async fn maintain(&self, cancel: tokio_util::sync::CancellationToken) {
         loop {
-            tokio::select! { biased; _=cancel.cancelled()=>return, _=self.refresh()=>{} }
+            self.publish_status();
+            let expiry = self.expiry().filter(|at| *at > self.clock.now());
+            let refresh = self.refresh();
+            tokio::pin!(refresh);
+            if let Some(expiry) = expiry {
+                tokio::select! {biased; _=cancel.cancelled()=>return, _=&mut refresh=>{}, _=self.clock.sleep_until(expiry)=>{
+                    self.publish_status();
+                    tokio::select!{biased; _=cancel.cancelled()=>return,_=&mut refresh=>{}}
+                }}
+            } else {
+                tokio::select! {biased;_=cancel.cancelled()=>return,_=&mut refresh=>{}}
+            }
+            self.publish_status();
             let deadline = {
                 let Ok(state) = self.inner.read() else { return };
-                if state.last_outcome.is_err() {
+                let retry = if state.last_outcome.is_err() {
                     state
                         .next_attempt
                         .unwrap_or_else(|| self.clock.now() + Duration::from_secs(1))
@@ -69,10 +80,58 @@ impl JwksCache {
                         .fetched_at
                         .map(|at| at + super::retry::refresh_age(rand::random()))
                         .unwrap_or_else(|| self.clock.now() + Duration::from_secs(1))
-                }
+                };
+                state
+                    .fetched_at
+                    .map(|at| at + self.ttl)
+                    .filter(|at| *at > self.clock.now())
+                    .map_or(retry, |expiry| expiry.min(retry))
             };
-            tokio::select! { biased; _=cancel.cancelled()=>return, _=self.clock.sleep_until(deadline)=>{} }
+            tokio::select! {biased;_=cancel.cancelled()=>return,_=self.clock.sleep_until(deadline)=>{}}
         }
+    }
+    fn expiry(&self) -> Option<Instant> {
+        self.inner.read().ok()?.fetched_at.map(|at| at + self.ttl)
+    }
+    fn publish_status(&self) {
+        let status = self.status();
+        self.diagnostics
+            .ready(ProviderComponent::Jwks, status == JwksStatus::Fresh);
+        let (state, reason, http, retry) = match self.inner.read() {
+            Ok(cache) => {
+                if status == JwksStatus::Stale {
+                    (ProviderState::Stale, "expired", None, Duration::ZERO)
+                } else if let Err(failure) = &cache.last_outcome {
+                    (
+                        if failure.kind == super::provider::ProviderFailureKind::InvalidResponse {
+                            ProviderState::InvalidResponse
+                        } else {
+                            ProviderState::Backoff
+                        },
+                        failure.reason(),
+                        failure.status,
+                        cache
+                            .next_attempt
+                            .map(|at| at.saturating_duration_since(self.clock.now()))
+                            .unwrap_or_default(),
+                    )
+                } else {
+                    (
+                        if status == JwksStatus::Fresh {
+                            ProviderState::Fresh
+                        } else {
+                            ProviderState::Empty
+                        },
+                        "snapshot",
+                        None,
+                        Duration::ZERO,
+                    )
+                }
+            }
+            Err(_) => (ProviderState::Backoff, "lock", None, Duration::from_secs(1)),
+        };
+        self.diagnostics
+            .transition(ProviderComponent::Jwks, state, reason, http, retry);
     }
 
     pub fn status(&self) -> JwksStatus {
@@ -112,6 +171,7 @@ impl JwksCache {
             source,
             clock,
             ttl,
+            diagnostics: Arc::new(ProviderDiagnostics::default()),
         }
     }
     pub fn find_key(&self, kid: &str) -> Result<Option<DecodingKey>, AuthError> {
@@ -184,7 +244,7 @@ impl JwksCache {
             .write()
             .map_err(|_| AuthError::Jwks("cache lock poisoned".into()))?;
         state.generation = state.generation.wrapping_add(1);
-        match result {
+        let outcome = match result {
             Ok(keys) => {
                 state.keys = keys;
                 state.fetched_at = Some(now);
@@ -200,7 +260,10 @@ impl JwksCache {
                 state.last_outcome = Err(failure);
                 Err(AuthError::Unavailable { retry_after: delay })
             }
-        }
+        };
+        drop(state);
+        self.publish_status();
+        outcome
     }
 }
 
@@ -297,6 +360,63 @@ mod controlled {
             clock,
         )
     }
+    #[cfg(feature = "prometheus")]
+    #[tokio::test]
+    async fn readiness_expires_without_auth_traffic_during_long_backoff() {
+        use crate::observability::tests::sample_series;
+        let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
+        let handle = recorder.handle();
+        let scenario = async {
+            let (c, s, t) = fixture();
+            c.refresh().await.expect("warmup");
+            assert_eq!(
+                sample_series(
+                    &handle.render(),
+                    "memory_oidc_provider_ready",
+                    "component=\"jwks\""
+                ),
+                Some(1.)
+            );
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let upkeep = c.maintain(cancel.clone());
+            tokio::pin!(upkeep);
+            assert!(matches!(
+                std::future::poll_fn(|cx| std::task::Poll::Ready(upkeep.as_mut().poll(cx))).await,
+                std::task::Poll::Pending
+            ));
+            *s.reply.lock().expect("source") = Err(super::super::provider::ProviderFailure {
+                kind: super::super::provider::ProviderFailureKind::Http,
+                status: Some(503),
+                retry_after: Some(Duration::from_secs(300)),
+            });
+            t.advance(270);
+            assert!(matches!(
+                std::future::poll_fn(|cx| std::task::Poll::Ready(upkeep.as_mut().poll(cx))).await,
+                std::task::Poll::Pending
+            ));
+            t.advance(30);
+            assert!(matches!(
+                std::future::poll_fn(|cx| std::task::Poll::Ready(upkeep.as_mut().poll(cx))).await,
+                std::task::Poll::Pending
+            ));
+            assert_eq!(
+                sample_series(
+                    &handle.render(),
+                    "memory_oidc_provider_ready",
+                    "component=\"jwks\""
+                ),
+                Some(0.)
+            );
+            assert_eq!(s.calls.load(Ordering::SeqCst), 2);
+            cancel.cancel();
+            upkeep.await;
+        };
+        tokio::pin!(scenario);
+        std::future::poll_fn(|cx| {
+            metrics::with_local_recorder(&recorder, || scenario.as_mut().poll(cx))
+        })
+        .await;
+    }
     #[tokio::test]
     async fn cached_known_key_survives_failed_early_refresh() {
         let (c, s, t) = fixture();
@@ -378,61 +498,73 @@ impl JwksSource for HttpJwksSource {
     async fn fetch(
         &self,
     ) -> Result<HashMap<String, DecodingKey>, super::provider::ProviderFailure> {
-        #[derive(serde::Deserialize)]
-        struct JwksDocument {
-            keys: Vec<Jwk>,
-        }
-        #[derive(serde::Deserialize)]
-        struct Jwk {
-            kid: String,
-            kty: String,
-            n: Option<String>,
-            e: Option<String>,
-            crv: Option<String>,
-            x: Option<String>,
-            y: Option<String>,
-            alg: Option<String>,
-        }
-        let document: JwksDocument =
-            serde_json::from_value(super::provider::json(self.client.get(&self.uri)).await?)
+        let diagnostics = ProviderDiagnostics::default();
+        let mut observation = RequestObservation::new(&diagnostics, ProviderStage::Jwks);
+        let result: Result<HashMap<String, DecodingKey>, super::provider::ProviderFailure> =
+            async {
+                #[derive(serde::Deserialize)]
+                struct JwksDocument {
+                    keys: Vec<Jwk>,
+                }
+                #[derive(serde::Deserialize)]
+                struct Jwk {
+                    kid: String,
+                    kty: String,
+                    n: Option<String>,
+                    e: Option<String>,
+                    crv: Option<String>,
+                    x: Option<String>,
+                    y: Option<String>,
+                    alg: Option<String>,
+                }
+                let document: JwksDocument = serde_json::from_value(
+                    super::provider::json(self.client.get(&self.uri)).await?,
+                )
                 .map_err(|_| super::provider::ProviderFailure::invalid())?;
-        let mut keys = HashMap::new();
-        for jwk in document.keys.into_iter().take(32) {
-            let key = match (
-                jwk.kty.as_str(),
-                jwk.n.as_deref(),
-                jwk.e.as_deref(),
-                jwk.crv.as_deref(),
-                jwk.x.as_deref(),
-                jwk.y.as_deref(),
-            ) {
-                ("RSA", Some(n), Some(e), _, _, _) => {
-                    jsonwebtoken::DecodingKey::from_rsa_components(n, e)
+                let mut keys = HashMap::new();
+                for jwk in document.keys.into_iter().take(32) {
+                    let key = match (
+                        jwk.kty.as_str(),
+                        jwk.n.as_deref(),
+                        jwk.e.as_deref(),
+                        jwk.crv.as_deref(),
+                        jwk.x.as_deref(),
+                        jwk.y.as_deref(),
+                    ) {
+                        ("RSA", Some(n), Some(e), _, _, _) => {
+                            jsonwebtoken::DecodingKey::from_rsa_components(n, e)
+                        }
+                        ("EC", _, _, Some("P-256"), Some(x), Some(y)) => {
+                            jsonwebtoken::DecodingKey::from_ec_components(x, y)
+                        }
+                        ("OKP", _, _, Some("Ed25519"), Some(x), _) => {
+                            jsonwebtoken::DecodingKey::from_ed_components(x)
+                        }
+                        _ => continue,
+                    }
+                    .map_err(|_| super::provider::ProviderFailure::invalid())?;
+                    // A key the provider pins to an algorithm we accept has to
+                    // survive. EC entries stay limited to P-256 above because no other
+                    // curve is decoded — so adding an ES* algorithm to
+                    // `SUPPORTED_ID_TOKEN_ALGORITHMS` needs a matching curve arm here,
+                    // or its key will drop out exactly as this filter used to drop
+                    // RS384's.
+                    if jwk
+                        .alg
+                        .as_deref()
+                        .is_none_or(|alg| SUPPORTED_ID_TOKEN_ALGORITHMS.contains(&alg))
+                    {
+                        keys.insert(jwk.kid, key);
+                    }
                 }
-                ("EC", _, _, Some("P-256"), Some(x), Some(y)) => {
-                    jsonwebtoken::DecodingKey::from_ec_components(x, y)
-                }
-                ("OKP", _, _, Some("Ed25519"), Some(x), _) => {
-                    jsonwebtoken::DecodingKey::from_ed_components(x)
-                }
-                _ => continue,
+                Ok(keys)
             }
-            .map_err(|_| super::provider::ProviderFailure::invalid())?;
-            // A key the provider pins to an algorithm we accept has to
-            // survive. EC entries stay limited to P-256 above because no other
-            // curve is decoded — so adding an ES* algorithm to
-            // `SUPPORTED_ID_TOKEN_ALGORITHMS` needs a matching curve arm here,
-            // or its key will drop out exactly as this filter used to drop
-            // RS384's.
-            if jwk
-                .alg
-                .as_deref()
-                .is_none_or(|alg| SUPPORTED_ID_TOKEN_ALGORITHMS.contains(&alg))
-            {
-                keys.insert(jwk.kid, key);
-            }
-        }
-        Ok(keys)
+            .await;
+        observation.finish(match &result {
+            Ok(_) => ProviderOutcome::Success,
+            Err(failure) => failure.outcome(),
+        });
+        result
     }
 }
 

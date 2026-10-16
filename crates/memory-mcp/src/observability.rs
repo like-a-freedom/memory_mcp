@@ -42,6 +42,15 @@ pub const METRIC_FS_WATCH_DEGRADED: &str = "memory_fs_watch_degraded";
 pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
     "memory_fs_watch_revision_duration_seconds";
 
+#[cfg(feature = "control-plane")]
+pub(crate) fn record_oidc_ready(component: &'static str, ready: bool) {
+    metrics::gauge!(crate::shared::observability::METRIC_OIDC_PROVIDER_READY,"component"=>component).set(if ready {1.}else{0.});
+}
+#[cfg(feature = "control-plane")]
+pub(crate) fn record_oidc_request(stage: &'static str, outcome: &'static str) {
+    metrics::counter!(crate::shared::observability::METRIC_OIDC_PROVIDER_REQUESTS_TOTAL,"stage"=>stage,"outcome"=>outcome).increment(1);
+}
+
 /// Record one background job: its outcome and how long it ran.
 ///
 /// Shared by scheduler jobs that do not already measure their bounded
@@ -1385,7 +1394,9 @@ pub(crate) mod tests {
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_BODY_BYTES,
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL,
         ];
-        const HTTP_OWNER_SNAPSHOT: [&str; 21] = [
+        const HTTP_OWNER_SNAPSHOT: [&str; 23] = [
+            crate::shared::observability::METRIC_OIDC_PROVIDER_READY,
+            crate::shared::observability::METRIC_OIDC_PROVIDER_REQUESTS_TOTAL,
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_BYTES,
             crate::shared::observability::METRIC_HTTP_TENANT_RUNTIME_COUNT,

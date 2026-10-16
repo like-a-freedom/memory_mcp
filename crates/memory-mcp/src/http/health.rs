@@ -60,7 +60,12 @@ pub async fn ready(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
             readiness_level(readiness),
         );
     }
-    let body = json!({"status": readiness}).to_string();
+    let oidc = state
+        .oidc
+        .as_ref()
+        .map(|runtime| runtime.health())
+        .unwrap_or_else(crate::control::oidc::OidcHealth::disabled);
+    let body = json!({"status": readiness,"oidc":oidc}).to_string();
     (
         status,
         [(axum::http::header::CONTENT_TYPE, "application/json")],

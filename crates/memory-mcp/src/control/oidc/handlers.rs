@@ -1057,7 +1057,7 @@ mod tests {
         );
 
         assert!(
-            matches!(outage, ApiError::Unavailable),
+            matches!(outage, ApiError::OidcUnavailable { .. }),
             "a JWKS outage must stay 503, not become 401"
         );
         assert!(

@@ -181,3 +181,55 @@ async fn malformed_jwt_payload_during_discovery_outage_is_401() {
     let response = bearer(&s, &format!("{encoded}.bm90LWpzb24.YWJj")).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn discovery_backoff_is_visible_without_gating_readiness() {
+    let mut p = OidcProviderFixture::start().await;
+    p.set_reply(
+        ProviderRoute::Discovery,
+        ProviderReply::status(StatusCode::BAD_GATEWAY),
+    );
+    let s = HttpServerFixture::spawn(config(&p, "oidc")).await;
+    p.next_request(ProviderRoute::Discovery).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let response = get(&s, "/health/ready").await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let body: serde_json::Value = response.json().await.expect("health JSON");
+            if body["oidc"]["metadata"] == "backoff" {
+                assert_eq!(body["status"], "ready");
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("backoff published");
+    let metrics = get(&s, "/metrics").await.text().await.expect("metrics");
+    assert!(metrics.contains("memory_oidc_provider_requests_total"));
+    assert!(
+        metrics
+            .lines()
+            .any(|line| line.starts_with("memory_oidc_provider_ready{")
+                && line.contains("component=\"metadata\"")
+                && line.ends_with(" 0"))
+    );
+}
+#[tokio::test]
+async fn disabled_provider_emits_no_series_or_requests() {
+    let p = OidcProviderFixture::start().await;
+    let mut local = config(&p, "local");
+    local
+        .extra_env
+        .retain(|(key, _)| !key.starts_with("MEMORY_MCP_HTTP_OIDC_"));
+    let s = HttpServerFixture::spawn(local).await;
+    assert_eq!(get(&s, "/health/ready").await.status(), StatusCode::OK);
+    let metrics = get(&s, "/metrics").await.text().await.expect("metrics");
+    assert!(
+        !metrics
+            .lines()
+            .any(|line| line.starts_with("memory_oidc_provider_"))
+    );
+    assert_eq!(p.count(ProviderRoute::Discovery), 0);
+    assert_eq!(p.count(ProviderRoute::Jwks), 0);
+}

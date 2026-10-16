@@ -370,3 +370,7 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) use provider::ProviderSettings;
+
+mod diagnostics;
+
+pub use diagnostics::{MetadataStatus, OidcHealth};

@@ -1,4 +1,6 @@
-//! Configured OIDC method: discovery is owned background work, never startup I/O.
+use super::diagnostics::{
+    MetadataStatus, OidcHealth, ProviderComponent, ProviderDiagnostics, ProviderState,
+};
 use super::{
     OidcClient,
     provider::{ProviderFailureKind, ProviderSettings},
@@ -17,6 +19,7 @@ pub struct OidcUnavailable {
     pub retry_after: Duration,
 }
 pub struct OidcRuntime {
+    diagnostics: ProviderDiagnostics,
     settings: Option<ProviderSettings>,
     http: reqwest::Client,
     clock: Arc<dyn OidcClock>,
@@ -25,7 +28,7 @@ pub struct OidcRuntime {
 struct RuntimeState {
     client: Option<Arc<OidcClient>>,
     retry_at: Instant,
-    invalid_response: bool,
+    metadata: MetadataStatus,
 }
 impl OidcRuntime {
     pub fn new(config: &OidcBrowserConfig) -> Result<Arc<Self>, MemoryError> {
@@ -37,26 +40,28 @@ impl OidcRuntime {
             &config.allowed_alg,
         )?;
         Ok(Arc::new(Self {
+            diagnostics: ProviderDiagnostics::default(),
             settings: Some(settings),
             http: super::provider::http_client()?,
             clock: Arc::new(SystemOidcClock),
             state: RwLock::new(RuntimeState {
                 client: None,
                 retry_at: Instant::now(),
-                invalid_response: false,
+                metadata: MetadataStatus::Initializing,
             }),
         }))
     }
     #[cfg(any(test, feature = "test-fixtures"))]
     pub(crate) fn ready(client: Arc<OidcClient>) -> Arc<Self> {
         Arc::new(Self {
+            diagnostics: ProviderDiagnostics::default(),
             settings: None,
             http: reqwest::Client::new(),
             clock: Arc::new(SystemOidcClock),
             state: RwLock::new(RuntimeState {
                 client: Some(client),
                 retry_at: Instant::now(),
-                invalid_response: false,
+                metadata: MetadataStatus::Initializing,
             }),
         })
     }
@@ -71,10 +76,40 @@ impl OidcRuntime {
                 .max(Duration::from_secs(1)),
         })
     }
+    pub fn health(&self) -> OidcHealth {
+        match self.state.read() {
+            Ok(state) => match &state.client {
+                Some(client) => OidcHealth {
+                    enabled: true,
+                    metadata: MetadataStatus::Ready,
+                    jwks: client.jwks().status(),
+                },
+                None => OidcHealth {
+                    enabled: true,
+                    metadata: state.metadata,
+                    jwks: super::JwksStatus::Empty,
+                },
+            },
+            Err(_) => OidcHealth {
+                enabled: true,
+                metadata: MetadataStatus::Backoff,
+                jwks: super::JwksStatus::Empty,
+            },
+        }
+    }
     pub(crate) async fn run(self: Arc<Self>, cancel: CancellationToken) {
         let Some(settings) = &self.settings else {
             return;
         };
+        self.diagnostics.ready(ProviderComponent::Metadata, false);
+        self.diagnostics.ready(ProviderComponent::Jwks, false);
+        self.diagnostics.transition(
+            ProviderComponent::Metadata,
+            ProviderState::Initializing,
+            "startup",
+            None,
+            Duration::ZERO,
+        );
         let mut attempt = 0;
         loop {
             let result = tokio::select! {biased; _=cancel.cancelled()=>return,result=OidcClient::discover(settings,&self.http)=>result};
@@ -83,21 +118,43 @@ impl OidcRuntime {
                     let client = Arc::new(client);
                     if let Ok(mut state) = self.state.write() {
                         state.client = Some(client.clone());
-                        state.invalid_response = false;
+                        state.metadata = MetadataStatus::Ready;
                     } else {
                         return;
                     }
+                    self.diagnostics.ready(ProviderComponent::Metadata, true);
+                    self.diagnostics.transition(
+                        ProviderComponent::Metadata,
+                        ProviderState::Ready,
+                        "success",
+                        None,
+                        Duration::ZERO,
+                    );
                     client.jwks().maintain(cancel).await;
                     return;
                 }
                 Err(failure) => {
                     let delay = super::retry::retry_delay(attempt, rand::random(), &failure);
                     attempt = attempt.saturating_add(1);
+                    self.diagnostics.transition(
+                        ProviderComponent::Metadata,
+                        if failure.kind == ProviderFailureKind::InvalidResponse {
+                            ProviderState::InvalidResponse
+                        } else {
+                            ProviderState::Backoff
+                        },
+                        failure.reason(),
+                        failure.status,
+                        delay,
+                    );
                     let deadline = self.clock.now() + delay;
                     if let Ok(mut state) = self.state.write() {
                         state.retry_at = deadline;
-                        state.invalid_response =
-                            failure.kind == ProviderFailureKind::InvalidResponse;
+                        state.metadata = if failure.kind == ProviderFailureKind::InvalidResponse {
+                            MetadataStatus::InvalidResponse
+                        } else {
+                            MetadataStatus::Backoff
+                        };
                     } else {
                         return;
                     }

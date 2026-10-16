@@ -507,6 +507,16 @@ _STDIO_ONLY = (
     "every deployment it is deployed to"
 )
 UNREAD_BY_DECISION = {
+    "memory_oidc_provider_ready": (
+        "OIDC-only incident diagnostic, read with /health/ready. Independent auth "
+        "paths remain available, so it is intentionally not an HTTP readiness/SLO "
+        "panel. Provider-specific dashboards are deferred by the resilience spec."
+    ),
+    "memory_oidc_provider_requests_total": (
+        "Raw bounded counters for OIDC incident triage and retry verification. "
+        "Provider-specific rate panels and alert baselines are deferred by the "
+        "resilience spec; operator queries are documented in observability/README.md."
+    ),
     # Filesystem ingestion is the stdio-only path. `MEMORY_INGESTION_INBOX` is
     # refused at startup in the HTTP profile, and the HTTP binary never wires a
     # watcher, so a panel or rule over `memory_fs_watch_*` is empty in every

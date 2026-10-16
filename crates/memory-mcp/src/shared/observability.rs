@@ -30,6 +30,11 @@
 
 use std::time::Instant;
 
+/// OIDC component readiness, independent of overall HTTP readiness.
+pub const METRIC_OIDC_PROVIDER_READY: &str = "memory_oidc_provider_ready";
+/// Actual OIDC upstream attempts by stage and bounded outcome.
+pub const METRIC_OIDC_PROVIDER_REQUESTS_TOTAL: &str = "memory_oidc_provider_requests_total";
+
 /// Gauge: the build this exposition belongs to, carried as a `version` label.
 ///
 /// The value is always 1 — the number carries no information, the label is the
@@ -325,6 +330,18 @@ pub struct MetricDescription {
 
 /// Every family this crate exports, in the order a reader meets them.
 pub const DESCRIPTIONS: &[MetricDescription] = &[
+    MetricDescription {
+        name: METRIC_OIDC_PROVIDER_READY,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "OIDC metadata or fresh JWKS readiness, independent of service readiness.",
+    },
+    MetricDescription {
+        name: METRIC_OIDC_PROVIDER_REQUESTS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Actual OIDC provider requests by discovery, JWKS or token stage and bounded outcome.",
+    },
     MetricDescription {
         name: METRIC_BUILD_INFO,
         kind: MetricKind::Gauge,

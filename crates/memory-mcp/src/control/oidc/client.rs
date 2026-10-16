@@ -26,6 +26,7 @@ pub struct OidcClient {
     token_endpoint: String,
     jwks: JwksCache,
     http: reqwest::Client,
+    diagnostics: std::sync::Arc<super::diagnostics::ProviderDiagnostics>,
 }
 
 impl OidcClient {
@@ -54,13 +55,26 @@ impl OidcClient {
         settings: &super::provider::ProviderSettings,
         http: &reqwest::Client,
     ) -> Result<Self, super::provider::ProviderFailure> {
-        use super::provider;
-        let discovery = provider::json(http.get(format!(
-            "{}/.well-known/openid-configuration",
-            normalize_issuer(&settings.issuer)
-        )))
-        .await?;
-        Self::from_metadata(settings, http, &discovery)
+        let diagnostics = super::diagnostics::ProviderDiagnostics::default();
+        let mut observation = super::diagnostics::RequestObservation::new(
+            &diagnostics,
+            super::diagnostics::ProviderStage::Discovery,
+        );
+        let result = async {
+            use super::provider;
+            let discovery = provider::json(http.get(format!(
+                "{}/.well-known/openid-configuration",
+                normalize_issuer(&settings.issuer)
+            )))
+            .await?;
+            Self::from_metadata(settings, http, &discovery)
+        }
+        .await;
+        observation.finish(match &result {
+            Ok(_) => super::diagnostics::ProviderOutcome::Success,
+            Err(failure) => failure.outcome(),
+        });
+        result
     }
 
     pub(crate) fn from_metadata(
@@ -96,6 +110,7 @@ impl OidcClient {
                 std::time::Duration::from_secs(300),
             ),
             http: http.clone(),
+            diagnostics: std::sync::Arc::new(super::diagnostics::ProviderDiagnostics::default()),
         })
     }
 
@@ -146,66 +161,93 @@ impl OidcClient {
         code: String,
         pkce: PkceCode,
     ) -> Result<OidcTokens, AuthError> {
-        let params = [
-            ("grant_type", "authorization_code".to_string()),
-            ("code", code),
-            ("redirect_uri", self.redirect_uri.clone()),
-            ("client_id", self.client_id.clone()),
-            ("code_verifier", pkce.verifier),
-        ];
+        use super::diagnostics::{
+            ProviderComponent, ProviderOutcome, ProviderStage, ProviderState, RequestObservation,
+        };
+        let mut observation = RequestObservation::new(&self.diagnostics, ProviderStage::Token);
+        let result = async {
+            let params = [
+                ("grant_type", "authorization_code".to_string()),
+                ("code", code),
+                ("redirect_uri", self.redirect_uri.clone()),
+                ("client_id", self.client_id.clone()),
+                ("code_verifier", pkce.verifier),
+            ];
 
-        let form_body = params
-            .iter()
-            .map(|(key, value)| {
-                format!(
-                    "{}={}",
-                    form_urlencode_component(key),
-                    form_urlencode_component(value),
+            let form_body = params
+                .iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{}={}",
+                        form_urlencode_component(key),
+                        form_urlencode_component(value),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("&");
+            let request = self
+                .http
+                .post(&self.token_endpoint)
+                .header(
+                    reqwest::header::CONTENT_TYPE,
+                    "application/x-www-form-urlencoded",
                 )
-            })
-            .collect::<Vec<_>>()
-            .join("&");
-        let request = self
-            .http
-            .post(&self.token_endpoint)
-            .header(
-                reqwest::header::CONTENT_TYPE,
-                "application/x-www-form-urlencoded",
-            )
-            .body(form_body);
-        let (status, bytes, retry_after) = super::provider::response(request)
-            .await
-            .map_err(|failure| failure.auth())?;
-        if !status.is_success() {
-            let invalid_grant = serde_json::from_slice::<serde_json::Value>(&bytes)
-                .ok()
-                .is_some_and(|body| {
-                    body.get("error").and_then(serde_json::Value::as_str) == Some("invalid_grant")
-                });
-            log_exchange_rejection(status.as_u16(), None);
-            if invalid_grant {
-                return Err(AuthError::InvalidGrant);
+                .body(form_body);
+            let (status, bytes, retry_after) = super::provider::response(request)
+                .await
+                .map_err(|failure| failure.auth())?;
+            if !status.is_success() {
+                let invalid_grant = serde_json::from_slice::<serde_json::Value>(&bytes)
+                    .ok()
+                    .is_some_and(|body| {
+                        body.get("error").and_then(serde_json::Value::as_str)
+                            == Some("invalid_grant")
+                    });
+                log_exchange_rejection(status.as_u16(), None);
+                if invalid_grant {
+                    return Err(AuthError::InvalidGrant);
+                }
+                return Err(super::provider::ProviderFailure {
+                    kind: super::provider::ProviderFailureKind::Http,
+                    status: Some(status.as_u16()),
+                    retry_after,
+                }
+                .auth());
             }
-            return Err(super::provider::ProviderFailure {
-                kind: super::provider::ProviderFailureKind::Http,
-                status: Some(status.as_u16()),
-                retry_after,
-            }
-            .auth());
+            let body: serde_json::Value = serde_json::from_slice(&bytes)
+                .map_err(|_| super::provider::ProviderFailure::invalid().auth())?;
+
+            let id_token = body
+                .get("id_token")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    log_exchange_rejection(status.as_u16(), Some("no_id_token"));
+                    AuthError::MalformedToken
+                })?
+                .to_string();
+
+            Ok(OidcTokens { id_token })
         }
-        let body: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|_| super::provider::ProviderFailure::invalid().auth())?;
-
-        let id_token = body
-            .get("id_token")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                log_exchange_rejection(status.as_u16(), Some("no_id_token"));
-                AuthError::MalformedToken
-            })?
-            .to_string();
-
-        Ok(OidcTokens { id_token })
+        .await;
+        let outcome = match &result {
+            Ok(_) => ProviderOutcome::Success,
+            Err(AuthError::InvalidGrant) => ProviderOutcome::Refused,
+            Err(AuthError::MalformedToken) => ProviderOutcome::InvalidResponse,
+            Err(_) => ProviderOutcome::Unavailable,
+        };
+        observation.finish(outcome);
+        self.diagnostics.transition(
+            ProviderComponent::Token,
+            if matches!(outcome, ProviderOutcome::Success | ProviderOutcome::Refused) {
+                ProviderState::Ready
+            } else {
+                ProviderState::Backoff
+            },
+            outcome.label(),
+            None,
+            std::time::Duration::ZERO,
+        );
+        result
     }
 
     /// Validate an ID token: issuer, audience, algorithm, expiry, JWKS signature.
@@ -402,6 +444,9 @@ mod tests {
             authorization_endpoint: "https://idp.example.com/authorize?tenant=one".into(),
             token_endpoint: "https://idp.example.com/token".into(),
             http: super::super::provider::http_client().expect("fixture HTTP client"),
+            diagnostics: std::sync::Arc::new(
+                super::super::diagnostics::ProviderDiagnostics::default(),
+            ),
             jwks: JwksCache::from_parts(
                 reqwest::Client::new(),
                 "https://idp.example.com/jwks".into(),

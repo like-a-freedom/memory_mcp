@@ -82,3 +82,24 @@ async fn readiness_reports_shutdown_before_closed_admission() {
 
     assert_eq!(readiness_body(response).await["status"], "shutting_down");
 }
+
+#[tokio::test]
+async fn readiness_exposes_cold_oidc_without_gating_service() {
+    let response = readiness_response(state().await).await;
+    assert_eq!(response.status(), axum::http::StatusCode::OK);
+    let body = readiness_body(response).await;
+    assert_eq!(body["oidc"]["enabled"], true);
+    assert_eq!(body["oidc"]["metadata"], "initializing");
+    assert_eq!(body["oidc"]["jwks"], "empty");
+}
+#[tokio::test]
+async fn disabled_oidc_is_reported_without_initializing_a_provider() {
+    let (builder, _) = HttpStateTestBuilder::local_admin().await;
+    let state = builder.build().await.expect("local state");
+    assert!(state.oidc.is_none());
+    let body = readiness_body(readiness_response(state).await).await;
+    assert_eq!(
+        body["oidc"],
+        serde_json::json!({"enabled":false,"metadata":"disabled","jwks":"disabled"})
+    );
+}
