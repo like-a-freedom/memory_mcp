@@ -14,18 +14,31 @@ use tokio::sync::Mutex;
 
 use super::flow_material::{AuthError, SUPPORTED_ID_TOKEN_ALGORITHMS};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JwksStatus {
+    Disabled,
+    Empty,
+    Fresh,
+    Stale,
+}
+
 #[derive(Clone)]
 pub struct JwksCache {
     inner: Arc<RwLock<JwksState>>,
     refresh_lock: Arc<Mutex<()>>,
-    client: reqwest::Client,
-    jwks_uri: String,
+    source: Arc<dyn JwksSource>,
+    clock: Arc<dyn super::retry::OidcClock>,
     ttl: Duration,
 }
 
 struct JwksState {
     keys: HashMap<String, DecodingKey>,
     fetched_at: Option<Instant>,
+    generation: u64,
+    next_attempt: Option<Instant>,
+    last_outcome: Result<(), super::provider::ProviderFailure>,
+    failures: u32,
 }
 
 impl JwksState {
@@ -33,19 +46,71 @@ impl JwksState {
         Self {
             keys: HashMap::new(),
             fetched_at: None,
+            generation: 0,
+            next_attempt: None,
+            last_outcome: Ok(()),
+            failures: 0,
         }
     }
 }
 
 impl JwksCache {
+    pub(crate) async fn maintain(&self, cancel: tokio_util::sync::CancellationToken) {
+        loop {
+            tokio::select! { biased; _=cancel.cancelled()=>return, _=self.refresh()=>{} }
+            let deadline = {
+                let Ok(state) = self.inner.read() else { return };
+                if state.last_outcome.is_err() {
+                    state
+                        .next_attempt
+                        .unwrap_or_else(|| self.clock.now() + Duration::from_secs(1))
+                } else {
+                    state
+                        .fetched_at
+                        .map(|at| at + super::retry::refresh_age(rand::random()))
+                        .unwrap_or_else(|| self.clock.now() + Duration::from_secs(1))
+                }
+            };
+            tokio::select! { biased; _=cancel.cancelled()=>return, _=self.clock.sleep_until(deadline)=>{} }
+        }
+    }
+
+    pub fn status(&self) -> JwksStatus {
+        match self.inner.read() {
+            Ok(state)
+                if state.fetched_at.is_some_and(|at| {
+                    self.clock.now().saturating_duration_since(at) >= self.ttl
+                }) =>
+            {
+                JwksStatus::Stale
+            }
+            Ok(state) if state.keys.is_empty() => JwksStatus::Empty,
+            Ok(state) if state.fetched_at.is_some() => JwksStatus::Fresh,
+            _ => JwksStatus::Empty,
+        }
+    }
     /// Construct a cache from its parts. Used by `OidcClient::new`
     /// after OIDC discovery.
     pub fn from_parts(client: reqwest::Client, jwks_uri: String, ttl: Duration) -> Self {
+        Self::from_source(
+            Arc::new(HttpJwksSource {
+                client,
+                uri: jwks_uri,
+            }),
+            Arc::new(super::retry::SystemOidcClock),
+            ttl,
+        )
+    }
+    pub(crate) fn from_source(
+        source: Arc<dyn JwksSource>,
+        clock: Arc<dyn super::retry::OidcClock>,
+        ttl: Duration,
+    ) -> Self {
         Self {
             inner: Arc::new(RwLock::new(JwksState::empty())),
             refresh_lock: Arc::new(Mutex::new(())),
-            client,
-            jwks_uri,
+            source,
+            clock,
             ttl,
         }
     }
@@ -60,31 +125,259 @@ impl JwksCache {
     }
 
     pub async fn key_for(&self, kid: &str) -> Result<DecodingKey, AuthError> {
-        let fresh = self
-            .inner
-            .read()
-            .map_err(|_| AuthError::Jwks("JWKS cache lock poisoned".into()))?
-            .fetched_at
-            .is_some_and(|at| at.elapsed() < self.ttl);
-        if fresh && let Some(key) = self.find_key(kid)? {
-            return Ok(key);
-        }
-        let _refresh = self.refresh_lock.lock().await;
-        let fresh = self
-            .inner
-            .read()
-            .map_err(|_| AuthError::Jwks("JWKS cache lock poisoned".into()))?
-            .fetched_at
-            .is_some_and(|at| at.elapsed() < self.ttl);
-        if fresh && let Some(key) = self.find_key(kid)? {
+        if self.status() == JwksStatus::Fresh
+            && let Some(key) = self.find_key(kid)?
+        {
             return Ok(key);
         }
         self.refresh().await?;
-        self.find_key(kid)?
-            .ok_or_else(|| AuthError::Jwks("unknown key id".into()))
+        let state = self
+            .inner
+            .read()
+            .map_err(|_| AuthError::Jwks("cache lock poisoned".into()))?;
+        if !state
+            .fetched_at
+            .is_some_and(|at| self.clock.now().saturating_duration_since(at) < self.ttl)
+        {
+            return Err(AuthError::Unavailable {
+                retry_after: state
+                    .next_attempt
+                    .map(|at| at.saturating_duration_since(self.clock.now()))
+                    .unwrap_or(Duration::from_secs(1))
+                    .max(Duration::from_secs(1)),
+            });
+        }
+        state.keys.get(kid).cloned().ok_or(AuthError::UnknownKeyId)
     }
 
     pub async fn refresh(&self) -> Result<(), AuthError> {
+        let generation = self
+            .inner
+            .read()
+            .map_err(|_| AuthError::Jwks("cache lock poisoned".into()))?
+            .generation;
+        let _gate = self.refresh_lock.lock().await;
+        {
+            let state = self
+                .inner
+                .read()
+                .map_err(|_| AuthError::Jwks("cache lock poisoned".into()))?;
+            if state.generation != generation
+                || state.next_attempt.is_some_and(|at| self.clock.now() < at)
+            {
+                return state
+                    .last_outcome
+                    .clone()
+                    .map_err(|failure| AuthError::Unavailable {
+                        retry_after: state
+                            .next_attempt
+                            .map(|at| at.saturating_duration_since(self.clock.now()))
+                            .unwrap_or_else(|| super::retry::retry_delay(0, 0, &failure))
+                            .max(Duration::from_secs(1)),
+                    });
+            }
+        }
+        let result = self.source.fetch().await;
+        let now = self.clock.now();
+        let mut state = self
+            .inner
+            .write()
+            .map_err(|_| AuthError::Jwks("cache lock poisoned".into()))?;
+        state.generation = state.generation.wrapping_add(1);
+        match result {
+            Ok(keys) => {
+                state.keys = keys;
+                state.fetched_at = Some(now);
+                state.next_attempt = Some(now + Duration::from_secs(1));
+                state.last_outcome = Ok(());
+                state.failures = 0;
+                Ok(())
+            }
+            Err(failure) => {
+                let delay = super::retry::retry_delay(state.failures, rand::random(), &failure);
+                state.failures = state.failures.saturating_add(1);
+                state.next_attempt = Some(now + delay);
+                state.last_outcome = Err(failure);
+                Err(AuthError::Unavailable { retry_after: delay })
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod controlled {
+    use super::super::retry::OidcClock;
+    use super::*;
+    use std::future::Future;
+    use std::sync::{
+        Mutex as SyncMutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+    struct Clock {
+        now: SyncMutex<Instant>,
+        changed: tokio::sync::Notify,
+    }
+    impl Clock {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                now: SyncMutex::new(Instant::now()),
+                changed: tokio::sync::Notify::new(),
+            })
+        }
+        fn advance(&self, seconds: u64) {
+            *self.now.lock().expect("clock") += Duration::from_secs(seconds);
+            self.changed.notify_waiters();
+        }
+    }
+    impl OidcClock for Clock {
+        fn now(&self) -> Instant {
+            *self.now.lock().expect("clock")
+        }
+        fn sleep_until(
+            &self,
+            deadline: Instant,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
+            Box::pin(async move {
+                loop {
+                    let changed = self.changed.notified();
+                    tokio::pin!(changed);
+                    changed.as_mut().enable();
+                    if self.now() >= deadline {
+                        return;
+                    }
+                    changed.await;
+                }
+            })
+        }
+    }
+    struct Source {
+        reply: SyncMutex<
+            Result<HashMap<String, DecodingKey>, super::super::provider::ProviderFailure>,
+        >,
+        calls: AtomicUsize,
+    }
+    impl Source {
+        fn new() -> Arc<Self> {
+            let source = Arc::new(Self {
+                reply: SyncMutex::new(Ok(HashMap::new())),
+                calls: AtomicUsize::new(0),
+            });
+            source.keys("old");
+            source
+        }
+        fn keys(&self, kid: &str) {
+            *self.reply.lock().expect("source") = Ok(HashMap::from([(
+                kid.into(),
+                DecodingKey::from_secret(b"controlled-cache-key"),
+            )]));
+        }
+        fn fail(&self) {
+            *self.reply.lock().expect("source") = Err(super::super::provider::ProviderFailure {
+                kind: super::super::provider::ProviderFailureKind::Transport,
+                status: None,
+                retry_after: None,
+            });
+        }
+    }
+    #[async_trait::async_trait]
+    impl JwksSource for Source {
+        async fn fetch(
+            &self,
+        ) -> Result<HashMap<String, DecodingKey>, super::super::provider::ProviderFailure> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.reply.lock().expect("source").clone()
+        }
+    }
+    fn fixture() -> (JwksCache, Arc<Source>, Arc<Clock>) {
+        let source = Source::new();
+        let clock = Clock::new();
+        (
+            JwksCache::from_source(source.clone(), clock.clone(), Duration::from_secs(300)),
+            source,
+            clock,
+        )
+    }
+    #[tokio::test]
+    async fn cached_known_key_survives_failed_early_refresh() {
+        let (c, s, t) = fixture();
+        c.refresh().await.expect("warmup");
+        t.advance(270);
+        s.fail();
+        assert!(c.refresh().await.is_err());
+        assert!(c.key_for("old").await.is_ok());
+    }
+    #[tokio::test]
+    async fn failed_refresh_does_not_extend_key_lifetime() {
+        let (c, s, t) = fixture();
+        c.refresh().await.expect("warmup");
+        t.advance(270);
+        s.fail();
+        assert!(c.refresh().await.is_err());
+        t.advance(30);
+        assert!(matches!(
+            c.key_for("old").await,
+            Err(AuthError::Unavailable { .. })
+        ));
+    }
+    #[tokio::test]
+    async fn empty_successful_replacement_removes_old_keys() {
+        let (c, s, t) = fixture();
+        c.refresh().await.expect("warmup");
+        t.advance(1);
+        *s.reply.lock().expect("source") = Ok(HashMap::new());
+        c.refresh().await.expect("replacement");
+        assert!(matches!(
+            c.key_for("old").await,
+            Err(AuthError::UnknownKeyId)
+        ));
+    }
+    #[tokio::test]
+    async fn rotated_key_is_discovered_after_one_second() {
+        let (c, s, t) = fixture();
+        c.refresh().await.expect("warmup");
+        s.keys("new");
+        t.advance(1);
+        assert!(c.key_for("new").await.is_ok());
+        assert_eq!(s.calls.load(Ordering::SeqCst), 2);
+    }
+    #[tokio::test]
+    async fn proactive_refresh_occurs_without_auth_requests() {
+        let (c, s, t) = fixture();
+        c.refresh().await.expect("warmup");
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let upkeep = c.maintain(cancel.clone());
+        tokio::pin!(upkeep);
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(upkeep.as_mut().poll(cx))).await,
+            std::task::Poll::Pending
+        ));
+        t.advance(270);
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(upkeep.as_mut().poll(cx))).await,
+            std::task::Poll::Pending
+        ));
+        assert_eq!(s.calls.load(Ordering::SeqCst), 2);
+        cancel.cancel();
+        tokio::time::timeout(Duration::from_secs(1), upkeep)
+            .await
+            .expect("cancelled upkeep");
+    }
+}
+
+#[async_trait::async_trait]
+pub(crate) trait JwksSource: Send + Sync {
+    async fn fetch(&self)
+    -> Result<HashMap<String, DecodingKey>, super::provider::ProviderFailure>;
+}
+struct HttpJwksSource {
+    client: reqwest::Client,
+    uri: String,
+}
+#[async_trait::async_trait]
+impl JwksSource for HttpJwksSource {
+    async fn fetch(
+        &self,
+    ) -> Result<HashMap<String, DecodingKey>, super::provider::ProviderFailure> {
         #[derive(serde::Deserialize)]
         struct JwksDocument {
             keys: Vec<Jwk>,
@@ -100,17 +393,9 @@ impl JwksCache {
             y: Option<String>,
             alg: Option<String>,
         }
-        let document = self
-            .client
-            .get(&self.jwks_uri)
-            .send()
-            .await
-            .map_err(|error| AuthError::Jwks(error.to_string()))?
-            .error_for_status()
-            .map_err(|error| AuthError::Jwks(error.to_string()))?
-            .json::<JwksDocument>()
-            .await
-            .map_err(|error| AuthError::Jwks(error.to_string()))?;
+        let document: JwksDocument =
+            serde_json::from_value(super::provider::json(self.client.get(&self.uri)).await?)
+                .map_err(|_| super::provider::ProviderFailure::invalid())?;
         let mut keys = HashMap::new();
         for jwk in document.keys.into_iter().take(32) {
             let key = match (
@@ -132,7 +417,7 @@ impl JwksCache {
                 }
                 _ => continue,
             }
-            .map_err(|error| AuthError::Jwks(error.to_string()))?;
+            .map_err(|_| super::provider::ProviderFailure::invalid())?;
             // A key the provider pins to an algorithm we accept has to
             // survive. EC entries stay limited to P-256 above because no other
             // curve is decoded — so adding an ES* algorithm to
@@ -147,13 +432,7 @@ impl JwksCache {
                 keys.insert(jwk.kid, key);
             }
         }
-        let mut state = self
-            .inner
-            .write()
-            .map_err(|_| AuthError::Jwks("JWKS cache lock poisoned".into()))?;
-        state.keys = keys;
-        state.fetched_at = Some(Instant::now());
-        Ok(())
+        Ok(keys)
     }
 }
 
@@ -300,19 +579,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn key_for_refetches_once_the_ttl_has_expired() {
+    async fn expired_cache_cannot_bypass_refresh_cooldown() {
         let server = StubJwksServer::serving(200, rsa_document("key-a", Some("RS256")));
         // A zero TTL means every entry is already stale on arrival.
         let cache = cache_for(&server, Duration::ZERO);
-        cache.key_for("key-a").await.expect("first lookup");
+        cache.refresh().await.expect("first fetch");
         let after_first = server.request_count();
-
-        let _ = cache.key_for("key-a").await;
-
+        assert!(matches!(
+            cache.key_for("key-a").await,
+            Err(AuthError::Unavailable { .. })
+        ));
         assert_eq!(
             server.request_count(),
-            after_first + 1,
-            "an expired cache must refetch"
+            after_first,
+            "an expired cache cannot bypass the provider-wide cooldown"
         );
     }
 

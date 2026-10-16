@@ -45,7 +45,7 @@ pub use flow_material::{
 // the OIDC path actually implements, without duplicating it.
 pub(crate) use flow_material::SUPPORTED_ID_TOKEN_ALGORITHMS;
 pub use handlers::{authorize, callback, logout, start_invite_flow, start_link_flow};
-pub use jwks::JwksCache;
+pub use jwks::{JwksCache, JwksStatus};
 pub use sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
 
 #[cfg(test)]
