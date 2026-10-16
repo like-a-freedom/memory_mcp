@@ -38,9 +38,12 @@
 # as "not set", so a method's material must be supplied by the operator's
 # environment rather than invented here.
 #
-# SECURITY: no secret is defaulted anywhere. Every `${VAR:?...}` must be
-# supplied by the operator from a protected environment file; there are no
-# example browser keys and no `root/root` database credentials.
+# SECURITY: no secret is defaulted anywhere. The database credentials and the
+# ingress URLs use `${VAR:?...}` and must be supplied by the operator from a
+# protected environment file; the three secret slots and the root secret use
+# `${VAR:-}` so that either form can be supplied, and the server refuses to
+# start when neither is. There are no example browser keys and no `root/root`
+# database credentials.
 
 services:
   surrealdb:
@@ -101,9 +104,14 @@ services:
       EMBEDDINGS_ENABLED: "${EMBEDDINGS_ENABLED:-false}"
 
       # ── Operator-generated secrets (never defaulted) ──────────────────
-      MEMORY_MCP_API_KEY_PEPPER: "${MEMORY_MCP_API_KEY_PEPPER:?MEMORY_MCP_API_KEY_PEPPER is required (>=32 bytes); supply an operator-generated value}"
-      MEMORY_MCP_HTTP_SESSION_KEY: "${MEMORY_MCP_HTTP_SESSION_KEY:?MEMORY_MCP_HTTP_SESSION_KEY is required (64 hex chars); supply an operator-generated value}"
-      MEMORY_MCP_HTTP_CSRF_KEY: "${MEMORY_MCP_HTTP_CSRF_KEY:?MEMORY_MCP_HTTP_CSRF_KEY is required (64 hex chars); supply an operator-generated value}"
+      # Supply the three individual secrets, or one MEMORY_MCP_HTTP_SECRET_KEY
+      # root (>=32 bytes) from which every unset slot is derived. An empty
+      # value reads as "not set", and with neither form the server refuses to
+      # start, naming the variable that is missing.
+      MEMORY_MCP_HTTP_SECRET_KEY: "${MEMORY_MCP_HTTP_SECRET_KEY:-}"
+      MEMORY_MCP_API_KEY_PEPPER: "${MEMORY_MCP_API_KEY_PEPPER:-}"
+      MEMORY_MCP_HTTP_SESSION_KEY: "${MEMORY_MCP_HTTP_SESSION_KEY:-}"
+      MEMORY_MCP_HTTP_CSRF_KEY: "${MEMORY_MCP_HTTP_CSRF_KEY:-}"
 
       # ── Storage ───────────────────────────────────────────────────────
       SURREALDB_CONTROL_URL: ws://surrealdb:8000/rpc
