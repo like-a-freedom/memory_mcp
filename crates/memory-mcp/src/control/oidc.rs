@@ -32,6 +32,8 @@ mod client;
 mod flow_material;
 mod handlers;
 mod jwks;
+mod provider;
+mod retry;
 mod sealing;
 
 pub use client::OidcClient;

@@ -158,13 +158,15 @@ impl From<MemoryError> for ApiError {
 impl From<super::oidc::AuthError> for ApiError {
     fn from(err: super::oidc::AuthError) -> Self {
         match err {
-            super::oidc::AuthError::MalformedToken
+            super::oidc::AuthError::InvalidGrant
+            | super::oidc::AuthError::UnknownKeyId
+            | super::oidc::AuthError::MalformedToken
             | super::oidc::AuthError::MissingKeyId
             | super::oidc::AuthError::DisallowedAlgorithm { .. }
             | super::oidc::AuthError::Jwt(_) => ApiError::Unauthorized,
-            super::oidc::AuthError::Jwks(_) | super::oidc::AuthError::Provider(_) => {
-                ApiError::Unavailable
-            }
+            super::oidc::AuthError::Unavailable { .. }
+            | super::oidc::AuthError::Jwks(_)
+            | super::oidc::AuthError::Provider(_) => ApiError::Unavailable,
             super::oidc::AuthError::Sealing => {
                 ApiError::Internal(MemoryError::ConfigInvalid(err.to_string()))
             }

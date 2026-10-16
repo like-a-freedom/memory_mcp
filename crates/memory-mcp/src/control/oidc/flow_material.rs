@@ -157,6 +157,12 @@ pub struct OidcCallback {
 /// Errors during OIDC auth.
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
+    #[error("invalid authorization grant")]
+    InvalidGrant,
+    #[error("unknown signing key")]
+    UnknownKeyId,
+    #[error("OIDC verification temporarily unavailable")]
+    Unavailable { retry_after: std::time::Duration },
     #[error("malformed token")]
     MalformedToken,
     #[error("token has no key id")]
@@ -182,7 +188,13 @@ pub enum AuthError {
 
 impl From<AuthError> for crate::error::MemoryError {
     fn from(err: AuthError) -> Self {
-        crate::error::MemoryError::ConfigInvalid(err.to_string())
+        match err {
+            AuthError::Unavailable { .. } | AuthError::Provider(_) | AuthError::Jwks(_) => {
+                Self::Unavailable("OIDC provider unavailable".into())
+            }
+            AuthError::Sealing => Self::ConfigInvalid(err.to_string()),
+            _ => Self::Auth("OIDC credential refused".into()),
+        }
     }
 }
 

@@ -25,6 +25,7 @@ pub struct OidcClient {
     authorization_endpoint: String,
     token_endpoint: String,
     jwks: JwksCache,
+    http: reqwest::Client,
 }
 
 impl OidcClient {
@@ -36,63 +37,56 @@ impl OidcClient {
         redirect_uri: &str,
         allowed_algorithm: &str,
     ) -> Result<Self, MemoryError> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .map_err(|e| MemoryError::ConfigInvalid(e.to_string()))?;
+        let settings = super::provider::ProviderSettings::new(
+            issuer,
+            client_id,
+            audience,
+            redirect_uri,
+            allowed_algorithm,
+        )?;
+        let http = super::provider::http_client()?;
+        Self::discover(&settings, &http)
+            .await
+            .map_err(|failure| MemoryError::Unavailable(failure.to_string()))
+    }
 
-        let discovery_url = format!(
+    pub(crate) async fn discover(
+        settings: &super::provider::ProviderSettings,
+        http: &reqwest::Client,
+    ) -> Result<Self, super::provider::ProviderFailure> {
+        use super::provider::{self, ProviderFailure};
+        let discovery = provider::json(http.get(format!(
             "{}/.well-known/openid-configuration",
-            normalize_issuer(issuer)
-        );
-        let discovery: serde_json::Value = client
-            .get(&discovery_url)
-            .send()
-            .await
-            .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery failed: {e}")))?
-            .error_for_status()
-            .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery failed: {e}")))?
-            .json()
-            .await
-            .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery parse failed: {e}")))?;
-
-        let issuer = resolve_published_issuer(issuer, &discovery)?;
-        let allowed_algorithms = resolve_allowed_algorithms(allowed_algorithm, &discovery)?;
-        let authorization_endpoint = discovery
-            .get("authorization_endpoint")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| {
-                MemoryError::ConfigInvalid("OIDC discovery missing authorization_endpoint".into())
-            })?
-            .to_string();
-        let token_endpoint = discovery
-            .get("token_endpoint")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| {
-                MemoryError::ConfigInvalid("OIDC discovery missing token_endpoint".into())
-            })?
-            .to_string();
-        let jwks_uri = discovery
-            .get("jwks_uri")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MemoryError::ConfigInvalid("OIDC discovery missing jwks_uri".into()))?
-            .to_string();
-
-        let jwks = JwksCache::from_parts(
-            client.clone(),
-            jwks_uri,
-            std::time::Duration::from_secs(300),
-        );
-
+            normalize_issuer(&settings.issuer)
+        )))
+        .await?;
+        let issuer = resolve_published_issuer(&settings.issuer, &discovery)
+            .map_err(|_| ProviderFailure::invalid())?;
+        let allowed_algorithms =
+            resolve_allowed_algorithms(&settings.allowed_algorithm, &discovery)
+                .map_err(|_| ProviderFailure::invalid())?;
+        let endpoint = |field: &str| -> Result<String, ProviderFailure> {
+            let value = discovery
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(ProviderFailure::invalid)?;
+            provider::validate_url(value)?;
+            Ok(value.to_owned())
+        };
         Ok(Self {
             issuer,
-            client_id: client_id.to_string(),
-            audience: audience.to_string(),
-            redirect_uri: redirect_uri.to_string(),
+            client_id: settings.client_id.clone(),
+            audience: settings.audience.clone(),
+            redirect_uri: settings.redirect_uri.clone(),
             allowed_algorithms,
-            authorization_endpoint,
-            token_endpoint,
-            jwks,
+            authorization_endpoint: endpoint("authorization_endpoint")?,
+            token_endpoint: endpoint("token_endpoint")?,
+            jwks: JwksCache::from_parts(
+                http.clone(),
+                endpoint("jwks_uri")?,
+                std::time::Duration::from_secs(300),
+            ),
+            http: http.clone(),
         })
     }
 
@@ -143,11 +137,6 @@ impl OidcClient {
         code: String,
         pkce: PkceCode,
     ) -> Result<OidcTokens, AuthError> {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| AuthError::Provider(e.to_string()))?;
-
         let params = [
             ("grant_type", "authorization_code".to_string()),
             ("code", code),
@@ -167,33 +156,36 @@ impl OidcClient {
             })
             .collect::<Vec<_>>()
             .join("&");
-        let resp = client
+        let request = self
+            .http
             .post(&self.token_endpoint)
             .header(
                 reqwest::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded",
             )
-            .body(form_body)
-            .send()
+            .body(form_body);
+        let (status, bytes, retry_after) = super::provider::response(request)
             .await
-            .map_err(|e| AuthError::Provider(e.to_string()))?;
-
-        // A refused exchange answers 503, indistinguishable from a JWKS or
-        // transport failure without this. The status is the whole signal; the
-        // body is deliberately not read — a provider's `error_description` can
-        // echo request content.
-        let status = resp.status();
+            .map_err(|failure| failure.auth())?;
         if !status.is_success() {
+            let invalid_grant = serde_json::from_slice::<serde_json::Value>(&bytes)
+                .ok()
+                .is_some_and(|body| {
+                    body.get("error").and_then(serde_json::Value::as_str) == Some("invalid_grant")
+                });
             log_exchange_rejection(status.as_u16(), None);
-            return Err(AuthError::Provider(format!(
-                "token endpoint returned {status}"
-            )));
+            if invalid_grant {
+                return Err(AuthError::InvalidGrant);
+            }
+            return Err(super::provider::ProviderFailure {
+                kind: super::provider::ProviderFailureKind::Http,
+                status: Some(status.as_u16()),
+                retry_after,
+            }
+            .auth());
         }
-
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| AuthError::Provider(e.to_string()))?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| super::provider::ProviderFailure::invalid().auth())?;
 
         let id_token = body
             .get("id_token")
@@ -209,7 +201,7 @@ impl OidcClient {
 
     /// Validate an ID token: issuer, audience, algorithm, expiry, JWKS signature.
     pub async fn validate_id_token(&self, token: &str) -> Result<AccessClaims, AuthError> {
-        use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+        use jsonwebtoken::{Algorithm, DecodingKey, decode};
 
         let header = jsonwebtoken::decode_header(token).map_err(AuthError::Jwt)?;
 
@@ -241,31 +233,31 @@ impl OidcClient {
 
         let key: DecodingKey = self.jwks.key_for(&kid).await?;
 
-        // A type-level conversion, not a policy list: every algorithm in
-        // `SUPPORTED_ID_TOKEN_ALGORITHMS` maps to a `jsonwebtoken` one, and a
-        // name outside it can only reach here as `DisallowedAlgorithm` above.
-        let validation_algorithm = match alg {
-            "RS256" => Algorithm::RS256,
-            "RS384" => Algorithm::RS384,
-            "RS512" => Algorithm::RS512,
-            "ES256" => Algorithm::ES256,
-            "EdDSA" => Algorithm::EdDSA,
-            _ => {
-                return Err(AuthError::DisallowedAlgorithm {
-                    alg: alg.to_owned(),
-                    kid,
-                });
-            }
-        };
-        let mut validation = Validation::new(validation_algorithm);
-        validation.set_audience(&[&self.audience]);
-        validation.set_issuer(&[&self.issuer]);
-        validation.validate_exp = true;
+        let validation = self.jwt_validation(header.alg)?;
 
         let token_data =
             decode::<AccessClaims>(token, &key, &validation).map_err(AuthError::Jwt)?;
 
         Ok(token_data.claims)
+    }
+
+    /// Shared issuer, audience and resolved algorithm policy for signed tokens.
+    pub fn jwt_validation(
+        &self,
+        algorithm: jsonwebtoken::Algorithm,
+    ) -> Result<jsonwebtoken::Validation, AuthError> {
+        let name = format!("{algorithm:?}");
+        if !self.allowed_algorithms.contains(&name.as_str()) {
+            return Err(AuthError::DisallowedAlgorithm {
+                alg: name,
+                kid: String::new(),
+            });
+        }
+        let mut validation = jsonwebtoken::Validation::new(algorithm);
+        validation.set_audience(&[&self.audience]);
+        validation.set_issuer(&[&self.issuer]);
+        validation.validate_exp = true;
+        Ok(validation)
     }
 
     /// The JWKS cache the MCP OAuth resource-server path validates access
@@ -400,6 +392,7 @@ mod tests {
             allowed_algorithms: vec!["RS256"],
             authorization_endpoint: "https://idp.example.com/authorize?tenant=one".into(),
             token_endpoint: "https://idp.example.com/token".into(),
+            http: super::super::provider::http_client().expect("fixture HTTP client"),
             jwks: JwksCache::from_parts(
                 reqwest::Client::new(),
                 "https://idp.example.com/jwks".into(),
@@ -682,7 +675,7 @@ mod tests {
         )
         .await;
 
-        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+        assert!(matches!(result, Err(MemoryError::Unavailable(_))));
     }
 
     #[tokio::test]
@@ -705,7 +698,7 @@ mod tests {
         )
         .await;
 
-        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+        assert!(matches!(result, Err(MemoryError::Unavailable(_))));
     }
 
     #[tokio::test]
@@ -720,7 +713,7 @@ mod tests {
         )
         .await;
 
-        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+        assert!(matches!(result, Err(MemoryError::Unavailable(_))));
     }
 
     #[tokio::test]
@@ -756,7 +749,7 @@ mod tests {
             .exchange_code("auth-code".to_string(), PkceCode::new())
             .await;
 
-        assert!(matches!(result, Err(AuthError::Provider(_))));
+        assert!(matches!(result, Err(AuthError::Unavailable { .. })));
     }
 
     #[tokio::test]

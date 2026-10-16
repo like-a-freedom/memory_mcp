@@ -186,6 +186,9 @@ fn reject_erroring(
 fn id_token_reason(error: &super::flow_material::AuthError) -> &'static str {
     use super::flow_material::AuthError;
     match error {
+        AuthError::InvalidGrant => "invalid_grant",
+        AuthError::UnknownKeyId => "unknown_key",
+        AuthError::Unavailable { .. } => "unavailable",
         AuthError::MalformedToken => "malformed",
         AuthError::MissingKeyId => "missing_kid",
         AuthError::DisallowedAlgorithm { .. } => "disallowed_alg",
