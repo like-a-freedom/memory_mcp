@@ -195,6 +195,27 @@ impl HttpServerFixture {
         }
     }
 
+    /// Signal and reap the fixture-owned process within a bounded deadline.
+    pub async fn stop_gracefully(&mut self, deadline: Duration) -> std::process::ExitStatus {
+        assert!(
+            Command::new("/bin/kill")
+                .args(["-TERM", &self.child.id().to_string()])
+                .status()
+                .expect("signal child")
+                .success()
+        );
+        tokio::time::timeout(deadline, async {
+            loop {
+                if let Some(status) = self.child.try_wait().expect("poll child") {
+                    return status;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("graceful child exit deadline")
+    }
+
     pub fn kill(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();

@@ -56,6 +56,7 @@ struct Inner {
 struct Shared {
     inner: Mutex<Inner>,
     requests: mpsc::UnboundedSender<ProviderRequest>,
+    cancel: tokio_util::sync::CancellationToken,
 }
 pub struct RequestGate(Arc<Semaphore>);
 impl RequestGate {
@@ -71,6 +72,7 @@ pub struct OidcProviderFixture {
 }
 impl Drop for OidcProviderFixture {
     fn drop(&mut self) {
+        self.state.cancel.cancel();
         self.task.abort();
     }
 }
@@ -84,7 +86,9 @@ impl OidcProviderFixture {
             serde_json::json!({"issuer":issuer,"authorization_endpoint":format!("{issuer}/authorize"),"token_endpoint":format!("{issuer}/token"),"jwks_uri":format!("{issuer}/jwks"),"id_token_signing_alg_values_supported":["RS256"]}),
         );
         let (tx, requests) = mpsc::unbounded_channel();
+        let cancel = tokio_util::sync::CancellationToken::new();
         let state = Arc::new(Shared {
+            cancel: cancel.clone(),
             inner: Mutex::new(Inner {
                 replies: [
                     discovery,
@@ -102,7 +106,10 @@ impl OidcProviderFixture {
             .route("/token", post(token_handler))
             .with_state(state.clone());
         let task = tokio::spawn(async move {
-            axum::serve(listener, app).await.expect("fixture server");
+            axum::serve(listener, app)
+                .with_graceful_shutdown(cancel.cancelled_owned())
+                .await
+                .expect("fixture server");
         });
         Self {
             issuer,
@@ -110,6 +117,13 @@ impl OidcProviderFixture {
             requests,
             task,
         }
+    }
+    pub async fn shutdown(&mut self) {
+        self.state.cancel.cancel();
+        tokio::time::timeout(Duration::from_secs(5), &mut self.task)
+            .await
+            .expect("fixture shutdown deadline")
+            .expect("fixture joined");
     }
     pub fn issuer(&self) -> &str {
         &self.issuer
@@ -126,7 +140,15 @@ impl OidcProviderFixture {
         RequestGate(gate)
     }
     pub async fn next_request(&mut self, route: ProviderRoute) -> ProviderRequest {
-        tokio::time::timeout(Duration::from_secs(10), async {
+        self.next_request_within(route, Duration::from_secs(10))
+            .await
+    }
+    pub async fn next_request_within(
+        &mut self,
+        route: ProviderRoute,
+        deadline: Duration,
+    ) -> ProviderRequest {
+        tokio::time::timeout(deadline, async {
             loop {
                 let request = self.requests.recv().await.expect("request channel");
                 if request.route == route {
@@ -149,7 +171,10 @@ async fn answer(state: Arc<Shared>, route: ProviderRoute, body: Vec<u8>) -> Resp
     };
     let _ = state.requests.send(ProviderRequest { route, body });
     if let Some(gate) = gate {
-        gate.acquire().await.expect("gate").forget();
+        tokio::select! {
+            permit=gate.acquire()=>permit.expect("gate").forget(),
+            _=state.cancel.cancelled()=>{}
+        }
     }
     let mut response = Response::new(Body::from(reply.body));
     *response.status_mut() = reply.status;

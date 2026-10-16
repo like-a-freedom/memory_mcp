@@ -174,3 +174,9 @@ RUST_LOG=info cargo run --features streamable-http --bin memory_mcp_http
 cargo run -- serve
 # … ingest; the line carries `req=req_NNNN`.
 ```
+
+## OIDC provider transitions
+
+`op=oidc.provider.state_changed` reports bounded `component`, `state`, `reason`, optional HTTP `status` and `retry_after_secs`. Degradation transitions use WARN, recovery uses INFO, and repeated unchanged states use DEBUG. Components are `metadata`, `jwks`, `token`; no provider response bodies or credentials are logged. A fresh JWKS can continue serving while a refresh failure is reported: inspect both cache health and retry state. Correlate authentication refusals with the ambient `request_id`.
+
+`memory_oidc_provider_ready{component="metadata|jwks"}` is a 0/1 gauge; JWKS becomes zero at expiry even without traffic. `memory_oidc_provider_requests_total{stage="discovery|jwks|token",outcome="success|unavailable|invalid_response|refused"}` counts actual outbound attempts. Disabled OIDC emits neither family. See [observability](../../observability/README.md).

@@ -313,6 +313,11 @@ notes were added with the audit change that followed.
   outbound request. The verified asymmetry is recorded in the implementation
   notes; making discovery lazy, or degrading to a provider-unavailable state that
   still serves the local method, would be a new decision.
+  **Amended 2026-10-16:** the [OIDC resilience specification](../superpowers/specs/2026-10-16-oidc-provider-resilience.md)
+  supersedes that startup behavior. Discovery and JWKS loading now belong to a
+  cancellable background worker; remote failure leaves HTTP serving with an
+  explicit provider-unavailable state. Invalid local configuration still fails
+  startup. Enabled local authentication and API keys remain independent.
 - The privileged door does not move. Local Administrators remain a separate
   principal, are still not Accounts, and still gain nothing from an identity
   provider — so a provider compromise cannot escalate to deployment

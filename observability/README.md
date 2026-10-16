@@ -609,3 +609,7 @@ expected. Its 45 `DESCRIPTIONS` entries each carry a `# HELP` line that names
 the measurement's semantics and limitations; those families render in
 `/metrics`. Source-level checker counts can also include references and test
 strings, so the registry is the family inventory.
+
+## OIDC diagnostics
+
+Query `memory_oidc_provider_ready` by `component` (`metadata`, `jwks`) and `memory_oidc_provider_requests_total` by `stage` (`discovery`, `jwks`, `token`) and `outcome` (`success`, `unavailable`, `invalid_response`, `refused`). Readiness measures usable provider material, not overall HTTP health; JWKS expires at 300 seconds despite refresh failures. Disabled OIDC emits no series. These bounded families are available for operator triage; dedicated dashboards and alerts are deferred. See [the outage runbook](../docs/operations/LIMITATIONS.md) and [transition logs](../docs/operations/LOGGING.md).

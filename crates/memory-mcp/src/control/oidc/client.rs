@@ -83,11 +83,10 @@ impl OidcClient {
         discovery: &serde_json::Value,
     ) -> Result<Self, super::provider::ProviderFailure> {
         use super::provider::{self, ProviderFailure};
-        let issuer = resolve_published_issuer(&settings.issuer, &discovery)
+        let issuer = resolve_published_issuer(&settings.issuer, discovery)
             .map_err(|_| ProviderFailure::invalid())?;
-        let allowed_algorithms =
-            resolve_allowed_algorithms(&settings.allowed_algorithm, &discovery)
-                .map_err(|_| ProviderFailure::invalid())?;
+        let allowed_algorithms = resolve_allowed_algorithms(&settings.allowed_algorithm, discovery)
+            .map_err(|_| ProviderFailure::invalid())?;
         let endpoint = |field: &str| -> Result<String, ProviderFailure> {
             let value = discovery
                 .get(field)

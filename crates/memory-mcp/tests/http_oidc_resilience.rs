@@ -233,3 +233,165 @@ async fn disabled_provider_emits_no_series_or_requests() {
     assert_eq!(p.count(ProviderRoute::Discovery), 0);
     assert_eq!(p.count(ProviderRoute::Jwks), 0);
 }
+
+fn discovery(p: &OidcProviderFixture) -> serde_json::Value {
+    serde_json::json!({"issuer":p.issuer(),"authorization_endpoint":format!("{}/authorize",p.issuer()),"token_endpoint":format!("{}/token",p.issuer()),"jwks_uri":format!("{}/jwks",p.issuer()),"id_token_signing_alg_values_supported":["RS256"]})
+}
+#[tokio::test]
+async fn cold_outage_recovers_and_completes_browser_sign_in() {
+    use base64::Engine;
+    use sha2::Digest;
+    let mut p = OidcProviderFixture::start().await;
+    p.set_reply(
+        ProviderRoute::Discovery,
+        ProviderReply::status(StatusCode::BAD_GATEWAY),
+    );
+    let s = HttpServerFixture::spawn(
+        config(&p, "oidc").with_env("MEMORY_MCP_HTTP_SIGNUP_MODE", "open"),
+    )
+    .await;
+    assert_independent_service(&s).await;
+    p.next_request(ProviderRoute::Discovery).await;
+    p.set_reply(ProviderRoute::Discovery, ProviderReply::json(discovery(&p)));
+    p.next_request(ProviderRoute::Jwks).await;
+    let authorize = get(&s, "/auth/oidc/authorize").await;
+    assert_eq!(authorize.status(), StatusCode::SEE_OTHER);
+    let url = reqwest::Url::parse(authorize.headers()["location"].to_str().expect("redirect"))
+        .expect("authorize URL");
+    let params: std::collections::HashMap<String, String> =
+        url.query_pairs().into_owned().collect();
+    let token = oidc_provider::sign(
+        &serde_json::json!({"sub":"resilience-user","iss":p.issuer(),"aud":"memory-mcp","exp":4102444800u64,"nonce":params["nonce"]}),
+        "key-1",
+    );
+    p.set_reply(
+        ProviderRoute::Token,
+        ProviderReply::json(serde_json::json!({"id_token":token})),
+    );
+    let response = get(
+        &s,
+        &format!(
+            "/auth/oidc/callback?code=fixture-code&state={}",
+            params["state"]
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let cookie = response
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|h| h.to_str().ok())
+        .find(|h| h.starts_with("__Host-memory_mcp_session="))
+        .expect("session cookie")
+        .split(';')
+        .next()
+        .expect("cookie pair")
+        .to_owned();
+    let request = p.next_request(ProviderRoute::Token).await;
+    let body = String::from_utf8(request.body).expect("form UTF8");
+    let form_url = reqwest::Url::parse(&format!("http://fixture/?{body}")).expect("form");
+    let form: std::collections::HashMap<String, String> =
+        form_url.query_pairs().into_owned().collect();
+    assert_eq!(form["code"], "fixture-code");
+    assert_eq!(
+        base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(sha2::Sha256::digest(form["code_verifier"].as_bytes())),
+        params["code_challenge"]
+    );
+    p.set_reply(
+        ProviderRoute::Token,
+        ProviderReply::status(StatusCode::BAD_GATEWAY),
+    );
+    let second = get(&s, "/auth/oidc/authorize").await;
+    let url =
+        reqwest::Url::parse(second.headers()["location"].to_str().expect("redirect")).expect("URL");
+    let params: std::collections::HashMap<String, String> =
+        url.query_pairs().into_owned().collect();
+    let callback = format!(
+        "/auth/oidc/callback?code=outage-code&state={}",
+        params["state"]
+    );
+    assert_eq!(
+        get(&s, &callback).await.status(),
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert!(get(&s, &callback).await.status().is_client_error());
+    let session = http()
+        .get(format!("{}/api/v1/account", s.base_url))
+        .header("host", "localhost")
+        .header("cookie", cookie)
+        .send()
+        .await
+        .expect("session");
+    assert_eq!(session.status(), StatusCode::OK);
+    let access = oidc_provider::sign(
+        &serde_json::json!({"sub":"resilience-user","iss":p.issuer(),"aud":"memory-mcp","exp":4102444800u64}),
+        "key-1",
+    );
+    tokio::time::timeout(Duration::from_secs(15), async {
+        loop {
+            let response = bearer(&s, &access).await;
+            if response.status() == StatusCode::OK {
+                break;
+            }
+            assert_eq!(
+                response.status(),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "{}",
+                response.text().await.expect("error body")
+            );
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("new tenant becomes ready");
+    assert_eq!(get(&s, "/health/ready").await.status(), StatusCode::OK);
+    assert_eq!(p.count(ProviderRoute::Token), 2);
+}
+#[tokio::test]
+async fn invalid_issuer_never_publishes_before_valid_recovery() {
+    let mut p = OidcProviderFixture::start().await;
+    let mut invalid = discovery(&p);
+    invalid["issuer"] = serde_json::json!("https://wrong.example");
+    p.set_reply(ProviderRoute::Discovery, ProviderReply::json(invalid));
+    let s = HttpServerFixture::spawn(config(&p, "oidc")).await;
+    p.next_request(ProviderRoute::Discovery).await;
+    assert_eq!(
+        get(&s, "/auth/oidc/authorize").await.status(),
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(p.count(ProviderRoute::Jwks), 0);
+    p.set_reply(ProviderRoute::Discovery, ProviderReply::json(discovery(&p)));
+    p.next_request_within(ProviderRoute::Discovery, Duration::from_secs(75))
+        .await;
+    p.next_request(ProviderRoute::Jwks).await;
+    assert_eq!(
+        get(&s, "/auth/oidc/authorize").await.status(),
+        StatusCode::SEE_OTHER
+    );
+}
+#[tokio::test]
+async fn blocked_discovery_shutdown_reaps_child() {
+    let mut p = OidcProviderFixture::start().await;
+    let _held = p.hold(ProviderRoute::Discovery);
+    let mut s = HttpServerFixture::spawn(
+        config(&p, "oidc").with_env("MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS", "1"),
+    )
+    .await;
+    p.next_request(ProviderRoute::Discovery).await;
+    assert!(s.stop_gracefully(Duration::from_secs(10)).await.success());
+    p.shutdown().await;
+}
+#[tokio::test]
+async fn blocked_jwks_shutdown_reaps_child() {
+    let mut p = OidcProviderFixture::start().await;
+    let _held = p.hold(ProviderRoute::Jwks);
+    let mut s = HttpServerFixture::spawn(
+        config(&p, "oidc").with_env("MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS", "1"),
+    )
+    .await;
+    p.next_request(ProviderRoute::Jwks).await;
+    assert!(s.stop_gracefully(Duration::from_secs(10)).await.success());
+    p.shutdown().await;
+}

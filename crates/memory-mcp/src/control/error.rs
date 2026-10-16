@@ -439,15 +439,11 @@ mod tests {
     #[cfg(feature = "control-plane")]
     #[test]
     fn auth_error_jwks_failure_converts_to_unavailable() {
-        let observed = matches!(
-            ApiError::from(super::super::oidc::AuthError::Jwks("timeout".into())),
-            ApiError::Unavailable
-        );
+        let observed = runtime().block_on(status_of(ApiError::from(
+            super::super::oidc::AuthError::Jwks("timeout".into()),
+        )));
 
-        assert!(
-            observed,
-            "a JWKS outage is the server's fault, not the caller's"
-        );
+        assert_eq!(observed, StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[cfg(feature = "control-plane")]
