@@ -36,6 +36,8 @@ pub struct HttpRuntime {
         Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     background_upkeep_cancel: tokio_util::sync::CancellationToken,
     background_upkeep: Option<tokio::task::JoinHandle<()>>,
+    oidc_cancel: tokio_util::sync::CancellationToken,
+    oidc_worker: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl HttpRuntime {
@@ -51,13 +53,15 @@ impl HttpRuntime {
         let upkeep = self.background_upkeep.take();
         let runner_for_shutdown = self.background_task_runner.clone();
         let coordinator_join = self.background_task_runner.join_until(deadline);
-        let upkeep_join = join_upkeep_until(upkeep, deadline);
+        let upkeep_join = join_upkeep_until(upkeep, deadline, "metrics upkeep");
 
-        let background_result = join_background_owners(
+        let background_result = join_all_background_owners(
             &self.background_upkeep_cancel,
             move || runner_for_shutdown.shutdown(),
             coordinator_join,
             upkeep_join,
+            &self.oidc_cancel,
+            join_upkeep_until(self.oidc_worker.take(), deadline, "oidc"),
         )
         .await;
         let maintenance_result = match tokio::time::timeout_at(
@@ -106,9 +110,43 @@ where
     }
 }
 
+async fn join_all_background_owners<C, U, O>(
+    cancel_upkeep: &tokio_util::sync::CancellationToken,
+    shutdown_coordinator: impl FnOnce(),
+    coordinator_join: C,
+    upkeep_join: U,
+    cancel_oidc: &tokio_util::sync::CancellationToken,
+    oidc_join: O,
+) -> Result<(), crate::error::MemoryError>
+where
+    C: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+    U: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+    O: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+{
+    cancel_oidc.cancel();
+    let (background, oidc) = tokio::join!(
+        join_background_owners(
+            cancel_upkeep,
+            shutdown_coordinator,
+            coordinator_join,
+            upkeep_join
+        ),
+        oidc_join,
+    );
+    match (background, oidc) {
+        (Ok(()), other) => other,
+        (Err(error), Ok(())) => Err(error),
+        (Err(error), Err(secondary)) => {
+            log_secondary_cleanup_failure("oidc", &secondary);
+            Err(error)
+        }
+    }
+}
+
 async fn join_upkeep_until(
     upkeep: Option<tokio::task::JoinHandle<()>>,
     deadline: tokio::time::Instant,
+    owner: &str,
 ) -> Result<(), crate::error::MemoryError> {
     let Some(mut upkeep) = upkeep else {
         return Ok(());
@@ -116,14 +154,14 @@ async fn join_upkeep_until(
     match tokio::time::timeout_at(deadline, &mut upkeep).await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(error)) => Err(crate::error::MemoryError::Storage(format!(
-            "metrics upkeep task failed while joining: {error}"
+            "{owner} task failed while joining: {error}"
         ))),
         Err(_) => {
             upkeep.abort();
             let _ = upkeep.await;
-            Err(crate::error::MemoryError::Storage(
-                "metrics upkeep task exceeded shutdown deadline; task aborted".to_string(),
-            ))
+            Err(crate::error::MemoryError::Storage(format!(
+                "{owner} task exceeded shutdown deadline; task aborted"
+            )))
         }
     }
 }
@@ -142,21 +180,26 @@ fn log_secondary_cleanup_failure(owner: &str, error: &crate::error::MemoryError)
 /// Test-fixture seam for verifying the shared shutdown ordering without
 /// constructing production storage or a process-global recorder.
 #[cfg(feature = "test-fixtures")]
-pub async fn join_background_owners_for_test<C, U>(
+pub async fn join_background_owners_for_test<C, U, O>(
     cancel_upkeep: tokio_util::sync::CancellationToken,
     shutdown_coordinator: impl FnOnce(),
     coordinator_join: C,
     upkeep_join: U,
+    cancel_oidc: tokio_util::sync::CancellationToken,
+    oidc_join: O,
 ) -> Result<(), crate::error::MemoryError>
 where
     C: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
     U: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+    O: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
 {
-    join_background_owners(
+    join_all_background_owners(
         &cancel_upkeep,
         shutdown_coordinator,
         coordinator_join,
         upkeep_join,
+        &cancel_oidc,
+        oidc_join,
     )
     .await
 }
@@ -458,6 +501,15 @@ pub async fn build_state(
     #[cfg(not(feature = "prometheus"))]
     let background_upkeep = None;
 
+    let oidc_cancel = tokio_util::sync::CancellationToken::new();
+    #[cfg(feature = "control-plane")]
+    let oidc_worker = state
+        .oidc
+        .as_ref()
+        .map(|runtime| tokio::spawn(runtime.clone().run(oidc_cancel.clone())));
+    #[cfg(not(feature = "control-plane"))]
+    let oidc_worker = None;
+
     log_memory_marker(logger, "upkeep_started");
 
     Ok(HttpRuntime {
@@ -468,6 +520,8 @@ pub async fn build_state(
         background_task_runner,
         background_upkeep_cancel,
         background_upkeep,
+        oidc_cancel,
+        oidc_worker,
     })
 }
 

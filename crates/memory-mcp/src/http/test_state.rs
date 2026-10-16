@@ -20,7 +20,7 @@ pub struct HttpStateTestBuilder {
     #[cfg(feature = "prometheus")]
     metrics_handle: Option<super::MetricsHandle>,
     #[cfg(feature = "control-plane")]
-    oidc_client: Option<std::sync::Arc<crate::control::oidc::OidcClient>>,
+    oidc: Option<std::sync::Arc<crate::control::oidc::OidcRuntime>>,
 }
 
 impl HttpStateTestBuilder {
@@ -42,7 +42,7 @@ impl HttpStateTestBuilder {
             #[cfg(feature = "prometheus")]
             metrics_handle: super::HttpState::test_metrics_handle(),
             #[cfg(feature = "control-plane")]
-            oidc_client: None,
+            oidc: None,
         }
     }
 
@@ -96,7 +96,7 @@ impl HttpStateTestBuilder {
                 #[cfg(feature = "prometheus")]
                 metrics_handle: super::HttpState::test_metrics_handle(),
                 #[cfg(feature = "control-plane")]
-                oidc_client: None,
+                oidc: None,
             },
             store,
         )
@@ -179,7 +179,16 @@ impl HttpStateTestBuilder {
         mut self,
         client: std::sync::Arc<crate::control::oidc::OidcClient>,
     ) -> Self {
-        self.oidc_client = Some(client);
+        self.oidc = Some(crate::control::oidc::OidcRuntime::ready(client));
+        self
+    }
+
+    #[cfg(feature = "control-plane")]
+    pub fn with_oidc_runtime(
+        mut self,
+        runtime: std::sync::Arc<crate::control::oidc::OidcRuntime>,
+    ) -> Self {
+        self.oidc = Some(runtime);
         self
     }
 
@@ -228,11 +237,11 @@ impl HttpStateTestBuilder {
         // `Arc` and nothing else clones it), so swapping the OIDC client in is
         // infallible.
         #[cfg(feature = "control-plane")]
-        let state = match self.oidc_client.take() {
+        let state = match self.oidc.take() {
             Some(client) => {
                 let mut inner = std::sync::Arc::try_unwrap(state)
                     .unwrap_or_else(|_| panic!("the assembled state is uniquely owned"));
-                inner.oidc_client = Some(client);
+                inner.oidc = Some(client);
                 std::sync::Arc::new(inner)
             }
             None => state,

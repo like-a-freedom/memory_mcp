@@ -34,6 +34,7 @@ mod handlers;
 mod jwks;
 mod provider;
 mod retry;
+mod runtime;
 mod sealing;
 
 pub use client::OidcClient;
@@ -41,6 +42,7 @@ pub use flow_material::{
     AccessClaims, Audience, AuthError, OidcCallback, OidcFlowIntent, OidcNonce, OidcState,
     OidcTokens, PkceCode, StoredOidcRequest,
 };
+pub use runtime::{OidcRuntime, OidcUnavailable};
 // Re-exported so the HTTP config validator can accept a pin only from the list
 // the OIDC path actually implements, without duplicating it.
 pub(crate) use flow_material::SUPPORTED_ID_TOKEN_ALGORITHMS;

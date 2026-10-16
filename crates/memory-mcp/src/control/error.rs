@@ -16,6 +16,9 @@ pub enum ApiError {
     NotFound,
     Conflict,
     Unavailable,
+    OidcUnavailable {
+        retry_after: std::time::Duration,
+    },
     ReauthRequired,
     Internal(MemoryError),
     /// The id of the request this error answers, taken from the request's
@@ -85,12 +88,21 @@ impl IntoResponse for ApiError {
             ApiError::At { error, request_id } => (*error, Some(request_id)),
             other => (other, None),
         };
+        let retry_after = match &this {
+            ApiError::OidcUnavailable { retry_after } => Some(
+                retry_after
+                    .as_secs()
+                    .saturating_add(u64::from(retry_after.subsec_nanos() > 0))
+                    .max(1),
+            ),
+            _ => None,
+        };
         let (status, code, message) = match this {
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", "unauthorized"),
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "forbidden"),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found", "not found"),
             ApiError::Conflict => (StatusCode::CONFLICT, "conflict", "conflict"),
-            ApiError::Unavailable => (
+            ApiError::Unavailable | ApiError::OidcUnavailable { .. } => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "temporarily_unavailable",
                 "temporarily unavailable",
@@ -133,12 +145,33 @@ impl IntoResponse for ApiError {
             // nothing to match against.
             "correlation_id": request_id.unwrap_or_else(uuid::Uuid::new_v4).to_string(),
         });
-        (
+        let mut response = (
             status,
             [(axum::http::header::CONTENT_TYPE, "application/json")],
             body.to_string(),
         )
-            .into_response()
+            .into_response();
+        if let Some(seconds) = retry_after {
+            response.headers_mut().insert(
+                axum::http::header::CACHE_CONTROL,
+                axum::http::HeaderValue::from_static("no-store"),
+            );
+            if let Ok(value) = seconds.to_string().parse() {
+                response
+                    .headers_mut()
+                    .insert(axum::http::header::RETRY_AFTER, value);
+            }
+        }
+        response
+    }
+}
+
+#[cfg(feature = "control-plane")]
+impl From<super::oidc::OidcUnavailable> for ApiError {
+    fn from(error: super::oidc::OidcUnavailable) -> Self {
+        Self::OidcUnavailable {
+            retry_after: error.retry_after,
+        }
     }
 }
 

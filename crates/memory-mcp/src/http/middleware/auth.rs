@@ -134,7 +134,7 @@ async fn oauth_bearer(
     {
         return None;
     }
-    let client = state.oidc_client.as_ref()?;
+    let client = state.oidc.as_ref()?.client().ok()?;
     crate::http::oauth::resolve_bearer_principal(
         &state.config,
         &*state.registry.accounts(),

@@ -73,7 +73,7 @@ pub struct HttpState {
     /// OIDC client for the control-plane login flow.
     /// `None` when the control plane is disabled.
     #[cfg(feature = "control-plane")]
-    pub oidc_client: Option<Arc<crate::control::oidc::OidcClient>>,
+    pub oidc: Option<Arc<crate::control::oidc::OidcRuntime>>,
     /// Local admin authentication extension. `Some` only when local auth mode
     /// is active. Provides the authority, hasher, and auth service.
     #[cfg(feature = "control-plane")]
@@ -322,25 +322,17 @@ impl HttpState {
                 account_resolver.clone(),
             ),
         );
-        // The OIDC client performs discovery against the configured
-        // issuer at startup. Without the `oidc` method there is no issuer to
-        // reach and no OIDC route is mounted, so discovery must not run: such a
-        // deployment has no dependency on any identity provider being online.
-        // A disabled control plane mounts no browser surface at all.
+        // Configured method presence is independent of remote availability.
         #[cfg(feature = "control-plane")]
-        let oidc_client = if browser_policy_override.is_none()
-            && config.has_method(crate::http::config::BrowserAuthMethod::Oidc)
-        {
-            Some(Arc::new(
-                crate::control::oidc::OidcClient::new(
-                    &config.oidc_issuer,
-                    &config.oidc_client_id,
-                    &config.oidc_audience,
-                    &config.oidc_redirect_uri,
-                    &config.oidc_allowed_alg,
-                )
-                .await?,
-            ))
+        let oidc = if config.has_method(crate::http::config::BrowserAuthMethod::Oidc) {
+            let oidc_config = config
+                .browser_auth
+                .as_ref()
+                .and_then(|methods| methods.oidc.as_ref())
+                .ok_or_else(|| {
+                    crate::error::MemoryError::ConfigInvalid("OIDC method requires settings".into())
+                })?;
+            Some(crate::control::oidc::OidcRuntime::new(oidc_config)?)
         } else {
             None
         };
@@ -463,7 +455,7 @@ impl HttpState {
             api_key_issuance,
             tenant_resolver,
             #[cfg(feature = "control-plane")]
-            oidc_client,
+            oidc,
             #[cfg(feature = "control-plane")]
             local_admin,
             #[cfg(feature = "control-plane")]

@@ -208,6 +208,7 @@ async fn begin_flow(
     state: &std::sync::Arc<HttpState>,
     intent: OidcFlowIntent,
 ) -> Result<String, ApiError> {
+    let oidc = state.oidc.as_ref().ok_or(ApiError::Unavailable)?.client()?;
     let pkce = PkceCode::new();
     let state_token = OidcState::new();
     let nonce = OidcNonce::new();
@@ -234,7 +235,6 @@ async fn begin_flow(
         .store_oidc_request(policy, &state_hash, &sealed, &aead_nonce)
         .await?;
 
-    let oidc = state.oidc_client.as_ref().ok_or(ApiError::Unavailable)?;
     let url = oidc.authorize_url(&state_token, &pkce, &nonce)?;
     Ok(url)
 }
@@ -415,7 +415,7 @@ async fn callback_inner(
 
     let code = params.code.ok_or_else(|| reject("missing_code"))?;
 
-    let oidc = state.oidc_client.as_ref().ok_or(ApiError::Unavailable)?;
+    let oidc = state.oidc.as_ref().ok_or(ApiError::Unavailable)?.client()?;
 
     // The exchange is the one stage that leaves the process, so its duration
     // is the number that separates "the provider answered" from "the provider

@@ -53,6 +53,8 @@ async fn runtime_shutdown_cancels_upkeep_and_attempts_embedding_join() {
         move || shutdown_flag.store(true, Ordering::SeqCst),
         coordinator_join,
         upkeep_join,
+        CancellationToken::new(),
+        async { Ok(()) },
     )
     .await;
 
@@ -64,4 +66,31 @@ async fn runtime_shutdown_cancels_upkeep_and_attempts_embedding_join() {
         .await
         .expect("coordinator join is attempted");
     upkeep_attempted_rx.await.expect("upkeep join is attempted");
+}
+
+#[tokio::test]
+async fn oidc_cleanup_runs_after_another_owner_fails() {
+    use memory_mcp::error::MemoryError;
+    use memory_mcp::http::runtime::bootstrap::join_background_owners_for_test;
+    use tokio_util::sync::CancellationToken;
+    let cancel = CancellationToken::new();
+    let observed = cancel.clone();
+    let (sent, received) = tokio::sync::oneshot::channel();
+    let result = join_background_owners_for_test(
+        CancellationToken::new(),
+        || {},
+        async { Err(MemoryError::Storage("coordinator failed".into())) },
+        async { Ok(()) },
+        cancel,
+        async move {
+            assert!(observed.is_cancelled());
+            let _ = sent.send(());
+            Ok(())
+        },
+    )
+    .await;
+    assert!(result.is_err());
+    received
+        .await
+        .expect("OIDC cleanup was polled despite coordinator failure");
 }
