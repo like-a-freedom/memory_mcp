@@ -70,6 +70,18 @@ pub struct LifecycleDashboard {
     pub communities: usize,
 }
 
+/// The inventory levels the lifecycle view reports, read in one pass.
+///
+/// One reader for the levels, so the dashboard and the periodic stock
+/// stamp measure the same quantities the same way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StockLevels {
+    pub active_facts: usize,
+    pub archival_candidates: usize,
+    pub archival_candidate_ids: Vec<String>,
+    pub communities: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LifecycleDefaults {
     pub archival_age_days: u32,

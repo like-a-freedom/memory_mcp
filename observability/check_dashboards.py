@@ -368,8 +368,10 @@ def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> Non
     Collapsed rows own a local grid and take one top-level grid line. An
     expanded row's children use absolute dashboard coordinates, so the next
     row starts after the last child rather than one line after the header.
-    Only the first row may be expanded; this keeps the overview visible while
-    preserving the existing collapsed-section behavior below it.
+    product.json expands only its first, overview row: the product summary
+    must be visible when the dashboard opens, and the sections below it keep
+    the collapsed behavior. technical.json expands the rows whose layout needs
+    the shared grid; every other row stays collapsed.
     """
     top = document["panels"]
     non_rows = [panel for panel in top if panel["type"] != "row"]
@@ -393,7 +395,7 @@ def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> Non
             continue
         grid = panel["gridPos"]
         collapsed = panel.get("collapsed", True)
-        if not collapsed and index != 0:
+        if not collapsed and index != 0 and path.name == "product.json":
             failures.append(
                 f"{path.name} / {panel['title']}: only the first overview row "
                 f"may be expanded"
@@ -437,8 +439,8 @@ def check_row_contents(
     """Check row children for bounds and collisions.
 
     Collapsed rows use a local coordinate space and must stay on one band;
-    Grafana renders a multi-band collapsed row as a diagonal staircase. The
-    expanded overview uses the shared dashboard grid and may have multiple
+    Grafana renders a multi-band collapsed row as a diagonal staircase. An
+    expanded row uses the shared dashboard grid and may have multiple
     bands, but its children must start below the row header.
 
     A row must not contain another row: Grafana's schema has a single row

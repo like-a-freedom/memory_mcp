@@ -295,6 +295,7 @@ const KNOWN_OPERATIONS: &[&str] = &[
     "explain",
     "invalidate",
     "lifecycle_dashboard",
+    "lifecycle_stock",
     "lifecycle_archive_candidates",
     "lifecycle_restore_archived",
     "lifecycle_recompute_decay",
@@ -785,6 +786,15 @@ pub(crate) mod tests {
     fn operation_labels_are_bounded() {
         assert_eq!(operation_label("ingest"), "ingest");
         assert_eq!(operation_label("request:abc"), "other");
+    }
+
+    /// The stock pass must keep its own name. A name outside the
+    /// vocabulary collapses into `other`, which on a dashboard is
+    /// indistinguishable from a metric nobody emits — the periodic
+    /// stamp would report zero series exactly when it is working.
+    #[test]
+    fn the_stock_pass_operation_is_in_the_vocabulary() {
+        assert_eq!(operation_label("lifecycle_stock"), "lifecycle_stock");
     }
 
     #[test]

@@ -320,6 +320,13 @@ pub async fn rebuild_communities(handles: &LifecycleHandles<'_>) -> Result<usize
     crate::memory::lifecycle_workers::run_community_rebuild_pass(handles).await
 }
 
+/// Run one memory-owned stock-level pass using its narrow lifecycle handles.
+pub async fn run_stock(
+    handles: &LifecycleHandles<'_>,
+) -> Result<crate::memory::lifecycle_types::StockLevels, MemoryError> {
+    crate::memory::lifecycle_workers::stock::run_stock_pass(handles).await
+}
+
 /// Filesystem discovery dependencies. Snapshot tokens describe metadata, never content.
 #[async_trait::async_trait]
 pub trait InboxReconciliationPort: Send + Sync {

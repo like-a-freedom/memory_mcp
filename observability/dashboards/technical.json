@@ -118,7 +118,7 @@
       "type": "row"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -152,16 +152,15 @@
                     "value": 0.0001
                   }
                 ]
-              },
-              "decimals": 3
+              }
             },
             "overrides": []
           },
           "gridPos": {
-            "h": 9,
-            "w": 12,
+            "h": 10,
+            "w": 24,
             "x": 0,
-            "y": 0
+            "y": 2
           },
           "id": 0,
           "options": {
@@ -176,7 +175,10 @@
               "fields": "",
               "values": false
             },
-            "textMode": "auto"
+            "textMode": "auto",
+            "text": {
+              "titleSize": 14
+            }
           },
           "pluginVersion": "13.2.4",
           "targets": [
@@ -224,16 +226,15 @@
                     "value": 0.1
                   }
                 ]
-              },
-              "decimals": 4
+              }
             },
             "overrides": []
           },
           "gridPos": {
             "h": 9,
-            "w": 12,
-            "x": 12,
-            "y": 0
+            "w": 24,
+            "x": 0,
+            "y": 12
           },
           "id": 0,
           "options": {
@@ -248,7 +249,10 @@
               "fields": "",
               "values": false
             },
-            "textMode": "auto"
+            "textMode": "auto",
+            "text": {
+              "titleSize": 12
+            }
           },
           "pluginVersion": "13.2.4",
           "targets": [
@@ -321,7 +325,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 21
       },
       "id": 0,
       "panels": [
@@ -354,8 +358,7 @@
                     "value": 108000
                   }
                 ]
-              },
-              "decimals": 0
+              }
             },
             "overrides": []
           },
@@ -402,7 +405,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Provisioning leases, durable tasks and embedding recovery on the budget their cadence deserves: amber at fifteen minutes, red at two hours, against intervals of seconds and a minute.\n\n**Without this tile, a stalled provisioning scheduler would take a day to be noticed** \u2014 the budget above has to clear a daily pass, and a budget loose enough for that is useless for a per-second one. The three passes also appear in the tile beside this one; this is the one that answers within minutes.\n\nAbsent when a pass has never run, which is a deployment that has not enabled it rather than one that has lost it.",
+          "description": "Lease renewal, durable tasks and embedding recovery on the budget their cadence deserves: red at eighty seconds, against intervals of seconds and a minute.\n\n**Without this tile, a stalled lease scheduler would take a day to be noticed** \u2014 the lenient budget in the tile beside this one has to clear a daily pass, and a budget loose enough for that is useless for a per-second one. The three passes also appear in that tile; this is the one that answers within minutes.\n\nAbsent when a pass has never run, which is a deployment that has not enabled it rather than one that has lost it.",
           "fieldConfig": {
             "defaults": {
               "unit": "dtdurations",
@@ -418,16 +421,11 @@
                     "value": null
                   },
                   {
-                    "color": "yellow",
-                    "value": 900
-                  },
-                  {
                     "color": "red",
-                    "value": 7200
+                    "value": 80
                   }
                 ]
-              },
-              "decimals": 0
+              }
             },
             "overrides": []
           },
@@ -440,9 +438,9 @@
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
-            "orientation": "auto",
+            "orientation": "horizontal",
             "reduceOptions": {
               "calcs": [
                 "lastNotNull"
@@ -474,18 +472,14 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Every stage in the pipeline as one row across the selected range, coloured by the same budget as the tiles above.\n\n**What a current value cannot answer: for how long.** A tile that is green now may have been red an hour ago, and the run of colour is what an incident review actually needs \u2014 a stage amber since the deploy is a different problem from one that spiked and recovered.\n\nFive rows, the inner stages only: adding the operations would double the rows for a coarser reading of the same thing.\n\n**Gaps are gaps.** A stage nobody calls any more leaves blanks, which is what a switched-off subsystem looks like and is not the same thing as a fast one.",
+          "description": "Every inner stage as one figure: its current p95, and the sparkline of its recent run.\n\n**What a current number cannot answer: for how long.** The figure does not tell a stage that spiked and recovered from one that has been slow since the deploy \u2014 the shape under it does, and that is what an incident review reads.\n\nFive stages, the inner stages only: adding the operations would double the figures for a coarser reading of the same thing.\n\n**Colour is a floor here, not the alarm.** Red starts at eighty seconds; the triage budget of one and three seconds lives in the stage tiles at the top of this dashboard, and this row answers *which stage, and for how long* rather than *is anything red*.\n\nAbsent when a stage has never run, which is a switched-off subsystem rather than a fast one.",
           "fieldConfig": {
             "defaults": {
+              "unit": "s",
               "color": {
                 "mode": "thresholds"
               },
-              "custom": {
-                "fillOpacity": 80,
-                "lineWidth": 1
-              },
               "mappings": [],
-              "unit": "s",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -494,12 +488,8 @@
                     "value": null
                   },
                   {
-                    "color": "yellow",
-                    "value": 1
-                  },
-                  {
                     "color": "red",
-                    "value": 3
+                    "value": 80
                   }
                 ]
               }
@@ -514,20 +504,18 @@
           },
           "id": 0,
           "options": {
-            "colWidth": 0.9,
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
             },
-            "perPage": 20,
-            "rowHeight": 0.85,
-            "showValue": "auto",
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
+            "textMode": "auto"
           },
           "pluginVersion": "13.2.4",
           "targets": [
@@ -544,7 +532,7 @@
             }
           ],
           "title": "Stage latency, over time",
-          "type": "status-history"
+          "type": "stat"
         }
       ],
       "title": "Helicopter view \u2014 is it still running",
@@ -556,7 +544,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 3
+        "y": 22
       },
       "id": 0,
       "panels": [
@@ -589,8 +577,7 @@
                     "value": 0.1
                   }
                 ]
-              },
-              "decimals": 3
+              }
             },
             "overrides": []
           },
@@ -668,8 +655,7 @@
                     "value": 2
                   }
                 ]
-              },
-              "decimals": 3
+              }
             },
             "overrides": []
           },
@@ -682,7 +668,7 @@
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -739,8 +725,7 @@
                     "value": null
                   }
                 ]
-              },
-              "decimals": 2
+              }
             },
             "overrides": []
           },
@@ -753,7 +738,7 @@
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -812,7 +797,7 @@
                   }
                 ]
               },
-              "decimals": 4
+              "decimals": 0
             },
             "overrides": []
           },
@@ -825,7 +810,7 @@
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -890,7 +875,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 23
       },
       "id": 0,
       "panels": [
@@ -1079,7 +1064,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 24
       },
       "id": 0,
       "panels": [
@@ -1290,7 +1275,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 25
       },
       "id": 0,
       "panels": [
@@ -1417,7 +1402,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 26
       },
       "id": 0,
       "panels": [
@@ -1722,7 +1707,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 27
       },
       "id": 0,
       "panels": [
@@ -1824,7 +1809,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 28
       },
       "id": 0,
       "panels": [
@@ -2056,7 +2041,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 29
       },
       "id": 0,
       "panels": [
@@ -2244,7 +2229,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 30
       },
       "id": 0,
       "panels": [
@@ -2450,7 +2435,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 31
       },
       "id": 0,
       "panels": [
@@ -2562,7 +2547,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 32
       },
       "id": 0,
       "panels": [
@@ -2761,7 +2746,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 33
       },
       "id": 0,
       "panels": [
@@ -3110,7 +3095,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 34
       },
       "id": 0,
       "panels": [
@@ -3145,12 +3130,12 @@
       "type": "row"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 35
       },
       "id": 0,
       "panels": [
@@ -3204,9 +3189,9 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 8,
+            "w": 24,
             "x": 0,
-            "y": 0
+            "y": 49
           },
           "id": 0,
           "options": {
@@ -3290,10 +3275,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 8,
-            "y": 0
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 57
           },
           "id": 0,
           "options": {
@@ -3377,10 +3362,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 16,
-            "y": 0
+            "h": 13,
+            "w": 24,
+            "x": 0,
+            "y": 36
           },
           "id": 0,
           "options": {
@@ -3425,7 +3410,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 66
       },
       "id": 0,
       "panels": [
@@ -3614,7 +3599,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 67
       },
       "id": 0,
       "panels": [
@@ -3736,12 +3721,12 @@
       "type": "row"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 68
       },
       "id": 0,
       "panels": [
@@ -3794,10 +3779,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 12,
+            "h": 9,
+            "w": 24,
             "x": 0,
-            "y": 0
+            "y": 69
           },
           "id": 0,
           "options": {
@@ -3881,10 +3866,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 0
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 78
           },
           "id": 0,
           "options": {
@@ -3924,12 +3909,12 @@
       "type": "row"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 89
       },
       "id": 0,
       "panels": [
@@ -3982,10 +3967,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 7,
+            "h": 11,
+            "w": 24,
             "x": 0,
-            "y": 0
+            "y": 98
           },
           "id": 0,
           "options": {
@@ -4049,13 +4034,13 @@
           "gridPos": {
             "h": 8,
             "w": 4,
-            "x": 7,
-            "y": 0
+            "x": 0,
+            "y": 90
           },
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -4105,21 +4090,20 @@
                     "value": null
                   }
                 ]
-              },
-              "decimals": 2
+              }
             },
             "overrides": []
           },
           "gridPos": {
             "h": 8,
             "w": 4,
-            "x": 11,
-            "y": 0
+            "x": 4,
+            "y": 90
           },
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -4169,21 +4153,20 @@
                     "value": null
                   }
                 ]
-              },
-              "decimals": 3
+              }
             },
             "overrides": []
           },
           "gridPos": {
             "h": 8,
             "w": 4,
-            "x": 15,
-            "y": 0
+            "x": 8,
+            "y": 90
           },
           "id": 0,
           "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": {
@@ -4262,9 +4245,9 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 5,
-            "x": 19,
-            "y": 0
+            "w": 12,
+            "x": 12,
+            "y": 90
           },
           "id": 0,
           "options": {
@@ -4309,7 +4292,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 109
       },
       "id": 0,
       "panels": [
@@ -4355,7 +4338,10 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "text": "victoriametrics",
+          "value": "edr4onptd6hogd"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "Data source",

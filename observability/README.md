@@ -150,7 +150,7 @@ access failure does not establish that a series is absent from VictoriaMetrics.
 | Are we saturated? | technical → *Saturation* |
 | What is the service refusing, and why? | technical → *Runtime refusals*, *Authentication* |
 | Are background jobs keeping up? | technical → *Background jobs* |
-| Is knowledge accumulating? | product → *What exists*, *How it is growing*, *What was learned* |
+| Is knowledge accumulating? | product → *Overview*, *How it is growing*, *What was learned* |
 | How old is what it knows? | product → *How fresh is the knowledge* |
 | Where is the product dashboard from here? | the dashboard header links to `/d/memory_mcp-product` |
 | What are people asking it for? | product → *What people are doing* |
@@ -176,6 +176,55 @@ questions are whether the memory is growing, how old it is, whether people are
 arriving, what they ask it for, and whether the knowledge is any good. A p99
 answers none of them, and a dashboard that makes its reader wade past one to
 reach "how much did we learn this week" is a dashboard that gets skimmed.
+
+## Reading the product dashboard
+
+Three figures on the product dashboard mislead without their context, so the
+context lives here rather than in on-dashboard text panels.
+
+**Freshness is a stamp no counter can fake.** Nothing in the operation metrics
+can answer how old the knowledge is: a counter that stopped growing still
+reports its last scrape as recent, and `increase()` over a window reads
+*nothing new* whether the service learned yesterday or learned nothing at all —
+so a memory system that stopped learning a week ago has every symptom of one
+that stopped an hour ago. The age is therefore a stamp,
+`memory_knowledge_last_write_timestamp_seconds`, written by the two writes that
+add knowledge — the episode store and the extraction — which is what makes it
+trustworthy: a recall reads knowledge and changes nothing, so a busy service
+nobody writes to ages visibly instead of looking permanently fresh. Stamping it
+at the MCP tool instead would leave it absent on any deployment whose knowledge
+arrives unattended, which is the one deployment whose freshness matters most.
+The stamp is also the signal a *reader* of the dashboard wants before any of
+the others: everything below it describes a store whose freshness is the
+assumption they are all making.
+
+**Stock curves are levels stamped by the hygiene pass, not accumulated
+totals.** The stock family — active facts, communities, archival candidates —
+is a level, not a total, which is why the curves can be compared across
+deployments and cannot be summed over time. The levels are stamped by the
+periodic hygiene pass (on the decay cadence, hourly by default) and by
+lifecycle-dashboard reads, so the curves step once per stamp rather than
+flowing; do not read a flat stretch as "nothing changed" — a window without a
+stamp means no observation, not no change. **The archival backlog is the curve
+to watch for direction**: it is the retention policy's own scoreboard — a
+standing non-zero means archiving is not being run, a rising line means the
+policy is falling behind what is being written, and a falling line to zero
+means the policy is doing its job. Communities are counted, not sized: more
+communities with the same fact count is fragmentation, not enrichment.
+
+**Yield is a shape, not a score.** Facts per episode and links per entity are
+two rates over a window, each the produced kind divided by the produced kind.
+There is no target: yield depends entirely on what is being ingested, and a
+codebase ingested once and a chat log ingested daily have nothing in common.
+What is worth watching is the *direction*, and it is worth watching against the
+input rather than on its own. Both denominators are floored rather than divided
+by zero, so a thin day reads as no yield, not as infinity — and re-extracting
+an episode inflates the ratio without a second episode ever arriving, because
+the denominator counts episodes as they were *ingested*. What yield deliberately
+does not measure is whether the facts are *true*, and whether recall found
+them: correctness is the evaluation suite's subject (`crates/eval-harness`),
+and retrieval quality needs a judged query set rather than a counter, so
+neither is pretended at here.
 
 ## The SLO
 

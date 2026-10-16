@@ -4,7 +4,7 @@ use serde_json::json;
 use crate::error::MemoryError;
 use crate::memory::lifecycle_types::{
     ArchiveCandidatesOutcome, LifecycleDashboard, LifecycleDefaults, LifecycleView,
-    RebuildCommunitiesOutcome, RecomputeDecayOutcome, RestoreArchivedOutcome,
+    RebuildCommunitiesOutcome, RecomputeDecayOutcome, RestoreArchivedOutcome, StockLevels,
 };
 
 impl crate::memory::lifecycle_workers::LifecycleHandles<'_> {
@@ -24,34 +24,25 @@ impl crate::memory::lifecycle_workers::LifecycleHandles<'_> {
         })
     }
 
-    pub async fn lifecycle_dashboard(&self) -> Result<LifecycleDashboard, MemoryError> {
-        let service = self;
-        let mut operation_metrics =
-            crate::observability::OperationMetrics::new("lifecycle_dashboard");
-        let active_facts = service
+    /// Reads the inventory levels the lifecycle view reports.
+    ///
+    /// One reader for the levels, so the dashboard and the periodic
+    /// stock stamp measure the same quantities the same way.
+    pub(crate) async fn read_stock_levels(&self) -> Result<StockLevels, MemoryError> {
+        let active_facts = self
             .knowledge_graph_store()
             .select_active_facts(10_000)
             .await?;
-        let policy = service.policy;
+        let policy = self.policy;
         let cutoff = crate::shared::temporal::normalize_dt(
             Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
         );
-        let archival_candidates = service
+        let archival_candidates = self
             .episode_store()
             .select_episodes_for_archival(&cutoff, 1_000)
             .await?;
-        let communities = service.knowledge_graph_store().select_communities().await?;
-
-        // A stock, not a flow: these are levels read from the store, so they are
-        // set rather than added. Counting them made the metric the sum of
-        // every inventory ever read — opening this dashboard grew the counter
-        // by the size of the store, and its rate reported dashboard traffic
-        // instead of growth in the data.
-        operation_metrics.record_stock("active_facts", active_facts.len());
-        operation_metrics.record_stock("archival_candidates", archival_candidates.len());
-        operation_metrics.record_stock("communities", communities.len());
-        operation_metrics.success();
-        Ok(LifecycleDashboard {
+        let communities = self.knowledge_graph_store().select_communities().await?;
+        Ok(StockLevels {
             active_facts: active_facts.len(),
             archival_candidates: archival_candidates.len(),
             archival_candidate_ids: archival_candidates
@@ -64,6 +55,29 @@ impl crate::memory::lifecycle_workers::LifecycleHandles<'_> {
                 })
                 .collect(),
             communities: communities.len(),
+        })
+    }
+
+    pub async fn lifecycle_dashboard(&self) -> Result<LifecycleDashboard, MemoryError> {
+        let service = self;
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_dashboard");
+        let levels = service.read_stock_levels().await?;
+
+        // A stock, not a flow: these are levels read from the store, so they are
+        // set rather than added. Counting them made the metric the sum of
+        // every inventory ever read — opening this dashboard grew the counter
+        // by the size of the store, and its rate reported dashboard traffic
+        // instead of growth in the data.
+        operation_metrics.record_stock("active_facts", levels.active_facts);
+        operation_metrics.record_stock("archival_candidates", levels.archival_candidates);
+        operation_metrics.record_stock("communities", levels.communities);
+        operation_metrics.success();
+        Ok(LifecycleDashboard {
+            active_facts: levels.active_facts,
+            archival_candidates: levels.archival_candidates,
+            archival_candidate_ids: levels.archival_candidate_ids,
+            communities: levels.communities,
         })
     }
 

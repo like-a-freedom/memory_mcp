@@ -3,6 +3,8 @@
 //! - Confidence decay refresh: marks stale facts as invalid
 //! - Episode archival: archives old episodes without active facts
 //! - Community recomputation: rebuilds community components from active edges
+//! - Stock-level stamping: re-reads inventory levels and stamps them as
+//!   gauges (read-only; the dashboard read stamps the same gauges)
 //!
 //! Community recomputation pages active-edge scans in 10K batches per namespace,
 //! which avoids truncating larger graphs while still bounding per-query memory.
@@ -15,17 +17,20 @@ use crate::config::LifecycleConfig;
 
 /// The handles the lifecycle background passes need.
 ///
-/// Decay, archival and community rebuild are all background hygiene
-/// jobs: they read the database through the bound namespace, log what
-/// they do, and otherwise talk to whichever context owns the table
-/// they are working on. Its core is four things, not twenty-nine; the
-/// decay pass additionally requires knowledge's atomic-retraction port.
+/// Decay, archival, community rebuild and the stock-level stamp are
+/// all background jobs: they read the database through the bound
+/// namespace, log what they do, and otherwise talk to whichever
+/// context owns the table they are working on. Its core is four
+/// things, not twenty-nine; the decay pass additionally requires
+/// knowledge's atomic-retraction port, and the stock stamp is
+/// read-only.
 pub struct LifecycleHandles<'a> {
     pub(crate) db_client: Arc<dyn crate::storage::DbClient>,
     pub(crate) active_namespace: &'a str,
     pub(crate) logger: &'a crate::logging::StdoutLogger,
     pub(crate) policy: LifecyclePolicy,
-    /// Present only for decay; archival and community passes do not retain it.
+    /// Present only for decay; archival, community and stock passes do
+    /// not retain it.
     pub(crate) claim_store: Option<Arc<dyn crate::knowledge::claims::ClaimStore>>,
 }
 
@@ -105,13 +110,15 @@ mod tests {
 pub mod archival;
 mod communities;
 pub mod decay;
+pub mod stock;
 
 pub(crate) use archival::spawn_archival_worker;
 pub(crate) use communities::{run_community_rebuild_pass, spawn_community_worker};
 pub(crate) use decay::spawn_decay_worker;
+pub(crate) use stock::spawn_stock_worker;
 
 /// Bounded runtime for the lifecycle background workers (decay, archival,
-/// community).
+/// community, stock).
 ///
 /// Mirrors `ClaimWorkerRuntime`: each worker task observes a shared
 /// [`CancellationToken`] and its `JoinHandle` is tracked here so that
@@ -208,6 +215,30 @@ impl LifecycleBackgroundWorkerRuntime {
         interval_secs: u64,
     ) {
         let handle = spawn_community_worker(
+            db_client,
+            active_namespace,
+            logger,
+            policy,
+            interval_secs,
+            self.shutdown.clone(),
+        );
+        if let Ok(mut handles) = self.handles.try_lock() {
+            handles.push(handle);
+        } else {
+            handle.abort();
+        }
+    }
+
+    /// Spawn the stock-level worker, tracking its handle for shutdown.
+    pub(crate) fn spawn_stock(
+        &self,
+        db_client: Arc<dyn crate::storage::DbClient>,
+        active_namespace: String,
+        logger: crate::logging::StdoutLogger,
+        policy: LifecyclePolicy,
+        interval_secs: u64,
+    ) {
+        let handle = spawn_stock_worker(
             db_client,
             active_namespace,
             logger,

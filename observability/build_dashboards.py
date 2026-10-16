@@ -90,6 +90,10 @@ def stat(
     thresholds: list[dict] | None = None,
     decimals: int | None = None,
     links: list[dict] | None = None,
+    legend: str = "",
+    graph_mode: str = "none",
+    orientation: str = "auto",
+    text_options: dict | None = None,
 ) -> dict:
     """A single number, read at a glance.
 
@@ -97,6 +101,11 @@ def stat(
     the ones wanted here: a stat that shows a sparkline is a stat nobody can
     read across a row, and one that colours by value paints a healthy service
     green and a broken one the same green.
+
+    `graph_mode` opts a tile into the sparkline (`"area"`) and `legend` names
+    the per-series label when one query returns several series; both default to
+    the flat single-number tile. `text_options` carries the optional
+    `titleSize`-style sizing Grafana exports for a few tiles.
     """
     field_defaults: dict[str, Any] = {
         "unit": unit,
@@ -114,9 +123,9 @@ def stat(
         "id": 0,
         "options": {
             "colorMode": "value",
-            "graphMode": "none",
+            "graphMode": graph_mode,
             "justifyMode": "auto",
-            "orientation": "auto",
+            "orientation": orientation,
             "reduceOptions": {
                 "calcs": ["lastNotNull"],
                 "fields": "",
@@ -125,7 +134,7 @@ def stat(
             "textMode": "auto",
         },
         "pluginVersion": "13.2.4",
-        "targets": [target(expr, "")],
+        "targets": [target(expr, legend)],
         "title": title,
         "type": "stat",
     }
@@ -141,6 +150,8 @@ def stat(
         }
     if decimals is not None:
         field_defaults["decimals"] = decimals
+    if text_options is not None:
+        panel["options"]["text"] = text_options
     if links:
         panel["links"] = links
     return panel
@@ -222,6 +233,11 @@ def timeseries(
     return panel
 
 
+# A section handed to `rows()`: `(title, panels)` stacks as a collapsed row;
+# `(title, panels, False)` expands it onto the shared dashboard grid.
+Section = tuple[str, list[dict]] | tuple[str, list[dict], bool]
+
+
 def row(
     title: str,
     panels: list[dict],
@@ -247,15 +263,43 @@ def row(
 
 
 def rows(
-    titles: list[tuple[str, list[dict]]],
+    sections: list[Section],
     *,
     start_y: int = 0,
 ) -> list[dict]:
-    """Stack collapsed rows, each one grid line apart from `start_y`."""
-    return [
-        row(title, panels, y=start_y + index)
-        for index, (title, panels) in enumerate(titles)
-    ]
+    """Stack rows from `start_y`, advancing the grid for each one.
+
+    A collapsed row owns a local grid: its panels keep the `y` they were
+    written with, and the row takes one dashboard line. A section may pass
+    `collapsed=False` for a layout that needs the shared grid; its panels are
+    rebased below the row header in absolute coordinates, and the cursor moves
+    past the last child so the next row starts after the section rather than
+    one line under its header.
+    """
+    stacked: list[dict] = []
+    cursor = start_y
+    for section in sections:
+        title, panels = section[0], section[1]
+        collapsed = True if len(section) == 2 else section[2]
+        if collapsed:
+            stacked.append(row(title, panels, y=cursor))
+            cursor += 1
+            continue
+        children = [
+            {
+                **panel,
+                "gridPos": {
+                    **panel["gridPos"],
+                    "y": cursor + 1 + panel["gridPos"]["y"],
+                },
+            }
+            for panel in panels
+        ]
+        stacked.append(row(title, children, collapsed=False, y=cursor))
+        cursor = max(
+            [cursor + 1, *(child["gridPos"]["y"] + child["gridPos"]["h"] for child in children)]
+        )
+    return stacked
 
 
 def text(title: str, body: str, grid: tuple[int, int, int, int], y: int = 0) -> dict:
@@ -273,73 +317,6 @@ def text(title: str, body: str, grid: tuple[int, int, int, int], y: int = 0) -> 
         "title": title,
         "type": "text",
     }
-
-
-def status_history(
-    title: str,
-    targets: list[dict],
-    grid: tuple[int, int, int, int],
-    description: str,
-    y: int = 0,
-    thresholds: list[dict] | None = None,
-    links: list[dict] | None = None,
-) -> dict:
-    """One row per series, coloured by value, across the selected range.
-
-    The tile grid answers "which stage is red right now"; this answers the
-    question a snapshot cannot — *for how long*, and whether something green now
-    was ever red. Each series is one row, so the panel is built for a bounded
-    set: Grafana's own suggestion supplier for this panel type declines to
-    render past thirty series, because past that the rows are thinner than the
-    labels on them.
-
-    The option names are the plugin's own (`showValue` as `auto`/`always`/
-    `never`, `rowHeight`, `colWidth`, `perPage`, plus the shared legend and
-    tooltip options), taken from the panel plugin rather than guessed, and an
-    option this panel does not have is left out rather than copied in from the
-    state timeline — consecutive equal values are merged there and are not
-    merged here, so the key would be a no-op that reads as intent.
-    """
-    field_defaults: dict[str, Any] = {
-        "color": {"mode": "thresholds"},
-        "custom": {"fillOpacity": 80, "lineWidth": 1},
-        "mappings": [],
-        "unit": "s",
-    }
-    panel: dict[str, Any] = {
-        "datasource": DATASOURCE,
-        "description": description,
-        "fieldConfig": {
-            "defaults": field_defaults,
-            "overrides": [],
-        },
-        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
-        "id": 0,
-        "options": {
-            "colWidth": 0.9,
-            "legend": {
-                "calcs": [],
-                "displayMode": "list",
-                "placement": "bottom",
-                "showLegend": False,
-            },
-            "perPage": 20,
-            "rowHeight": 0.85,
-            "showValue": "auto",
-            "tooltip": {"mode": "single", "sort": "none"},
-        },
-        "pluginVersion": "13.2.4",
-        "targets": targets,
-        "title": title,
-        "type": "status-history",
-    }
-    field_defaults["thresholds"] = {
-        "mode": "absolute",
-        "steps": thresholds or [{"color": "text", "value": None}],
-    }
-    if links:
-        panel["links"] = links
-    return panel
 
 
 def link(title: str, url_path: str) -> dict:
@@ -365,7 +342,7 @@ def technical() -> dict:
     dashboard ordered by subsystem forces the reader to know which subsystem is
     responsible before they know whether anything is.
     """
-    sections: list[tuple[str, list[dict]]] = []
+    sections: list[Section] = []
 
     # ─── The helicopter view ──────────────────────────────────────────────────
     #
@@ -447,7 +424,7 @@ def technical() -> dict:
             "Every operation, failure rate",
             "",
             "percentunit",
-            (0, 9, 12, 9),
+            (0, 10, 24, 10),
             "One tile per operation: the share of its calls that failed over "
             "fifteen minutes.\n\n"
             "**The red/green widget of this dashboard**, and the first thing to "
@@ -462,13 +439,13 @@ def technical() -> dict:
                 {"color": "green", "value": None},
                 {"color": "red", "value": 0.0001},
             ],
-            decimals=3,
+            text_options={"titleSize": 14},
         ),
         stat(
             "Everything else, failures per second",
             "",
             "ops",
-            (12, 9, 12, 9),
+            (0, 9, 24, 9),
             "The failures that do not belong to an operation: background passes "
             "that failed or degraded, claim projection errors, sign-in "
             "refusals, runtime refusals and registry drift.\n\n"
@@ -492,7 +469,8 @@ def technical() -> dict:
                 {"color": "yellow", "value": 0.0001},
                 {"color": "red", "value": 0.1},
             ],
-            decimals=4,
+            y=10,
+            text_options={"titleSize": 12},
         ),
     ]
     what_is_failing[0]["targets"] = [
@@ -513,7 +491,7 @@ def technical() -> dict:
             "E",
         ),
     ]
-    sections.append(("Helicopter view — what is failing", what_is_failing))
+    sections.append(("Helicopter view — what is failing", what_is_failing, False))
 
     still_running = [
         stat(
@@ -540,52 +518,55 @@ def technical() -> dict:
                 {"color": "yellow", "value": 90000},
                 {"color": "red", "value": 108000},
             ],
-            decimals=0,
         ),
         stat(
             "Frequent schedulers, since they last ran",
             'memory:background_job:run_age_seconds{pass=~"task|provisioning|embedding_backfill"}',
             "dtdurations",
             (7, 9, 5, 9),
-            "Provisioning leases, durable tasks and embedding recovery on the budget "
-            "their cadence deserves: amber at fifteen minutes, red at two "
-            "hours, against intervals of seconds and a minute.\n\n"
-            "**Without this tile, a stalled provisioning scheduler would take a day to "
-            "be noticed** — the budget above has to clear a daily pass, and a "
-            "budget loose enough for that is useless for a per-second one. The "
-            "three passes also appear in the tile beside this one; this is the "
-            "one that answers within minutes.\n\n"
+            "Lease renewal, durable tasks and embedding recovery on the budget "
+            "their cadence deserves: red at eighty seconds, against intervals "
+            "of seconds and a minute.\n\n"
+            "**Without this tile, a stalled lease scheduler would take a day to "
+            "be noticed** — the lenient budget in the tile beside this one has "
+            "to clear a daily pass, and a budget loose enough for that is "
+            "useless for a per-second one. The three passes also appear in "
+            "that tile; this is the one that answers within minutes.\n\n"
             "Absent when a pass has never run, which is a deployment that has "
             "not enabled it rather than one that has lost it.",
             thresholds=[
                 {"color": "green", "value": None},
-                {"color": "yellow", "value": 900},
-                {"color": "red", "value": 7200},
+                {"color": "red", "value": 80},
             ],
-            decimals=0,
+            graph_mode="area",
+            orientation="horizontal",
         ),
-        status_history(
+        stat(
             "Stage latency, over time",
-            [
-                target(
-                    "max by (stage) (memory:pipeline_stage_duration:p95_5m)",
-                    "{{stage}}",
-                )
-            ],
+            "max by (stage) (memory:pipeline_stage_duration:p95_5m)",
+            "s",
             (12, 9, 12, 9),
-            "Every stage in the pipeline as one row across the selected range, "
-            "coloured by the same budget as the tiles above.\n\n"
-            "**What a current value cannot answer: for how long.** A tile that "
-            "is green now may have been red an hour ago, and the run of colour "
-            "is what an incident review actually needs — a stage amber since "
-            "the deploy is a different problem from one that spiked and "
-            "recovered.\n\n"
-            "Five rows, the inner stages only: adding the operations would "
-            "double the rows for a coarser reading of the same thing.\n\n"
-            "**Gaps are gaps.** A stage nobody calls any more leaves blanks, "
-            "which is what a switched-off subsystem looks like and is not the "
-            "same thing as a fast one.",
-            thresholds=stage_budget,
+            "Every inner stage as one figure: its current p95, and the "
+            "sparkline of its recent run.\n\n"
+            "**What a current number cannot answer: for how long.** The figure "
+            "does not tell a stage that spiked and recovered from one that has "
+            "been slow since the deploy — the shape under it does, and that is "
+            "what an incident review reads.\n\n"
+            "Five stages, the inner stages only: adding the operations would "
+            "double the figures for a coarser reading of the same thing.\n\n"
+            "**Colour is a floor here, not the alarm.** Red starts at eighty "
+            "seconds; the triage budget of one and three seconds lives in the "
+            "stage tiles at the top of this dashboard, and this row answers "
+            "*which stage, and for how long* rather than *is anything red*.\n\n"
+            "Absent when a stage has never run, which is a switched-off "
+            "subsystem rather than a fast one.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "red", "value": 80},
+            ],
+            legend="{{stage}}",
+            graph_mode="area",
+            orientation="horizontal",
         ),
     ]
     sections.append(("Helicopter view — is it still running", still_running))
@@ -605,7 +586,6 @@ def technical() -> dict:
                 {"color": "yellow", "value": 0.01},
                 {"color": "red", "value": 0.1},
             ],
-            decimals= 3,
             links=[link("Errors over time ↓", "#traffic-and-errors")],
         ),
         stat(
@@ -622,7 +602,7 @@ def technical() -> dict:
                 {"color": "yellow", "value": 0.5},
                 {"color": "red", "value": 2},
             ],
-            decimals= 3,
+            graph_mode="area",
             links=[link("Latency by route ↓", "#http-latency")],
         ),
         stat(
@@ -636,7 +616,7 @@ def technical() -> dict:
             thresholds=[
                 {"color": "text", "value": None},
             ],
-            decimals= 2,
+            graph_mode="area",
         ),
         stat(
             "Error ratio",
@@ -652,7 +632,8 @@ def technical() -> dict:
                 {"color": "yellow", "value": 0.001},
                 {"color": "red", "value": 0.01},
             ],
-            decimals= 4,
+            decimals=0,
+            graph_mode="area",
         ),
         text(
             "How to read this row",
@@ -1116,34 +1097,36 @@ def technical() -> dict:
         timeseries(
             "Scheduler passes by outcome",
             [target("memory:background_jobs:rate15m", "{{pass}} · {{outcome}}")],
-            (0, 8, 8, 8),
+            (0, 8, 24, 8),
             "Lease and task scheduler passes, by outcome. `degraded` is its own "
             "value and means the pass itself succeeded while some tenant's step "
             "was refused — neither a failure of the pass nor a healthy one, and "
             "the reason it is not folded into `ok`.",
+            y=13,
             unit="ops",
             legend_calcs=["mean", "max"],
         ),
         timeseries(
             "Unhealthy passes",
             [target("memory:background_jobs:unhealthy_rate15m", "{{pass}}")],
-            (8, 8, 8, 8),
+            (0, 9, 24, 9),
             "Passes that failed or degraded, per scheduler. A steady non-zero "
             "line here is a subsystem that has been failing quietly for a while.",
+            y=21,
             unit="ops",
             legend_calcs=["mean", "max"],
         ),
         timeseries(
             "Job duration p95",
             [target("memory:background_job_duration:p95_5m", "{{pass}}")],
-            (16, 8, 8, 8),
+            (0, 13, 24, 13),
             "How long one pass takes. Timed from when the job started running, "
             "not when it was scheduled, so queue wait is not counted as work.",
             unit="s",
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    sections.append(("Background jobs", jobs))
+    sections.append(("Background jobs", jobs, False))
 
     refusals = [
         timeseries(
@@ -1214,7 +1197,7 @@ def technical() -> dict:
         timeseries(
             "Stage latency p95",
             [target("memory:pipeline_stage_duration:p95_5m", "{{operation}} · {{stage}}")],
-            (0, 8, 12, 8),
+            (0, 9, 24, 9),
             "Where a memory operation spends its time, stage by stage. The five "
             "measured stages are the embedding provider, the vector index, "
             "extraction and the store write.\n\n"
@@ -1228,26 +1211,28 @@ def technical() -> dict:
         timeseries(
             "Operation latency p95",
             [target("memory:operation_duration:p95_5m", "{{operation}}")],
-            (12, 8, 12, 8),
+            (0, 11, 24, 11),
             "The total, per operation, for comparison with the stages beside it. "
             "A stage that accounts for nearly all of the total is the stage to "
             "look at; a set of stages that each account for a little is a "
             "different kind of slow.",
+            y=9,
             unit="s",
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    sections.append(("Pipeline stages", stages))
+    sections.append(("Pipeline stages", stages, False))
 
     claims = [
         timeseries(
             "Claim pipeline events",
             [target("memory:claim_pipeline:rate15m", "{{stage}} · {{outcome}}")],
-            (0, 8, 7, 8),
+            (0, 11, 24, 11),
             "Claim projection and reconciliation, by stage and outcome. "
             "Outcomes worth watching are `supersession` and `contradiction`: a "
             "rise in either means the knowledge graph is finding claims that "
             "disagree, which is the policy working rather than failing.",
+            y=8,
             unit="ops",
             legend_calcs=["mean", "max"],
         ),
@@ -1255,32 +1240,33 @@ def technical() -> dict:
             "Active relations",
             "memory:claim_relations:active",
             "short",
-            (7, 8, 4, 8),
+            (0, 8, 4, 8),
             "Claim relations currently stored, across schema and outcome. A "
             "level, read as it stands.\n\n"
             "**This under-reports.** A series only exists once it has been set at "
             "least once, so a schema with no relations of some outcome is absent "
             "from the exposition rather than zero. A sudden drop in the total is "
             "real; a missing contribution is not a measurement.",
-            decimals= 0,
+            decimals=0,
+            graph_mode="area",
         ),
         stat(
             "Mean candidates per slot",
             "memory:claim_candidates:mean15m",
             "short",
-            (11, 8, 4, 8),
+            (4, 8, 4, 8),
             "Candidates considered for one claim slot, averaged.\n\n"
             "A **mean, deliberately** — the family is exported as a summary, so a "
             "quantile would read zero for both 'no candidates' and 'a handful', "
             "which is the exact distinction this number exists to show. A rising "
             "mean means reconciliation is scanning more to place each claim.",
-            decimals= 2,
+            graph_mode="area",
         ),
         stat(
             "Claims backfilled, per second",
             "memory:claim_backfill_facts:rate15m",
             "ops",
-            (15, 8, 4, 8),
+            (8, 8, 4, 8),
             "Facts the background walk projected into claims, by outcome.\n\n"
             "**The slow half of the claims pipeline, and the one that can fall "
             "behind silently.** Extraction derives facts immediately; claims are "
@@ -1292,7 +1278,7 @@ def technical() -> dict:
             "flat relation count means claims are being derived and not kept, "
             "and a standing zero with a non-zero fact count means the walk has "
             "not run.",
-            decimals=3,
+            graph_mode="area",
         ),
         timeseries(
             "Reconciliation latency p95",
@@ -1302,14 +1288,14 @@ def technical() -> dict:
                     "p95",
                 )
             ],
-            (19, 8, 5, 8),
+            (12, 8, 12, 8),
             "How long a claim reconciliation pass takes. Recorded for the "
             "`reconcile` stage; projection is fast enough not to need a panel.",
             unit="s",
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    sections.append(("Claims", claims))
+    sections.append(("Claims", claims, False))
 
     sections.append((
         "Reference",
@@ -1393,11 +1379,12 @@ def product() -> dict:
             'max(memory_operation_stock{result="active_facts"})',
             "short",
             (0, 5, 6, 5),
-            "Facts currently in the knowledge graph, as of the last lifecycle "
-            "dashboard read.\n\n"
-            "**A level, not a total.** Read the value; a rate here would tell "
-            "you how often someone opened a dashboard.",
-            decimals=0,
+            "Facts currently in the knowledge graph, as of the last stock "
+            "stamp.\n\n"
+            "**A level, not a total.** The level is stamped by the periodic "
+            "hygiene pass — on the decay cadence, hourly by default — and by "
+            "any lifecycle-dashboard read; read the value, because a rate "
+            "here would only tell you how often the stamp was written.",
             y=1,
         ),
         stat(
@@ -1405,11 +1392,11 @@ def product() -> dict:
             'max(memory_operation_stock{result="communities"})',
             "short",
             (6, 5, 6, 5),
-            "Detected communities in the knowledge graph. A rising number with a "
-            "flat fact count means the graph is fragmenting — more, smaller "
-            "clusters — which is worth knowing before it becomes a search "
-            "problem.",
-            decimals=0,
+            "Detected communities in the knowledge graph, stamped by the "
+            "same periodic pass as the facts beside it. A rising number "
+            "with a flat fact count means the graph is fragmenting — more, "
+            "smaller clusters — which is worth knowing before it becomes a "
+            "search problem.",
             y=1,
         ),
         stat(
@@ -1422,7 +1409,6 @@ def product() -> dict:
             "**Under-reports by design**: a series exists only after its first "
             "write, so a schema with no relations of some outcome is absent "
             "rather than zero.",
-            decimals=0,
             y=1,
         ),
         stat(
@@ -1430,10 +1416,10 @@ def product() -> dict:
             'max(memory_operation_stock{result="archival_candidates"})',
             "short",
             (18, 5, 6, 5),
-            "Episodes old enough to archive but not yet archived. A standing "
-            "non-zero here is a retention policy that is not being run; a "
-            "sudden jump is old data arriving all at once.",
-            decimals=0,
+            "Episodes old enough to archive but not yet archived, stamped "
+            "by the same periodic pass. A standing non-zero here is a "
+            "retention policy that is not being run; a sudden jump is old "
+            "data arriving all at once.",
             y=1,
         ),
     ]
@@ -1442,13 +1428,17 @@ def product() -> dict:
         "Knowledge age",
         "memory:knowledge:age_seconds",
         "dtdurations",
-        (16, 8, 8, 8),
+        (0, 8, 24, 8),
         "How old the newest knowledge in the store is.\n\n"
         "**The number that decides whether any other number here can be "
         "trusted.** A memory service whose last write was three days ago "
         "still serves confident answers, from a world that has moved on — "
         "every other panel below can look perfectly healthy while this one "
         "climbs.\n\n"
+        "**The stamp is written by the two writes that add knowledge** — the "
+        "episode store and the extraction — and nothing else: a recall reads "
+        "knowledge and changes nothing, so a busy service nobody writes to "
+        "ages visibly instead of looking permanently fresh.\n\n"
         "**No data means nothing has ever been captured**, which is a "
         "different statement from 'zero' and the reason this panel cannot "
         "lie about a service that never learned anything.\n\n"
@@ -1465,45 +1455,29 @@ def product() -> dict:
             {"color": "yellow", "value": 3600},
             {"color": "red", "value": 86400},
         ],
-        decimals=0,
-        y=6,
+        graph_mode="area",
+        y=14,
     )
     freshness = [
         timeseries(
             "How fast the knowledge is ageing",
             [target("memory:knowledge:age_seconds", "age")],
-            (0, 7, 16, 7),
+            (0, 7, 24, 7),
             "The same figure over time, which is the shape that tells a "
             "deployment apart from itself: a rising staircase is normal and "
             "expected between writes, and a staircase that never steps is "
             "capture that has stopped.\n\n"
-            "No threshold line is drawn on this panel — the colours on the stat "
-            "beside it are the reading, and a second set of lines here would be "
-            "the same numbers twice. Read the trend, not a single sample: the "
-            "age only ever grows until the next write pulls it back.",
+            "**No counter can answer this instead.** A service that stopped "
+            "learning a week ago has every symptom of one that stopped an "
+            "hour ago; only the capture-path stamp, refreshed by writes and "
+            "never by reads, tells them apart.\n\n"
+            "No threshold line is drawn on this panel — the stat above it "
+            "carries the colours, and a second set of lines here would be "
+            "the same numbers twice. Read the trend, not a single sample: "
+            "the age only ever grows until the next write pulls it back.",
             unit="dtdurations",
             min_=0,
             legend_calcs=["lastNotNull", "max"],
-        ),
-        text(
-            "Why this row exists",
-            "Nothing in the metrics above can answer it. A counter that "
-            "stopped growing still reports the last scrape as recent, and "
-            "`increase()` over a window reads *nothing new* whether the "
-            "service learned yesterday or learned nothing at all — so a memory "
-            "system that stopped learning a week ago has every symptom of one "
-            "that stopped learning an hour ago.\n\n"
-            "The stamp is written by the two writes that add knowledge — the "
-            "episode store and the extraction — which is what makes it "
-            "trustworthy: a recall reads knowledge and changes nothing, so a "
-            "busy service nobody writes to ages visibly instead of looking "
-            "permanently fresh. Stamping it at the MCP tool instead would leave "
-            "it absent on any deployment whose knowledge arrives unattended, "
-            "which is the one deployment whose freshness matters most.\n\n"
-            "It is also the signal a *reader* of this dashboard wants before "
-            "any of the others: everything below describes a store whose "
-            "freshness is the assumption they are all making.",
-            (16, 7, 8, 7),
         ),
     ]
     sections.append(("How fresh is the knowledge", freshness))
@@ -1518,8 +1492,8 @@ def product() -> dict:
                     "{{result}}",
                 )
             ],
-            (0, 8, 16, 8),
-            "The three levels from *What exists*, as curves rather than "
+            (0, 8, 24, 8),
+            "The three levels from *Overview*, as curves rather than "
             "numbers.\n\n"
             "**A level answers 'how much', only a curve answers 'is it "
             "working'.** Facts flat while input keeps arriving is the shape "
@@ -1527,72 +1501,67 @@ def product() -> dict:
             "the graph is fragmenting into smaller, more numerous clusters, "
             "which shows up as a search problem months before anyone reports "
             "one.\n\n"
-            "**Step-like and sparse, and both are honest.** These levels are "
-            "written by the lifecycle dashboard operation and by nothing else — "
-            "so the curves are absent until someone opens the lifecycle view, "
-            "and each step marks one such read. Read them as 'this is where the "
-            "store stood at the last read', which is the same claim the four "
-            "stats above make, and do not read the flat stretches as 'nothing "
-            "changed': no read means no observation, not no change.",
+            "**Step-like, and the steps are honest.** These levels are "
+            "stamped by the periodic hygiene pass — hourly by default — and "
+            "by lifecycle-dashboard reads, so each step is one such stamp. "
+            "The archival backlog is the curve to watch for direction: a "
+            "standing non-zero means archiving is not being run, a rising "
+            "line means the policy is falling behind, and a falling line to "
+            "zero means it is keeping up. Communities are counted, not "
+            "sized: more communities with the same fact count is "
+            "fragmentation, not enrichment.",
             unit="short",
             min_=0,
             legend_calcs=["lastNotNull", "mean"],
         ),
-        text(
-            "Reading a stock curve",
-            "The stock family is a **level, not a total** — which is why these "
-            "curves can be compared across deployments and why they cannot be "
-            "summed over time.\n\n"
-            "**The archival backlog is the one to watch for direction.** It is "
-            "the retention policy's own scoreboard: a standing non-zero means "
-            "archiving is not being run, a rising line means the policy is "
-            "falling behind what is being written, and a falling line to zero "
-            "means the policy is doing its job.\n\n"
-            "Communities are counted, not sized: more communities with the "
-            "same fact count is fragmentation, not enrichment.",
-            (16, 8, 8, 8),
-        ),
     ]
     sections.append(("How it is growing", growth))
 
-    activity = [
-        timeseries(
-            "Operations per minute, by operation",
-            [target("memory:operation_calls:rate15m", "{{operation}}")],
-            (0, 8, 12, 8),
-            "Which operations people and agents are actually calling. This is "
-            "the adoption signal: a feature nobody calls is a feature nobody "
-            "needs, and this is where that shows up before anyone says so.\n\n"
-            "Measured over MCP rather than HTTP, so it counts tool calls on the "
-            "data plane and not only browser requests.",
-            unit="ops",
-            legend_calcs=["mean", "max", "sum"],
-        ),
-        timeseries(
-            "Success and failure by operation",
-            [
-                target(
-                    'sum by (operation, outcome) (rate(memory_operation_calls_total[15m])) or vector(0)',
-                    "{{operation}} · {{outcome}}",
-                )
-            ],
-            (12, 8, 12, 8),
-            "The same operations split by outcome. The default outcome is "
-            "`error` and it is set on every early return, so a failure here is "
-            "every failure — not only the ones somebody wrote an explicit branch "
-            "for.\n\n"
-            "A rising `error` line on one operation while the others hold steady "
-            "is that operation breaking, not the service.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-    ]
-    sections.append(("What people are doing", activity))
+    sections.append((
+        "What people are doing",
+        [
+            timeseries(
+                "Operations per minute, by operation",
+                [target("memory:operation_calls:rate15m", "{{operation}}")],
+                (0, 8, 24, 8),
+                "Which operations people and agents are actually calling. This is "
+                "the adoption signal: a feature nobody calls is a feature nobody "
+                "needs, and this is where that shows up before anyone says so.\n\n"
+                "Measured over MCP rather than HTTP, so it counts tool calls on the "
+                "data plane and not only browser requests.",
+                unit="ops",
+                legend_calcs=["mean", "max", "sum"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Success and failure by operation",
+        [
+            timeseries(
+                "Success and failure by operation",
+                [
+                    target(
+                        'sum by (operation, outcome) (rate(memory_operation_calls_total[15m])) or vector(0)',
+                        "{{operation}} · {{outcome}}",
+                    )
+                ],
+                (0, 8, 24, 8),
+                "The same operations split by outcome. The default outcome is "
+                "`error` and it is set on every early return, so a failure here is "
+                "every failure — not only the ones somebody wrote an explicit branch "
+                "for.\n\n"
+                "A rising `error` line on one operation while the others hold steady "
+                "is that operation breaking, not the service.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
 
     context_delivered = timeseries(
         "Context delivered, per second",
         [target("memory:lifecycle:recall:rate15m", "{{operation}}")],
-        (0, 8, 16, 8),
+        (0, 8, 24, 8),
         "The recall half of the loop, by operation: `assemble_context` is "
         "context handed to an agent, and with it `resolve` and `explain`, "
         "which only mean anything against knowledge that already exists.\n\n"
@@ -1606,97 +1575,112 @@ def product() -> dict:
         unit="ops",
         legend_calcs=["mean", "max"],
     )
-    delivered = [
-        timeseries(
-            "Recall against capture",
-            [
-                target("memory:lifecycle:recall:rate15m_total", "recall"),
-                target("memory:lifecycle:capture:rate15m_total", "capture (asked for)"),
-                target("memory:lifecycle:inbox_capture:rate15m_total", "capture (inbox)"),
-            ],
-            (0, 8, 16, 8),
-            "Both sides of the loop on one scale, with nothing left to the "
-            "reader but the comparison.\n\n"
-            "**Two capture lines, because capture has two doors.** `capture "
-            "(asked for)` is MCP `ingest` and `extract` calls; `capture "
-            "(inbox)` is episodes the filesystem watcher carried in without "
-            "anyone asking. A deployment that only uses the watcher reads a "
-            "flat capture (asked for) at zero and a live capture (inbox) — "
-            "which is a working deployment, not an idle one.\n\n"
-            "All three are rates over the same window, so this compares "
-            "*shape*, not size: a deployment ten times busier than another is "
-            "not better at recalling, it is just bigger. Lines that cross are "
-            "normal — recall bursts when an agent asks, capture arrives in "
-            "batches. Lines that never cross are not.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-        stat(
-            "Recalls per capture",
-            "memory:lifecycle:recalls_per_capture15m",
-            "short",
-            (16, 8, 8, 8),
-            "How many times knowledge was read back for every time it was "
-            "written, over fifteen minutes.\n\n"
-            "**Below one means storing more than reading** — where a memory "
-            "system sits while an agent is still learning a project, and well "
-            "above once it has context worth reusing. A very large number "
-            "means recall with almost no capture: what is stored is being used "
-            "and nothing is coming in to replace it.\n\n"
-            "**Capture here is what callers asked for** — MCP ingest and "
-            "extract. Inbox capture is a separate line on the panel above, so a "
-            "watcher-fed deployment reads *0* here — no recalls against no "
-            "asked-for capture — rather than a ratio built on a denominator "
-            "that does not exist. Zero with no recall is "
-            "the write-only archive, shown rather than hidden behind a gap.\n\n"
-            "Read it as a shape, never as a target. It is a rate over a recent "
-            "window, so a quiet half hour and a busy one differ by an order of "
-            "magnitude on the same day.",
-            thresholds=[
-                {"color": "red", "value": None},
-                {"color": "yellow", "value": 1},
-                {"color": "green", "value": 3},
-            ],
-            decimals=2,
-        ),
-    ]
-    sections.append(("Context delivered", delivered))
+    sections.append((
+        "Context delivered",
+        [
+            timeseries(
+                "Recall against capture",
+                [
+                    target("memory:lifecycle:recall:rate15m_total", "recall"),
+                    target("memory:lifecycle:capture:rate15m_total", "capture (asked for)"),
+                    target("memory:lifecycle:inbox_capture:rate15m_total", "capture (inbox)"),
+                ],
+                (0, 8, 24, 8),
+                "Both sides of the loop on one scale, with nothing left to the "
+                "reader but the comparison.\n\n"
+                "**Two capture lines, because capture has two doors.** `capture "
+                "(asked for)` is MCP `ingest` and `extract` calls; `capture "
+                "(inbox)` is episodes the filesystem watcher carried in without "
+                "anyone asking. A deployment that only uses the watcher reads a "
+                "flat capture (asked for) at zero and a live capture (inbox) — "
+                "which is a working deployment, not an idle one.\n\n"
+                "All three are rates over the same window, so this compares "
+                "*shape*, not size: a deployment ten times busier than another is "
+                "not better at recalling, it is just bigger. Lines that cross are "
+                "normal — recall bursts when an agent asks, capture arrives in "
+                "batches. Lines that never cross are not.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Recalls per capture",
+        [
+            stat(
+                "Recalls per capture",
+                "memory:lifecycle:recalls_per_capture15m",
+                "short",
+                (0, 8, 24, 8),
+                "How many times knowledge was read back for every time it was "
+                "written, over fifteen minutes.\n\n"
+                "**Below one means storing more than reading** — where a memory "
+                "system sits while an agent is still learning a project, and well "
+                "above once it has context worth reusing. A very large number "
+                "means recall with almost no capture: what is stored is being used "
+                "and nothing is coming in to replace it.\n\n"
+                "**Capture here is what callers asked for** — MCP ingest and "
+                "extract. Inbox capture is a separate line on the *Context "
+                "delivered* row above, so a "
+                "watcher-fed deployment reads *0* here — no recalls against no "
+                "asked-for capture — rather than a ratio built on a denominator "
+                "that does not exist. Zero with no recall is "
+                "the write-only archive, shown rather than hidden behind a gap.\n\n"
+                "Read it as a shape, never as a target. It is a rate over a recent "
+                "window, so a quiet half hour and a busy one differ by an order of "
+                "magnitude on the same day.",
+                thresholds=[
+                    {"color": "red", "value": None},
+                    {"color": "yellow", "value": 1},
+                    {"color": "green", "value": 3},
+                ],
+                graph_mode="area",
+            ),
+        ],
+    ))
 
-    learned = [
-        timeseries(
-            "Knowledge produced, last 24 hours",
-            [target("memory:operation_results:increase1d", "{{result}}")],
-            (0, 8, 12, 8),
-            "Facts, entities, links and episodes extracted in the last day — the "
-            "answer to 'what did this deployment learn'.\n\n"
-            "Read as an **increase over a window**, not a rate. A rate of "
-            "'facts per second' is a number nobody asks for; 'how much did we "
-            "extract today' is the question, and it is the one this panel is "
-            "built for.",
-            unit="short",
-            stack=True,
-            legend_calcs=["sum"],
-        ),
-        timeseries(
-            "Knowledge produced, last hour",
-            [target("memory:operation_results:increase1h", "{{result}}")],
-            (12, 8, 12, 8),
-            "The same, over an hour, so a slow day can be told apart from a dead "
-            "one. A flat line here with a busy 24-hour panel is the normal shape "
-            "of a deployment nobody is using right now.",
-            unit="short",
-            stack=True,
-            legend_calcs=["sum"],
-        ),
-    ]
-    sections.append(("What was learned", learned))
+    sections.append((
+        "What was learned",
+        [
+            timeseries(
+                "Knowledge produced, last 24 hours",
+                [target("memory:operation_results:increase1d", "{{result}}")],
+                (0, 8, 24, 8),
+                "Facts, entities, links and episodes extracted in the last day — the "
+                "answer to 'what did this deployment learn'.\n\n"
+                "Read as an **increase over a window**, not a rate. A rate of "
+                "'facts per second' is a number nobody asks for; 'how much did we "
+                "extract today' is the question, and it is the one this panel is "
+                "built for.",
+                unit="short",
+                stack=True,
+                legend_calcs=["sum"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Knowledge produced, last hour",
+        [
+            timeseries(
+                "Knowledge produced, last hour",
+                [target("memory:operation_results:increase1h", "{{result}}")],
+                (0, 8, 24, 8),
+                "The same, over an hour, so a slow day can be told apart from a dead "
+                "one. A flat line here with a busy 24-hour panel is the normal shape "
+                "of a deployment nobody is using right now.",
+                unit="short",
+                stack=True,
+                legend_calcs=["sum"],
+            ),
+        ],
+    ))
 
     yield_row = [
         stat(
             "Facts per episode, last 24 hours",
             "memory:operation_results:facts_per_episode1d",
             "short",
-            (0, 7, 6, 7),
+            (0, 7, 12, 7),
             "How much an episode is worth, over a day.\n\n"
             "**The counter-metric to the fact count.** A fact total that "
             "rises while this falls means the same extraction is being asked "
@@ -1710,129 +1694,138 @@ def product() -> dict:
             "episodes as they were *ingested*, so extracting the same episode "
             "twice raises this without a second episode ever arriving. Read it "
             "as yield per ingested episode, which is what it is.",
-            decimals=2,
         ),
         stat(
             "Links per entity, last 24 hours",
             "memory:operation_results:links_per_entity1d",
             "short",
-            (6, 7, 6, 7),
+            (12, 7, 12, 7),
             "Whether what was found is connected to anything, over a day.\n\n"
             "Facts say *what* was found; links say whether it landed in a "
             "graph or in a pile. Extraction that produces entities and almost "
             "no links is a product that stores text with names attached — "
             "which still answers a direct query and still fails the one an "
-            "agent asks when it needs to know how two things relate.",
-            decimals=2,
-        ),
-        text(
-            "What yield is and is not",
-            "Two rates over a day, each the produced kind divided by the "
-            "produced kind.\n\n"
-            "**Yield is a shape, not a score.** There is no target: it depends "
-            "entirely on what is being ingested, and a codebase ingested once "
-            "and a chat log ingested daily have nothing in common. What is "
-            "worth watching is the *direction*, and it is worth watching "
-            "against the input rather than on its own.\n\n"
-            "**What it deliberately does not measure:** whether the facts are "
-            "true, and whether recall found them. Correctness is the domain's "
-            "own subject — the evaluation suite in `crates/eval-harness` is "
-            "where that is answered — and retrieval quality needs a judged "
-            "query set rather than a counter, so neither is pretended at here.\n\n"
-            "Both denominators are floored rather than divided by zero: a thin "
-            "day reads as no yield, not as infinity.",
-            (12, 7, 12, 7),
+            "agent asks when it needs to know how two things relate.\n\n"
+            "**Yield is a shape, not a score.** There is no target: it "
+            "depends entirely on what is being ingested, and a codebase "
+            "ingested once and a chat log ingested daily have nothing in "
+            "common. Watch the direction, against the input. Whether the "
+            "facts are *true* is the evaluation suite's subject "
+            "(`crates/eval-harness`), and retrieval quality needs a judged "
+            "query set — neither is pretended at by a counter.",
         ),
     ]
     sections.append(("What each episode yields", yield_row))
 
-    quality = [
-        timeseries(
-            "Failure rate by operation",
-            [target("memory:operation_calls:error_ratio15m", "{{operation}}")],
-            (0, 8, 8, 8),
-            "The fraction of calls that failed, per operation. Read against the "
-            "traffic panel: a high ratio on a rarely-used operation matters far "
-            "less than a low one on the operation everyone depends on.",
-            unit="percentunit",
-            min_=0,
-            legend_calcs=["mean", "max"],
-        ),
-        timeseries(
-            "Extraction warnings",
-            [
-                target(
-                    'sum(rate(memory_operation_results_total{result="warnings"}[15m])) or vector(0)',
-                    "warnings",
-                )
-            ],
-            (8, 8, 8, 8),
-            "Warnings raised during extraction, per second. These are the "
-            "interesting failures: the operation succeeded, but something about "
-            "the input was worth flagging. A flat zero across a busy day is a "
-            "sign the warnings are not being raised, not that the input is "
-            "clean.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-        timeseries(
-            "Claim outcomes",
-            [
-                target(
-                    'memory:claim_pipeline:rate15m{stage="reconcile"} or vector(0)',
-                    "{{outcome}}",
-                )
-            ],
-            (16, 8, 8, 8),
-            "What reconciliation found when comparing claims. "
-            "`supersession` and `contradiction` are the policy working — two "
-            "claims about the same thing that disagree, caught and resolved. A "
-            "sudden rise in either is worth a look: it means the knowledge is "
-            "becoming less consistent, not more.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-    ]
-    sections.append(("Is the knowledge any good", quality))
+    sections.append((
+        "Is the knowledge any good",
+        [
+            timeseries(
+                "Failure rate by operation",
+                [target("memory:operation_calls:error_ratio15m", "{{operation}}")],
+                (0, 8, 24, 8),
+                "The fraction of calls that failed, per operation. Read against the "
+                "*What people are doing* row: a high ratio on a rarely-used "
+                "operation matters far less than a low one on the operation "
+                "everyone depends on.",
+                unit="percentunit",
+                min_=0,
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Extraction warnings",
+        [
+            timeseries(
+                "Extraction warnings",
+                [
+                    target(
+                        'sum(rate(memory_operation_results_total{result="warnings"}[15m])) or vector(0)',
+                        "warnings",
+                    )
+                ],
+                (0, 8, 24, 8),
+                "Warnings raised during extraction, per second. These are the "
+                "interesting failures: the operation succeeded, but something about "
+                "the input was worth flagging. A flat zero across a busy day is a "
+                "sign the warnings are not being raised, not that the input is "
+                "clean.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Claim outcomes",
+        [
+            timeseries(
+                "Claim outcomes",
+                [
+                    target(
+                        'memory:claim_pipeline:rate15m{stage="reconcile"} or vector(0)',
+                        "{{outcome}}",
+                    )
+                ],
+                (0, 8, 24, 8),
+                "What reconciliation found when comparing claims. "
+                "`supersession` and `contradiction` are the policy working — two "
+                "claims about the same thing that disagree, caught and resolved. A "
+                "sudden rise in either is worth a look: it means the knowledge is "
+                "becoming less consistent, not more.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
 
-    access = [
-        timeseries(
-            "Sign-ins, per second",
-            [target("memory:auth_signins:rate15m", "sign-ins")],
-            (0, 8, 8, 8),
-            "Sign-ins that completed and issued a session.\n\n"
-            "The other half of the refusal panel beside it: sign-ins through "
-            "the OIDC browser flow that completed and issued a session. "
-            "**It counts arrivals and nothing about who they are** — no "
-            "account, no subject, no tenant label, because a metric carrying "
-            "an identifier is a disclosure rather than a measurement.\n\n"
-            "Two honest limits, both deliberate. A first sign-up and a "
-            "returning user are the same number, so activation and retention "
-            "are not on this dashboard at all. And the local-admin sign-in "
-            "path mints the same session cookie without being counted here, so "
-            "this is the OIDC flow's arrivals, not the deployment's. See "
-            "*Reference*.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-        timeseries(
-            "Sign-in refusals by reason",
-            [target("memory:auth_refusals:rate15m", "{{branch}}")],
-            (8, 8, 8, 8),
-            "The identity callback declining a sign-in, by reason.\n\n"
-            "Read against the sign-ins beside it: refusals without sign-ins "
-            "mean a deployment nobody is getting into, and refusals *with* "
-            "sign-ins mean a specific reason is turning away people who would "
-            "otherwise have arrived.\n\n"
-            "`signup_invite_only` is a policy, not a fault: a deployment "
-            "closed to self-service sign-up refuses every one of them, "
-            "correctly and indefinitely, which is why that alert is a ticket "
-            "rather than a page.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-    ]
-    sections.append(("Access and automation", access))
+    sections.append((
+        "Access and automation",
+        [
+            timeseries(
+                "Sign-ins, per second",
+                [target("memory:auth_signins:rate15m", "sign-ins")],
+                (0, 8, 24, 8),
+                "Sign-ins that completed and issued a session.\n\n"
+                "The other half of the refusal row below this one: sign-ins "
+                "through "
+                "the OIDC browser flow that completed and issued a session. "
+                "**It counts arrivals and nothing about who they are** — no "
+                "account, no subject, no tenant label, because a metric carrying "
+                "an identifier is a disclosure rather than a measurement.\n\n"
+                "Two honest limits, both deliberate. A first sign-up and a "
+                "returning user are the same number, so activation and retention "
+                "are not on this dashboard at all. And the local-admin sign-in "
+                "path mints the same session cookie without being counted here, so "
+                "this is the OIDC flow's arrivals, not the deployment's. See "
+                "*Reference*.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
+    sections.append((
+        "Sign-in refusals by reason",
+        [
+            timeseries(
+                "Sign-in refusals by reason",
+                [target("memory:auth_refusals:rate15m", "{{branch}}")],
+                (0, 8, 24, 8),
+                "The identity callback declining a sign-in, by reason.\n\n"
+                "Read against the *Access and automation* row above this one: "
+                "refusals without sign-ins "
+                "mean a deployment nobody is getting into, and refusals *with* "
+                "sign-ins mean a specific reason is turning away people who would "
+                "otherwise have arrived.\n\n"
+                "`signup_invite_only` is a policy, not a fault: a deployment "
+                "closed to self-service sign-up refuses every one of them, "
+                "correctly and indefinitely, which is why that alert is a ticket "
+                "rather than a page.",
+                unit="ops",
+                legend_calcs=["mean", "max"],
+            ),
+        ],
+    ))
 
     sections.append((
         "Reference",
@@ -1847,7 +1840,7 @@ def product() -> dict:
                 "gets skimmed. Latency lives on the technical dashboard, which "
                 "links here.\n\n"
                 "**Five figures that mislead if read naively:**\n\n"
-                "1. *What exists* reads levels, not totals. These used to be "
+                "1. *Overview* reads levels, not totals. These used to be "
                 "added to a counter, so the metric was the sum of every "
                 "inventory ever read — opening the dashboard grew it by the "
                 "size of the store.\n"
@@ -1962,7 +1955,7 @@ def dashboard(
         "templating": {
             "list": [
                 {
-                    "current": {},
+                    "current": {"text": "victoriametrics", "value": "edr4onptd6hogd"},
                     "hide": 0,
                     "includeAll": False,
                     "label": "Data source",

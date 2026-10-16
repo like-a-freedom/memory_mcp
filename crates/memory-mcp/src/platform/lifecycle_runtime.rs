@@ -55,7 +55,14 @@ pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize
     crate::memory::api::rebuild_communities(&handles_without_claim_store_from(service)).await
 }
 
-/// Spawns all three lifecycle workers against `service` with the given
+/// Runs one stock-level pass over a service, stamping the inventory gauges.
+pub async fn stock_pass(
+    service: &MemoryService,
+) -> Result<crate::memory::lifecycle_types::StockLevels, MemoryError> {
+    crate::memory::api::run_stock(&handles_without_claim_store_from(service)).await
+}
+
+/// Spawns all lifecycle workers against `service` with the given
 /// intervals. The configuration-driven path is `spawn_workers_from_config`;
 /// this one takes the intervals directly for tests that assert spawn and
 /// shutdown behaviour without a config file.
@@ -89,6 +96,13 @@ pub fn spawn_all_for_test(
         policy,
         interval_secs,
         age_days,
+    );
+    runtime.spawn_stock(
+        db_client.clone(),
+        namespace.clone(),
+        logger.clone(),
+        policy,
+        interval_secs,
     );
     runtime.spawn_community(db_client, namespace, logger, policy, interval_secs);
     runtime
@@ -127,6 +141,19 @@ pub fn spawn_workers_from_config(
         policy,
         config.archival_interval_secs,
         policy.archival_age_days,
+    );
+    // The stock stamp is a cheap read-only re-read of the same stores the
+    // decay pass already touches; it rides the decay cadence (1h) so a
+    // restart never leaves the dashboard empty for longer than one decay
+    // interval. No separate interval knob: a config field here would be
+    // one more thing operators must tune for a pass that costs three
+    // bounded selects.
+    runtime.spawn_stock(
+        db_client.clone(),
+        namespace.clone(),
+        logger.clone(),
+        policy,
+        config.decay_interval_secs,
     );
     runtime.spawn_community(
         db_client,
