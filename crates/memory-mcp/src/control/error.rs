@@ -197,9 +197,14 @@ impl From<super::oidc::AuthError> for ApiError {
             | super::oidc::AuthError::MissingKeyId
             | super::oidc::AuthError::DisallowedAlgorithm { .. }
             | super::oidc::AuthError::Jwt(_) => ApiError::Unauthorized,
-            super::oidc::AuthError::Unavailable { .. }
-            | super::oidc::AuthError::Jwks(_)
-            | super::oidc::AuthError::Provider(_) => ApiError::Unavailable,
+            super::oidc::AuthError::Unavailable { retry_after } => {
+                ApiError::OidcUnavailable { retry_after }
+            }
+            super::oidc::AuthError::Jwks(_) | super::oidc::AuthError::Provider(_) => {
+                ApiError::OidcUnavailable {
+                    retry_after: std::time::Duration::from_secs(1),
+                }
+            }
             super::oidc::AuthError::Sealing => {
                 ApiError::Internal(MemoryError::ConfigInvalid(err.to_string()))
             }

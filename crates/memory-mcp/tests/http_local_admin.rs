@@ -69,6 +69,29 @@ impl Harness {
         }
     }
 
+    async fn cold_combined() -> Self {
+        use memory_mcp::http::config::LocalBrowserConfig;
+        let (builder, store) = HttpStateTestBuilder::local_admin().await;
+        let mut config = memory_mcp::http::config::HttpConfig::default_for_test();
+        config.browser_auth.as_mut().expect("browser methods").local = Some(LocalBrowserConfig {
+            session_key: HttpStateTestBuilder::LOCAL_TEST_SESSION_KEY,
+            csrf_key: HttpStateTestBuilder::LOCAL_TEST_CSRF_KEY,
+            default_plan_version: 1,
+            default_plan_limits: Default::default(),
+        });
+        let state = builder
+            .with_config(config)
+            .build()
+            .await
+            .expect("combined state");
+        let router = build_router(state.clone(), None).expect("combined router");
+        Self {
+            state,
+            store,
+            router,
+        }
+    }
+
     /// The production bearer authenticator wired by `HttpState::assemble`.
     /// It shares the registry store and the configured pepper with the
     /// local admin key handler, so it is the real data-plane path.
@@ -166,13 +189,12 @@ impl Harness {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Arc<LocalAdminAuthority>> + Send + '_>>
     {
         Box::pin(async move {
-            LocalAdminAuthority::join_local_for_test(
-                self.store.clone(),
-                HttpStateTestBuilder::LOCAL_TEST_SESSION_KEY,
-                HttpStateTestBuilder::LOCAL_TEST_CSRF_KEY,
-            )
-            .await
-            .expect("join durable local policy")
+            self.state
+                .local_admin
+                .as_ref()
+                .expect("local method")
+                .authority
+                .clone()
         })
     }
 
@@ -2300,4 +2322,70 @@ async fn a_second_administrator_sees_and_can_administer_the_same_clients() {
         read_client(&harness, &second, &account_id).await["account_status"],
         "active"
     );
+}
+
+#[tokio::test]
+async fn cold_combined_auth_outage_preserves_local_login() {
+    let harness = Harness::cold_combined().await;
+    assert!(
+        harness
+            .state
+            .oidc
+            .as_ref()
+            .expect("configured OIDC")
+            .client()
+            .is_err()
+    );
+    let code = harness.create_admin("outage.ops").await;
+    harness
+        .activate(&code, "a sufficiently long passphrase")
+        .await;
+    let session = harness
+        .login("outage.ops", "a sufficiently long passphrase")
+        .await;
+    assert_eq!(
+        harness
+            .send(
+                "GET",
+                "/api/v1/admin/session",
+                None,
+                &[],
+                Some(&session.cookie)
+            )
+            .await
+            .status(),
+        StatusCode::OK
+    );
+}
+#[tokio::test]
+async fn established_local_session_does_not_change_combined_policy_during_outage() {
+    let harness = Harness::cold_combined().await;
+    let before = harness.authority().await.policy().clone();
+    let code = harness.create_admin("session.ops").await;
+    harness
+        .activate(&code, "a sufficiently long passphrase")
+        .await;
+    let session = harness
+        .login("session.ops", "a sufficiently long passphrase")
+        .await;
+    assert_eq!(
+        harness.get("/auth/oidc/authorize", &[]).await.status(),
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(
+        harness
+            .send(
+                "GET",
+                "/api/v1/admin/session",
+                None,
+                &[],
+                Some(&session.cookie)
+            )
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    let after = harness.authority().await.policy().clone();
+    assert_eq!(before.epoch, after.epoch);
+    assert_eq!(before.methods, after.methods);
 }

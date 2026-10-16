@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use jsonwebtoken::{decode, decode_header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -23,51 +23,72 @@ pub struct AccessClaims {
 }
 
 /// Errors during JWT validation.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TokenError {
+    #[error("OIDC provider temporarily unavailable")]
+    ProviderUnavailable { retry_after: std::time::Duration },
+    #[error("access token refused")]
     MalformedToken,
+    #[error("access token refused")]
     MissingKeyId,
+    #[error("access token refused")]
     DisallowedAlgorithm,
+    #[error("access token refused")]
     ExpiredToken,
+    #[error("access token refused")]
     InvalidAudience,
+    #[error("access token refused")]
     InvalidIssuer,
+    #[error("access token refused")]
     KeyNotFound(String),
+    #[error("access token refused")]
     Validation(jsonwebtoken::errors::Error),
+}
+
+/// Inspect only credential syntax before consulting provider readiness.
+pub(crate) fn credential_header(token: &str) -> Result<jsonwebtoken::Header, TokenError> {
+    use base64::Engine;
+    let header = decode_header(token).map_err(|_| TokenError::MalformedToken)?;
+    let mut parts = token.split('.');
+    let _ = parts.next();
+    let payload = parts.next().ok_or(TokenError::MalformedToken)?;
+    let signature = parts.next().ok_or(TokenError::MalformedToken)?;
+    if parts.next().is_some() || signature.is_empty() {
+        return Err(TokenError::MalformedToken);
+    }
+    let encoding = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let bytes = encoding
+        .decode(payload)
+        .map_err(|_| TokenError::MalformedToken)?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| TokenError::MalformedToken)?;
+    if !claims.is_object() || encoding.decode(signature).is_err() {
+        return Err(TokenError::MalformedToken);
+    }
+    Ok(header)
 }
 
 /// Validate an OAuth 2.0 access token against the OIDC provider's JWKS.
 pub async fn validate_token(
     token: &str,
-    cfg: &crate::http::config::HttpConfig,
-    jwks: &crate::control::oidc::JwksCache,
+    client: &crate::control::oidc::OidcClient,
 ) -> Result<AccessClaims, TokenError> {
     let header = decode_header(token).map_err(|_| TokenError::MalformedToken)?;
-
-    let algorithm = match cfg.oidc_allowed_alg.as_str() {
-        "RS256" => Algorithm::RS256,
-        "ES256" => Algorithm::ES256,
-        "EdDSA" => Algorithm::EdDSA,
-        _ => return Err(TokenError::DisallowedAlgorithm),
-    };
-
-    if header.alg != algorithm {
-        return Err(TokenError::DisallowedAlgorithm);
-    }
-
+    let mut validator = client
+        .jwt_validation(header.alg)
+        .map_err(|_| TokenError::DisallowedAlgorithm)?;
+    validator.set_required_spec_claims(&["exp", "iss"]);
     let kid = header.kid.ok_or(TokenError::MissingKeyId)?;
-    let key: DecodingKey = jwks
+    let key = client
+        .jwks()
         .key_for(&kid)
         .await
-        .map_err(|e| TokenError::KeyNotFound(format!("JWKS key lookup failed: {e}")))?;
-
-    let mut validator = Validation::new(algorithm);
-    if !cfg.oidc_audience.is_empty() {
-        validator.set_audience(&[cfg.oidc_audience.as_str()]);
-    }
-    if !cfg.oidc_issuer.is_empty() {
-        validator.set_issuer(&[cfg.oidc_issuer.as_str()]);
-    }
-    validator.set_required_spec_claims(&["exp", "iss"]);
+        .map_err(|error| match error {
+            crate::control::oidc::AuthError::Unavailable { retry_after } => {
+                TokenError::ProviderUnavailable { retry_after }
+            }
+            _ => TokenError::KeyNotFound("unknown signing key".into()),
+        })?;
 
     let claims = decode::<AccessClaims>(token, &key, &validator)
         .map_err(|e| match e.kind() {
@@ -86,38 +107,41 @@ pub async fn validate_token(
 /// Validates the token against the OIDC provider's JWKS, derives the
 /// `(issuer, subject_verifier)` blind index exactly as the login flow does,
 /// and returns the Account that index names — but only while it is Active.
-/// Every failure mode (bad signature, wrong issuer/audience, expired, unknown
-/// identity, suspended Account) collapses to `None`, so a caller cannot tell
-/// them apart.
+/// Credential faults remain refusals; provider unavailability remains typed.
+/// Unknown identities and suspended Accounts return `Ok(None)`.
 pub async fn resolve_bearer_principal(
     config: &crate::http::config::HttpConfig,
     accounts: &dyn crate::http::registry::storage::AccountStore,
-    jwks: &crate::control::oidc::JwksCache,
+    client: &crate::control::oidc::OidcClient,
     token: &str,
-) -> Option<crate::http::principal::AuthenticatedPrincipal> {
-    let claims = validate_token(token, config, jwks).await.ok()?;
-    let verifier = crate::control::oidc::identity_subject_verifier(
+) -> Result<Option<crate::http::principal::AuthenticatedPrincipal>, TokenError> {
+    let claims = validate_token(token, client).await?;
+    let Ok(verifier) = crate::control::oidc::identity_subject_verifier(
         &config.keys.identity_index,
         &claims.iss,
         &claims.sub,
-    )
-    .ok()?;
-    let account = accounts
+    ) else {
+        return Ok(None);
+    };
+    let Some(account) = accounts
         .find_account_by_identity(
             &claims.iss,
             &crate::http::registry::models::SubjectVerifier(verifier),
         )
         .await
         .ok()
-        .flatten()?;
+        .flatten()
+    else {
+        return Ok(None);
+    };
     if account.status != crate::http::registry::models::AccountStatus::Active {
-        return None;
+        return Ok(None);
     }
-    Some(crate::http::principal::AuthenticatedPrincipal::Oidc {
+    Ok(Some(crate::http::principal::AuthenticatedPrincipal::Oidc {
         account: Arc::new(account),
         issuer: claims.iss,
         subject: claims.sub,
-    })
+    }))
 }
 
 /// GET /.well-known/oauth-protected-resource
@@ -154,9 +178,8 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::time::Duration;
 
-    use jsonwebtoken::{EncodingKey, Header, encode};
+    use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 
     /// A real 2048-bit RSA key pair, so signatures and JWKS decoding are
     /// exercised for real rather than against a stubbed verifier.
@@ -170,7 +193,7 @@ mod tests {
 
     /// A loopback JWKS endpoint serving one RSA key, which is the only
     /// boundary `validate_token` reaches out to.
-    fn jwks_cache() -> crate::control::oidc::JwksCache {
+    fn oidc_client(cfg: &crate::http::config::HttpConfig) -> crate::control::oidc::OidcClient {
         let body = format!(
             r#"{{"keys":[{{"kid":"{KEY_ID}","kty":"RSA","n":"{RSA_N}","e":"{RSA_E}","alg":"RS256"}}]}}"#
         );
@@ -195,11 +218,15 @@ mod tests {
                 let _ = stream.flush();
             }
         });
-        crate::control::oidc::JwksCache::from_parts(
-            reqwest::Client::new(),
-            format!("http://{addr}/jwks"),
-            Duration::from_secs(300),
+        let settings = crate::control::oidc::ProviderSettings::new(
+            &cfg.oidc_issuer,
+            "test-client",
+            &cfg.oidc_audience,
+            "https://app.example/callback",
+            &cfg.oidc_allowed_alg,
         )
+        .expect("fixture settings");
+        crate::control::oidc::OidcClient::from_metadata(&settings,&reqwest::Client::new(),&serde_json::json!({"issuer":cfg.oidc_issuer,"authorization_endpoint":"https://issuer.example/authorize","token_endpoint":"https://issuer.example/token","jwks_uri":format!("http://{addr}/jwks"),"id_token_signing_alg_values_supported":["RS256"]})).expect("fixture metadata")
     }
 
     /// An `HttpConfig` with the audience and issuer the tokens below claim.
@@ -252,7 +279,7 @@ mod tests {
     async fn accepts_a_validly_signed_token() {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(observed.is_ok(), "a correctly signed token must validate");
     }
@@ -261,7 +288,7 @@ mod tests {
     async fn returns_the_subject_of_a_valid_token() {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache())
+        let observed = validate_token(&token, &oidc_client(&config()))
             .await
             .expect("token validates");
 
@@ -270,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_a_token_that_is_not_a_jwt() {
-        let observed = validate_token("not-a-jwt", &config(), &jwks_cache()).await;
+        let observed = validate_token("not-a-jwt", &oidc_client(&config())).await;
 
         assert!(matches!(observed, Err(TokenError::MalformedToken)));
     }
@@ -279,7 +306,7 @@ mod tests {
     async fn rejects_a_token_with_no_key_id() {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), None);
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(
             matches!(observed, Err(TokenError::MissingKeyId)),
@@ -291,7 +318,7 @@ mod tests {
     async fn rejects_a_token_whose_key_id_is_unknown() {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), Some("key-unknown"));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(matches!(observed, Err(TokenError::KeyNotFound(_))));
     }
@@ -302,7 +329,7 @@ mod tests {
         let mut config = config();
         config.oidc_allowed_alg = "ES256".to_string();
 
-        let observed = validate_token(&token, &config, &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config)).await;
 
         // Algorithm confusion must be refused: a token signed with a different
         // algorithm than the deployment allows never reaches verification.
@@ -311,12 +338,13 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_an_algorithm_the_deployment_does_not_allow() {
-        let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
-        let mut config = config();
-        config.oidc_allowed_alg = "HS256".to_string();
-
-        let observed = validate_token(&token, &config, &jwks_cache()).await;
-
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &valid_claims("user-1", FAR_FUTURE),
+            &EncodingKey::from_secret(b"untrusted"),
+        )
+        .expect("test token");
+        let observed = validate_token(&token, &oidc_client(&config())).await;
         assert!(matches!(observed, Err(TokenError::DisallowedAlgorithm)));
     }
 
@@ -324,7 +352,7 @@ mod tests {
     async fn rejects_an_expired_token() {
         let token = sign(&valid_claims("user-1", 1), Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(matches!(observed, Err(TokenError::ExpiredToken)));
     }
@@ -339,7 +367,7 @@ mod tests {
         });
         let token = sign(&claims, Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(matches!(observed, Err(TokenError::InvalidAudience)));
     }
@@ -354,7 +382,7 @@ mod tests {
         });
         let token = sign(&claims, Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(matches!(observed, Err(TokenError::InvalidIssuer)));
     }
@@ -368,7 +396,7 @@ mod tests {
         });
         let token = sign(&claims, Some(KEY_ID));
 
-        let observed = validate_token(&token, &config(), &jwks_cache()).await;
+        let observed = validate_token(&token, &oidc_client(&config())).await;
 
         assert!(
             observed.is_err(),
@@ -445,9 +473,9 @@ mod tests {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), &token).await;
 
-        match principal {
+        match principal.expect("token validates") {
             Some(AuthenticatedPrincipal::Oidc {
                 account,
                 issuer,
@@ -467,10 +495,10 @@ mod tests {
         let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), &token).await;
 
         assert!(
-            principal.is_none(),
+            principal.ok().flatten().is_none(),
             "a token for an Account that is not Active must not authenticate"
         );
     }
@@ -483,9 +511,12 @@ mod tests {
         let token = sign(&valid_claims("someone-else", FAR_FUTURE), Some(KEY_ID));
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), &token).await;
 
-        assert!(principal.is_none(), "an unlinked subject must not resolve");
+        assert!(
+            principal.ok().flatten().is_none(),
+            "an unlinked subject must not resolve"
+        );
     }
 
     #[tokio::test]
@@ -493,9 +524,13 @@ mod tests {
         let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), "not-a-jwt").await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), "not-a-jwt")
+                .await;
 
-        assert!(principal.is_none(), "a malformed token must not resolve");
+        assert!(
+            principal.ok().flatten().is_none(),
+            "a malformed token must not resolve"
+        );
     }
 
     #[tokio::test]
@@ -510,10 +545,10 @@ mod tests {
         let token = sign(&claims, Some(KEY_ID));
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), &token).await;
 
         assert!(
-            principal.is_some(),
+            principal.ok().flatten().is_some(),
             "an array audience naming this resource must resolve the Account"
         );
     }
@@ -526,10 +561,10 @@ mod tests {
         let token = sign(&claims, Some(KEY_ID));
 
         let principal =
-            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+            resolve_bearer_principal(&config(), &*accounts, &oidc_client(&config()), &token).await;
 
         assert!(
-            principal.is_none(),
+            principal.ok().flatten().is_none(),
             "an array audience that omits this resource must not resolve"
         );
     }

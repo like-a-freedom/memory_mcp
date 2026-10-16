@@ -88,7 +88,7 @@ impl OidcProviderFixture {
             inner: Mutex::new(Inner {
                 replies: [
                     discovery,
-                    ProviderReply::json(serde_json::json!({"keys":[]})),
+                    signing_keys(),
                     ProviderReply::json(serde_json::json!({"error":"invalid_grant"})),
                 ],
                 counts: [0; 3],
@@ -164,4 +164,24 @@ async fn jwks_handler(State(s): State<Arc<Shared>>) -> Response {
 }
 async fn token_handler(State(s): State<Arc<Shared>>, body: axum::body::Bytes) -> Response {
     answer(s, ProviderRoute::Token, body.to_vec()).await
+}
+
+pub const RSA_N: &str = "sWmwOq_tLQb96bfMzWSNEjJRQhd2ZNcZGVBHdGfBu9LJg36Y4tJ62GNLbnMDtQBjiumnN8owIeIOZjypySedttnX6MfvQh9cFkfLxa6d2A2ADuJXkyQNpte0QC1qGKGBjTdqYNX_cfjrwRIlk7HlK2VINjlFpvrcYYJYArVqCMjvCq3L7srhDNeT4L7Ec9ch-cUBhZQFRexdSGAWorBRlMazlQnIJLYpZSydOnnwgX_P1I3W9KXiew5bO3SmV2mo73vf95TayWnc4CWbtOEp3Q_JFgCG8Q0PZYUAx7X7atP26-6dBXeyXBdJ2dNP6BOAzRpiNiuhKT3Fkdslxm8pIQ";
+pub fn signing_keys() -> ProviderReply {
+    ProviderReply::json(
+        serde_json::json!({"keys":[{"kid":"key-1","kty":"RSA","n":RSA_N,"e":"AQAB","alg":"RS256"}]}),
+    )
+}
+pub fn sign(claims: &serde_json::Value, kid: &str) -> String {
+    let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+    header.kid = Some(kid.into());
+    jsonwebtoken::encode(
+        &header,
+        claims,
+        &jsonwebtoken::EncodingKey::from_rsa_pem(include_bytes!(
+            "../fixtures/oauth_test_rsa_key.pem"
+        ))
+        .expect("fixture key"),
+    )
+    .expect("fixture signature")
 }

@@ -76,8 +76,22 @@ pub async fn authenticate(
                         other => {
                             let not_an_api_key = matches!(other, AuthDecision::NotApplicable);
                             match oauth_bearer(&state, credentials).await {
-                                Some(principal) => AuthDecision::Allow(principal),
-                                None => {
+                                Ok(Some(principal)) => AuthDecision::Allow(principal),
+                                Err(crate::http::oauth::TokenError::ProviderUnavailable {
+                                    retry_after,
+                                }) => {
+                                    let error = crate::control::error::ApiError::OidcUnavailable {
+                                        retry_after,
+                                    };
+                                    return match req
+                                        .extensions()
+                                        .get::<crate::http::logging::RequestId>()
+                                    {
+                                        Some(id) => error.at_request(id.as_uuid()).into_response(),
+                                        None => error.into_response(),
+                                    };
+                                }
+                                Ok(None) | Err(_) => {
                                     if not_an_api_key {
                                         crate::http::logging::log_auth_rejection(
                                             crate::http::logging::AuthRejection::Parse,
@@ -127,18 +141,41 @@ pub async fn authenticate(
 async fn oauth_bearer(
     state: &HttpState,
     token: &str,
-) -> Option<crate::http::principal::AuthenticatedPrincipal> {
+) -> Result<Option<crate::http::principal::AuthenticatedPrincipal>, crate::http::oauth::TokenError>
+{
     if !state
         .config
         .has_method(crate::http::config::BrowserAuthMethod::Oidc)
     {
-        return None;
+        return Ok(None);
     }
-    let client = state.oidc.as_ref()?.client().ok()?;
+    let header = crate::http::oauth::credential_header(token)?;
+    if header.kid.as_deref().is_none_or(str::is_empty) {
+        return Err(crate::http::oauth::TokenError::MissingKeyId);
+    }
+    if !matches!(
+        header.alg,
+        jsonwebtoken::Algorithm::RS256
+            | jsonwebtoken::Algorithm::RS384
+            | jsonwebtoken::Algorithm::RS512
+            | jsonwebtoken::Algorithm::ES256
+            | jsonwebtoken::Algorithm::EdDSA
+    ) {
+        return Err(crate::http::oauth::TokenError::DisallowedAlgorithm);
+    }
+    let Some(runtime) = state.oidc.as_ref() else {
+        return Ok(None);
+    };
+    let client =
+        runtime.client().map_err(
+            |error| crate::http::oauth::TokenError::ProviderUnavailable {
+                retry_after: error.retry_after,
+            },
+        )?;
     crate::http::oauth::resolve_bearer_principal(
         &state.config,
         &*state.registry.accounts(),
-        client.jwks(),
+        &client,
         token,
     )
     .await
@@ -150,8 +187,9 @@ async fn oauth_bearer(
 async fn oauth_bearer(
     _state: &HttpState,
     _token: &str,
-) -> Option<crate::http::principal::AuthenticatedPrincipal> {
-    None
+) -> Result<Option<crate::http::principal::AuthenticatedPrincipal>, crate::http::oauth::TokenError>
+{
+    Ok(None)
 }
 
 /// Authenticate the control-plane Secure cookie and attach the server-side

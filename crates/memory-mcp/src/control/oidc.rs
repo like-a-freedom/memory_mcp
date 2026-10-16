@@ -367,3 +367,6 @@ mod tests {
         assert!(result.is_err());
     }
 }
+
+#[cfg(test)]
+pub(crate) use provider::ProviderSettings;

@@ -54,12 +54,21 @@ impl OidcClient {
         settings: &super::provider::ProviderSettings,
         http: &reqwest::Client,
     ) -> Result<Self, super::provider::ProviderFailure> {
-        use super::provider::{self, ProviderFailure};
+        use super::provider;
         let discovery = provider::json(http.get(format!(
             "{}/.well-known/openid-configuration",
             normalize_issuer(&settings.issuer)
         )))
         .await?;
+        Self::from_metadata(settings, http, &discovery)
+    }
+
+    pub(crate) fn from_metadata(
+        settings: &super::provider::ProviderSettings,
+        http: &reqwest::Client,
+        discovery: &serde_json::Value,
+    ) -> Result<Self, super::provider::ProviderFailure> {
+        use super::provider::{self, ProviderFailure};
         let issuer = resolve_published_issuer(&settings.issuer, &discovery)
             .map_err(|_| ProviderFailure::invalid())?;
         let allowed_algorithms =
