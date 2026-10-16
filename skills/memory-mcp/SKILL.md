@@ -1,7 +1,7 @@
 ---
 name: memory-mcp
 description: "Use when an MCP-connected agent must store a verified source, extract facts, resolve entity aliases, recall assembled context, explain provenance, invalidate a fact, or operate a Memory MCP app session."
-compatibility: Requires a configured `memory-mcp` MCP server. This skill is MCP-only; use `memory-cli` for shell commands, scripts, server startup, watch mode, or re-embedding.
+compatibility: Requires a configured `memory-mcp` MCP server. This skill is MCP-only; use `memory-cli` for shell commands, scripts, server startup, filesystem ingestion, or re-embedding.
 ---
 
 # Memory MCP

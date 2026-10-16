@@ -348,13 +348,17 @@ The Compose file defaults the non-secret method material, including
 `MEMORY_MCP_HTTP_AUTH_METHODS=local`, so a deployment with no identity provider
 starts from the file plus the exports below. Secret material is never
 invented: export the individual secrets, or one `MEMORY_MCP_HTTP_SECRET_KEY`
-root from which every unset slot is derived, before starting Compose:
+root from which every unset slot is derived, before starting Compose. The file
+forwards both forms into the container and reads an empty value as "not set",
+so either form works; with neither, the server refuses to start and names the
+missing variable:
 
 ```bash
 # Required in every configuration.
 export SURREALDB_USERNAME=... SURREALDB_PASSWORD=...
+# Either the three individual secrets...
 export MEMORY_MCP_API_KEY_PEPPER=... MEMORY_MCP_HTTP_SESSION_KEY=... MEMORY_MCP_HTTP_CSRF_KEY=...
-# Or one root secret instead of the individual ones:
+# ...or one root secret (>=32 bytes) instead:
 # export MEMORY_MCP_HTTP_SECRET_KEY=...
 export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=http://localhost:8080
 export ALLOWED_HOSTS=localhost:8080,127.0.0.1:8080 ALLOWED_ORIGINS=http://localhost:8080
@@ -433,8 +437,8 @@ source with Cargo and its final stage is `gcr.io/distroless/cc-debian13:nonroot`
 Release runs publish the image to GitHub Container Registry as
 `ghcr.io/like-a-freedom/memory_mcp:latest`, `sha-<commit>` and the release
 tag; a manual run started from `master` refreshes `latest` and `sha-<commit>`.
-Pushes to `master` run the quality gate only — platform builds and the image
-start on pull requests, manual runs and releases. To deploy a published image
+CI runs on pull requests, manual runs, and releases; the `push` trigger is
+disabled, so pushes to `master` start no workflow. To deploy a published image
 instead of building locally, log in to GHCR and pull it before starting
 Compose:
 
@@ -641,7 +645,7 @@ diagnostics.
 
 ### Optional MCP apps surface
 
-The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is feature-gated so the eight canonical memory tools stay available without exposing extra session and resource endpoints by default.
+The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. The MCP tool list is not gated: all eight tools are always advertised, and without the `mcp-apps` feature `open_app` and `app_command` return a runtime error telling you to enable it. What the feature gates at compile time is the resource side — app discovery and session URIs such as `ui://memory/apps` are empty without it.
 
 Build or run with apps enabled:
 
@@ -990,7 +994,8 @@ with, so a variable must be exported into it (or placed in the container's
 
 ### Environment variable index
 
-Every operator-facing variable in one alphabetical list. `Required` is one of:
+Every operator-facing variable, in alphabetical order, in one of two tables.
+`Required` is one of:
 
 - **Yes** — startup fails without it.
 - **Conditional** — required only under the condition named in the row.
@@ -1001,17 +1006,59 @@ values, and failure behavior. Test-only, benchmark, and CI variables are not
 operator configuration and are listed under
 [Not operator configuration](#not-operator-configuration).
 
+The first table holds every variable the server may require at startup — each
+`Yes` and `Conditional` row. The optional ones follow in a collapsed block, each
+still marked `No`.
+
 | Variable | Group | Required | Details |
 | --- | --- | --- | --- |
 | `ALLOWED_HOSTS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
 | `ALLOWED_ORIGINS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `EMBEDDINGS_MODEL` | Embeddings | Conditional | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_MCP_API_KEY_PEPPER` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_CSRF_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_ISSUER` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SECRET_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_PASSWORD` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_TENANT_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_URL` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_USERNAME` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+
+<details>
+<summary>Optional variables (Required: No — a default always exists)</summary>
+
+| Variable | Group | Required | Details |
+| --- | --- | --- | --- |
 | `ANNO_MAX_INPUT_BYTES` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_API_KEY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_AUTO_RECOVERY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_BASE_URL` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_ENABLED` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_MAX_TOKENS` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
-| `EMBEDDINGS_MODEL` | Embeddings | Conditional | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_MODEL_DIR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_PROVIDER` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
@@ -1032,7 +1079,6 @@ operator configuration and are listed under
 | `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_CLAIM_ROLLOUT_STAGE` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_CONTEXT_CACHE_BYTES` | Memory cache | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
-| `MEMORY_QUERY_EMBEDDING_CACHE_BYTES` | Memory cache | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_HOOK_CONTENT` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_HOOK_POLICY_TAGS` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
@@ -1043,47 +1089,28 @@ operator configuration and are listed under
 | `MEMORY_LOG_FILE` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_LOG_FORMAT` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_LOG_TARGETS` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
-| `MEMORY_MCP_API_KEY_PEPPER` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_AUTH_METHODS` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_BIND` | HTTP ingress | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_BODY_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_CSRF_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_DATA_DIR` | HTTP storage | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` | HTTP diagnostics | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_CAPACITY` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_IDLE_TTL_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_METADATA_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_OIDC_ISSUER` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_POOL_CAP` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_SECRET_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
-| `MEMORY_MCP_HTTP_SESSION_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1096,35 +1123,26 @@ operator configuration and are listed under
 | `MEMORY_MCP_IMAGE` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64) |
 | `MEMORY_MCP_SERVER_CMD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_MCP_SERVER_CWD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
-| `MEMORY_MCP_TEST_PROXY_BIN` | Tests | No | [Not operator configuration](#not-operator-configuration) |
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | Metrics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_QUERY_EMBEDDING_CACHE_BYTES` | Memory cache | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_CACHE_DIR` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_EXTRACTOR` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_IDLE_UNLOAD_SECS` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_LABELS` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_MAX_CONCURRENCY` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `NER_THRESHOLD` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
-| `QUERY_LOG_RETENTION_DAYS` | Query analytics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `QUERY_LOGGING_ENABLED` | Query analytics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `QUERY_LOG_RETENTION_DAYS` | Query analytics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `RETRIEVAL_RERANKER_ADMISSION_FLOOR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `RETRIEVAL_RERANKER_MODEL_DIR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `RUST_LOG` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
-| `SURREALDB_CONTROL_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_CONTROL_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_CONTROL_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_CONTROL_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_CONTROL_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
 | `SURREALDB_DATA_DIR` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_DB_NAME` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDED` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDING_DIMENSION` | Embeddings | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_NAMESPACE` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
-| `SURREALDB_PASSWORD` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
-| `SURREALDB_TENANT_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_TENANT_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_TENANT_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_TENANT_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_TENANT_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
-| `SURREALDB_URL` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
-| `SURREALDB_USERNAME` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+
+</details>
 
 Variables that are retired, removed, or ignored are collected under
 [Removed and ignored variables](#removed-and-ignored-variables).
@@ -1181,9 +1199,9 @@ MEMORY_INGESTION_INBOX="$HOME/notes" memory_mcp serve
 
 Leaving it unset is the normal case and changes nothing at startup. Setting it on
 a binary built **without** the `fs-watch` feature is a startup error rather than a
-silent no-op. The HTTP profile never reads this variable at all — it is a
-stdio-only ingestion path, so a value set there has no effect rather than being
-rejected. The revision and deduplication behavior, supported file types, and MCP
+silent no-op. The HTTP profile rejects this variable at startup: filesystem
+ingestion is a stdio-only path, so a value set in the HTTP environment fails
+startup rather than being ignored. The revision and deduplication behavior, supported file types, and MCP
 host examples are covered under
 [Filesystem ingestion](#filesystem-ingestion-optional-inside-serve) in the Quick
 start section above.
@@ -1209,7 +1227,7 @@ The following settings are optional for power users. They are read by the same e
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | unsigned integer | `86400` | Archival worker interval in seconds |
 | `LIFECYCLE_DECAY_THRESHOLD` | floating-point number | `0.3` | Confidence threshold for fact invalidation |
 | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | unsigned integer | `90` | Days before archiving episodes |
-| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | floating-point number | `365` | Half-life in days for decay computation |
+| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | floating-point number | `365` | Half-life in days for decay computation. Unlike the `MEMORY_CLAIM_*` variables, the numeric `LIFECYCLE_*` settings do not fail startup on an invalid value: an unparseable number is silently replaced by the default above |
 | `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set; `true` when a provider is set and this variable is unset | Enable semantic retrieval; explicit `false` takes precedence over provider selection |
 | `EMBEDDINGS_PROVIDER` | string enum | `disabled` when both variables are unset; `local-candle` when `EMBEDDINGS_ENABLED=true` without a provider | Embedding backend: `local-candle`, `openai-compatible`, or `ollama`; when `EMBEDDINGS_ENABLED` is unset, setting a provider enables embeddings, while explicit `false` disables them and explicit `true` enables the selected/default provider. Matching is case-insensitive and accepts the aliases `local_candle` and `localcandle` for `local-candle`, and `openai` and `openai_compatible` for `openai-compatible`; any other value is a startup error |
 | `EMBEDDINGS_MODEL` | string | `intfloat/multilingual-e5-small` for `local-candle`; required for external providers when enabled | Model identifier for the selected embedding provider |
@@ -1220,12 +1238,14 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff. Must be greater than zero — `0` is a startup error, not a way to disable the interval (use `EMBEDDINGS_AUTO_RECOVERY=false`). The **HTTP** profile spawns no in-process recovery worker — a deployment that cannot resolve its provider fails startup rather than degrading — so there the variable only enforces its `>0` check |
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out. In the **HTTP** profile this additionally gates the per-tenant backfill scheduler job — only `1`/`true`/`yes` are true, and `auto` is not. See [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
+| `RETRIEVAL_RERANKER_ADMISSION_FLOOR` | floating-point number | `0.0` | Reranker admission floor; must be finite — `NaN` is a startup error |
+| `RETRIEVAL_RERANKER_MODEL_DIR` | path | unset | Local reranker model directory; requires `EMBEDDINGS_PROVIDER=local-candle`, any other provider is a startup error |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
 | `ANNO_MAX_INPUT_BYTES` | integer in `1..=1048576` | `1048576` | Maximum whole-input UTF-8 byte length for `NER_EXTRACTOR=anno`. Larger input is refused without truncation or chunking; persisted oversized episodes remain stored but extraction does not write facts, entities, edges, or an extraction projection. An explicit override with another extractor is a startup error. Use `65536` for the constrained memory profile |
 | `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
 | `NER_CACHE_DIR` | path | `<data>/models/ner` | Artifact store root for model-backed extractors (Anno ONNX, classic GLiNER, VAGO LFM2) |
 | `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for model-backed extractors; trimmed, lowercased, deduplicated in first-declared order |
-| `NER_THRESHOLD` | floating-point number | `0.5` | Confidence threshold for model-backed extractors (each backend owns an evaluated default; explicit in-range values override it) |
+| `NER_THRESHOLD` | floating-point number | unset (each backend's evaluated default; anno-onnx uses `0.5`) | Confidence threshold for model-backed extractors; explicit in-range values override the backend default |
 | `NER_MAX_CONCURRENCY` | positive integer | `1` | Concurrent local NER inference limit. `0` is a startup error |
 | `NER_IDLE_UNLOAD_SECS` | unsigned integer | `0` | Seconds of inactivity before any model-backed extractor unloads its model; `0` keeps it loaded for the process lifetime |
 | `GLINER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; `0` is a startup error. Increase only after workload-specific benchmarking |
@@ -1249,7 +1269,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | **Required** — startup fails without it. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI bundle at startup, so no UI rebuild is needed when it changes. The `memory_mcp admin` CLI is the one exception: it falls back to `https://localhost` when unset, so it accepts a deployment the server would refuse |
-| `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
+| `ALLOWED_HOSTS` | comma-separated list | unset | Required for production; must be non-empty at startup. The code does not reject wildcards in hosts — a `*` entry is accepted but never matches, so list concrete hosts. Missing `Host` returns `403` |
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
 | `MEMORY_MCP_HTTP_BODY_LIMIT` | bytes | `8388608` (8 MiB) | Maximum request body size; oversized bodies return `413` |
@@ -1322,8 +1342,10 @@ in order of cost:
 - **A single-tenant deployment can open sign-up once.** Set
   `MEMORY_MCP_HTTP_SIGNUP_MODE=open` with the seven plan seed variables set,
   sign in once so the account exists, then return to `invite_only` and
-  recreate the container. Note that `env_file` is read at container start, so a
-  changed `.env` needs `docker compose up -d --force-recreate`, not a restart.
+  recreate the container. Compose reads the root `.env` for `${...}`
+  interpolation when the command runs; after changing it, run
+  `docker compose up -d`, which recreates the container whose rendered
+  configuration changed.
 
 There is no in-code bootstrap for the first account: an invitation needs a
 session, and a session needs an account. `open` is the intended escape hatch,
@@ -1331,24 +1353,28 @@ and it is explicit in configuration precisely because it is the one setting
 that would otherwise be unreachable.
 
 
-**Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64`/`usize`. For open signup the values seed the `free` plan at version 1 when no plan exists; the `local` method instead creates `local_plan_v{version}` at `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` and compares every limit. An existing durable plan is never overwritten, and a stored plan whose limits differ fails startup.
+**Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64` or `u32`. For open signup the values seed the `free` plan at version 1 when no plan exists; the `local` method instead creates `local_plan_v{version}` at `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` and compares every limit. An existing durable plan is never overwritten, and a stored plan whose limits differ fails startup.
 
 | Variable | Type | Description |
 | --- | --- | --- |
 | `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES` | `u64` | Cumulative ingested source bytes per tenant |
 | `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | `u64` | Total episode count per tenant |
-| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | `u64` | Token-bucket ingest rate per tenant |
-| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | `usize` | Concurrent App Sessions per tenant |
-| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | `usize` | Active API keys per account |
-| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | `usize` | Concurrent ordinary requests per tenant |
-| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | `usize` | Concurrent `extract` operations per tenant |
+| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | `u32` | Token-bucket ingest rate per tenant |
+| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | `u32` | Concurrent App Sessions per tenant |
+| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | `u32` | Active API keys per account |
+| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | `u32` | Concurrent ordinary requests per tenant |
+| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | `u32` | Concurrent `extract` operations per tenant |
 
 **Runtime pool, subscriptions, tasks, replica identity**
 
-Every limit in the two tables above and in this one must be greater than zero;
-`0` is a startup error rather than an "unlimited" spelling. The one upper bound
-is `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`, which must not exceed `60`
-seconds — a longer interval would let a revoked authorization keep streaming.
+Every limit in the table below must be greater than zero; `0` is a startup error
+rather than an "unlimited" spelling. The plan-seed table above follows a narrower
+rule: `0` is refused only for `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`
+and `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`, `MEMORY_MCP_HTTP_INGEST_PER_MINUTE=0`
+is a supported value that disables ingest, and the remaining four seed variables
+accept `0`. The one upper bound is `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
+which must not exceed `60` seconds — a longer interval would let a revoked
+authorization keep streaming.
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -1449,16 +1475,16 @@ retrieval until an operator rewrites its vectors through the reembed route, and
 the deployment never does that on its own. See
 [docs/operations/LIMITATIONS.md](docs/operations/LIMITATIONS.md).
 
-`MEMORY_INGESTION_INBOX` is never read by the HTTP profile: filesystem ingestion
-is a stdio-only path, so a value set in the environment has no effect here rather
-than failing startup.
+`MEMORY_INGESTION_INBOX` is rejected at startup by the HTTP profile: filesystem
+ingestion is a stdio-only path, so a value set in the environment is a
+misconfiguration that fails startup rather than being silently ignored.
 
 **Additional startup-failure rules**:
 
 - `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` are required and must be non-empty in any HTTP build. Missing or wildcard origins are rejected at startup (`ConfigInvalid`), and the server does not fall back to permissive defaults.
 - The control and tenant SurrealDB targets (`SURREALDB_CONTROL_*` vs `SURREALDB_TENANT_*`) must differ in at least one of `url`, `namespace`, or `database`. The server rejects identical bindings at startup to prevent the control Registry from writing into a tenant namespace.
 - `mem://` is rejected at startup in any non-test HTTP build. Production HTTP must use a remote `ws`/`wss`/`http`/`https` SurrealDB target or a documented embedded `rocksdb://` profile.
-- `SURREALDB_FS_WATCH_INBOX` is rejected as a fatal startup error if set. Filesystem ingestion is the stdio-only ingestion path; setting it in the HTTP profile means the deployment is misconfigured.
+- `MEMORY_INGESTION_INBOX` is rejected as a fatal startup error if set. Filesystem ingestion is the stdio-only ingestion path; setting it in the HTTP profile means the deployment is misconfigured. (`SURREALDB_FS_WATCH_INBOX`, an older misspelling, is read by no code path and is silently ignored.)
 
 ### Runtime metrics
 
@@ -1579,7 +1605,7 @@ including the editor-by-editor hook matrix.
 | `MEMORY_HOOK_CONTENT` | unset | Explicit snapshot text. Wins over the transcript and over the hook payload |
 | `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | `80` | How many trailing lines to copy from the transcript path in the payload. Must be an integer — a non-numeric value fails the hook |
 | `MEMORY_HOOK_SOURCE_TYPE` | `session_summary` | `source_type` recorded with the ingested episode |
-| `MEMORY_HOOK_POLICY_TAGS` | event-specific: `hook:stop,session_summary` and `hook:precompact,session_summary,emergency_save` | Replaces the default tag list entirely. An empty value falls back to the event default |
+| `MEMORY_HOOK_POLICY_TAGS` | event-specific: `hook:stop,session_summary` and `hook:precompact,session_summary,emergency_save` | Replaces the default tag list entirely. An explicitly empty value yields an empty tag list; leave the variable unset to keep the event default |
 | `MEMORY_HOOK_VERBOSE` | unset; `1` enables | Print one success line per invocation |
 
 The scripts also inject server defaults with `setdefault`, so they never override
@@ -1609,7 +1635,7 @@ file.
 | `NER_DEVICE` | Rejected at startup | `GLINER_DEVICE` |
 | `GLINER_IDLE_UNLOAD_SECS` | Rejected at startup | `NER_IDLE_UNLOAD_SECS` |
 | `SURREALDB_NAMESPACES` | Rejected at startup | `SURREALDB_NAMESPACE` — exactly one namespace, per [One active namespace](#one-active-namespace) |
-| `SURREALDB_FS_WATCH_INBOX` | Rejected in the HTTP profile | `MEMORY_INGESTION_INBOX`. This guard is defensive: no code path ever sets this name, but the HTTP profile checks for it so a hand-edited deployment file cannot reintroduce filesystem ingestion silently |
+| `SURREALDB_FS_WATCH_INBOX` | Ignored — never read | `MEMORY_INGESTION_INBOX`. No code path ever reads this name; it is listed so a hand-edited deployment file that still carries it is recognized as inert. The HTTP profile's guard checks `MEMORY_INGESTION_INBOX` instead, which it rejects at startup |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | Ignored — never read | The `streamable-http` build feature selects the control plane |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | Ignored — never read | The `ui` feature, implied by `streamable-http` |
 | `MEMORY_HOOK_PROJECT` | Ignored — never read | Nothing. It appeared in older hook documentation and does nothing anywhere; remove it from your editor config |
@@ -1617,31 +1643,39 @@ file.
 
 ### Not operator configuration
 
-These variables exist, but they configure tooling, tests, benchmarks, or the
-build — never a running deployment. They are listed here so a search of this
-document turns up, and deliberately carry no detail:
+These variables configure tooling, tests, benchmarks, or the build — never a
+running deployment. They are listed here so a search of this document turns up,
+grouped by what reads them:
 
-- **Build-time:** `MEMORY_MCP_UI_DIST` (UI bundle directory read by `build.rs`;
-  see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)),
-  plus the Cargo-supplied `CARGO_*`, `OUT_DIR`, and `GIT_COMMIT`, and the
-  Dockerfile build args `DIOXUS_CLI_VERSION` and `WASM_TARGET`.
-- **Test-only** (behind the `test-fixtures` feature, or inside `#[cfg(test)]`):
-  `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`, `MEMORY_MCP_HTTP_TEST_SEED_RESERVED`,
-  `MEMORY_MCP_HTTP_TEST_SEED_SESSION`, `MEMORY_MCP_HTTP_TEST_FAULT_POINT`,
-  `MEMORY_MCP_HTTP_TEST_FAULT_AT`, and `LOCAL_ADMIN_TEST_CONTROL_URL`,
-  `LOCAL_ADMIN_TEST_CONTROL_USERNAME`, `LOCAL_ADMIN_TEST_CONTROL_PASSWORD`.
-  Setting these outside a test build is a startup error.
-- **Benchmarks and evaluations:** `MEMORY_MCP_BENCH_REQUIRE_FIXTURES`,
-  `MEMORY_RELEASE_BINARY`, `MEMORY_MCP_TEST_PROXY_BIN`,
-  `MEMORY_EVAL_NER_ARTIFACT_BASE_URL`, and the `eval-harness` run fingerprint —
-  `MEMORY_MCP_PROVIDER`, `MEMORY_MCP_MODEL`, `MEMORY_MCP_DEVICE`,
-  `MEMORY_MCP_ENABLED_FEATURES` — which record provenance in a run hash and do
-  not select a provider. The runtime selectors are `EMBEDDINGS_PROVIDER` and
-  `GLINER_DEVICE`. See [Performance benchmarks](#performance-benchmarks).
-- **Scripts and harnesses:** `PROXY_LISTEN`, `PROXY_UPSTREAM`,
-  `PROXY_READ_TIMEOUT`, `PROXY_BLOCK_METRICS` (`scripts/test_proxy.py`),
-  `MEMORY_MCP_BINARY`, and `LONGMEMEVAL_V2_REPO_COMMIT` /
-  `LONGMEMEVAL_V2_HF_REVISION` (pinned in `evals/longmemeval_v2/pins.env`).
+| Variable | Read by | Purpose |
+| --- | --- | --- |
+| `MEMORY_MCP_UI_DIST` | Build (`build.rs`) | UI bundle directory; see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging) |
+| `CARGO_*`, `OUT_DIR`, `GIT_COMMIT` | Cargo | Supplied by Cargo during compilation |
+| `DIOXUS_CLI_VERSION`, `WASM_TARGET` | Dockerfile | Image build args |
+| `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`, `MEMORY_MCP_HTTP_TEST_SEED_RESERVED`, `MEMORY_MCP_HTTP_TEST_SEED_SESSION`, `MEMORY_MCP_HTTP_TEST_FAULT_POINT`, `MEMORY_MCP_HTTP_TEST_FAULT_AT` | memory-mcp tests | Bootstrap, seeding, and fault injection behind the `test-fixtures` feature; a startup error outside a test build |
+| `LOCAL_ADMIN_TEST_CONTROL_URL`, `LOCAL_ADMIN_TEST_CONTROL_USERNAME`, `LOCAL_ADMIN_TEST_CONTROL_PASSWORD` | memory-mcp tests | Control-registry endpoint for the local-admin tests |
+| `MEMORY_MCP_TEST_PROXY_BIN` | memory-mcp tests | Proxy command for the release-gate streaming test (ignored by default `cargo test`; the test panics if it runs without this variable) |
+| `MEMORY_RELEASE_BINARY` | memory-mcp tests | Release binary for the fs-watch release test; skips when unset |
+| `HTTP_MEMORY_TEST_DESTRUCTIVE_STAGING`, `HTTP_MEMORY_TEST_BASE_URL`, `HTTP_MEMORY_TEST_API_KEY` | memory-mcp tests | Target of the destructive HTTP memory-workload run |
+| `MEMORY_MCP_MAINTENANCE_WS_URL`, `MEMORY_MCP_MAINTENANCE_WS_USERNAME`, `MEMORY_MCP_MAINTENANCE_WS_PASSWORD` | memory-mcp tests | SurrealDB endpoint for the maintenance-session tests |
+| `MEMORY_MCP_STORAGE_ALLOCATION_URL`, `MEMORY_MCP_STORAGE_ALLOCATION_NAMESPACE`, `MEMORY_MCP_STORAGE_ALLOCATION_DATABASE`, `MEMORY_MCP_STORAGE_ALLOCATION_USERNAME`, `MEMORY_MCP_STORAGE_ALLOCATION_PASSWORD`, `MEMORY_MCP_STORAGE_ALLOCATION_MODE` | memory-mcp tests | Storage-allocation measurement |
+| `MEMORY_EXEC_PROBE_REPORT`, `MEMORY_EXEC_PROBE_GATE`, `MEMORY_EXEC_PROBE_ADDRESS`, `MEMORY_EXEC_BARRIER_START_TICKS` | memory-mcp tests | Execution probe and barrier for `http_storage_memory` |
+| `STARTUP_CHILD_PID` | memory-mcp tests | PID file of the started child server |
+| `MEMORY_HTTP_LIFECYCLE_TEST_PROBE`, `MEMORY_HTTP_ARCHIVAL_TEST_PROBE`, `MEMORY_HTTP_COMMUNITY_TEST_PROBE` | memory-mcp unit tests | In-process lifecycle probes inside `#[cfg(test)]` |
+| `RETRIEVAL_QWEN_RERANKER_MODEL_DIR`, `RETRIEVAL_QWEN_GGUF_MODEL_DIR` | memory-mcp tests | Model caches for the E5 purpose tests; the service itself reads `RETRIEVAL_RERANKER_MODEL_DIR` only |
+| `MEMORY_MCP_PROVIDER`, `MEMORY_MCP_MODEL`, `MEMORY_MCP_DEVICE`, `MEMORY_MCP_ENABLED_FEATURES` | eval-harness | Run fingerprint recorded in the artifact hash; selects nothing at runtime — the runtime selectors are `EMBEDDINGS_PROVIDER` and `GLINER_DEVICE` |
+| `MEMORY_MCP_BENCH_REQUIRE_FIXTURES` | eval-harness benches | Panic instead of skipping when a fixture is missing or an extraction probe fails |
+| `MEMORY_EVAL_NER_ARTIFACT_BASE_URL` | memory-mcp (`eval-support` feature) | Base URL override for NER artifact downloads during evaluations |
+| `GATING_KIND`, `GATING_ROOT` | eval-harness tests | Fixture-gating mode and tree |
+| `NATIVE_CALIBRATION_PAIRS` | eval-harness tests | Source-reviewed reranker calibration pairs |
+| `STORAGE_RELEASE_PAIR_SET`, `STORAGE_RELEASE_BASELINE_QUALITY`, `STORAGE_RELEASE_CANDIDATE_QUALITY` | eval-harness tests | Storage release-gate artifacts |
+| `MEMORY_PERF_HOST_TAG` | `make perf-smoke` | Host tag in perf artifacts (default `local`) |
+| `PROXY_LISTEN`, `PROXY_UPSTREAM`, `PROXY_READ_TIMEOUT`, `PROXY_BLOCK_METRICS` | `scripts/test_proxy.py` | Proxy listener, upstream, timeout, and `/metrics` blocking |
+| `MEMORY_MCP_BINARY` | `evals/longmemeval_v2/run_pinned.sh` | Binary the pinned harness drives |
+| `LONGMEMEVAL_V2_REPO_COMMIT`, `LONGMEMEVAL_V2_HF_REVISION` | `evals/longmemeval_v2/pins.env` | Pinned corpus revisions |
+
+See [Performance benchmarks](#performance-benchmarks) for how the benchmark
+variables are set.
 
 ### Build features
 
@@ -2262,13 +2296,17 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │   │   └── tests/          # production integration and release-gate tests
 │   ├── ui/             # Dioxus 0.7 web SPA (embedded by the streamable-http profile)
 │   │   └── src/            # SPA routes, API client, OIDC and local-admin pages
-│   └── eval-harness/       # private evaluation package
-│       ├── benches/        # Criterion benchmark families
-│       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
-│       └── tests/          # harness integration tests and fixtures
+│   ├── eval-harness/       # private evaluation package
+│   │   ├── benches/        # Criterion benchmark families
+│   │   ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
+│   │   └── tests/          # harness integration tests and fixtures
+│   └── xtask/              # build automation: package, UI bundle check, observability check, toolchain pin
 ├── evals/
+│   ├── baselines/          # checked-in regression baselines (one-active-namespace pr/release)
 │   ├── corpora/            # immutable corpus manifests + NER corpora
 │   ├── longmemeval_v2/     # prepared LoCoMo/LongMemEval corpora
+│   ├── models/             # pinned model manifests (E5, mMARCO, Qwen3 reranker)
+│   ├── perf/               # perf baselines, profiles, results
 │   ├── performance/        # pinned-runner config
 │   ├── profiles/           # pr.json, release.json, nightly.json, ner_quality.json
 │   ├── results/            # recorded comparison results (e.g. NER)
@@ -2330,7 +2368,7 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md): Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md): evaluation architecture and design
 - [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md): compact tool responses design
-- [`docs/adr/`](docs/adr/): Architecture Decision Records (57 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
+- [`docs/adr/`](docs/adr/): Architecture Decision Records (82 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
 - [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md): scope/namespace compatibility contract
 - [`docs/operations/`](docs/operations/): operator runbooks, including the [local administrator runbook](docs/operations/LOCAL_ADMIN.md), protocol conformance, credential rotation, known limitations, and the SurrealDB restore drill
 - [`docs/performance/`](docs/performance/): memory profile and NER performance measurements

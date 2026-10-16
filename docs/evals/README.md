@@ -7,13 +7,17 @@ suite-scoped cases.
 
 | Profile | Command | Scope | Status |
 |---|---|---|---|
-| `pr` | `make eval-pr` | local retrieval, extraction, claims, external mini-corpus | blocking |
-| `release` | `make eval-release` | PR suites plus lifecycle checks | blocking |
-| `nightly` | `make eval-nightly` | scheduled breadth | blocking when scheduled |
+| `pr` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/pr.json --artifact target/evals/pr.json` | local retrieval, extraction, claims, external mini-corpus | blocking |
+| `release` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/release.json --artifact target/evals/release.json` | PR suites plus lifecycle checks | blocking |
+| `nightly` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/nightly.json --artifact target/evals/nightly.json` | scheduled breadth | blocking when scheduled |
 | `response_size` | `make eval-response-size` | compact vs verbose `assemble_context` and `explain` serialization | diagnostic; execution integrity blocking |
 | `ner_quality` | `make eval-ner-quality` | five extractor backends on the committed fixture | manual/platform-aware |
 | `perf_weekly` | `make perf-weekly` | ingest/assemble latency and throughput gates vs the committed baseline | manual, local machine only |
-| `external_*` | `make eval-external-*` | one pinned classic corpus per profile | requires prepared corpus |
+| `external_*` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/external_<name>.json --artifact target/evals/external_<name>.json` | one pinned classic corpus per profile | requires prepared corpus |
+
+The `pr`, `release`, `nightly`, and `external_*` profiles have no Make
+target — run the `cargo run` command above directly. CI inlines the same
+invocation.
 
 Response-size reports separate `assemble_*` and `explain_*` metrics. It is
 intentionally gate-free: the design target is diagnostic, while missing or

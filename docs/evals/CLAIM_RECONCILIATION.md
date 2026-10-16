@@ -40,7 +40,8 @@ fixture cases and reports per-split confusion counts and case outcomes.
 
 ```bash
 # Run claim reconciliation as part of the PR profile
-make eval-pr
+cargo run -p eval-harness --bin memory-eval -- run \
+  --profile evals/profiles/pr.json --artifact target/evals/pr.json
 
 # Run the claim reconciliation suite unit tests (parsing, schema, reducer)
 cargo test -p eval-harness suites::claims

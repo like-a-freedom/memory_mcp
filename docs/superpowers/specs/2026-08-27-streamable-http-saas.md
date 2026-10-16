@@ -52,7 +52,7 @@ second sentence prescribes: backfill runs from the scheduler when
 `EMBEDDINGS_AUTO_RECOVERY` is enabled, and a whole-namespace vector rewrite is
 requested with `POST /api/v1/operator/tenants/{id}/reembed`. The distinction is
 deliberate and is recorded in
-[ADR-0077](../adr/0077-http-embedding-maintenance.md).
+[ADR-0077](../../adr/0077-http-embedding-maintenance.md).
 
 ### 2.2 Cargo features
 
@@ -643,7 +643,7 @@ stale index would otherwise reject the first write. Facts whose vectors were
 written by a different provider or dimension must be rewritten, which means
 replacing the HNSW index and cannot be undone — so that path runs only when an
 operator asks for it through the control plane. See
-[ADR-0077](../adr/0077-http-embedding-maintenance.md).
+[ADR-0077](../../adr/0077-http-embedding-maintenance.md).
 
 The application does not require production egress allowlisting. Operators may
 add network policy as defense in depth. This residual risk is documented.

@@ -18,14 +18,14 @@ Run the actual CLI from the workspace root with model directories set to absolut
 EMBEDDINGS_ENABLED=true EMBEDDINGS_PROVIDER=local-candle EMBEDDINGS_MODEL=intfloat/multilingual-e5-small \
 EMBEDDINGS_MODEL_DIR=/absolute/e5-cache RETRIEVAL_RERANKER_MODEL_DIR=/absolute/reranker-cache \
 RETRIEVAL_RERANKER_ADMISSION_FLOOR=0 \
-MEMORY_CLAIM_ROLLOUT_STAGE=evidence cargo run -p eval-harness --locked -- \
+MEMORY_CLAIM_ROLLOUT_STAGE=evidence cargo run -p eval-harness --bin memory-eval --locked -- \
 run --profile evals/profiles/retrieval_quality.json --artifact /absolute/result.json
 ```
 
 Prepare/read back sources independently of queries and labels:
 
 ```sh
-cargo run -p eval-harness --locked -- prepare-retrieval-quality \
+cargo run -p eval-harness --bin memory-eval --locked -- prepare-retrieval-quality \
   --sources evals/corpora/retrieval-quality-v1/sources.json --output /absolute/inventory.json
 ```
 

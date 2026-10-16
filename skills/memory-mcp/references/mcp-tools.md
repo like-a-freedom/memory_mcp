@@ -60,7 +60,10 @@ canonical entity or aliases. Keep it out of the read-only recall SOP.
 
 ## App routing
 
-App tools are available only when the server is built with MCP Apps support.
+`open_app` and `app_command` are always advertised in the tool list. Without
+the `mcp-apps` feature they fail at call time with an error telling you to
+enable it; the app discovery and session resources are what the feature gates
+at compile time.
 
 | App | Use for |
 |---|---|

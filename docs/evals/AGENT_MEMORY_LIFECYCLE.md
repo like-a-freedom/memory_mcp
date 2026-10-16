@@ -43,7 +43,7 @@ The lifecycle suite exercises:
 ### Surface freeze
 
 ```bash
-cargo test -p memory-mcp --test agent_memory_lifecycle_release_gate public_surface_snapshot -- --exact
+cargo test -p memory_mcp --test agent_memory_lifecycle_release_gate public_surface_snapshot -- --exact
 ```
 
 Asserts exactly eight MCP tool names and the ordinary CLI command snapshot,
@@ -53,7 +53,7 @@ and the absence of `prepare_task`, `record_event`, `hook`, `checkpoint`,
 ### Fixture coverage
 
 ```bash
-cargo test -p memory-mcp --test agent_memory_lifecycle_release_gate lifecycle_fixture_covers_core_risks -- --exact
+cargo test -p memory_mcp --test agent_memory_lifecycle_release_gate lifecycle_fixture_covers_core_risks -- --exact
 ```
 
 Asserts every required risk family is represented.

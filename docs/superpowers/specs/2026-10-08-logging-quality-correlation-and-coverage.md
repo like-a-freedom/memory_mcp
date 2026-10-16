@@ -5,10 +5,10 @@
 **Baseline:** the working tree of 2026-10-08, which includes the in-progress
 `http-bounded-memory` change. Every reference below is to a file or symbol, not a
 line number, so it survives that work landing.
-**Decisions:** [ADR-0079](../adr/0079-log-level-policy.md) (levels),
-[ADR-0080](../adr/0080-one-request-identity.md) (correlation),
-[ADR-0081](../adr/0081-operation-naming-contract.md) (operation names).
-**Related plan:** `../plans/2026-10-08-logging-quality-correlation-and-coverage.md`.
+**Decisions:** [ADR-0079](../../adr/0079-log-level-policy.md) (levels),
+[ADR-0080](../../adr/0080-one-request-identity.md) (correlation),
+[ADR-0081](../../adr/0081-operation-naming-contract.md) (operation names).
+**Related plan:** removed with `docs/superpowers/plans/` (commit `fdf85d23`).
 
 ## 1. Purpose and scope
 
