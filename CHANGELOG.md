@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.37.0] - 2026-10-18
+
+### Added
+- The HTTP server starts and remains available while the configured OIDC provider is offline. Discovery and signing-key refresh retry in the background, while local admin and API-key authentication remain available.
+- Readiness and Prometheus metrics expose OIDC discovery and signing-key health, including provider recovery.
+
+### Changed
+- **Breaking:** OAuth token validation now uses the shared OIDC client. Bearer-principal resolution returns provider outages separately from rejected credentials.
+
+### Fixed
+- Temporary OIDC failures are reported as retryable service errors instead of invalid credentials. Provider requests have bounded time and response sizes.
+
 ## [1.36.0] - 2026-10-16
 
 ### Added
@@ -31,5 +43,6 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.37.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.36.0...v1.37.0
 [1.36.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.35.0...v1.36.0
 [1.35.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.34.2...v1.35.0
