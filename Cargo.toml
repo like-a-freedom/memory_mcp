@@ -9,7 +9,7 @@ rust-version = "1.99.0"
 license = "MIT"
 
 [workspace.dependencies]
-anno = { version = "0.13.0", default-features = false, features = ["onnx"] }
+anno = { version = "0.14.0", default-features = false, features = ["onnx"] }
 async-trait = "0.1.92"
 # `matched-path` is what lets the access log name the endpoint a request
 # matched, so the traffic and latency metrics can be read per route instead of
@@ -36,32 +36,32 @@ http-body = "1.1.0"
 http-body-util = "0.1.5"
 indicatif = "0.18.6"
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
-lopdf = "0.45.0"
-lru = "0.18.4"
+lopdf = "0.46.0"
+lru = "0.19.0"
 metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["http-listener"] }
 mimalloc = "0.1.52"
 mockall = "0.15.0"
-notify = "8.2.0"
+notify = "8.2.1"
 oauth2 = { version = "5", features = ["reqwest"] }
-proptest = "1.11.0"
+proptest = "1.12.0"
 rand = "0.10.3"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
-rmcp = { version = "3.5.1", features = ["macros", "transport-io", "server"] }
-roxmltree = "0.21.1"
-schemars = "1.2.2"
+rmcp = { version = "3.8.0", features = ["macros", "transport-io", "server"] }
+roxmltree = "0.21.2"
+schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 sha2 = "0.11"
 strsim = "0.11.1"
 subtle = "2.6.1"
-surrealdb = { version = "3.3.2", features = ["kv-rocksdb", "kv-mem"] }
+surrealdb = { version = "3.3.5", features = ["kv-rocksdb", "kv-mem"] }
 tar = { version = "0.4", default-features = false }
 tempfile = "3.27.0"
-thiserror = "2.0.20"
+thiserror = "2.0.21"
 tokenizers = { version = "0.23.2", default-features = false, features = ["fancy-regex"] }
-tokio = { version = "1.53.1", features = [
+tokio = { version = "1.54.1", features = [
     "rt-multi-thread",
     "macros",
     "io-std",
@@ -69,15 +69,15 @@ tokio = { version = "1.53.1", features = [
     "time",
     "signal",
 ] }
-tokio-util = { version = "0.7.19", features = ["rt"] }
+tokio-util = { version = "0.7.20", features = ["rt"] }
 tower-service = "0.3.3"
 # Logging facility. Versions align with the `tracing` already pulled
 # transitively by `surrealdb`, so the lock gains no duplicate major.
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "registry", "std"] }
-unicode-normalization = "0.1.25"
-uuid = { version = "1.26.1", features = ["v4"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+unicode-normalization = "0.1.26"
+uuid = { version = "1.29.0", features = ["v4"] }
+zip = { version = "9.3.0", default-features = false, features = ["deflate"] }
 
 [workspace.lints.rust]
 unexpected_cfgs = "warn"

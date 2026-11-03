@@ -85,7 +85,13 @@ where
             let file = archive.by_index(index).map_err(|err| {
                 MemoryError::Validation(format!("failed to inspect archive entry {index}: {err}"))
             })?;
-            file.name().to_string()
+            file.name()
+                .map_err(|err| {
+                    MemoryError::Validation(format!(
+                        "failed to read archive entry name {index}: {err}"
+                    ))
+                })?
+                .to_string()
         };
         if name.starts_with(prefix) && name.ends_with(suffix) {
             names.push(name);

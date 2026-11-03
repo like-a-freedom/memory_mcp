@@ -658,7 +658,10 @@ mod tests {
             let mut contents = Vec::new();
             for index in 0..zip.len() {
                 let mut entry = zip.by_index(index).expect("read zip entry");
-                let name = entry.name().replace('\\', "/");
+                let name = entry
+                    .name()
+                    .expect("read zip entry name")
+                    .replace('\\', "/");
                 let mut bytes = Vec::new();
                 entry.read_to_end(&mut bytes).expect("read zip payload");
                 contents.push((name, hex::encode(Sha256::digest(&bytes))));

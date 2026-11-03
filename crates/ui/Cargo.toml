@@ -47,10 +47,10 @@ gloo-storage = { version = "=0.4.0" }
 # and with `dioxus-web`'s own `mounted` feature; `HtmlElement` is deliberately
 # absent because the focus itself goes through Dioxus's `MountedData::set_focus`,
 # which calls it inside `dioxus-web`.
-gloo-timers = { version = "=0.3.0", features = ["futures"] }
-js-sys = "=0.3.105"
-wasm-bindgen-futures = "=0.4.78"
-web-sys = { version = "=0.3.105", features = [
+gloo-timers = { version = "=0.4.0", features = ["futures"] }
+js-sys = "=0.3.107"
+wasm-bindgen-futures = "=0.4.80"
+web-sys = { version = "=0.3.107", features = [
   "Clipboard",
   "Crypto",
   "Document",

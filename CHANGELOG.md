@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.37.2] - 2026-11-03
+
+### Fixed
+- ZIP-based document extraction and release archive verification now handle the fallible entry-name API in `zip` 9.
+
+### Other
+- Updated workspace Rust dependencies to the latest compatible crates.io releases.
+
 ## [1.37.1] - 2026-11-03
 
 ### Fixed
@@ -50,6 +58,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.37.2]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.1...v1.37.2
 [1.37.1]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.0...v1.37.1
 [1.37.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.36.0...v1.37.0
 [1.36.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.35.0...v1.36.0
