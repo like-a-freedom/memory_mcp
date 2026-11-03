@@ -46,7 +46,7 @@ async fn exposes_supersession_on_the_predecessor_item() {
         "episode:sup-1",
         "fs:docs/deploy.md:aaaa",
         "fs:docs/deploy.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -57,7 +57,7 @@ async fn exposes_supersession_on_the_predecessor_item() {
         "episode:sup-2",
         "fs:docs/deploy.md:bbbb",
         "fs:docs/deploy.md",
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -220,7 +220,7 @@ async fn leaves_reconciliation_none_when_no_relation_exists() {
         "episode:lonely",
         "fs:docs/only.md:aaaa",
         "fs:docs/only.md",
-        "ARR is standalone",
+        "subject: ARR; dimension: ARR; value: standalone",
         Utc.with_ymd_and_hms(2026, 6, 5, 10, 0, 0).unwrap(),
     )
     .await;
@@ -247,7 +247,7 @@ async fn deduplicates_identical_facts_only_after_persisted_duplicate_relation() 
         "episode:duplicate-a",
         "fs:docs/duplicate-a.md:aaaa",
         "fs:docs/duplicate-a.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -257,7 +257,7 @@ async fn deduplicates_identical_facts_only_after_persisted_duplicate_relation() 
         "episode:duplicate-b",
         "fs:docs/duplicate-b.md:bbbb",
         "fs:docs/duplicate-b.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -284,7 +284,10 @@ async fn deduplicates_identical_facts_only_after_persisted_duplicate_relation() 
         1,
         "only exact-content facts joined by visible persisted Duplicate evidence should collapse"
     );
-    assert_eq!(items[0].content, "ARR is legacy");
+    assert_eq!(
+        items[0].content,
+        "subject: ARR; dimension: ARR; value: legacy"
+    );
     let relation = items[0]
         .reconciliation
         .as_ref()
@@ -317,7 +320,7 @@ async fn duplicate_metadata_does_not_expose_an_unselected_counterpart() {
         "episode:hidden-duplicate-a",
         "fs:docs/hidden-duplicate-a.md:aaaa",
         "fs:docs/hidden-duplicate-a.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -327,7 +330,7 @@ async fn duplicate_metadata_does_not_expose_an_unselected_counterpart() {
         "episode:hidden-duplicate-b",
         "fs:docs/hidden-duplicate-b.md:bbbb",
         "fs:docs/hidden-duplicate-b.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -416,7 +419,7 @@ async fn withholds_relations_below_the_evidence_stage() {
             "episode:gate-1",
             "fs:docs/gated.md:aaaa",
             "fs:docs/gated.md",
-            "ARR is legacy",
+            "subject: ARR; dimension: ARR; value: legacy",
             Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
         )
         .await;
@@ -426,7 +429,7 @@ async fn withholds_relations_below_the_evidence_stage() {
             "episode:gate-2",
             "fs:docs/gated.md:bbbb",
             "fs:docs/gated.md",
-            "ARR is supersedes",
+            "subject: ARR; dimension: ARR; value: supersedes",
             Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
         )
         .await;
@@ -555,7 +558,7 @@ async fn assemble_pair(
         "episode:pair-1",
         "fs:docs/pair.md:aaaa",
         first_lineage,
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -565,7 +568,7 @@ async fn assemble_pair(
         "episode:pair-2",
         "fs:docs/pair.md:bbbb",
         second_lineage,
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;

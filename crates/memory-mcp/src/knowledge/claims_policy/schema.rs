@@ -167,7 +167,7 @@ impl ClaimSchema for AttributeV1 {
                 schema_ref: self.schema_ref(),
                 subject: input.subject.to_string(),
                 comparison_key: key,
-                qualifiers: BTreeMap::new(),
+                qualifiers: super::structural::detect_value_and_qualifiers(val).1,
                 value: ClaimValue::Text(NormalizedText::new(val)),
                 cardinality: ClaimCardinality::SingleValued,
                 observed_at: input.t_ref,
@@ -267,7 +267,7 @@ impl ClaimSchema for AttributeV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_span: None,
+                source_span: Some((0, input.content.len())),
             });
         }
 
@@ -283,8 +283,127 @@ impl ClaimSchema for AttributeV1 {
 
 struct QuantityV1;
 
+/// An assertion grammar can supply a neutral mention even when NER misses it.
+/// Type inference remains the provider's responsibility; this is a concept.
+pub(crate) fn grammatical_subject_candidate(
+    content: &str,
+) -> Option<crate::models::EntityCandidate> {
+    let fields = super::structural::explicit_schema_fields(content);
+    if let Some(subject) = fields.get("subject") {
+        return Some(crate::models::EntityCandidate {
+            entity_type: "concept".to_string(),
+            canonical_name: subject.clone(),
+            aliases: Vec::new(),
+        });
+    }
+    if [" reports ", " says ", " will ", " сообщает, что ", "报告"]
+        .iter()
+        .map(|marker| content.matches(marker).count())
+        .sum::<usize>()
+        != 1
+    {
+        return None;
+    }
+    let subject = if let Some(parsed) = parse_commitment_sentence(content) {
+        parsed.subject
+    } else {
+        parse_multilingual_quantity(content)?.0
+    };
+    if subject.is_empty()
+        || subject.contains(['\n', ':', '"', '.', '!', '?', ';', '。', '！', '？', '；'])
+    {
+        return None;
+    }
+    // Deictic pronouns need discourse identity, and coordination does not
+    // identify one canonical subject. Grammar alone cannot resolve either.
+    let normalized = NormalizedText::new(&subject);
+    if matches!(
+        normalized.as_str(),
+        "i" | "we"
+            | "you"
+            | "he"
+            | "she"
+            | "they"
+            | "it"
+            | "я"
+            | "мы"
+            | "ты"
+            | "вы"
+            | "он"
+            | "она"
+            | "они"
+            | "我"
+            | "我们"
+            | "你"
+            | "你们"
+            | "他"
+            | "她"
+            | "他们"
+    ) || normalized
+        .as_str()
+        .split_whitespace()
+        .any(|word| matches!(word, "and" | "or" | "и" | "или"))
+        || subject.contains(['和', '与', '或', '&', ','])
+    {
+        return None;
+    }
+    Some(crate::models::EntityCandidate {
+        entity_type: "concept".to_string(),
+        canonical_name: subject,
+        aliases: Vec::new(),
+    })
+}
+
 fn parse_multilingual_quantity(content: &str) -> Option<(String, String, String, String)> {
     let content = content.trim().trim_end_matches(['.', '。']);
+
+    for marker in [" reports ", " says "] {
+        if let Some((subject, assertion)) = content.split_once(marker) {
+            let (measure, value) = assertion.split_once(" is ")?;
+            let money = value.trim().strip_prefix('$')?;
+            let (number, power) = if let Some(number) = money.strip_suffix(['M', 'm']) {
+                (number, 6)
+            } else if let Some(number) = money.strip_suffix(['K', 'k']) {
+                (number, 3)
+            } else {
+                (money, 0)
+            };
+            let digits = number.trim().trim_start_matches(['+', '-']);
+            if number
+                .trim()
+                .chars()
+                .filter(|c| matches!(c, '+' | '-'))
+                .count()
+                > 1
+                || digits.matches('.').count() > 1
+                || !digits.chars().any(|c| c.is_ascii_digit())
+                || !digits.chars().all(|c| c.is_ascii_digit() || c == '.')
+            {
+                return None;
+            }
+            let decimal = CanonicalDecimal::parse(number).ok()?;
+            let coefficient = decimal
+                .coefficient()
+                .checked_mul(10i128.checked_pow(power)?)?;
+            let scale = usize::try_from(decimal.scale()).ok()?;
+            let digits = format!("{:0>width$}", coefficient.checked_abs()?, width = scale + 1);
+            let split = digits.len().checked_sub(scale)?;
+            let sign = if coefficient < 0 { "-" } else { "" };
+            let value = CanonicalDecimal::parse(&format!(
+                "{sign}{}.{}",
+                &digits[..split],
+                &digits[split..]
+            ))
+            .ok()?
+            .to_string();
+            return Some((
+                subject.trim().to_string(),
+                measure.trim().trim_start_matches("the ").to_string(),
+                value,
+                "usd".to_string(),
+            ));
+        }
+    }
 
     if let Some(measure_start) = content.find(" сообщает, что ") {
         let subject = content[..measure_start].trim().to_string();
@@ -306,7 +425,7 @@ fn parse_multilingual_quantity(content: &str) -> Option<(String, String, String,
         return Some((
             subject,
             measure,
-            (number * multiplier).to_string(),
+            number.checked_mul(multiplier)?.to_string(),
             unit.to_string(),
         ));
     }
@@ -324,7 +443,7 @@ fn parse_multilingual_quantity(content: &str) -> Option<(String, String, String,
         return Some((
             subject,
             measure,
-            (number * multiplier).to_string(),
+            number.checked_mul(multiplier)?.to_string(),
             unit.to_string(),
         ));
     }
@@ -381,7 +500,7 @@ impl ClaimSchema for QuantityV1 {
                         valid_from: None,
                         valid_to: None,
                         validity_source: ClaimValiditySource::Explicit,
-                        source_span: None,
+                        source_span: Some((0, input.content.len())),
                     });
                 }
                 Err(_) => {
@@ -418,7 +537,7 @@ impl ClaimSchema for QuantityV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_span: None,
+                source_span: Some((0, input.content.len())),
             });
             return Ok(());
         }
@@ -488,7 +607,7 @@ impl ClaimSchema for QuantityV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_span: None,
+                source_span: Some((0, input.content.len())),
             });
         }
 
@@ -700,7 +819,7 @@ impl ClaimSchema for CommitmentV1 {
 
             output.push(ClaimDraftCandidate {
                 schema_ref: self.schema_ref(),
-                subject: parsed.subject,
+                subject: input.subject.to_string(),
                 comparison_key: key,
                 qualifiers,
                 value: ClaimValue::Boolean(true),

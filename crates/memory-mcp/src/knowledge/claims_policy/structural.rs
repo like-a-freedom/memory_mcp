@@ -64,6 +64,37 @@ pub(crate) fn resolve_subject<'a>(
     }
 }
 
+/// Resolve the complete subject phrase in a supported reporting statement.
+/// Nested or compound attribution never establishes one comparison subject.
+pub(crate) fn resolve_leading_subject<'a>(
+    content: &str,
+    candidates: &'a [SubjectCandidate],
+) -> Result<&'a str, &'static str> {
+    let content = NormalizedText::new(content);
+    // Match the complete subject phrase of supported reporting constructions.
+    // A mere name prefix can select a reporter in a nested attribution, or
+    // one member of a compound subject, neither of which identifies the slot.
+    let markers = [" reports ", " says ", " will ", " сообщает, что ", "报告"];
+    if markers
+        .iter()
+        .map(|marker| content.as_str().matches(marker).count())
+        .sum::<usize>()
+        != 1
+    {
+        return Err("unresolved_subject");
+    }
+    let subject = markers
+        .iter()
+        .find_map(|marker| {
+            content
+                .as_str()
+                .split_once(marker)
+                .map(|(subject, _)| subject)
+        })
+        .ok_or("unresolved_subject")?;
+    resolve_subject(Some(&NormalizedText::new(subject)), candidates)
+}
+
 /// Parse raw content into structural assertions.
 pub(crate) fn parse_assertions(content: &str) -> Vec<StructuralAssertion> {
     let assertions = Vec::new();
@@ -85,6 +116,20 @@ pub(crate) fn parse_assertions(content: &str) -> Vec<StructuralAssertion> {
     }
 
     assertions
+}
+
+/// Colon syntax alone does not establish a single-valued schema.
+pub(crate) fn has_unstructured_colon_value(content: &str) -> bool {
+    content.lines().any(|line| {
+        let Some((key, value)) = line.split_once(':').or_else(|| line.split_once('=')) else {
+            return false;
+        };
+        let value = value.trim();
+        if key.trim().is_empty() || value.is_empty() || key.contains(" is ") {
+            return false;
+        }
+        true
+    })
 }
 
 // Priority-1 JSON-scalar leaf extraction is intentionally deferred: no plan
@@ -171,7 +216,9 @@ fn extract_is_sentence(text: &str) -> Option<(String, String, String)> {
     }
 }
 
-fn detect_value_and_qualifiers(val: &str) -> (StructuralValue, BTreeMap<String, String>) {
+pub(super) fn detect_value_and_qualifiers(
+    val: &str,
+) -> (StructuralValue, BTreeMap<String, String>) {
     let val = val.trim();
     let mut qualifiers = BTreeMap::new();
 
@@ -235,6 +282,50 @@ fn split_number_unit(val: &str) -> Option<(String, Option<String>)> {
                 None
             }
         }
+    }
+}
+
+/// Recognize only complete records in the existing built-in schema vocabulary.
+/// An arbitrary prose heading never declares a scalar dimension.
+pub(crate) fn explicit_schema_fields(content: &str) -> BTreeMap<String, String> {
+    let mut fields = BTreeMap::new();
+    for line in content
+        .split(['\n', ';'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
+        let Some((key, value)) = line.split_once(':').or_else(|| line.split_once('=')) else {
+            return BTreeMap::new();
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if !matches!(
+            key,
+            "subject"
+                | "dimension"
+                | "value"
+                | "measure"
+                | "unit"
+                | "predicate"
+                | "object"
+                | "action"
+                | "target"
+                | "deadline"
+                | "status"
+        ) || value.is_empty()
+            || fields.insert(key.to_string(), value.to_string()).is_some()
+        {
+            return BTreeMap::new();
+        }
+    }
+    if (fields.contains_key("dimension") || fields.contains_key("measure"))
+        && fields.contains_key("value")
+        || fields.contains_key("predicate") && fields.contains_key("object")
+        || fields.contains_key("action") && fields.contains_key("target")
+    {
+        fields
+    } else {
+        BTreeMap::new()
     }
 }
 

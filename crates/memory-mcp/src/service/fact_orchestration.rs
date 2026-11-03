@@ -25,6 +25,8 @@ use crate::shared::ids::deterministic_fact_id;
 use crate::shared::temporal::{normalize_dt, now};
 use crate::shared::validation::validate_fact_input;
 
+type LinkedEntityNames = std::collections::HashMap<String, (String, Vec<String>)>;
+
 impl FactService {
     /// Adds a new fact, orchestrating embedding generation, triple extraction,
     /// and claim projection.
@@ -52,7 +54,7 @@ impl FactService {
         // this value is retained only for derived job/diagnostic metadata.
         let namespace = ctx.active_namespace.clone();
 
-        let (index_keys, episode_source_lineage) = self
+        let (index_keys, episode_source_lineage, entity_names) = self
             .prepare_index_keys(
                 ctx,
                 content,
@@ -93,6 +95,7 @@ impl FactService {
             content,
             &policy_tags,
             &entity_links,
+            &entity_names,
             t_valid,
             episode_source_lineage.as_deref(),
             deferred_embedding_input,
@@ -118,7 +121,7 @@ impl FactService {
         provenance: &Provenance,
         entity_links: &[String],
         t_valid: DateTime<Utc>,
-    ) -> Result<(Vec<String>, Option<String>), MemoryError> {
+    ) -> Result<(Vec<String>, Option<String>, LinkedEntityNames), MemoryError> {
         let entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
             ctx.find_entity_records_by_ids(entity_links).await?;
 
@@ -148,7 +151,7 @@ impl FactService {
             )
             .await?;
 
-        Ok((index_keys, episode_source_lineage))
+        Ok((index_keys, episode_source_lineage, entity_map))
     }
 
     /// Generate the embedding payload for the fact, or defer/skip it.
@@ -274,6 +277,7 @@ impl FactService {
         content: &str,
         policy_tags: &[String],
         entity_links: &[String],
+        entity_names: &LinkedEntityNames,
         t_valid: DateTime<Utc>,
         source_lineage: Option<&str>,
         deferred_embedding_input: Option<String>,
@@ -301,6 +305,7 @@ impl FactService {
                     content,
                     policy_tags,
                     entity_links,
+                    entity_names,
                     t_valid,
                     source_lineage,
                 ),
@@ -334,6 +339,7 @@ impl FactService {
         content: &str,
         policy_tags: &[String],
         entity_links: &[String],
+        entity_names: &LinkedEntityNames,
         t_valid: DateTime<Utc>,
         source_lineage: Option<&str>,
     ) {
@@ -350,6 +356,7 @@ impl FactService {
             content: &claim_content,
             policy_tags,
             entity_links: &claim_entity_links,
+            entity_names: Some(entity_names),
             t_valid,
             source_lineage,
         };

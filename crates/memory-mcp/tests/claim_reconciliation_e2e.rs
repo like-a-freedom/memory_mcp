@@ -106,6 +106,299 @@ async fn fetch_claim_keys_for_episode(db_client: &Arc<SurrealDbClient>, ep: &str
         .unwrap_or_default()
 }
 
+#[tokio::test]
+async fn unscoped_historical_records_do_not_form_comparable_claims() {
+    let (service, db) = make_service().await;
+    let first = common::seed_fact_at(
+        &service,
+        "org",
+        "Historical superseded workout: {\"date\":\"2026-10-24\",\"min\":95}",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+    )
+    .await;
+    let second = common::seed_fact_at(
+        &service,
+        "org",
+        "Historical superseded workout: {\"date\":\"2026-10-29\",\"min\":30}",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+    )
+    .await;
+    let rows = db
+        .query(
+            "SELECT source_fact_id FROM claim WHERE source_fact_id IN $ids",
+            Some(serde_json::json!({"ids": [first, second]})),
+            "org",
+        )
+        .await
+        .expect("query claims");
+    let claims: Vec<serde_json::Value> = serde_json::from_value(rows).expect("claim rows");
+    assert!(
+        claims.is_empty(),
+        "unscoped independent records must not share a claim slot: {claims:?}"
+    );
+    let rows = db
+        .query(
+            "SELECT fact_id FROM fact WHERE fact_id IN $ids",
+            Some(serde_json::json!({"ids": [first, second]})),
+            "org",
+        )
+        .await
+        .expect("query source facts");
+    assert_eq!(
+        serde_json::from_value::<Vec<serde_json::Value>>(rows)
+            .expect("fact rows")
+            .len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn source_episode_and_facts_survive_when_record_projection_is_skipped() {
+    let (service, db) = make_service().await;
+    let episode = ingest_source(
+        &service,
+        "conversation",
+        "source:records",
+        "Facts:\n- Historical record: {\"date\":\"2026-10-24\",\"duration\":95}\n- Historical record: {\"date\":\"2026-10-29\",\"duration\":30}",
+        "2026-11-01T00:00:00Z",
+    ).await;
+    let facts = db
+        .query(
+            "SELECT fact_id FROM fact WHERE source_episode = $episode",
+            Some(serde_json::json!({"episode": episode})),
+            "org",
+        )
+        .await
+        .expect("read sourced facts");
+    assert_eq!(
+        serde_json::from_value::<Vec<serde_json::Value>>(facts)
+            .expect("facts")
+            .len(),
+        2
+    );
+    assert_eq!(claim_count_for_episode(&db, &episode).await, 0);
+    let episodes = db
+        .query(
+            "SELECT episode_id FROM episode WHERE episode_id = $episode",
+            Some(serde_json::json!({"episode": episode})),
+            "org",
+        )
+        .await
+        .expect("read source episode");
+    assert_eq!(
+        serde_json::from_value::<Vec<serde_json::Value>>(episodes)
+            .expect("episodes")
+            .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn same_subject_conflicting_values_produce_contradiction() {
+    let (service, db) = make_service().await;
+    let time = parse_t_ref("2026-11-01T00:00:00Z");
+    let subject = common::resolve_entity(&service, "person", "Alice Smith")
+        .await
+        .expect("resolve");
+    let first = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Alice Smith reports ARR is $5M.",
+        time,
+        vec![subject.clone()],
+    )
+    .await;
+    let second = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Alice Smith reports ARR is $7M.",
+        time,
+        vec![subject],
+    )
+    .await;
+    let rows = db.query(
+        "SELECT outcome FROM claim_relation WHERE left_fact_id IN $ids AND right_fact_id IN $ids",
+        Some(serde_json::json!({"ids": [first, second]})),
+        "org",
+    ).await.expect("query relations");
+    let relations: Vec<serde_json::Value> = serde_json::from_value(rows).expect("relation rows");
+    assert!(
+        relations.iter().any(|r| r["outcome"] == "contradiction"),
+        "expected real contradiction: {relations:?}"
+    );
+}
+
+#[tokio::test]
+async fn numeric_heading_alone_does_not_establish_single_valued_cardinality() {
+    let (service, db) = make_service().await;
+    let time = parse_t_ref("2026-11-01T00:00:00Z");
+    let first = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Historical session: 95",
+        time,
+        vec!["entity:athlete".into()],
+    )
+    .await;
+    let second = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Historical session: 30",
+        time,
+        vec!["entity:athlete".into()],
+    )
+    .await;
+    let rows = db.query("SELECT outcome FROM claim_relation WHERE left_fact_id IN $ids AND right_fact_id IN $ids", Some(serde_json::json!({"ids": [first, second]})), "org").await.expect("relations");
+    let relations: Vec<serde_json::Value> = serde_json::from_value(rows).expect("rows");
+    assert!(
+        !relations.iter().any(|r| r["outcome"] == "contradiction"),
+        "a number does not prove one value per subject: {relations:?}"
+    );
+}
+
+#[tokio::test]
+async fn named_subject_in_prose_keeps_a_genuine_conflict() {
+    let (service, _) = make_service().await;
+    ingest_source(
+        &service,
+        "chat",
+        "named:first",
+        "Alice Smith reports ARR is $5M.",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+    let id = IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_context: None,
+            source_type: "chat".into(),
+            source_id: "named:second".into(),
+            content: "Alice Smith reports ARR is $7M.".into(),
+            t_ref: parse_t_ref("2026-06-01T00:00:00Z"),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest");
+    let result = ExtractCapability::extract_from_service(&service, &id, None, None)
+        .await
+        .expect("extract");
+    assert!(
+        !result.warnings.is_empty(),
+        "a conflict for the same named subject must remain visible"
+    );
+}
+
+#[tokio::test]
+async fn different_named_subjects_do_not_share_a_claim_slot() {
+    let (service, db) = make_service().await;
+    let first = ingest_source(
+        &service,
+        "chat",
+        "different:first",
+        "Alice Smith reports ARR is $5M.",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+    let id = IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_context: None,
+            source_type: "chat".into(),
+            source_id: "different:second".into(),
+            content: "Bob Jones reports ARR is $7M.".into(),
+            t_ref: parse_t_ref("2026-06-01T00:00:00Z"),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest");
+    let result = ExtractCapability::extract_from_service(&service, &id, None, None)
+        .await
+        .expect("extract");
+    assert!(claim_count_for_episode(&db, &first).await > 0);
+    assert!(claim_count_for_episode(&db, &id).await > 0);
+    assert!(
+        result.warnings.is_empty(),
+        "different subjects must not share a claim slot"
+    );
+}
+
+#[tokio::test]
+async fn a_linked_entity_does_not_make_a_json_blob_a_scalar_claim() {
+    let (service, db) = make_service().await;
+    let fact = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Historical record: {\"date\":\"2026-10-24\",\"min\":95}",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec!["entity:service".into()],
+    )
+    .await;
+    let rows = db.query("SELECT source_fact_id, schema_family, comparison_key FROM claim WHERE source_fact_id = $id", Some(serde_json::json!({"id": fact})), "org").await.expect("query claims");
+    let claims: Vec<serde_json::Value> = serde_json::from_value(rows).expect("claim rows");
+    assert!(
+        claims.is_empty(),
+        "a JSON record is not a scalar assertion: {claims:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_linked_entity_does_not_make_a_prose_heading_a_scalar_claim() {
+    let (service, db) = make_service().await;
+    let fact = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Training summary: completed an easy run in the park",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec!["entity:athlete".into()],
+    )
+    .await;
+    let rows = db
+        .query(
+            "SELECT source_fact_id FROM claim WHERE source_fact_id = $id",
+            Some(serde_json::json!({"id": fact})),
+            "org",
+        )
+        .await
+        .expect("query claims");
+    let claims: Vec<serde_json::Value> = serde_json::from_value(rows).expect("claim rows");
+    assert!(
+        claims.is_empty(),
+        "prose after a heading is not a scalar assertion: {claims:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_prose_heading_starting_with_a_number_is_not_a_scalar_claim() {
+    let (service, db) = make_service().await;
+    let fact = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Training summary: 12 km easy run",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec!["entity:athlete".into()],
+    )
+    .await;
+    let rows = db
+        .query(
+            "SELECT source_fact_id FROM claim WHERE source_fact_id = $id",
+            Some(serde_json::json!({"id": fact})),
+            "org",
+        )
+        .await
+        .expect("query claims");
+    let claims: Vec<serde_json::Value> = serde_json::from_value(rows).expect("claim rows");
+    assert!(
+        claims.is_empty(),
+        "a number does not turn prose into a scalar claim: {claims:?}"
+    );
+}
+
 /// Wait for the fire-and-forget claim projection spawned by `add_fact` to
 /// land at least one row satisfying `poll`. Yields between attempts so the
 /// runtime can drive the spawned task forward.
@@ -130,9 +423,7 @@ where
 async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
     let (service, db_client) = make_service().await;
 
-    // Content matches the metric heuristic ("ARR" + "$5") so `extract_facts`
-    // stores one metric fact, then the fire-and-forget claim projection
-    // parses the "X is Y" sentence via `AttributeV1` and writes one claim.
+    // The statement contains a named subject and a reported metric.
     let ep = ingest_source(
         &service,
         "chat",
@@ -181,19 +472,13 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
 async fn same_value_under_distinct_keys_produces_distinct_claims() {
     let (service, db_client) = make_service().await;
 
-    // The leading `ARR` token trips `is_metric_statement`, so `extract_facts`
-    // stores exactly one metric fact containing all three lines. Claim
-    // projection then calls `parse_assertions` on that content: the `kv`
-    // parser splits `measure_a: 100` and `measure_b: 100` into two
-    // assertions whose predicates (`measure_a`, `measure_b`) are NOT in the
-    // AttributeV1 skip list (`measure`, `unit`, `predicate`, `object`,
-    // `action`, `target`). The two drafts therefore carry distinct
-    // comparison_key hashes.
+    // Two sourced statements with the same subject and value but different
+    // metrics must retain distinct comparison keys.
     let ep = ingest_source(
         &service,
         "chat",
         "src:b",
-        "ARR\nmeasure_a: 100\nmeasure_b: 100",
+        "Facts:\n- Alice Smith reports ARR is $5M.\n- Alice Smith reports MRR is $5M.",
         "2026-06-01T00:00:00Z",
     )
     .await;
@@ -309,6 +594,7 @@ async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
 
     // Same-id/same-content is idempotent by contract: re-extracting the same
     // episode must neither duplicate facts/claims/jobs nor surface an error.
+    let jobs_before = job_count_with_source_fact(&db_client).await;
     ExtractCapability::extract_from_service(&service, &ep, None, None)
         .await
         .expect("repeat extract should succeed");
@@ -319,7 +605,6 @@ async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
         claims_before,
         "claims must not duplicate"
     );
-    let jobs_before = job_count_with_source_fact(&db_client).await;
     assert_eq!(
         job_count_with_source_fact(&db_client).await,
         jobs_before,
@@ -375,7 +660,7 @@ async fn claims_prefer_explicit_episode_lineage_over_versioned_source_id() {
         "episode:fs-rev-1",
         "fs:docs/spec.md:aaaa",
         "fs:docs/spec.md",
-        "Budget is $5M.",
+        "Alice Smith reports ARR is $5M.",
         "2026-06-01T00:00:00Z",
     )
     .await;
@@ -385,7 +670,7 @@ async fn claims_prefer_explicit_episode_lineage_over_versioned_source_id() {
         "episode:fs-rev-2",
         "fs:docs/spec.md:bbbb",
         "fs:docs/spec.md",
-        "Budget is $6M.",
+        "Alice Smith reports ARR is $6M.",
         "2026-06-02T00:00:00Z",
     )
     .await;
@@ -490,4 +775,117 @@ async fn ordinary_episode_uses_source_id_as_claim_lineage_fallback() {
             "ordinary episodes fall back to source_id as lineage, got {lineage:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn explicit_schema_fields_in_text_keep_scalar_claims() {
+    let (service, db) = make_service().await;
+    let subject = common::resolve_entity(&service, "person", "Alice Smith")
+        .await
+        .expect("subject");
+    let fact = common::seed_fact_with_links(
+        &service,
+        "org",
+        "subject: Alice Smith\ndimension: height\nvalue: 180",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec![subject],
+    )
+    .await;
+    let rows = db
+        .query(
+            "SELECT source_fact_id FROM claim WHERE source_fact_id = $id",
+            Some(serde_json::json!({"id": fact})),
+            "org",
+        )
+        .await
+        .expect("claims");
+    let rows: Vec<serde_json::Value> = serde_json::from_value(rows).expect("rows");
+    assert!(
+        !rows.is_empty(),
+        "an explicit schema record must remain projectable"
+    );
+}
+
+#[tokio::test]
+async fn arbitrary_equals_heading_does_not_establish_cardinality() {
+    let (service, db) = make_service().await;
+    let fact = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Historical record = 95",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec!["entity:subject".into()],
+    )
+    .await;
+    let rows = db
+        .query(
+            "SELECT source_fact_id FROM claim WHERE source_fact_id = $id",
+            Some(serde_json::json!({"id": fact})),
+            "org",
+        )
+        .await
+        .expect("claims");
+    assert!(
+        serde_json::from_value::<Vec<serde_json::Value>>(rows)
+            .expect("rows")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn explicit_schema_record_keeps_a_genuine_conflict() {
+    let (service, db) = make_service().await;
+    let subject = common::resolve_entity(&service, "concept", "device")
+        .await
+        .expect("subject");
+    let first = common::seed_fact_with_links(
+        &service,
+        "org",
+        "subject: device\ndimension: state\nvalue: active",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec![subject.clone()],
+    )
+    .await;
+    let second = common::seed_fact_with_links(
+        &service,
+        "org",
+        "subject: device\ndimension: state\nvalue: inactive",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec![subject],
+    )
+    .await;
+    let rows = db.query("SELECT outcome FROM claim_relation WHERE left_fact_id IN $ids AND right_fact_id IN $ids", Some(serde_json::json!({"ids": [first, second]})), "org").await.expect("relations");
+    let rows: Vec<serde_json::Value> = serde_json::from_value(rows).expect("rows");
+    assert!(rows.iter().any(|row| row["outcome"] == "contradiction"));
+}
+
+#[tokio::test]
+async fn compatible_descriptions_do_not_invent_single_valued_attributes() {
+    let (service, db) = make_service().await;
+    let subject = common::resolve_entity(&service, "person", "Alice Smith")
+        .await
+        .expect("subject");
+    let first = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Alice Smith is a runner",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec![subject.clone()],
+    )
+    .await;
+    let second = common::seed_fact_with_links(
+        &service,
+        "org",
+        "Alice Smith is a coach",
+        parse_t_ref("2026-11-01T00:00:00Z"),
+        vec![subject],
+    )
+    .await;
+    let rows = db.query("SELECT outcome FROM claim_relation WHERE left_fact_id IN $ids AND right_fact_id IN $ids", Some(serde_json::json!({"ids": [first, second]})), "org").await.expect("relations");
+    assert!(
+        !serde_json::from_value::<Vec<serde_json::Value>>(rows)
+            .expect("rows")
+            .iter()
+            .any(|row| row["outcome"] == "contradiction")
+    );
 }

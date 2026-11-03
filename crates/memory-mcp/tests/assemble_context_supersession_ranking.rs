@@ -42,7 +42,7 @@ async fn content_query_does_not_rescue_a_successor_without_query_evidence() {
         "episode:rank-1",
         "fs:docs/rank.md:aaaa",
         "fs:docs/rank.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy predecessor",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -52,7 +52,7 @@ async fn content_query_does_not_rescue_a_successor_without_query_evidence() {
         "episode:rank-2",
         "fs:docs/rank.md:bbbb",
         "fs:docs/rank.md",
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -63,13 +63,15 @@ async fn content_query_does_not_rescue_a_successor_without_query_evidence() {
     );
 
     // Under the retrieval admission contract, this content query supports the
-    // predecessor with both terms but the successor with only ARR. A persisted
+    // predecessor with all three terms but the successor with only ARR. A persisted
     // relation may explain the selected fact, but it cannot grant the
     // unsupported successor an admission bypass.
-    let items =
-        AssembleContextCapability::assemble_context_from_service(&service, request("ARR legacy"))
-            .await
-            .expect("context should assemble");
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        request("ARR legacy predecessor"),
+    )
+    .await
+    .expect("context should assemble");
 
     assert_eq!(
         items.len(),
@@ -93,7 +95,7 @@ async fn current_query_returns_only_the_persisted_successor() {
         "episode:current-1",
         "fs:docs/current.md:aaaa",
         "fs:docs/current.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -103,7 +105,7 @@ async fn current_query_returns_only_the_persisted_successor() {
         "episode:current-2",
         "fs:docs/current.md:bbbb",
         "fs:docs/current.md",
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -160,7 +162,7 @@ async fn timeline_keeps_persisted_predecessor_before_its_successor() {
         "episode:timeline-1",
         "fs:docs/timeline.md:aaaa",
         "fs:docs/timeline.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -170,7 +172,7 @@ async fn timeline_keeps_persisted_predecessor_before_its_successor() {
         "episode:timeline-2",
         "fs:docs/timeline.md:bbbb",
         "fs:docs/timeline.md",
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;

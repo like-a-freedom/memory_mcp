@@ -24,7 +24,69 @@ pub(crate) fn project_fact(
     let mut drafts = Vec::new();
     let mut skips = Vec::new();
 
+    // The current schemas project one subject per fact. Do not bind several
+    // independent copular assertions to the first subject.
+    if input.structured_fields.is_empty() && input.content.matches(" is ").count() > 1 {
+        skips.push(ClaimSkip {
+            reason_code: "ambiguous_subject".to_string(),
+        });
+        return Ok(ProjectionResult { drafts, skips });
+    }
+
     registry.project_all(input, &mut drafts, &mut skips)?;
+    // Colon-delimited prose cannot establish scalar attribute cardinality.
+    // Other schemas still evaluate their own supported constructions, so a
+    // URL or timestamp does not suppress a commitment or quantity assertion.
+    if input.structured_fields.is_empty()
+        && super::structural::has_unstructured_colon_value(input.content)
+    {
+        drafts.retain(|draft| {
+            draft.schema_ref.family == crate::models::claim::ClaimSchemaFamily::Commitment
+                && input.fact_type == "promise"
+        });
+        skips.push(ClaimSkip {
+            reason_code: "unstructured_colon_value".to_string(),
+        });
+    }
+
+    if !input.structured_fields.is_empty() {
+        use crate::models::claim::ClaimSchemaFamily;
+        drafts.retain(|draft| match draft.schema_ref.family {
+            ClaimSchemaFamily::Attribute => input.structured_fields.contains_key("dimension"),
+            ClaimSchemaFamily::Quantity => input.structured_fields.contains_key("measure"),
+            ClaimSchemaFamily::Relation => input.structured_fields.contains_key("predicate"),
+            ClaimSchemaFamily::Commitment => input.structured_fields.contains_key("action"),
+        });
+    }
+
+    // The generic attribute schema has no domain cardinality evidence for
+    // free prose ("Alice is a runner" and "Alice is a coach" can coexist).
+    // Only an explicit schema record declares its single-valued dimension.
+    // Quantity/commitment schemas retain their typed assertion contracts.
+    if !input.structured_fields.contains_key("dimension") {
+        let before = drafts.len();
+        drafts.retain(|draft| {
+            draft.schema_ref.family != crate::models::claim::ClaimSchemaFamily::Attribute
+        });
+        if drafts.len() < before {
+            skips.push(ClaimSkip {
+                reason_code: "unknown_cardinality".to_string(),
+            });
+        }
+    }
+
+    // An absent subject cannot identify a comparison slot. Keeping it as an
+    // empty string causes otherwise unrelated facts to reconcile together.
+    drafts.retain(|draft| {
+        if draft.subject.trim().is_empty() {
+            skips.push(ClaimSkip {
+                reason_code: "missing_subject".to_string(),
+            });
+            false
+        } else {
+            true
+        }
+    });
 
     // Deduplicate by canonical payload
     let mut seen = std::collections::BTreeSet::new();
@@ -141,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn project_fact_extracts_from_kv_content() {
+    fn project_fact_skips_unstructured_kv_content() {
         let fp = ExtractorFingerprint::compute(1, "test");
         let registry = ClaimSchemaRegistry::built_in(fp);
 
@@ -149,16 +211,13 @@ mod tests {
         let input = test_input_with_content(fields, "Height: 180 cm");
 
         let result = project_fact(&registry, &input).unwrap();
-        assert!(!result.drafts.is_empty());
-        // Should have attribute draft from kv parsing
-        let attribute_drafts: Vec<_> = result
-            .drafts
-            .iter()
-            .filter(|d| d.schema_ref.family == ClaimSchemaFamily::Attribute)
-            .collect();
-        assert_eq!(attribute_drafts.len(), 1);
-        // Should have source span
-        assert!(attribute_drafts[0].source_span.is_some());
+        assert!(result.drafts.is_empty());
+        assert!(
+            result
+                .skips
+                .iter()
+                .any(|skip| skip.reason_code == "unstructured_colon_value")
+        );
     }
 
     #[test]

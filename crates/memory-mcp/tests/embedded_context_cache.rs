@@ -218,6 +218,7 @@ async fn fact_creation_invalidates_context_warmed_during_claim_projection()
             .with_claim_rollout_stage("evidence")?,
     );
     let now = Utc::now();
+    let subject = common::resolve_entity(&service, "concept", "Temperature").await?;
     let add_service = service.clone();
     let add_fact = tokio::spawn(async move {
         add_service
@@ -228,7 +229,7 @@ async fn fact_creation_invalidates_context_warmed_during_claim_projection()
                 "episode:cache-projection-race",
                 now,
                 0.9,
-                vec![],
+                vec![subject],
                 vec![],
                 Provenance::agent_observation("episode:cache-projection-race"),
             )

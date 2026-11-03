@@ -179,6 +179,9 @@ async fn decay_projection_closes_derived_claims_after_successful_retraction() {
     let (service, db_client) = common::make_service_with_client().await;
     let service = common::exposing_claims(service).expect("evidence-stage service");
     let old_date = Utc::now() - Duration::days(400);
+    let subject = common::resolve_entity(&service, "concept", "Temperature")
+        .await
+        .expect("resolve");
     let fact_id = service
         .add_fact(
             "note",
@@ -187,7 +190,7 @@ async fn decay_projection_closes_derived_claims_after_successful_retraction() {
             "episode:decay_claim_projection",
             old_date,
             0.4,
-            vec![],
+            vec![subject],
             vec![],
             Provenance::manual(),
         )

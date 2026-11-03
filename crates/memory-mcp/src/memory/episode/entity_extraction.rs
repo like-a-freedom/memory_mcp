@@ -31,7 +31,7 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let candidates =
+    let mut candidates =
         match run_ner_extraction(service.entity_extractor.clone(), content, zero_shot_labels).await
         {
             Ok(candidates) => candidates,
@@ -41,6 +41,15 @@ pub async fn extract_entities(
                 return Err(err);
             }
         };
+
+    if let Some(candidate) =
+        crate::knowledge::claims_policy::schema::grammatical_subject_candidate(content)
+        && !candidates.iter().any(|existing| {
+            normalize_text(&existing.canonical_name) == normalize_text(&candidate.canonical_name)
+        })
+    {
+        candidates.push(candidate);
+    }
 
     service.logger.log(
         log_event(
@@ -125,7 +134,10 @@ async fn resolve_and_dedupe(
     provider: &str,
     candidates: Vec<EntityCandidate>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
-    let candidates = dedupe_entity_candidates(candidates);
+    let candidates = dedupe_entity_candidates(candidates)
+        .into_iter()
+        .filter(|candidate| !is_scalar_mention(&candidate.canonical_name))
+        .collect::<Vec<_>>();
     let mut entities = Vec::with_capacity(candidates.len());
     let mut seen_entity_ids = HashSet::new();
 
@@ -168,6 +180,16 @@ async fn resolve_and_dedupe(
     Ok(entities)
 }
 
+/// Dates and percentages are scalar mentions, not evidence of entity identity.
+/// This applies only to automatic extraction; explicit resolution stays intact.
+fn is_scalar_mention(name: &str) -> bool {
+    let name = name.trim();
+    chrono::NaiveDate::parse_from_str(name, "%Y-%m-%d").is_ok()
+        || name
+            .strip_suffix('%')
+            .is_some_and(|number| number.trim().parse::<f64>().is_ok_and(f64::is_finite))
+}
+
 /// Persists one append-only projection row for a successful extraction run.
 ///
 /// The row records the resolved entity ids and the durable extractor
@@ -181,7 +203,11 @@ pub(super) async fn persist_extraction_projection(
     entities: &[ExtractedEntity],
 ) -> Result<(), MemoryError> {
     let ingested_at = crate::shared::temporal::now();
-    let fingerprint = service.entity_extractor.fingerprint();
+    let backend_fingerprint = service.entity_extractor.fingerprint();
+    let fingerprint = crate::knowledge::entity_extraction::ExtractorFingerprint::new(format!(
+        "{}|candidate-policy=scalar-grammar-v1",
+        backend_fingerprint.as_str()
+    ));
     let fingerprint_value = serde_json::to_value(&fingerprint).map_err(|err| {
         MemoryError::Storage(format!("failed to serialize extractor fingerprint: {err}"))
     })?;

@@ -157,7 +157,7 @@ async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
         "episode:budget-1",
         "fs:docs/budget.md:aaaa",
         "fs:docs/budget.md",
-        "ARR is legacy",
+        "subject: ARR; dimension: ARR; value: legacy",
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
@@ -167,7 +167,7 @@ async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
         "episode:budget-2",
         "fs:docs/budget.md:bbbb",
         "fs:docs/budget.md",
-        "ARR is supersedes",
+        "subject: ARR; dimension: ARR; value: supersedes",
         Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
     )
     .await;
@@ -208,19 +208,21 @@ async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
 
     // 1. The stale value does not lead.
     assert_ne!(
-        items[0].content, "ARR is legacy",
+        items[0].content, "subject: ARR; dimension: ARR; value: legacy",
         "the superseded value must not be served first"
     );
 
     // 2. Correction, not retraction: the stale record survives.
     assert!(
-        items.iter().any(|item| item.content == "ARR is legacy"),
+        items
+            .iter()
+            .any(|item| item.content == "subject: ARR; dimension: ARR; value: legacy"),
         "the superseded value remains retrievable for provenance — correction never deletes"
     );
 
     let successor = items
         .iter()
-        .find(|item| item.content == "ARR is supersedes")
+        .find(|item| item.content == "subject: ARR; dimension: ARR; value: supersedes")
         .expect("the corrected counterpart is present");
     assert_eq!(
         successor.provenance["retrieval_admission"]["basis"], "entity",
@@ -230,7 +232,7 @@ async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
     // 3. The stale item explains itself.
     let stale = items
         .iter()
-        .find(|item| item.content == "ARR is legacy")
+        .find(|item| item.content == "subject: ARR; dimension: ARR; value: legacy")
         .expect("stale item present");
     let summary = stale
         .reconciliation

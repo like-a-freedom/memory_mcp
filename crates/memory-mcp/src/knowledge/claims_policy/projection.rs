@@ -78,6 +78,8 @@ pub(crate) struct FactPersistedParams<'a> {
     pub content: &'a str,
     pub policy_tags: &'a [String],
     pub entity_links: &'a [String],
+    /// Names already resolved for linked entities, when available.
+    pub entity_names: Option<&'a std::collections::HashMap<String, (String, Vec<String>)>>,
     pub t_valid: chrono::DateTime<chrono::Utc>,
     /// Stable source-lineage identifier from the episode's source identity.
     /// Populated from the episode `source_id`; `None` means no lineage was
@@ -88,7 +90,7 @@ pub(crate) struct FactPersistedParams<'a> {
 impl ClaimService {
     /// Create a new ClaimService with the built-in registry and default config.
     pub fn new(store: Arc<dyn ClaimStore>) -> Self {
-        let fingerprint = ExtractorFingerprint::compute(1, "builtin");
+        let fingerprint = ExtractorFingerprint::compute(2, "builtin-comparable");
         let registry = Arc::new(ClaimSchemaRegistry::built_in(fingerprint));
         Self {
             store,
@@ -127,23 +129,52 @@ impl ClaimService {
             });
         }
 
-        let structured_fields = std::collections::BTreeMap::new();
+        let structured_fields = super::structural::explicit_schema_fields(params.content);
 
         let assertions =
             crate::knowledge::claims_policy::structural::parse_assertions(params.content);
-        let subject_hint = assertions.first().and_then(|a| a.subject_hint.as_ref());
+        let explicit_subject = structured_fields
+            .get("subject")
+            .map(|subject| crate::models::claim::NormalizedText::new(subject));
+        let subject_hint = explicit_subject
+            .as_ref()
+            .or_else(|| assertions.first().and_then(|a| a.subject_hint.as_ref()));
         let candidates: Vec<crate::knowledge::claims_policy::structural::SubjectCandidate> = params
             .entity_links
             .iter()
             .map(
                 |eid| crate::knowledge::claims_policy::structural::SubjectCandidate {
                     entity_id: eid.clone(),
-                    names: vec![crate::models::claim::NormalizedText::new(eid)],
+                    names: params
+                        .entity_names
+                        .and_then(|names| names.get(eid))
+                        .map_or_else(
+                            || vec![crate::models::claim::NormalizedText::new(eid)],
+                            |(name, aliases)| {
+                                std::iter::once(name)
+                                    .chain(aliases)
+                                    .map(|name| crate::models::claim::NormalizedText::new(name))
+                                    .collect()
+                            },
+                        ),
                 },
             )
             .collect();
+        if !structured_fields.is_empty() && explicit_subject.is_none() {
+            return Ok(FactProjectionSummary {
+                fact_id: params.fact_id.clone(),
+                claims_projected: 0,
+                claims_skipped: 1,
+            });
+        }
         let subject =
             crate::knowledge::claims_policy::structural::resolve_subject(subject_hint, &candidates)
+                .or_else(|_| {
+                    crate::knowledge::claims_policy::structural::resolve_leading_subject(
+                        params.content,
+                        &candidates,
+                    )
+                })
                 .unwrap_or("");
 
         let input = ClaimProjectionInput {
@@ -444,6 +475,9 @@ mod tests {
         ClaimService::new(noop_store())
     }
 
+    static TEST_ENTITY_LINKS: std::sync::LazyLock<Vec<String>> =
+        std::sync::LazyLock::new(|| vec!["temperature".to_string()]);
+
     fn test_params<'a>(fact_id: &'a FactId, content: &'a str) -> FactPersistedParams<'a> {
         FactPersistedParams {
             namespace: "ns",
@@ -452,7 +486,8 @@ mod tests {
             fact_type: "experience",
             content,
             policy_tags: &[],
-            entity_links: &[],
+            entity_links: std::sync::LazyLock::force(&TEST_ENTITY_LINKS),
+            entity_names: None,
             t_valid: chrono::Utc::now(),
             source_lineage: None,
         }
@@ -537,16 +572,19 @@ mod tests {
         let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let svc = ClaimService::new(Arc::new(NoopClaimStore::capturing(captured.clone())));
         let fact_id = FactId::from("fact:span");
-        // Key-value line: the structural parser reports span 0..line.len().
-        let params = test_params(&fact_id, "height: 180");
+        // The structural sentence parser retains the source span.
+        let content = "Temperature is 36.5 celsius";
+        let params = test_params(&fact_id, content);
         let result = svc.after_fact_persisted(&params).await;
         assert!(result.is_ok());
         let summary = result.unwrap();
         assert!(summary.claims_projected > 0);
         let claims = captured.lock().unwrap();
         assert!(
-            claims.iter().any(|c| c.source_span == Some((0, 11))),
-            "expected a persisted claim with source_span (0, 11), got {:?}",
+            claims
+                .iter()
+                .any(|c| c.source_span == Some((0, content.len()))),
+            "expected a persisted claim covering the source, got {:?}",
             claims.iter().map(|c| c.source_span).collect::<Vec<_>>()
         );
     }

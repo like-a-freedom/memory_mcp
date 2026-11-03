@@ -176,6 +176,34 @@ pub async fn extract_facts(
     episode: &Episode,
     entities: &[ExtractedEntity],
 ) -> Result<FactExtractionOutcome, MemoryError> {
+    let fields =
+        crate::knowledge::claims_policy::structural::explicit_schema_fields(&episode.content);
+    if !fields.is_empty() {
+        let fact_type = if fields.contains_key("measure") {
+            FactType::Metric
+        } else if fields.contains_key("action") {
+            FactType::Promise
+        } else {
+            FactType::Experience
+        };
+        let entity_links = entity_links_for_fact_content(&episode.content, entities);
+        let fact = add_extracted_fact(
+            service,
+            episode,
+            fact_type.as_str(),
+            &episode.content,
+            &episode.content,
+            &entity_links,
+            "explicit_schema_record",
+        )
+        .await?;
+        return Ok(FactExtractionOutcome {
+            facts: vec![fact],
+            note_fallback_used: false,
+            structured_line_fact_count: 1,
+        });
+    }
+
     let structured_candidates = structured_summary_fact_candidates(&episode.content);
     if !structured_candidates.is_empty() {
         log_extraction_decision(
@@ -305,6 +333,23 @@ async fn fact_content_from_record(
         .and_then(|record| fact_from_value_or_wrapper(&Value::Object(record)))
 }
 
+async fn cached_fact_content(
+    service: &ExtractDeps,
+    fact_id: &str,
+    cache: &mut std::collections::HashMap<String, String>,
+) -> String {
+    if let Some(content) = cache.get(fact_id) {
+        return content.clone();
+    }
+    let Some(fact) = fact_content_from_record(service, fact_id).await else {
+        // Preserve the existing best-effort retry on a failed or missing read.
+        return String::new();
+    };
+    let content = fact.content;
+    cache.insert(fact_id.to_string(), content.clone());
+    content
+}
+
 /// Query claim relations for active contradictions involving the extracted facts.
 async fn claim_based_contradiction_warnings(
     service: &ExtractDeps,
@@ -319,6 +364,7 @@ async fn claim_based_contradiction_warnings(
     }
     let relations = claim_relations_for_facts(service, &fact_ids).await?;
     let mut warnings = Vec::new();
+    let mut fact_contents = std::collections::HashMap::new();
     for rel in &relations {
         if rel.outcome != ClaimRelationOutcome::Contradiction {
             continue;
@@ -358,16 +404,9 @@ async fn claim_based_contradiction_warnings(
             .map(|f| f.fact_type.clone())
             .unwrap_or_default();
         // Load both fact records to read their content.
-        let current_record = fact_content_from_record(service, current_fact_id).await;
-        let new_content = current_record
-            .as_ref()
-            .map(|f| f.content.clone())
-            .unwrap_or_default();
-        let counterpart = fact_content_from_record(service, counterpart_id).await;
-        let counterpart_content = counterpart
-            .as_ref()
-            .map(|f| f.content.clone())
-            .unwrap_or_default();
+        let new_content = cached_fact_content(service, current_fact_id, &mut fact_contents).await;
+        let counterpart_content =
+            cached_fact_content(service, counterpart_id, &mut fact_contents).await;
         warnings.push(ContradictionWarning {
             fact_type,
             new_fact_id: current_fact_id.to_string(),
