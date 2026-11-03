@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.37.1] - 2026-11-03
+
+### Fixed
+- Prevented unrelated free-text records and ambiguous subjects from producing false contradictions.
+- Preserved genuine conflict warnings while reducing repeated fact reads during extraction.
+- Prevented dates, percentages and unresolved grammatical subjects from being promoted as automatic entity identities.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added
@@ -43,6 +50,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.37.1]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.0...v1.37.1
 [1.37.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.36.0...v1.37.0
 [1.36.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.35.0...v1.36.0
 [1.35.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.34.2...v1.35.0
