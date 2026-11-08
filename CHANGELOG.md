@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.38.0] - 2026-11-09
+
+### Other
+- Updated workspace Rust dependencies to the latest crates.io releases (`rmcp` 3.9, `lopdf` 0.47, `zip` 9.4, `notify` 8.2.2, `uuid` 1.29.1 and the transitive tree).
+- `surrealdb` deliberately stays on 3.x: 4.0.0 removed the `kv-rocksdb` storage engine behind the documented `rocksdb://` connection URLs, and upgrading it requires a storage-migration decision.
+
 ## [1.37.2] - 2026-11-03
 
 ### Fixed
