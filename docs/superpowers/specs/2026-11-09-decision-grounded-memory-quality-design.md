@@ -1,90 +1,72 @@
-# Decision-grounded evaluation of current memory and retention
+# Evidence-grounded current memory, conflict decisions, and retention
 
 - **Date:** 2026-11-09
-- **Status:** Proposed design; evaluation first, product policy changes conditional
-- **Baseline:** `3622ceb3` (`v1.38.0`)
-- **Scope:** Claim/currency read behavior and lifecycle decay/archival decisions on the existing eight-tool surface
+- **Status:** Revised proposed design; product policies are conditional on measured outcomes
+- **Baseline inspected:** `3622ceb3` (`v1.38.0`)
+- **Scope:** Memory formation evidence, temporal/currency reads, and retention decisions
 
-## Intent
+## Decision problem
 
-Measure whether the system supplies the right evidence and answer for a query at a given valid-time and transaction-time cutoff, including after memory is superseded, contradicted, decayed, or archived. Use the measurement to decide whether a typed retention policy is justified. Do not infer memory quality from the number of stored facts, relation accuracy alone, or a benchmark's self-reported consolidation score.
+For a query, return evidence that supports the answer the caller could have known at a specified time. Preserve source episodes and explain why a fact is current, disputed, missing, or withheld. Retention is beneficial only when it reduces cost/noise without losing future decision value. These questions share a source-grounded eval corpus, so they belong in one spec; the external [LongMemEval-V2 run](2026-11-09-longmemeval-v2-official-run-design.md) has a separate protocol.
 
-This combines two improvements because the same query outcomes test both: conflict/version selection determines **which** memory is current, while retention determines **whether** that evidence is still available. A separate LongMemEval-V2 specification covers the external benchmark and reader protocol; this specification defines the internal decision-quality contract and ablations.
+The [original review](2026-11-09-agent-memory-review-evidence-ledger.md) suggested a `conflicts` tool, typed decay and an archived-then-needed scenario. Current code already has versioned claim relations ([ADR-0010](../../adr/0010-persist-versioned-claim-relations.md)) and a connected relation read path ([ADR-0074](../../adr/0074-connect-the-reconciliation-relation-to-the-read-path.md)); default rollout remains `Shadow` in [claims config](../../../crates/memory-mcp/src/config/claims.rs). These are building blocks, not proof that every user intent is satisfied. The present design allows a breaking interface or new tool after a demonstrated capability gap and the required ADR.
 
-## Verified baseline and research
+Three baseline facts change the experiment. The public [retrieval pipeline](../../../crates/memory-mcp/src/memory/retrieval/pipeline.rs) takes one `as_of` and uses it for both validity and ingestion visibility; [fact filtering](../../../crates/memory-mcp/src/memory/retrieval/filtering.rs) and [episode fallback SQL](../../../crates/memory-mcp/src/memory/queries.rs) apply the same cutoff to `t_valid/t_ref` and `t_ingested`. That does not expose independent `valid_at` and `known_at` views. Worse, the public [ingest parameters](../../../crates/memory-mcp/src/tools/params.rs) accept caller-supplied `t_ingested`; [tool parsing](../../../crates/memory-mcp/src/tools/ingest.rs) silently discards an invalid value, and [episode storage](../../../crates/memory-mcp/src/memory/ingestion.rs) accepts a valid override. Thus current `t_ingested` is not necessarily a server-verified transaction timestamp. Finally, [archival](../../../crates/memory-mcp/src/memory/lifecycle_workers/archival.rs) marks old episodes without active facts as `archived`, while the inspected episode fallback query does not filter that status. An “archived episode was forgotten” case cannot be assumed to exercise a loss path. Map every read path before scoring archival.
 
-| Observation | Design implication |
-| --- | --- |
-| [ADR-0010](../../adr/0010-persist-versioned-claim-relations.md) already defines durable, versioned `Duplicate`, `Supersession`, `Correction`, `Contradiction`, and `TemporalAmbiguity` relations. [ADR-0074](../../adr/0074-connect-the-reconciliation-relation-to-the-read-path.md) connects relations to retrieval. | No parallel `Belief` object, new relation vocabulary, or new `conflicts` MCP tool. |
-| [`ClaimRolloutStage`](../../../crates/memory-mcp/src/config/claims.rs) defaults to `Shadow`; the read path exposes relation evidence only in `Evidence` stage. [`project_current_candidates`](../../../crates/memory-mcp/src/memory/retrieval/currency.rs) suppresses known predecessors for Current intent and can return `currency_unknown`. | Compare shadow and evidence on identical data; test safe uncertainty, not just relation creation. |
-| [`run_decay_pass`](../../../crates/memory-mcp/src/memory/lifecycle_workers/decay.rs) uses one `half_life_days`, `access_count`/`last_accessed` heat, and retracts facts with derived claims. [`archival`](../../../crates/memory-mcp/src/memory/lifecycle_workers/archival.rs) can archive old episodes when no active facts remain. | Replay retention decisions with future query utility; access is a retrieval count, not proof of usefulness. |
-| [ADR-0076](../../adr/0076-route-retrieval-by-intent-and-type-memory-by-retention-class.md) chooses the existing `FactType` axis (`Note`, `Decision`, `Metric`, `Promise`, `Experience`) for any typed policy. | No second taxonomy or learned volatility prior without evidence. |
-| The [Epistemics of Agent Memory paper](https://arxiv.org/html/2609.33013) reports that its consolidation-quality score does not predict transfer accuracy in its measured panel (pooled Spearman ρ = −0.24, n = 12, confidence interval spans zero). | Use downstream query/answer outcomes and keep governance measures separate; do not import its score as an acceptance gate. |
+## Research that transfers, and what does not
 
-The historical [2026-10-05 memory-quality review](2026-10-05-memory-quality-evidence-review.md) was written against v1.26.1 and contains later revision notes. Its old “relation invisible to retrieval” diagnosis is no longer the v1.38.0 baseline. Current code and accepted ADRs take precedence.
+- [SodaMem](https://arxiv.org/abs/2608.08055) supports source-span grounding and separating mention, occurrence and validity time; its 92.8% LongMemEval-S is best of three runs with a shared reader/judge and does not establish a comparable local target.
+- [Complementary Curation and Consolidation](https://arxiv.org/abs/2610.39790) supports keeping episodic and relational evidence together. Its consolidation ablation keeps performance roughly stable while compressing; it does not show that consolidation itself raises answer accuracy.
+- [RoMem](https://arxiv.org/abs/2604.11544) learns temporal relation behavior using graph embeddings. Its ICEWS MRR is a link-prediction result, not evidence that a fixed per-`FactType` half-life improves this product.
+- [The Epistemics of Agent Memory](https://arxiv.org/abs/2609.33013) reports that its consolidation score failed to predict external transfer in a twelve-policy panel. Governance and downstream answer quality need separate measures.
+- [Dual-Layer](https://arxiv.org/abs/2608.22215) defines marginal write utility relative to a particular reader's zero-shot answer; its learned gate and SFT write-back do not give a cheap, model-independent admission rule. [Hippocam](https://arxiv.org/abs/2610.12124) does report benchmark and ablation numbers, contrary to the review, but requires agent intent/outcome context and additional models absent from a standalone memory server.
 
-## Goals and boundaries
+## Approaches and decision
 
-**Goals**
-
-1. Establish a reproducible, leakage-resistant internal eval with fixed historical cutoffs and future queries, covering current value, change history, contradiction, uncertainty, procedural experience, and retrieval after decay/archival.
-2. Report retrieval evidence, answer correctness, freshness/temporal correctness, abstention, latency and tokens separately. Keep per-case provenance and failure classification.
-3. Compare current behavior with an identical-data no-decay counterfactual and a candidate policy based only on existing `FactType`, before any policy change.
-4. Make conflict evidence decision-ready through existing retrieval responses where it demonstrably improves answers, with no eighth-tool-surface expansion.
-
-**Non-goals:** A new MCP tool, auto-resolution of contested claims, an LLM that rewrites primary memory, physical erase, a new fact taxonomy, trained retention, or claim-confidence probabilities. A relation is evidence, not automatic authority to invalidate a source. This work does not promote `Evidence` rollout merely because relation precision is high.
-
-## Evaluation design
-
-### 1. Fixed corpus and truth labels
-
-Construct a versioned corpus from existing pinned eval fixtures plus targeted new scenarios. Each case includes source episodes, ingest order, `t_ref`, `t_ingested`, query time and transaction cutoff, expected evidence IDs, answer or permitted abstention, and reason for the label. Include positive and adversarial pairs: a current successor vs an old predecessor, two genuinely conflicting live sources, temporal ambiguity, a missing or cyclic successor chain, an invalidated claim, identical-content duplicates, an archived episode needed later, a durable preference/experience, and a noisy short-lived metric. Labelers see source evidence but not candidate outputs. Hold out a slice for the final policy comparison; pre-register cases and scoring before running that slice.
-
-For retention, replay only evidence that was available at each decision time. Future queries are labels, never input to the policy. Feed `access_count` and `last_accessed` only from a separately recorded, chronological **pre-decision** retrieval workload. If no such history exists, mark the case as cold rather than inventing accesses. Scored future queries run against isolated snapshots or read-only probes whose access counters cannot affect later policy decisions. Use isolated stores or controlled adapters, not mutation of live personal/SaaS data. Preserve the distinction between valid time and ingested time; a late-arriving correction must not appear in an earlier transaction-time answer. Record corpus license and privacy handling for any non-synthetic source.
-
-### 2. Compared arms
-
-| Arm | Purpose |
-| --- | --- |
-| Incumbent | Current rollout stage, retrieval and lifecycle settings, fixed at baseline commit/config. |
-| No decay/archival counterfactual | Upper bound on availability, with added storage/context cost measured. It is not the proposed shipping policy. |
-| Evidence-stage relation read | Same writes/data, relation evidence visible to Current intent, with no other retrieval changes. |
-| Candidate `FactType` retention | Shadow policy over `Note`, `Decision`, `Metric`, `Promise`, `Experience`; use only if previous arms show a material retention failure. |
-
-Keep embedding model, extraction model/config, reader, token budget, query set, cutoffs, hardware class, and random seeds fixed within a comparison. Compare relation-read stages first with retention fixed at the incumbent. Select the read stage for the next experiment based on that gate; then compare incumbent, no-decay, and `FactType` retention with the selected read stage fixed. An optional interaction arm can follow, but cannot replace these controlled contrasts. If a dependency is nondeterministic, save outputs and report variance over repeated runs rather than attributing noise to the policy. The baseline arm must be runnable from a pinned artifact.
-
-### 3. Measures and gates
-
-Per case, record whether the answer used the gold current source, a stale predecessor, both sides of a true live contradiction, or no supported evidence; whether it answered correctly or abstained; whether a necessary item was removed by decay/archival; and retrieval/reader latency and context tokens. **Primary outcome:** source-supported answer correctness, with appropriate abstention counted correct when the case has no answerable evidence. Evidence availability is a diagnostic and a safety constraint, not a substitute for the answer outcome. Aggregate by query intent, `FactType`, relation outcome, age bucket, and profile. Report denominators and confidence intervals; surface every hard regression as a case ID with source evidence.
-
-Use two gate layers:
-
-- **Safety invariants:** zero known predecessor presented as the sole current truth when a valid successor is visible at the cutoff; zero future-ingested evidence in a past transaction-time answer; zero fabricated conflict resolution; zero silent data loss from a failed replay. Curated adversarial cases must pass individually.
-- **Comparative gate:** a proposed relation-read or retention change must improve the pre-registered downstream answer/availability objective on the held-out slice without a material regression in temporal correctness, abstention, latency, token budget, or another `FactType` stratum. Decide the numeric materiality thresholds from the measured incumbent distribution **before** inspecting the held-out results, and publish them in the run profile. If the sample is too small to distinguish improvement from noise, the decision is “insufficient evidence,” not promotion.
-
-Do not use `claim_precision`/`claim_recall` alone as gates for answer quality. Reconcile the documented metrics in [`CLAIM_RECONCILIATION.md`](../../evals/CLAIM_RECONCILIATION.md) against executable metrics before referring to any threshold as implemented.
-
-## Conditional product behavior
-
-If the relation-read arm clears the gate, keep the existing `assemble_context`/`explain` family as the output surface. Return a concise, source-linked indication that a current candidate supersedes an older one, that live sources conflict, or that currency is unknown; distinguish these states from `t_invalid` and from a low ranking score. Do not create a new `contested` database status unless the existing relation model cannot express the necessary answer and that gap is demonstrated. A correction/retraction decision remains an explicit owner use case, audited and bi-temporal. Promotion from `Shadow` to `Evidence` is staged and reversible by config.
-
-If retention experiments show a gain, implement one versioned, deterministic policy over existing `FactType` in the owning context. Record policy version and decision reason for each shadow pass and actual retraction so a replay can explain which policy would have kept or removed a fact. Preserve source episodes and the bi-temporal audit trail. Do not derive usefulness from `access_count` alone; it counts retrieval events, not successful use. If the evidence is equivocal, keep the scalar half-life and ship the eval only.
-
-## Alternatives considered
-
-| Approach | Decision | Reason |
+| Approach | Trade-off | Decision |
 | --- | --- | --- |
-| Add `conflicts` as a ninth MCP tool | Reject for this scope | The eight-tool surface is frozen; current relation/read mechanisms already cover much of the need. A new tool needs a separate ADR and demonstrated gap. |
-| Per-predicate volatility or learned priors now | Defer | No validated outcome traces, versioning, or comparative benefit yet. `FactType` is the accepted policy axis. |
-| Adopt a published consolidation score as product metric | Reject | The cited study explicitly did not find transfer prediction. |
-| Treat “no decay” as the final policy | Reject | It reveals false forgetting but omits cost and stale-noise tradeoffs. |
+| Tune existing relation stage and scalar decay directly | Fast, but one-cutoff and caller-supplied transaction times make a historical quality claim unsound; archive may have no retrieval effect. | Reject as a promotion basis. |
+| Establish source-grounded evaluation and true valid/known-time semantics, then promote only measured behavior | Requires API/storage compatibility work and a fixed reader, but tests the actual decision outcome and exposes regressions. | **Choose.** |
+| Replace current representation with a learned temporal graph or model-written memory | May help on other tasks, but changes cost, provenance and failure modes before a local baseline exists. | Keep as a later experimental arm. |
 
-## Acceptance and sequence
+The anti-goals are a new metric that merely rewards its own labels, silent conflict resolution, and irreversible forgetting justified by access counts alone. The builder may choose a compatible wire shape and migration sequence, but must preserve the observable time and evidence semantics below. No current implementation is assumed sufficient simply because an ADR accepted it.
 
-1. Pin corpus, labels, profiles, cutoffs, reader and replay protocol. Show no leakage from future episodes or labels into policy/query inputs.
-2. Run incumbent and no-decay arms; publish per-case failures and cost/latency. Confirm that the archival scenario actually traverses the real archival/retrieval path.
-3. Run relation-read arm with the same data and demonstrate source-linked current/conflict/unknown responses in integration tests. Decide whether rollout promotion is warranted.
-4. Only if the retention signal is clear, run a shadow `FactType` policy and review the held-out results. A proposed production policy needs independent integration tests for retraction of facts and derived claims, restart/replay idempotence, and historical cutoffs.
-5. Publish an evaluation artifact with version hashes, case manifest, denominators, failures, variance/intervals, and the promotion decision. A smoke slice is labelled smoke, never external benchmark proof.
+## Product and evaluation contracts
 
-Before any product change ships, use the repository's narrow tests and required workspace clippy gate. This specification itself changes no policy or stored data.
+### 1. Two temporal axes and source traceability
+
+Represent the question “what was valid at `valid_at`, as known at `known_at`?” explicitly. `valid_at` selects event-world validity; `known_at` selects what had been committed and which corrections/invalidation decisions existed then. Neither may silently default to the other. Define default current view as both axes at the same captured request time, and preserve a compatibility interpretation for existing `as_of` callers during migration. A late-arriving correction dated before `valid_at` is invisible when `known_at` precedes its commit; a later invalidation must not retroactively erase the earlier knowledge snapshot. Apply both axes consistently to facts, episodes, claim relations, graph expansion, ranking, cache keys and provenance.
+
+Ordinary agent-facing writes and later derived writes must get transaction order from a server-owned, monotonic revision in the **active tenant/store**, assigned in atomic commit-visibility order, never by a caller or a pre-commit reservation. A failed/stalled writer cannot create a visible revision gap that lets a later commit appear earlier. Store a timestamp for human use and define a stable timestamp-to-committed-revision mapping: same-timestamp events are included together by a time-only query, while an explicit revision selects an exact boundary; backward wall-clock jumps cannot reorder commits. Resolve `known_at` to that committed snapshot. An explicit historical import/replay mode may carry a separate **claimed observation/ingest time** for source chronology, but it cannot impersonate actual commit order; it needs operator authority and audit provenance. A deterministic replay records how its ordered source events mapped to assigned revisions, not backdated transaction timestamps. Reject malformed submitted timestamps rather than silently replacing them. Existing rows with caller-supplied `t_ingested` have uncertain transaction provenance: audit and label them; do not retroactively claim a reliable `known_at` for them. Historical ranking must also use access/heat state as of `known_at` or explicitly exclude post-cutoff heat. The current [retrieval path](../../../crates/memory-mcp/src/memory/retrieval.rs) records fact accesses and [ranking](../../../crates/memory-mcp/src/memory/retrieval/ranking.rs) consumes access counts; a later query must not change an earlier snapshot's answer. If stored relation or access events lack enough transaction history to reconstruct a snapshot, document the limitation and add the minimal versioned record or read policy before claiming full bi-temporal replay. This is a justified potential public API and storage break, subject to an ADR/migration review at implementation.
+
+Keep raw episodes accessible as the recoverable evidence layer. Extracted facts and summaries must carry source episode and a verifiable span/quote or an explicit unsupported/derived marker. A source quote alone is not proof of entailment: evaluate literal anchoring and semantic support separately. A separate, presently untracked 2026-11-02 extract-quality-and-cost proposal may own extraction mechanics if adopted; this spec owns the downstream evidence contract and must not silently depend on that proposal being implemented.
+
+### 2. Conflict and current-value behavior
+
+Treat `Duplicate`, `Supersession`, `Correction`, `Contradiction` and `TemporalAmbiguity` as evidence with provenance, time and review state. A current-value query should show a supported live successor, or clearly say that live sources disagree or currency is unknown. Do not turn a model-scored relation into an automatic invalidation or a fabricated “winner.” A reviewed owner decision, if needed, is a durable event referencing the competing evidence and the deciding principal; it is superseded/reversed when source evidence changes, not overwritten invisibly.
+
+Test distinct user intents: “what is current?”, “what changed?”, “why?”, and “list unresolved conflicts I can review.” Map each to actual `assemble_context`/`explain` outputs and call counts. If existing tools can return a complete, bounded, access-scoped review queue, use them. If they cannot, specify a purpose-built review capability and seek the required ADR for a ninth tool or an explicit redesign of the eight-tool surface. Tool-count freeze is a governance gate, not a reason to hide an unmet user task. A `contested` storage status is only justified if relations plus reviewed decisions cannot express required behavior.
+
+### 3. Retention and archive behavior
+
+First establish what decay and archival actually change: source availability, fact visibility, context rank, disk bytes, query latency, or merely a status field. Measure each independently. The current [decay worker](../../../crates/memory-mcp/src/memory/lifecycle_workers/decay.rs) uses one half-life and access heat, retracting facts and derived claims; access counts are not evidence of answer utility. The current archival worker marks episodes without active facts; inspected fallback SQL still selects archived episodes. Do not attribute a missed answer to archival until a traced query proves it.
+
+Compare the incumbent, no-decay, no-archival, and combined counterfactuals where those switches change behavior. A candidate policy may use `FactType` ([ADR-0076](../../adr/0076-route-retrieval-by-intent-and-type-memory-by-retention-class.md)) as a first stratification, but the five broad types are not a sufficient volatility model by assumption: “born in Moscow” and “lives in Moscow” can share a type but have different change rates. Test predicate/time/source-specific features only after a stable baseline and enough labelled transitions. A policy must be versioned, replayable, and reversible; it must preserve audit history and state why each item was retained or retracted. Keep separate storage, latency, context-cost and missed-future-answer objectives rather than optimizing a single scalar score.
+
+### 4. Leakage-resistant experiment
+
+Build a versioned corpus of source episodes, ordered ingest events, valid/known-time queries, access principals, gold evidence spans, answer/abstention labels and rationale. Include corrections arriving late, two simultaneously live contradictory sources, duplicate versions, missing/cyclic successor chains, invalidations, procedural outcomes, durable preferences, volatile metrics and actual decay losses. An archival scenario is a characterization case until a real exclusion/compaction effect is shown. Use real storage integration tests for query/transaction semantics and controlled adapters for policy faults; no live personal/SaaS store is mutated.
+
+Freeze labels, query set, reader and judge versions, model settings, token budget, clock, seeds and hardware class before comparing arms. The server produces context, not final prose answers: use one fixed external reader for answer scoring, retain its prompt/output, and score evidence retrieval separately so reader failure is distinguishable from memory failure. Use held-out source histories and future queries; never feed future queries, gold answers or post-decision access counts to a retention policy. Replay chronological pre-decision retrieval only; score future queries on isolated snapshots or with read-side heat writes disabled so measurement cannot heat the next policy decision. Test that a post-cutoff query does not change a historical ranking. Report paired case outcomes, confidence intervals or variance, latency, bytes and context tokens with denominators.
+
+Hard invariants: no evidence committed after `known_at`, no invalidation applied before its transaction event, no known predecessor as sole current truth when an authorized successor is visible, no invented conflict decision, and no silent data loss on retry. Comparative promotion requires a preregistered, material downstream improvement without unacceptable regressions in temporal correctness, abstention, cost, latency or important strata. A small/noisy result is “insufficient evidence.” `claim_precision`/`claim_recall` remain diagnostics; reconcile the [documented claim metrics](../../evals/CLAIM_RECONCILIATION.md) with executable scoring before using them as gates.
+
+## Sequence and acceptance
+
+1. Publish the source-to-answer path inventory, including archived-status behavior, caller-controlled `t_ingested`, legacy timestamp provenance and which relation events have transaction history. Establish the current API's temporal limits with an integration test.
+2. Freeze the corpus, reader/judge protocol and decision thresholds. Run the incumbent with failure attribution for extraction, retrieval, relation projection and reader.
+3. Implement and test independent `valid_at`/`known_at` semantics before claiming historical decision quality. Cover overlapping writers where one stalls/aborts after preparing a revision and another commits, tied/backward clock timestamps, restart, and replay-to-revision mapping. Compare relation-read stages on identical writes/data. Demonstrate current, history, conflict and unknown behavior with source-linked responses.
+4. Run retention counterfactuals only for mechanisms with a measured product effect. Promote a typed/predicate policy only after held-out improvement, replayability, resource gates and integration tests for derived claims/restarts.
+5. Decide the review-queue interface from an observable task test. Any new MCP tool, migration or dependency change requires the repository's ADR/approval process. Before shipping code, run targeted tests and the required workspace clippy gate.
+
+Publish a manifest with commits, model signatures, case IDs, exclusions, per-case traces and a promotion/rejection decision. This document does not claim that an eval or product change has run.

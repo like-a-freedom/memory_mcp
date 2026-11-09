@@ -1,80 +1,41 @@
-# Ingestion source authority and secret-safe persistence
+# Explicit ingestion authority and safe evidence handling
 
 - **Date:** 2026-11-09
-- **Status:** Proposed design; no implementation authorized by this document
-- **Baseline:** `3622ceb3` (`v1.38.0`)
-- **Scope:** Existing `ingest` capability in local and Streamable HTTP profiles; no new MCP tool
+- **Status:** Revised proposal; no product change in this document
+- **Baseline inspected:** `3622ceb3` (`v1.38.0`)
+- **Decision:** A breaking change to agent-facing path/URL auto-detection is justified
 
-## Intent and evidence
+## Problem and evidence
 
-An `ingest` caller submits `content`, but the server currently decides whether that string is inline text, an existing file, an existing directory, or an HTTP(S) URL. The decision can initiate file or network I/O before the prepared request is validated. The same service is used under different trust assumptions. Define source authority at the composition boundary, so the server never infers permission to read local files or fetch URLs merely from untrusted content.
+`ingest.content` currently doubles as memory data and an instruction to read a server file, directory, or URL. [`prepare_ingest_request`](../../../crates/memory-mcp/src/memory/content_extraction.rs) checks path existence, reads paths, and fetches HTTP(S) before the request is validated. The HTTP fetcher already validates public DNS, pins addresses, disables proxies/redirects, and bounds response size and time; these controls do not authorize the fetch itself. [Inline `extract`](../../../crates/memory-mcp/src/tools/extract.rs) also creates an episode via the same ingestion capability. A local stdio MCP caller is still an agent-controlled caller: a prompt-injected agent can submit a path it could not otherwise read through its tools. A trusted operator and an agent running on the operator's machine are different principals.
 
-This is a trust-boundary design, not a claim that an SSRF exploit has been demonstrated. The URL fetcher already validates public addresses, pins the resolved address, disables proxies and redirects, and limits time and response size. Those protections remain useful when URL import is explicitly authorized. Connection strings that are not HTTP(S) currently fall through as inline text; they are a possible secret-persistence problem, not evidence of an attempted database connection.
+Raw `source_id` crosses two logging layers: [`tools::ingest`](../../../crates/memory-mcp/src/tools/ingest.rs) emits it at start/success/error, and [`IngestionService`](../../../crates/memory-mcp/src/memory/ingestion.rs) logs it by default. Parser/fetch errors and invalid `t_ref` can echo raw input. [`tools::assemble_context`](../../../crates/memory-mcp/src/tools/assemble_context.rs) logs the raw query. Reviewing only the storage seam would leave the disclosure path open. The [agent-memory security survey](https://arxiv.org/abs/2604.16548) distinguishes write authority, provenance, scoped retrieval and verified forgetting; this design addresses write authority and diagnostic leakage, not all four.
 
-| Evidence | Consequence |
-| --- | --- |
-| [`detect_ingest_transport` and `prepare_ingest_request`](../../../crates/memory-mcp/src/memory/content_extraction.rs) check `Path::exists()` and may read a file/directory, then consider HTTP(S). | Source selection and authority need separate decisions. |
-| [`IngestionService::ingest_with_metadata`](../../../crates/memory-mcp/src/memory/ingestion.rs) calls preparation before `validate_ingest_request` and logs the caller's `source_id` by default. | Validate and redact before I/O or logs; do not put raw identifiers in errors. |
-| [`CapturePolicy`](../../../crates/memory-mcp/src/memory/agent_memory/policy.rs) already has a secret-like-content rule for lifecycle capture. | Reuse its intent and tests where applicable, but verify its false-positive behavior before applying it to generic ingest. |
-| [OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) distinguishes trusted-destination and arbitrary-external cases, recommends constrained protocols, validated destinations and redirect control. | Preserve the existing network controls even behind an authority gate. |
-| [cognee v1.6.7](https://github.com/topoteretes/cognee/releases/tag/v1.6.7) rejects raw connection strings and unsafe paths by default. | Useful prior art, not a drop-in policy for this project's local and SaaS profiles. |
+[cognee v1.6.7](https://github.com/topoteretes/cognee/releases/tag/v1.6.7) is supporting prior art for refusing unsafe path/connection inputs by default. Its exact policy is not evidence that our current code has an exploitable SSRF. [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) supports destination validation for any authorized URL import.
 
-## Goals, non-goals, constraints
+## Approaches and decision
 
-**Goals**
-
-1. In the HTTP SaaS profile, an untrusted `content` value cannot cause server-side file, directory, or URL reads without a separate, explicit, authorized import path.
-2. Generic ingestion cannot persist recognized credentials or echo them in logs and errors. The policy reports an actionable refusal reason without returning the secret.
-3. Local single-user ingestion keeps a deliberate route for importing local files and public URLs; existing legitimate use cases have a documented migration path.
-4. Maintain deterministic episode identity, provenance, bi-temporal timestamps, tenant isolation, and the existing eight-tool surface.
-
-**Non-goals:** DLP for arbitrary secrets, prompt-injection classification, malware scanning, a new connector framework, a new MCP tool, or physical deletion of previously stored content. An inferred secret is not silently rewritten inside an episode or extracted fact; silent redaction would change evidence.
-
-**Constraints:** Use a context-local ingestion use case with narrow policy input. Keep transport handlers thin. Do not change dependencies, migrations, generated code, or the public tool count as a by-product of this design. If a public request schema change or a new tool becomes necessary, stop for the repository's ADR/approval gate.
-
-## Chosen design
-
-### 1. Separate representation from authority
-
-The composition root supplies an immutable `IngestSourcePolicy` (name illustrative), not a caller-controlled flag. Its decision distinguishes `inline`, `local_file`, `local_directory`, and `remote_url` and is evaluated **before** any source I/O. The service must not equate a syntactically recognizable path or URL with permission to import it.
-
-| Profile / entry point | Default meaning of `content` | Authorized import route |
+| Approach | Trade-off | Decision |
 | --- | --- | --- |
-| Streamable HTTP MCP and control-plane clients | Literal inline content only. Existing path strings and URL strings stay literal unless rejected by secret policy. | A future import operation requires explicit authority and its own review; this spec does not add one. |
-| Local stdio MCP and `memory_mcp ingest` CLI | Preserve the current path/URL convenience for the trusted single-user profile during migration, but make it a documented profile policy rather than an emergent parser rule. | Local profile policy explicitly enables path/URL import. A later compatibility change may move this behind explicit CLI intent after usage is measured. |
-| Filesystem watcher | Its configured inbox only. | Keep the watcher containment and symlink rules; do not route it through generic unrestricted path detection. |
+| Keep auto-detection with path/URL filters | Least migration, but content still selects a privileged action and every parser/fetch path needs defense. | Reject. |
+| Literal agent content plus a bounded operator import route | Breaks local convenience and needs a migration, but gives the write boundary one comprehensible meaning. | **Choose.** |
+| Give agents a separate import MCP tool | Could serve a future agent workflow, but requires independent authorization, user intent and an ADR. | Defer until that workflow is demonstrated. |
 
-The exact internal type and constructor are builder choices. The observable contract is fixed: an HTTP caller cannot change source authority via `source_type`, `source_id`, `policy_tags`, content spelling, or MCP access fields. The local policy is selected at startup. Existing URL validation remains a second line of defense when local URL import is enabled. The builder must trace every HTTP and local construction path to prove the intended policy reaches the ingestion use case.
+Success means an agent-supplied string cannot initiate an unauthorized server read, and diagnostics cannot disclose the string or its identifiers. The anti-goals are silent evidence rewriting, a superficial regex-only security claim, or a CLI flag presented as proof of human authorization. The builder chooses internal types and platform-specific safe-open mechanics within the observable contract below.
 
-### 2. Validate before side effects and persistence
+## Contract
 
-Order the work as: rate/access check → cheap request-shape and submitted-string secret validation → source policy classification → safe diagnostic identifier → optional authorized source I/O → post-extraction content validation → durable write and extraction. For HTTP inline content, classification must be side-effect-free, including no filesystem existence probe. Validate the final extracted text because a safe-looking path may point to credentials. A credential-bearing path, URL userinfo, or URL query token is refused **before** a local read, DNS lookup, or network request. Authenticated URL import through credentials embedded in the URL is not part of this contract.
+1. **Data is never an authority token.** The `content` and `text` fields of every agent-facing MCP `ingest` and inline `extract`, local stdio or HTTP, mean literal content. Enforce this at the shared writer so lifecycle capture, control-plane upload and future entry points cannot bypass it. An existing path, `https://` URL, or connection string cannot trigger file/network I/O. `source_type`, `source_id`, `source_group`, tags, or transport headers cannot grant import rights. A literal URL may be remembered as text; it is not fetched. This intentionally breaks the current local convenience behavior.
+2. **Operator imports have explicit intent and bounded authority.** Provide separate CLI file/directory and URL import commands or typed CLI options, outside the agent-facing `content` contract. Permitted roots/hosts come from protected operator configuration, not an agent-supplied argument. Path import must confine the opened object to an allowed root, handle symlinks and race-resistant opening, bound total bytes/files/depth, and report unsupported/skipped files. URL import retains public-address validation, address pinning, no redirects/proxy, scheme and size/time limits; reject URL userinfo and credential-like query parameters **before DNS/request**, and apply an allowlist where an import policy has one. A CLI flag proves intent, not human identity: an agent with an unrestricted shell under the same OS account may invoke it. This design protects MCP-mediated reads; protecting against such a shell requires a separate OS principal, protected approval channel or equivalent authority boundary. No request-controlled `is_trusted` flag. A new MCP import tool is out of this proposal unless a demonstrated agent use case and authorization model justify an ADR; the frozen tool count is a current constraint, not an architectural proof.
+3. **Watcher is a distinct authority.** The configured inbox grants only watcher-originated reads under its containment rules. Watcher-prepared text is passed as literal bytes; a snapshot whose text resembles a path/URL must not be reinterpreted by generic ingest. Provenance records the actual source kind, stable source identity, and authorized actor without treating those labels as permission.
+4. **Validate and make operation boundaries explicit.** Perform access/size/shape checks before optional I/O, validate imported text and identifiers before the episode write, and make that write atomic. For `ingest → extract`, an `ingest` success means the episode is durable, not that extraction succeeded. For inline `extract(content|text)`, the episode may already be durable when extraction fails. Return a stable episode identity and a pending/retryable extraction state, never claim that derived facts exist, and define whether partial derived writes are invisible or rolled back. Retries must use the same source identity without duplicating the episode or publishing half a claim graph. Reject malformed time and identity fields without reflecting the submitted value. Distinguish refused input, failed import, and failed extraction; never report a failed import as a successful episode.
+5. **Credential handling is explicit and limited.** Default agent-facing writes refuse high-confidence credentials (for example URI userinfo/password, private-key blocks, known token formats) before persistence. Apply the same check to imported content and all identifying metadata. For operator URL import, check the submitted URL before any DNS/request and check fetched text before persistence; a fetched body may arrive over the network before its content can be classified. Keep a reason code and safe correlation ID, never the matched value. Do not silently alter primary evidence or claim that heuristic detection is complete. Document false positives, and define any privileged exception only as a separate audited operator workflow with retrieval restrictions; do not add a caller-controlled bypass. This policy does not imply that all personal or confidential facts are prohibited.
+6. **Diagnostics are content-safe end to end.** Tool, context, transport, parser, storage, and worker logs/errors must not serialize raw `content`, query, path, URL query/userinfo, `source_id`, `source_type`, `source_group` or caller-supplied tags without a field-specific safe encoding. Use bounded operation IDs and typed reasons. Audit existing log fields and error formatting before declaring the boundary closed. This also protects identifiers that are sensitive without matching a token pattern.
 
-Recognize concrete credential-bearing formats (for example a URI with userinfo/password or known token syntax) in all persistence-bound text and identifying metadata, including `source_id`. Refuse on a positive match with a typed validation reason in every profile, including local CLI, stdio, HTTP, and watcher ingestion; there is no trusted override in this design. Do not promise perfect detection, and do not globally reject ordinary documentation about connection strings. Avoid returning raw `content`, URL query strings, path names, or `source_id` in errors/log fields. Any diagnostic correlation uses a bounded non-reversible identifier and reason code. Review the existing lifecycle `resembles_secret` rule for reuse rather than creating an inconsistent second heuristic.
+## Migration and acceptance
 
-For an authorized URL import, keep scheme restriction, DNS validation/address pinning, redirect and proxy disabling, limits, and response-size enforcement. Reject unsupported URL schemes as import targets. For local file/directory import, retain the watcher-specific containment independently; do not assume generic local import has watcher containment.
+The public `ingest` wire behavior changes: publish a migration note showing literal ingestion and explicit operator import. Keep historical stored episodes unchanged. No schema or dependency change is assumed; if implementation needs one, use the repository's approval/ADR process. Preserve deterministic episode identity, provenance, tenant isolation and bi-temporal timestamps. The composition root injects narrow source permissions; it must not give a use case the whole service container.
 
-### 3. Rollout and compatibility
+Acceptance requires real local stdio, HTTP, inline `extract`, lifecycle/control-plane and watcher entry-point tests, not only a parser unit test. For each agent-facing write entry point, submit an existing file, directory, public URL, loopback URL and URL with credentials; assert **zero unauthorized** import I/O and literal or safely refused behavior. The watcher may make one bounded read of its configured snapshot, but generic ingestion must make zero secondary imports when that text resembles a path/URL. Test watcher credential policy. Test operator file/URL imports, symlink/race/size/redirect/DNS cases, failures after preparation, idempotent episode retry, and partial-write absence. Force extraction failure after episode commit, including inline `extract`; verify stable identity, explicit pending state, no visible partial derived graph and successful retry. Capture all logging and returned errors across tool and service layers; assert no raw identifiers, query text, path, URL token or credential. Test ordinary discussion of a URL or connection string and high-confidence credential refusal separately to constrain false positives. A source-authority security claim is gated on these end-to-end tests and a threat-model review.
 
-Make the HTTP policy fail closed at the shared ingestion seam, not only in one handler. Add explicit local/HTTP contract documentation and deprecation notes if local auto-detection is later removed. Existing stored episodes are not rewritten. If a suspected credential is already stored, incident response and deletion policy are separate work.
-
-## Alternatives considered
-
-| Approach | Decision | Reason |
-| --- | --- | --- |
-| Only add a connection-string blacklist | Reject | Paths and URLs remain ambient authority; blacklist evasion and false positives remain. |
-| Disable all URL/path import in every profile immediately | Reject | Breaks the documented local workflow without requiring it for the HTTP boundary. |
-| Add a public `transport` parameter or ninth MCP tool | Defer | Requires a schema/ADR decision and cannot be inferred from this security design alone. |
-| Redact matched substrings in raw memory | Reject | Produces altered evidence and may leave derived copies inconsistent. Refusal before write is auditable. |
-
-## Acceptance evidence
-
-1. Integration tests exercise the real HTTP and local composition paths. HTTP requests containing an existing server path, directory path, public URL, localhost URL, `file://` string, and common connection-string examples cause **zero** filesystem/network import calls. Ordinary literal discussion of a URL or connection string remains possible if it contains no credential.
-2. Local authorized file and public-URL imports still work; the URL tests cover redirects, DNS rebinding/pinning, non-public addresses, oversized responses, and timeout behavior without relaxing existing protections.
-3. A controlled adapter captures file/network calls and log/error output. Credential-bearing input is refused before durable state or extraction; tests assert absence of the credential from logs, errors, and stored rows. Include positive and negative detector cases.
-4. The final content after authorized extraction receives the same secret check; a file containing a credential is refused without a partial episode. A failed import cannot leave a partially written episode or derived facts.
-5. Cross-tenant and local-profile tests show that `source_type`, `source_id`, and `policy_tags` cannot grant extra authority. Document the operational boundary and known detector limitations.
-
-## Delivery boundary
-
-This design can be implemented independently of the memory-quality and LongMemEval-V2 specifications. Before implementation, confirm every active entry point's policy wiring. Before shipping, follow the repository's targeted tests and workspace clippy gate. The present document performs no implementation or release action.
+This specification is independent of the [memory quality](2026-11-09-decision-grounded-memory-quality-design.md) and [LongMemEval-V2](2026-11-09-longmemeval-v2-official-run-design.md) designs. Its scope excludes physical erasure, malicious content classification, and arbitrary-secret DLP; those are separate threats with different evidence and contracts.
