@@ -1,7 +1,7 @@
 # November 2026 agent-memory review: evidence and design decisions
 
 - **Date:** 2026-11-09
-- **Status:** Research companion to three proposed specifications
+- **Status:** Research companion to three product/benchmark specifications and one cross-cutting evaluation specification
 - **Input:** “Ежемесячный обзор агентной памяти — ноябрь 2026 (выпуск 1)” supplied in the session
 - **Method:** Check primary papers/releases and the inspected `v1.38.0` source. A published benchmark is evidence for its own task and protocol, not a product requirement or comparable score.
 
@@ -38,3 +38,5 @@ For each idea ask: Which user decision improves? What evidence is available at w
 ## Dependencies and unresolved checks
 
 The [agent-memory survey](https://arxiv.org/abs/2602.06052) supplies a useful taxonomy of working, episodic, semantic and procedural memory, but its taxonomy is not an ablation showing which mechanism this server should add. The ingestion authority change can be designed independently. The internal quality experiment needs a fixed reader, source-anchored extraction quality, server-owned transaction time and independent valid/known-time support before historical claims. The external benchmark needs a secure upstream pin, real adapter registration/persistence and modality selection; it does **not** validate real-world temporal timestamps because the dataset lacks them. The untracked extract-quality proposal in this workspace is a possible companion, not an implemented prerequisite. No benchmark score, bug exploit, security guarantee or production policy improvement is claimed by these documents.
+
+All proposed improvements share the [agent-memory outcome and usability evaluation contract](2026-11-09-agent-memory-outcome-evaluation-design.md). It adds a paired, held-out, real agent/tool loop to the local eval-harness and defines promotion gates for task success, evidence support, interaction effort, reliability and cost. Existing lexical/context-hit suites and a future official LongMemEval-V2 score cannot by themselves establish that agents complete more work or find the MCP interface easier to use. The contract is a falsifiable release condition, not an advance promise that every mechanism will improve both axes.

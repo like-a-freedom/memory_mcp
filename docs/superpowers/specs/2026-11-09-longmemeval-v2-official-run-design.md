@@ -7,7 +7,7 @@
 
 ## Why this is a separate spec
 
-[LongMemEval-V2](https://arxiv.org/abs/2605.12493) evaluates memory from ordered browser-agent trajectories with a bounded context passed to a fixed reader. It has 451 curated questions across five abilities and two domains, with text and image evidence. The paper's 72.5% AgentRunbook-C result and 48.5% RAG comparison are for its own protocol and cohort; a text-only subset here cannot be ranked against them. This work needs an upstream runner, data, reader/judge, cost and modality contract separate from the internal [decision-quality evaluation](2026-11-09-decision-grounded-memory-quality-design.md).
+[LongMemEval-V2](https://arxiv.org/abs/2605.12493) evaluates memory from ordered browser-agent trajectories with a bounded context passed to a fixed reader. It has 451 curated questions across five abilities and two domains, with text and image evidence. The paper's 72.5% AgentRunbook-C result and 48.5% RAG comparison are for its own protocol and cohort; a text-only subset here cannot be ranked against them. This work needs an upstream runner, data, reader/judge, cost and modality contract separate from the internal [decision-quality evaluation](2026-11-09-decision-grounded-memory-quality-design.md). The [agent-task evaluation contract](2026-11-09-agent-memory-outcome-evaluation-design.md) is also separate: the official fixed-reader score is evidence about memory-assisted answering, not how easily an agent uses MCP tools.
 
 ## Verified starting point and blockers
 
@@ -64,5 +64,6 @@ Any run that sends dataset-derived content or queries to external reader, judge,
 3. Adjudicate and freeze per-case text evidence. Test ordering, identity, shared-haystack isolation, query-order effects, failure handling, context-item validity and clock behavior against the real product interface.
 4. Pilot enough cases to estimate runtime, spend and bottlenecks; fix interface issues without changing gold-based selection. Freeze the run profile.
 5. Run the full selected cohort, publish official scored-case metrics alongside failure-inclusive coverage and case-level receipts, and only then consider before/after comparisons of memory-quality changes. A run with unresolved affected cases does not clear the complete-baseline gate.
+6. **Only when claiming a LongMemEval-V2 improvement**, run the same frozen official cohort on incumbent and candidate with matched reader/judge settings, report paired case differences and cost, and publish the independent [local agent-task result](2026-11-09-agent-memory-outcome-evaluation-design.md) if also claiming agent usability. The official run is supplementary to the ordinary local quality release gate; lack of external-run authorization blocks a V2 claim, not unrelated local changes. An improvement in the official score alone does not establish easier agent tool use; a local agent-task gain does not alter the official upstream score.
 
 No production code, pin or external benchmark run is changed by this specification.
