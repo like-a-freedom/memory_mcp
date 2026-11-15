@@ -127,7 +127,7 @@ impl KnowledgeStoreClient {
         let sql = format!(
             "SELECT {} FROM fact \
              WHERE fact_id IN ( \
-               SELECT source_fact_id FROM triple \
+               SELECT VALUE source_fact_id FROM triple \
                WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
              ) \
                AND {BI_TEMPORAL_WHERE} \
