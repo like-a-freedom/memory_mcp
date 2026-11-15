@@ -3,6 +3,9 @@
 - Status: accepted — 2026-10-06
 - Relates to: [ADR-0048](0048-bounded-runtime-observability.md) (logs vs.
   metrics separator), `docs/BACKLOG.md` (log format entry)
+- Superseded in part by [ADR-0080](0080-one-request-identity.md): the HTTP
+  request span described below was deleted; correlation is now the ambient
+  `request_id` field stamped by the formatter.
 
 The service logged through a bespoke logger (`StdoutLogger`) that rendered a
 `HashMap<String, Value>` per event as `[ts] LEVEL req=… op=… k=v …`. The format

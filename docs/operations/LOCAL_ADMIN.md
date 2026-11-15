@@ -20,7 +20,7 @@ Covers the local (non-OIDC) browser control plane: administrator accounts,
 password lifecycle, durable sessions, client provisioning, client API keys, and
 the deployment configuration that selects it.
 
-Every claim below was checked against the code on branch `local-admin`
+Every claim below was checked against the code on branch `master`
 (`crates/memory-mcp/src/{control/local_admin,service/local_admin,http/config,http/registry/surreal_store,cli}`),
 and every command is labelled with whether it was actually executed. Where the
 implementation does not match the approved design, the divergence is stated
@@ -54,8 +54,8 @@ All of the following were executed in this repository and passed:
 |---|---|
 | Service + durable registry (in-memory SurrealDB) | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked` — 1815 passed, 3 ignored |
 | Service security experiments against the **real** store | `... --lib ... service::local_admin` — 31 passed (of which 13 are the plan §5 experiments; see §13.3 for the per-case mapping) |
-| HTTP surface (real router, real pre-auth cookie, CSRF, Origin, session, SQL transactions, migrated in-memory registry) | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` — 42 passed |
-| OIDC regression | `... --test http_control_plane` — 13 passed |
+| HTTP surface (real router, real pre-auth cookie, CSRF, Origin, session, SQL transactions, migrated in-memory registry) | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` — 44 passed |
+| OIDC regression | `... --test http_control_plane` — 20 passed |
 | CLI contract (clap surface + real subprocess against file-backed RocksDB) | `... --test local_admin_cli` — 11 passed, including the two removals (§5) |
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
@@ -166,8 +166,8 @@ Run from the repository root.
 | `cargo check -p memory_mcp --no-default-features --features streamable-http --locked` | ✅ executed, clean |
 | `cargo test -p memory_mcp --locked` | ✅ executed, every target green |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked service::local_admin` | ✅ executed, 31 passed |
-| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_control_plane` | ✅ executed, 13 passed |
-| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
+| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_control_plane` | ✅ executed, 20 passed |
+| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` | ✅ executed, 44 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 11 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ❌ superseded: the target was not created (§13.4). Its two remote-race cases moved inline into `surreal_store/local_admin_remote.rs`, so the `-- --ignored` row below replaces it. This row is the only plan §6 command that no longer exists verbatim |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
@@ -178,7 +178,7 @@ Run from the repository root.
 | `cargo clippy ... --features ...,ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_UI_DIST` set) |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables); the test is now an inline adapter test, so the command selects it, and running it without the variables **fails** rather than skipping |
 | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features streamable-http,test-fixtures --locked ui::assets` | ✅ executed, 24 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html`. The module is `ui::assets`, not `control::static_assets`: the delivery adapter moved out of `control/` when the UI became a module of its own |
-| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --features ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
+| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --features ui,test-fixtures --locked --test http_local_admin` | ✅ executed, green (the suite now holds 44 tests; none is `ui`-gated) |
 | `docker compose --env-file <operator env> config --quiet` | ✅ executed, the single runtime file resolves. The browser method set is a runtime value, so the provider half resolves from the same file rather than from a second overlay. The file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
 | `cargo run -p xtask -- package target/debug aarch64-apple-darwin` | ✅ executed against the real binaries — archive, `.sha256` sidecars and the standalone CLI, all produced after the smoke test passed |
@@ -253,7 +253,7 @@ binary under test:
 
 1. `admin create --username ops.one` prints one JSON object whose
    `activation_url` carries no code.
-2. `GET /api/v1/auth/config` → `{"mode":"local"}`.
+2. `GET /api/v1/auth/config` → `{"methods":["local"]}`.
 3. `GET /api/v1/auth/local/csrf` → pre-auth cookie + token; `POST
    /api/v1/auth/local/activate` → `204`.
 4. `POST /api/v1/auth/local/login` → `204` with a `__Host-memory_mcp_admin`
@@ -661,7 +661,7 @@ still passes `textContent` checks, and still accepts a synthesised `fill`.
 **Found in the same review, recorded and not changed: the account surface has no
 local-mode root.** `/` resolves to `StatusPage`, and `/login`, `/keys` and
 `/delete` are the OIDC account pages. Local mode mounts no `/api/v1/account/*`
-route at all (§4.2, and by design: mode disclosure reports `{"mode":"local"}`),
+route at all (§4.2, and by design: mode disclosure reports `{"methods":["local"]}`),
 so in a local deployment the bare origin loads the bundle and then reports a
 missing endpoint. The documented local entry point is `/admin/login` — the routes
 in §4.2 are exactly the `/admin/*` set — and nothing in the local console links to
@@ -791,7 +791,7 @@ cargo test -p memory_mcp --features streamable-http,test-fixtures --locked \
 
 Those suites start `memory_mcp_http` from an operator environment file (local
 mode, HTTPS public URL, the seven plan limits, both browser keys) and
-`GET /api/v1/auth/config` answers `{"mode":"local"}`. They then exercise
+`GET /api/v1/auth/config` answers `{"methods":["local"]}`. They then exercise
 activation, login, session, client create/list/get, restart persistence, the
 plan-mismatch startup refusal, and recovery, so §3.1 and §3.3 are a working
 deployment recipe rather than an intention.
@@ -1125,7 +1125,7 @@ wrapped in the host-allowlist middleware and the local deadline middleware.
 
 | Method | Path | Auth | Success | Failure codes observed in code |
 |---|---|---|---|---|
-| GET | `/api/v1/auth/config` | none | `200 {"mode":"local"\|"oidc"}` | mounted in **both** browser-auth modes so the UI can discover which flow to run, and only while the control plane is enabled; an **off** deployment does not mount it and answers the JSON `404` (`http::router::tests::off_mode_mounts_no_browser_auth_route`) |
+| GET | `/api/v1/auth/config` | none | `200 {"methods":["local"]}` / `{"methods":["oidc"]}` | mounted in **both** browser-auth methods so the UI can discover which flow to run (`auth_upgrade.rs::each_auth_shape_discloses_exactly_the_methods_it_enabled`, `http_local_admin.rs::auth_config_reports_only_the_local_method`, `http_control_plane.rs::auth_config_reports_the_oidc_method_without_disclosing_more`); there is no `off` deployment — the data-plane-only runtime mode was retired with ADR-0058, and `MEMORY_MCP_HTTP_AUTH_METHODS` must name at least one method |
 | GET | `/api/v1/auth/local/csrf` | none | `200 {"csrf_token": ...}` + pre-auth cookie | `503` if local auth is not configured |
 | POST | `/api/v1/auth/local/challenge` | pre-auth | `200 {username, expires_at}` | `400 invalid_challenge`, `400 bad_request`, `403`, `413`, `415`, `429`, `503` |
 | POST | `/api/v1/auth/local/activate` | pre-auth | `204` | as above + `409` on state conflict |
@@ -1505,7 +1505,7 @@ bucket dimensions are already aggregated in `local_admin_rate_bucket` (§13.4).
 
 | Key | Source | Role in this revision |
 |---|---|---|
-| `MEMORY_MCP_HTTP_SESSION_KEY` | Deployment env / protected operator env file | Feeds the `browser_auth_policy` configuration fingerprint only. Session cookies are independent 256-bit random verifiers, so this key does not sign or verify a session and rotating it does not by itself invalidate existing sessions — it makes the policy join fail |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | Deployment env / protected operator env file | Feeds the `browser_auth_policy` fingerprint, HMACs local one-time challenge codes, and keys control-plane account-session cookies (`keyed_session_hash`). Local admin session cookies are independent 256-bit random verifiers, so rotating this key does not revoke them directly; it invalidates control-plane sessions, kills in-flight challenges, and the stored fingerprint then fails the policy join |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | Deployment env / protected operator env file | Pre-auth cookie signatures, session CSRF tokens, and the domain-separated throttle bucketing key |
 | `MEMORY_MCP_API_KEY_PEPPER` | Deployment env | Client key verifier HMAC |
 
@@ -1564,10 +1564,12 @@ All local-admin records live in the control registry
 `browser_auth_policy`, `local_admin`, `local_admin_challenge`,
 `local_admin_session`, `local_admin_rate_bucket`, `local_admin_client`,
 `local_admin_client_key`, `local_admin_operation`, `local_admin_audit`. All are
-`SCHEMAFULL` with unique indices where required. Three later registry migrations
+`SCHEMAFULL` with unique indices where required. Five later registry migrations
 are additive and matter to a restore: `048_browser_auth_policy_methods` (the
-enabled-method set), `049_identity_change_audit` (`audit_event.target_identity_id`)
-and `050_browser_auth_method_removal` (`local_admin_audit.target_method`). A
+enabled-method set), `049_identity_change_audit` (`audit_event.target_identity_id`),
+`050_browser_auth_method_removal` (`local_admin_audit.target_method`),
+`051_local_admin_table_permissions` (unprivileged-access denial on the
+local-admin tables) and `052_account_display_name` (`account.display_name`). A
 snapshot taken before them restores without error — every added column is
 optional — but it also restores the older enabled-method set, so re-check the
 browser-auth policy after any rewind.
@@ -1601,10 +1603,13 @@ running the CLI while the server holds the same path was not exercised.
 **Migration asset path.** The registry migration SQL is read at runtime from
 `CARGO_MANIFEST_DIR/migrations`, i.e. the absolute build-time path
 `<build-root>/crates/memory-mcp/migrations`. Any image or deployment that ships
-the binary must keep `047_local_admin_auth.surql` (and `001_registry`,
-`045_deletion_and_usage_hardening`, `046_registry_correctness`, the only other
-catalog entries) at that path — the current `Dockerfile` does this with a `COPY`
-from the builder stage.
+the binary must keep every file in the registry catalog there — currently
+`001_registry`, `045_deletion_and_usage_hardening`, `046_registry_correctness`,
+`047_local_admin_auth`, `048_browser_auth_policy_methods`,
+`049_identity_change_audit`, `050_browser_auth_method_removal`,
+`051_local_admin_table_permissions`, `052_account_display_name` (the catalog is
+`REGISTRY_MIGRATIONS` in `src/http/registry/migrations.rs`) — the current
+`Dockerfile` does this with a `COPY` from the builder stage.
 
 ## 11. Rollback
 
@@ -1662,7 +1667,7 @@ regardless.
 
 | Claim | Evidence |
 |---|---|
-| Local routes are mounted only when the set enables `local`; OIDC routes are absent otherwise | `http_local_admin.rs::local_routes_are_mounted_and_oidc_routes_are_not` (ADR-0057) |
+| Local routes are mounted only when the set enables `local`; OIDC routes are absent otherwise | `http_local_admin.rs::local_mode_does_not_mount_oidc_routes` (ADR-0057) |
 | `GET /api/v1/auth/config` reports the enabled method set | `http_local_admin.rs::auth_config_reports_only_the_local_method` (local), `http_control_plane.rs::auth_config_reports_the_oidc_method_without_disclosing_more` (OIDC); both enable the other method's absence is asserted by the router tests |
 | Pre-auth cookie is `__Host-`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` | `http_local_admin.rs::preauth_cookie_is_host_scoped_and_httponly` |
 | Activation → login → session round trip, no session from activation | `http_local_admin.rs::activation_login_session_roundtrip` |
@@ -1693,13 +1698,12 @@ regardless.
 | The client view reports live tenant state, not the create-time snapshot | `http_local_admin.rs::client_view_reflects_live_tenant_state` (writes plan 3 / schema 7 directly and reads them back) |
 | `provisioning_reason` is a closed, allowlisted mapping | `http_local_admin.rs::client_view_reports_a_bounded_provisioning_reason` (a `failed` tenant at stage `migrating` → `provisioning failed at migrating`) |
 | Suspend/resume coherent no-op, stale CAS, and no reprovision while suspended | `http_local_admin.rs::suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
-| A stale plan is refused at startup rather than adopted | `http_local_admin.rs::startup_refuses_a_plan_the_deployment_does_not_grant` — `plan_limit_mismatch` |
 | Pre-auth code, activation, login, session and recovery survive a real restart | `http_crash_recovery.rs`, `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
 | `ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_UI_DIST` pointing at one |
 | The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
 | The console is served with the CSP the WASM client needs | `ui_assets.rs::every_ui_response_carries_the_policy_the_wasm_client_needs`, plus the `docker` job's walk of the shipped image (which asserts the same header against a real image rather than a fixture) |
 | A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the close gate (an Escape before the value is taken warns and keeps the panel open; a saved secret closes and leaves the page interactive). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
-| Activation, login, client creation, keys and suspend/resume through the real HTTP surface | `http_local_admin.rs` (42 tests) |
+| Activation, login, client creation, keys and suspend/resume through the real HTTP surface | `http_local_admin.rs` (44 tests) |
 | The CLI narrows the durable policy and the restarted deployment serves the narrowed set | `--scenario removal` → the two guards, the store's `would leave no browser authentication method`, `removed_method`/`enabled_methods`/`epoch`/`guidance`, the second removal refused by name, and the local routes `404` while the provider routes are mounted (§5) |
 | The Compose file resolves with operator-generated secrets | `docker compose --env-file … config --quiet` |
 | Issued key is a real data-plane credential | `http_local_admin.rs::issued_key_authenticates_on_the_data_plane` — live key `200` on `POST /mcp`, revoked key `401`, no credential `401` |
@@ -1726,6 +1730,7 @@ regardless.
 | `surrealdb` SQL fault injection in the local-admin store (nonselected statement error, audit insert error) | ✅ `sql_fault_tests` — a test-only SQL fault hook fails a named local-admin statement; the aborted transaction leaves no session, no success audit row and no half-applied credential change |
 | CLI versus a live holder of the same embedded RocksDB path | ❌ only standalone CLI use is proven; the script stops the server first by design |
 | Unscheduled rate-bucket cleanup | ✅ scheduled: `local_admin_rate::rate_bucket_cleanup_scheduler_job` is registered by `memory_mcp_http`, at most one bounded pass every 300 s per process |
+| A stale plan is refused at startup rather than adopted | ⚠️ enforced in code only: `ensure_local_plan` runs at startup (`http.rs`) and the store `THROW`s `'plan_limit_mismatch'` when the stored limit set differs (`surreal_store.rs`); no test exercises the refusal |
 
 ### 13.3 Where each plan §5 security case is proven
 
@@ -1756,7 +1761,7 @@ suite that covers them instead of asserting against a test double.
 | Provisioner restart in `Reserved`/`NamespaceCreating`/`schema 0`/`Migrating` | `http_crash_recovery.rs` (11 tests, including `provisioning_resumes_a_tenant_stranded_in_namespace_creating`) |
 | Coherent suspend/resume, stale CAS, no false `Ready` | `suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
 | Warm cache; revoke or expire; resume | `revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected`, `cache_hit_with_a_mismatched_owner_is_denied` |
-| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 42 tests in `http_local_admin.rs` |
+| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 44 tests in `http_local_admin.rs` |
 | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html`, `a_key_for_one_client_cannot_reach_another` |
 | Packaged artifact runs end to end | `cargo xtask package` — the real binary through `init`, both ingest extractors, a live MCP `initialize` and clean shutdown, before anything is archived |
 | Generated sentinel secrets through errors/Debug/logs/audit/metadata | `surreal_store/local_admin.rs::secret_hygiene_tests` — the activation code, the session cookie and the password are absent from all nine tables and from every `Debug`/`Display` rendering, while each is present in the value its authorized caller receives; `LocalAdminError::Infrastructure` prints `<redacted>` instead of the wrapped `MemoryError` |
@@ -1764,6 +1769,14 @@ suite that covers them instead of asserting against a test double.
 ### 13.4 Divergences from the approved interface ledger
 
 Stated rather than smoothed over:
+
+> **Historical note (2026-11-14):** the `off` rows below describe the release as
+> it shipped. The data-plane-only (`off`) runtime mode was later retired by
+> [ADR-0058](../adr/0058-bounded-contexts-modular-monolith.md), and the Compose
+> overlays (`docker-compose.off.yml`, `.local.yml`, `.oidc.yml`) were
+> consolidated into the single `docker-compose.yml` — `MEMORY_MCP_HTTP_AUTH_METHODS`
+> now selects the method set at runtime. No deployment can configure `off` today.
+
 
 | Plan §3.4 entry | What shipped |
 |---|---|

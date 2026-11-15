@@ -3,6 +3,13 @@
 - Status: accepted — 2026-10-05
 - Related: [ADR-0074](0074-connect-the-reconciliation-relation-to-the-read-path.md),
   [ADR-0075](0075-carry-the-existing-trustclass-on-claims-and-edges.md)
+- Amended 2026-11-14: the shipped mechanism differs from the original
+  wording below. Intent is derived server-side by `classify_intent` in
+  `memory/retrieval/admission.rs` (it feeds `QueryEvidence.intent` and drives
+  the traversal plan), not carried as a schema-skipped field on the request —
+  the frozen-surface guarantee still holds because no caller can set it. The
+  memory-class half is **not implemented**: `LifecyclePolicy.decay_half_life_days`
+  remains a single scalar, so per-type retention is still open.
 
 Retrieval currently runs a fixed fusion of every available signal for every
 query, and retention applies a broadly uniform half-life across fact types.
@@ -59,7 +66,8 @@ forgetting a stated preference or preserving operational noise.
 - Per-type write gates land at the extraction seam, where type selection already
   happens (`summary_parser.rs:209`, `classify_structured_summary_fact_type`), not
   as a parallel gate.
-- The `access_count` novelty penalty (`ranking.rs:486–488`) measures *retrievals*,
+- The `access_count` novelty penalty (the `novelty_factor` function over
+  `fact.access_count` in `ranking.rs`) measures *retrievals*,
   not usefulness, and inverts the feedback loop by penalising frequently-needed
   memories. Replacing it with a use-based signal requires outcome trace data, so
   it is scheduled with the trace work rather than here — until then the plan

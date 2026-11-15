@@ -15,8 +15,11 @@ exact profile commands and baseline paths.
 | `ner_cpu` | regex, Anno, Anno-ONNX, GLiNER, VAGO | all local model fixtures | `MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --features eval-harness/bench --bench ner_cpu` |
 | `ner_metal` | Apple Silicon production path | macOS arm64 and local Metal/model assets | `make bench-metal` |
 
-`make bench-check` only compiles targets. CI's scheduled `make bench-cpu`
-sets `MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1`; missing or failing model smoke
-probes therefore fail the job rather than producing a green skipped result.
-Record commit, profile, fixture revisions, host, and Criterion output under
-the run artifact when publishing a comparison.
+`make bench-check` only compiles targets. CI runs `make bench-cpu-core`
+unconditionally; the `ner_cpu` bench runs only when
+`crates/memory-mcp/tests/models/ner` exists, and that invocation sets
+`MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1` — so on a fixture-equipped host a
+missing or failing model smoke probe fails the job, while a fixture-less CI
+runner prints a skip message and stays green. Record commit, profile, fixture
+revisions, host, and Criterion output under the run artifact when publishing a
+comparison.

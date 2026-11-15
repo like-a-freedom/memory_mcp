@@ -1,10 +1,10 @@
 //! HTTP SaaS transport.
 //!
-//! # rmcp API surface (verified 2026-10-02 against `rmcp 3.5.0`)
+//! # rmcp API surface (first verified 2026-10-02 against `rmcp 3.5.0`)
 //!
 //! The following types and methods are confirmed against the version resolved
-//! by `Cargo.lock` (currently `rmcp 3.5.0`; the workspace requirement starts
-//! at `3.4.0`). Line numbers are intentionally not treated as an API contract.
+//! by `Cargo.lock` (currently `rmcp 3.9.0`; the workspace requirement is
+//! `3.9.0`). Line numbers are intentionally not treated as an API contract.
 //!
 //! - `rmcp::transport::streamable_http_server::StreamableHttpServerConfig`.
 //! - `rmcp::transport::streamable_http_server::StreamableHttpService<S, M>`.

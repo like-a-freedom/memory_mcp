@@ -1,10 +1,10 @@
 ---
 name: mcp-design
-description: Design intent-driven MCP servers — use when creating, reviewing, or refactoring an MCP server or its tools.
+description: Design intent-driven MCP servers and their tools for agent context efficiency — use when creating, reviewing, or refactoring an MCP server, or designing tool responses that stay within agent context windows via pagination, bounded output, truncation, and progressive disclosure.
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: "mcp-design-skill"
-  tags: ["mcp", "ai-agents", "tool-design", "intent-driven"]
+  tags: ["mcp", "ai-agents", "tool-design", "intent-driven", "context-engineering", "token-optimization"]
 ---
 
 # MCP Server Design Expert
@@ -25,6 +25,7 @@ Before designing any tool or server, internalise these axioms:
 3. **Descriptions are prompts.** Tool names, parameter descriptions, and return schemas are part of the system prompt.
 4. **Every response is guidance.** Error messages, empty states, and partial results must tell the agent what to do next.
 5. **Curate ruthlessly.** A server with 5 well-designed tools outperforms one with 50 mediocre ones.
+6. **Every response is spent context.** A tool result lands in the model's context window on the turn it returns and stays there; unbounded or oversized returns are context-budget bombs, not just style issues.
 
 ---
 
@@ -78,7 +79,7 @@ Do NOT use this tool when: <anti-condition>.
 Arguments:
 - `param_name` (type): <description, valid values, default if any>
 
-Returns: <description of return shape and key fields>
+Returns: <description of return shape and key fields; for lists include pagination metadata>
 On error: <what the error means and what to do next>
 ```
 
@@ -87,10 +88,13 @@ On error: <what the error means and what to do next>
 Rules:
 - Return **decision-ready** data: pre-filtered, pre-sorted, pre-aggregated
 - Always include `status` field: `"success"` | `"partial"` | `"not_found"` | `"error"`
-- For lists: always include `has_more: bool`, `total_count: int`, `next_offset: int | null`
-- Default page size: 20–50 items
+- For lists: always include a completeness signal — `has_more: bool`, `next_cursor: string | null` (or `next_offset`), and `total_count: int` where cheap to compute
+- Default page size: 20–50 items; hard server-side cap (e.g., 100) even if the caller asks for more
 - Never return raw upstream API responses
 - Include `guidance` field in error/partial responses with next-step instructions
+- Signal truncation explicitly (`truncated: true` + truncation details) instead of dropping data silently; always provide a path to the rest (cursor, detail tool, resource link, narrower query)
+- For single-result tools, apply a default output cap and expose an agent-facing bound argument; prefer reference-style returns (resource link / detail tool) over inlining large payloads
+- Never return an unbounded result: size must be **bounded**, **paginated**, or **may-be-truncated** — there is no fourth, acceptable state
 
 ### Step 5 — Apply the Tool Budget
 
@@ -104,6 +108,11 @@ If over budget:
 2. Identify tools that belong to a different domain → separate server
 3. Identify tools that differ only by one parameter → unify with a `mode: Literal[...]` argument
 
+Also audit context cost at registration time:
+- Every tool ships name + description + full parameter schema into the model's context before any call executes; registration is a context tax
+- Measure serialized tool-list size (the way your MCP client injects it) and cut ruthlessly: 40 narrow tools lose to 6 well-designed ones
+- Keep descriptions lean — they exist to answer "should the model pick this tool for this task?", not to document every return field; move deep return detail into the tool's `Returns` guidance rather than the description
+
 ### Step 6 — Validate Intent Coverage (Intent Matrix)
 
 Build a matrix:
@@ -113,6 +122,67 @@ Build a matrix:
 | <intent> | <tool name(s)> | <number> | ✅ single-call / ⚠️ multi-call / ❌ impossible |
 
 Any intent requiring 3+ sequential calls is a design smell → consider a higher-level composite tool.
+
+---
+
+## Context Window Discipline
+
+Tool definitions and tool results both consume the agent's context. A design that is token-efficient at rest but bloated at runtime will still blow the window. Treat response size as part of the tool contract, not an afterthought.
+
+### The Context-Budget Profile
+
+Every tool response must declare its size profile. Pick exactly one:
+
+| Profile | Meaning | When it applies |
+|---|---|---|
+| **bounded** | Return size has a constant upper bound, independent of data volume | Single-record fetch, status check, count, fixed small set |
+| **paginated** | Returns one page plus a cursor; absence of cursor means done | Any list/search whose result count grows with data |
+| **may-be-truncated** | Returns a best-effort prefix with a truncation signal and a path to the rest | Single record whose own contents can be large (long body, big log) |
+
+An **unbounded** profile — size grows with the data and no cap, cursor, or truncation signal exists — is a design defect. Design against the largest realistic input, not the dev fixture.
+
+### Pagination Contract
+
+- Give every list-shaped tool a `limit` argument (default small: 20–50 items, hard server-side cap: 100) and an opaque cursor argument.
+- Return a response envelope carrying pagination metadata:
+  - MCP's cursor pagination covers list operations; for `tools/call` results, add `cursor`/`limit` as ordinary tool arguments yourself.
+  - Include `nextCursor` (or `has_more` + `next_offset`) when more results exist.
+  - Include `total_count` / `total` when cheap to compute, so the agent knows how much exists without fetching it all.
+- Use opaque cursors (stable under concurrent writes) rather than transparent page numbers; offsets silently skip/duplicate rows under inserts.
+- Never silently drop data past a limit. A `truncated: true` flag plus `nextCursor` (or truncation message) is mandatory; silent truncation is worse than an error, because the model then believes it reasoned over the complete picture.
+- Truncate the *largest sub-fields first*, never the structural fields (keep `id`, `status`, `title`; truncate `body`, `logs`, `diff`).
+- Point to the rest: a resource link, a detail tool, or a narrower query — "truncated, good luck" is not a policy.
+
+### Single-Result Unboundedness
+
+Single-result tools (file reads, log fetches, large record fields) have no natural pagination. Mitigations:
+
+- Default an output size cap per tool (e.g., ~25k characters / ~6k tokens) with the excess truncated and a truncation marker.
+- Expose an agent-facing argument (e.g., `max_output_chars`) so the model can bound large results.
+- For very large sources, prefer reference-style returns: a resource link the client can fetch on demand, or a dedicated detail tool — never inline the whole payload.
+- Structured content (MCP 2025-11-25 `outputSchema`) makes the shape a validated contract but does not bound size; structure and size are orthogonal.
+
+### Client-Side Caps
+
+Hosts may enforce their own ceilings (e.g., Claude Code warns above 10k tokens of tool output, caps at 25k by default via `MAX_MCP_OUTPUT_TOKENS`, saves larger successful text results to a file and returns the path). Design for a server-side default that fits comfortably inside a typical host cap, so client-side behavior never becomes a correctness problem.
+
+### Progressive Disclosure (tool definitions)
+
+When a server's tool definitions take a large share of the context window, prefer progressive loading over bulk injection:
+
+- Hosts may defer injecting tool definitions into context and instead offer a lightweight `search_tools` meta-tool; full definitions load only as needed.
+- Hosts may implement progressive discovery behind a context-window threshold (e.g., 1%–5% of the window): start with name-only or name-plus-description results, then load full schemas on demand.
+- Cache tool definitions host-side (memoize after `tools/list`) and refresh on `notifications/tools/list_changed`.
+- Group tools by server so the model can reason about related capabilities.
+- For multi-server setups, apply the same review policy to brokered calls as to direct ones — output truncation alone does not prevent cross-server exfiltration.
+
+### Code-Mode Orchestration (Cloudflare pattern)
+
+Cloudflare's Code Mode lets an agent write and execute JavaScript that composes multiple MCP tool calls inside a sandboxed runtime — loops, conditionals, error handling — instead of issuing dozens of sequential tool calls by hand.
+
+- **Applicability:** host-side capability; not every MCP host/client implements it. Design must assume either orchestration mode.
+- **Design implication:** when Code Mode is available, favour composable tool surfaces (high-level verbs) so orchestration-in-code is meaningful; when absent, minimal sequential-call design must still hold.
+- **Boundary:** Code Mode reduces orchestration overhead, not result-size problems — pagination and bounded results remain mandatory, and a Code-Mode script can still request unbounded data.
 
 ---
 
@@ -141,6 +211,8 @@ When reviewing a design, flag and fix:
 | **Generic names** | `create_issue` on a multi-server setup | Prefix: `github_create_issue` |
 | **Raw payload returns** | Returning full API JSON | Filter to decision-relevant fields + add `guidance` |
 | **Silent failure** | `{"error": "not found"}` | `{"error": "not found", "guidance": "Try list_users to find the correct ID"}` |
+| **Silent truncation** | No `truncated` flag / data dropped past a limit | Truncate visibly with `truncated: true` and a `nextCursor` / path to the rest |
+| **Unbounded response** | List tool returns all rows, or single tool returns the full blob | Paginate (limit + cursor) or cap + truncate + point to the rest |
 | **Oversized server** | 20+ tools on one server | Split by domain or persona |
 | **Imperative docstring** | "This tool calls the /users endpoint..." | Rewrite as agent-facing: "Use when you need to resolve a user identity from an email" |
 
@@ -188,11 +260,35 @@ When producing a design, always output in this structure:
 }
 ```
 
+**Returns (paginated list example):**
+```json
+{
+  "status": "success",
+  "items": [ ... ],
+  "has_more": true,
+  "total_count": 3187,
+  "returned": 20,
+  "next_cursor": "eyJvZmZzZXQiOjIwfQ=="
+}
+```
+
 **Error example:**
 ```json
 {
   "status": "not_found",
   "guidance": "No user with that ID. Call search_user(query=<name>) to find the correct ID."
+}
+```
+
+**Returns (single large result, truncated):**
+```json
+{
+  "status": "success",
+  "data": { ... },
+  "truncated": true,
+  "truncated_field": "body",
+  "total_chars": 214003,
+  "returned_chars": 4000
 }
 ```
 
@@ -214,11 +310,20 @@ Before finalising any design, verify:
 - [ ] No tool has nested dict/object arguments
 - [ ] Every tool description answers: what, when to use, when NOT to use, args, return shape, errors
 - [ ] Every error response includes a `guidance` field with next-step instructions
-- [ ] Paginated list tools include `has_more`, `total_count`, `next_offset`
+- [ ] Every list response carries a completeness signal: `has_more` / `next_cursor` / `total_count`
+- [ ] Every list tool has a `limit` (default 20–50) with a hard server-side cap (e.g., 100)
+- [ ] Every truncation is explicit and recoverable: `truncated: true` + path to the rest; no silent drops
+- [ ] Single-result tools have a default output cap and/or agent-facing bound argument; large sources use resource links or detail tools
+- [ ] No tool response is unbounded; each has a **bounded**, **paginated**, or **may-be-truncated** profile
 - [ ] Total tool count ≤ 15 per server
 - [ ] No user intent requires more than 2 sequential tool calls
 - [ ] Server has a single coherent domain (passes the "one sentence domain test")
 - [ ] Tool responses return decision-ready data, not raw upstream payloads
+- [ ] Agent context budget is audited: tool count, description size, and serialized tool-list tokens are measured, not assumed
+- [ ] Tool definitions use progressive disclosure when the tool set is large (search_tools / lazy full-schema loading / host-side caching)
+- [ ] Multi-server deployments apply the same output review policy to brokered calls as to direct calls
+- [ ] Orchestration is designed for the available mode: Code Mode (Cloudflare) where supported, otherwise minimal sequential calls — not both simultaneously
+- [ ] When Code Mode is used, composable high-level tool verbs are present so orchestration-in-code is meaningful
 
 ---
 

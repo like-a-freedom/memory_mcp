@@ -1,7 +1,7 @@
 # Memory quality as the product result — critical review and landing plan
 
 **Date:** 2026-10-05
-**Status:** Proposed direction; nothing in this document is implemented
+**Status:** Partially implemented — Phase-0 shipped: `view_mode` and `superseded_by_fact_id` request fields plus ADR-0074/0075/0076; the remaining capability areas are not implemented
 **Baseline:** `f0618fb` (`v1.26.1`)
 **Inputs:** an external review of this repository proposing five capability areas
 (benchmark leadership, a belief layer, typed multi-graph, typed memory classes,

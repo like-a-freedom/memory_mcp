@@ -1,4 +1,4 @@
-# 0033: SurrealDB/RocksDB Memory Footprint
+# ADR-0033: SurrealDB/RocksDB Memory Footprint
 
 ## Status
 Accepted (investigation — controls EXIST, not enabled by this plan)
@@ -9,7 +9,9 @@ engine defaults, is the LARGEST hidden memory term after the GLiNER model it
 would leave behind once unload lands.
 
 Verified against surrealdb-core 3.0.0 sources
-(`~/.cargo/registry/src/*/surrealdb-core-3.0.0/src/kvs/rocksdb/cnf.rs`):
+(`~/.cargo/registry/src/*/surrealdb-core-3.0.0/src/kvs/rocksdb/cnf.rs`);
+the workspace now pins SurrealDB 3.3.5, so treat these engine defaults as a
+dated observation and re-verify against the pinned version before acting on them:
 
 | Knob                                | Env variable                          | Engine default |
 |-------------------------------------|---------------------------------------|----------------|

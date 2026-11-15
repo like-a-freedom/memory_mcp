@@ -25,7 +25,7 @@ the workspace:
 | `audit_undeclared_sources.py` | removed; see [ADR-0063](0063-retire-the-undeclared-source-audit.md) |
 | `audit_doc_claims.py`, `test_doc_claims.py` | removed with the doc-claim citation check |
 | `local_admin_image.py`, `local_admin_browser.mjs` (1676 lines) | removed; nothing ran them |
-| — | `cargo run -p xtask -- check-observability`, which runs the four `observability/check_*.py` scripts. See [ADR-0070](0070-observability-checkers-through-cargo.md). |
+| — | `cargo run -p xtask -- check-observability`, which runs the five Python scripts in the xtask `SCRIPTS` list: `build_dashboards.py`, the three `observability/check_*.py` checkers, and `tests/test_external_metrics.py`. See [ADR-0070](0070-observability-checkers-through-cargo.md). |
 
 `release.yml` is unchanged: it consumes `dist/*`, which `xtask package` still
 produces in the same shape, with the same `.sha256` sidecars and the same

@@ -1,6 +1,6 @@
 # Storage materialization memory remediation — design and acceptance contract
 
-**Дата:** 2026-10-13. **Статус:** проект для review; реализация не начата.
+**Дата:** 2026-10-13. **Статус:** реализовано и покрыто acceptance-тестами (`crates/memory-mcp/tests/storage_materialization_memory.rs`); реализация локальная, production rollout отдельно.
 
 ## Основание и границы доказательства
 

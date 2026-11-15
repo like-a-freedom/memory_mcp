@@ -6,7 +6,7 @@
 |----------|---------|-----------------|
 | `MEMORY_MCP_API_KEY_PEPPER` | HMAC pepper for API key verification; must be ≥ 32 bytes of secret material (hex encoding is conventional but not required) | Invalidates all existing API keys |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers | Requires OIDC identity relinking |
-| `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers | Invalidates all browser sessions |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | Keyed hash for control-plane account-session cookies; also HMACs local-admin one-time challenge codes and feeds the `browser_auth_policy` fingerprint | Invalidates all control-plane browser sessions and in-flight local login challenges. Local-admin session cookies are independent random verifiers and are not revoked directly, but on the next start the stored fingerprint no longer matches and the policy join fails |
 | `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | OIDC state nonce encryption key | Invalidates in-flight login flows |
 | `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | OIDC nonce encryption key | Invalidates in-flight login flows |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | CSRF token HMAC key | Invalidates all CSRF tokens |
@@ -17,7 +17,7 @@ Rotate in this order to minimize disruption:
 
 1. **API-key pepper first** — invalidates restored/compromised keys. Users must generate new keys.
 2. **OIDC identity-index key second** — requires restored OIDC identities to relink via the control plane.
-3. **Browser/OIDC session keys** — users must re-login.
+3. **Browser/OIDC session keys** — control-plane users must re-login; in a `local` deployment expect the policy-join failure described above and reconcile `browser_auth_policy` before restart.
 4. **CSRF keys** — invalidated alongside session rotation.
 
 ## Notes

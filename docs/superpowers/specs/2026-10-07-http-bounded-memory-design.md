@@ -1,9 +1,9 @@
 # HTTP bounded memory — вариант A
 
-**Статус:** проект дизайна для совместного review с планом; не разрешение на реализацию или deployment.
+**Статус:** реализовано локально (см. коммит `0ba336f` «fix(http): bound retained resources and diagnostics» и [HTTP memory baseline](../../performance/HTTP_MEMORY_BASELINE.md)); acceptance (Linux A/B, attributed RSS reduction, deployment choice) не закрыт, production rollout отдельно.
 **Дата:** 2026-10-07.
-**Исходный запрос:** снизить RAM memory_mcp на VPS 2 CPU / 2 GB; желаемые 10–20 MB idle и 100–200 MB active для одного tenant. Пользователь выбрал вариант A: исправить memory bounds и избыточные аллокации существующего SaaS-профиля. На этой стадии нужны проверки и план, не product code.
-**Связанный план:** удалён вместе с `docs/superpowers/plans/` (коммит `fdf85d23`).
+**Исходный запрос:** снизить RAM memory_mcp на VPS 2 CPU / 2 GB; желаемые 10–20 MB idle и 100–200 MB active для одного tenant. Пользователь выбрал вариант A: исправить memory bounds и избыточные аллокации существующего SaaS-профиля.
+**Связанный план:** удалён вместе с `docs/superpowers/plans/` (коммит `fdf85d23`); сама директория plans/ поздже была воссоздана для других работ.
 
 ## 1. Цель и границы
 

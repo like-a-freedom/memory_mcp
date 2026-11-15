@@ -1,6 +1,6 @@
 # SurrealDB query efficiency: design and acceptance contract
 
-Статус: proposed design; реализация и production rollout не разрешены этим документом.
+Статус: реализована локально — индексные изменения и миграции `053`/`054` влиты в `master`; acceptance неполное (G1 partial, G4 open, см. [audit](../../performance/surrealdb-query-audit-2026-10-14/audit.md)); production rollout не выполнен и этим документом не авторизуется.
 
 ## Цель и evidence
 

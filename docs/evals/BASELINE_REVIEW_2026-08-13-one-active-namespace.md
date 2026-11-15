@@ -41,8 +41,9 @@ write path, eval corpus rebase).
 
 Both artifacts are approved as frozen baselines. Regression budgets in
 `evals/profiles/pr.json` and `evals/profiles/release.json` are now enforced
-against these files; `make eval-pr` / `make eval-release` pass them
-automatically.
+against these files; the one-line `make eval-pr` / `make eval-release` targets
+that used to pass them automatically were retired — run the profile directly:
+`cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/<name>.json --artifact target/evals/<name>.json`.
 
 Replacement requires before/after artifact review and a dated rationale
 (plan Task 19). The pre-approval `target/evals/` artifacts used for this

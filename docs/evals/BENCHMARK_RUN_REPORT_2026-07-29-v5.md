@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-29 (fifth run)  
 **Commit**: `29051273` — `make evaluation results truthful and coverage-aware`  
-**Previous runs**: [v1 2026-07-28](BENCHMARK_RUN_REPORT_2026-07-28.md) · [v2 2026-07-29](BENCHMARK_RUN_REPORT_2026-07-29.md) · [v3 2026-07-29](BENCHMARK_RUN_REPORT_2026-07-29-v3.md)
+**Previous runs**: v1 (2026-07-28), v2/v3 (2026-07-29) — superseded drafts, removed from the repository; this report is the canonical record. A v4 report was never committed; the "v4" columns below quote that run's local results.
 **Host**: macOS 26.5.2 — Apple Silicon (arm64)  
 **Rust**: 1.97.1 / Cargo 1.97.1
 

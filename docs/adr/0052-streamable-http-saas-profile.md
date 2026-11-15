@@ -7,6 +7,13 @@ Accepted; core implementation complete, release verification incomplete —
 open signup remains blocked until the executable and operational evidence in the
 completion plan and `docs/operations/HTTP_RELEASE_GATE.md` has passed.
 
+> **Amended 2026-11-14** (historical text below is left as written per
+> [ADR-0058](0058-bounded-contexts-modular-monolith.md)'s no-rewrite rule):
+> the workspace now resolves `rmcp` 3.9.0; the UI crate and feature are `ui`,
+> not `control-plane-ui` (ADR-0058 item 6); [ADR-0055](0055-local-admin-authentication-for-remote-deployment.md)
+> local-admin authentication is implemented, so "Implementation is pending" below
+> is obsolete.
+
 ## Context
 
 Memory MCP currently runs as a local stdio server with one immutable Active

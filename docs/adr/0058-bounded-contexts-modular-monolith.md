@@ -4,7 +4,8 @@
 **Status:** Accepted; implemented. The follow-up ADRs are ADR-0059
 (per-context control-plane stores), ADR-0060 (the last
 context-to-service edges) and ADR-0061 (the compiler graph defines the
-source tree).
+source tree; superseded in part by ADR-0063 and reinstated in part by
+ADR-0065).
 **Supersedes:** Module organization after implementation, not current runtime behavior
 **Spec:** [design contract](../superpowers/specs/2026-09-23-ddd-modular-monolith.md)
 **Execution:** this ADR, with ADR-0059, ADR-0060 and the bounded-context

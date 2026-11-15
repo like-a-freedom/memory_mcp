@@ -74,12 +74,20 @@ State.OOMKilled=false у последующего запущенного кон�
 
 ## Точный дефект в исходниках
 
-1. [run_decay_pass](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/memory/lifecycle_workers/decay.rs:110) вызывает select_active_facts(1000).
-2. [build_select_active_facts_query](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/knowledge/queries.rs:183) строит SELECT * FROM fact. Для decay нужны fact_id, t_valid, t_invalid, confidence, access_count и last_accessed, а embedding не используется.
-3. [SurrealDbClient::query](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/storage/client.rs:1072) вызывает surreal_to_json, затем extract_records.
-4. [surreal_to_json](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/storage/helpers.rs:129) использует serde_json::to_value для SurrealDB Value. Это сериализация enum-представления, а не прямая конвертация в обычный JSON. Один float превращается в {"Number":{"Float":число}}: два JSON object вместо одного scalar.
-5. [extract_records](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/storage/helpers.rs:149) извлекает Array, затем делает as_array().cloned(). Это глубокая копия всего tagged дерева, включая сотни тысяч объектов чисел, при ещё живом оригинале.
-6. [normalize_surreal_json](/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/src/storage/helpers.rs:193) строит обычное дерево, а исходные tagged деревья освобождаются. Живой результат маленький; ранее затронутые страницы остаются у glibc.
+> **Статус (2026-11-14):** дефект описан ниже устранён изменением
+> materialization хранения (`crates/memory-mcp/src/storage/json_conversion.rs`,
+> проекция `NONSEMANTIC_FACT_PROJECTION`, `select_decay_candidates`) — см.
+> [дизайн storage-materialization](../superpowers/specs/2026-10-13-storage-materialization-memory-design.md)
+> и `crates/memory-mcp/tests/storage_materialization_memory.rs`. Указатели на
+> строки ниже соответствуют коду на дату отчёта (2026-10-13) и с тех пор
+> сместились; нумерация сохранена как историческая запись.
+
+1. `run_decay_pass` (`crates/memory-mcp/src/memory/lifecycle_workers/decay.rs`) вызывает select_active_facts(1000).
+2. `build_select_active_facts_query` (`crates/memory-mcp/src/knowledge/queries.rs`) строит SELECT * FROM fact. Для decay нужны fact_id, t_valid, t_invalid, confidence, access_count и last_accessed, а embedding не используется.
+3. `SurrealDbClient::query` (`crates/memory-mcp/src/storage/client.rs`) вызывает surreal_to_json, затем extract_records.
+4. `surreal_to_json` (`crates/memory-mcp/src/storage/helpers.rs`) использует serde_json::to_value для SurrealDB Value. Это сериализация enum-представления, а не прямая конвертация в обычный JSON. Один float превращается в {"Number":{"Float":число}}: два JSON object вместо одного scalar.
+5. `extract_records` (`crates/memory-mcp/src/storage/helpers.rs`) извлекает Array, затем делает as_array().cloned(). Это глубокая копия всего tagged дерева, включая сотни тысяч объектов чисел, при ещё живом оригинале.
+6. `normalize_surreal_json` (`crates/memory-mcp/src/storage/helpers.rs`) строит обычное дерево, а исходные tagged деревья освобождаются. Живой результат маленький; ранее затронутые страницы остаются у glibc.
 
 SurrealDB Value::Number и Number::Float сериализуются как externally tagged enum. Размер SurrealDB Value в воспроизведении — 56 байт, serde_json::Value — 32. JSON objects используют BTreeMap. Поэтому ответ с миллионами маленьких объектов существенно дороже самого массива чисел. Это не догадка о JSON: ниже измерены реальные allocation sizes и RSS.
 
@@ -161,12 +169,11 @@ Linux воспроизведение выполнено на arm64; production �
 
 ## Сохранённые материалы
 
-- [Production observations, startup logs, kernel OOM, scalar SQL aggregates](/Users/solovey/Documents/dev/memory_mcp/docs/performance/memory-root-cause-2026-10-13/production-observations.json)
-- [Grafana metrics at 08:41:30 UTC](/Users/solovey/Documents/dev/memory_mcp/docs/performance/memory-root-cause-2026-10-13/metrics-at-084130.json)
-- [First background/startup window](/Users/solovey/Documents/dev/memory_mcp/docs/performance/memory-root-cause-2026-10-13/startup-window.json)
-- [All five Linux A/B outputs and exact run commands](/Users/solovey/Documents/dev/memory_mcp/docs/performance/memory-root-cause-2026-10-13/results.json)
-- [Probe source](/private/tmp/memory-rootcause-linux-probe/src/main.rs)
-- [Probe dependency lock](/private/tmp/memory-rootcause-linux-probe/Cargo.lock)
+- [Production observations, startup logs, kernel OOM, scalar SQL aggregates](memory-root-cause-2026-10-13/production-observations.json)
+- [Grafana metrics at 08:41:30 UTC](memory-root-cause-2026-10-13/metrics-at-084130.json)
+- [First background/startup window](memory-root-cause-2026-10-13/startup-window.json)
+- [All five Linux A/B outputs and exact run commands](memory-root-cause-2026-10-13/results.json)
+- Probe source and dependency lock: `/private/tmp/memory-rootcause-linux-probe/` (outside the repository; not preserved)
 
 Контейнеры эксперимента запускались с --rm; исходники проекта и production config не менялись. В baseline функции storage helpers использованы без изменения; варианты move/direct/projected/trim — только в экспериментальном коде.
 

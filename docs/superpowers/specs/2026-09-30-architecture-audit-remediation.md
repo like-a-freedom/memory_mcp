@@ -49,7 +49,7 @@ Three rules the method followed, and this work keeps:
 - `observability/` reaches no CI job, Makefile target, or Cargo target. Three of its four checkers import `yaml`; `pyproject.toml` declares `numpy`, `onnxruntime`, and `tokenizers` and no `pyyaml`, so it resolves only by accident through the onnxruntime chain.
 - `accelerate` — one site (`crates/memory-mcp/Cargo.toml:62`), zero builds. `mimalloc` — one site (`src/main.rs:1-3`), zero builds. `metal`'s `ner_metal` bench — compiled, never executed.
 - Most of the sixteen `Makefile` targets are never invoked by any workflow; four are (`eval-response-size`, `eval-ner-quality`, `bench-check`, `bench-cpu-core`), and a fifth, `bench-cpu`, appears only inside a printed suggestion in the step summary rather than as an invocation.
-- `docs/superpowers/specs/2026-09-18-local-admin-auth.md:4` still reads "proposed technical design awaiting review" for a shipped Local Administrator authentication path, and its baseline table still names the removed `control-plane-ui` crate (49, 63, 90, 91) and a `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE*` variable the code no longer reads. `2026-09-23-path-prefix-deployment.md:4` reads "Approved for planning" for a deployment that is fully implemented and verified in code.
+- `docs/superpowers/specs/2026-09-18-local-admin-auth.md:4` and `2026-09-23-path-prefix-deployment.md:4` read "proposed technical design awaiting review" / "Approved for planning" at audit time for shipped work; both now read **Implemented** (updated after this audit — see their status lines).
 
 ### 3. Container width
 

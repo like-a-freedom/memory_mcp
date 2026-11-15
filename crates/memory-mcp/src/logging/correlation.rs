@@ -3,7 +3,7 @@
 //! One id per unit of work, carried out-of-band so producers never thread it
 //! through their signatures. The formatter reads [`current`] and stamps it on
 //! every event that does not carry its own. See
-//! [ADR-0080](../../../docs/adr/0080-one-request-identity.md).
+//! [ADR-0080](../../../../docs/adr/0080-one-request-identity.md).
 
 tokio::task_local! {
     static REQUEST_ID: String;

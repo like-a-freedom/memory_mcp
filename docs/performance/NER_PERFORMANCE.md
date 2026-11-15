@@ -190,7 +190,7 @@ of the extension contract. Clients without the extension continue to receive
 synchronous tool results.
 
 The MCP adapter delegates task lifecycle, TTL, polling, retention, and
-cooperative cancellation to rmcp 3.1 `TaskManager`.
+cooperative cancellation to rmcp 3.9 `TaskManager`.
 
 ## Device policy
 

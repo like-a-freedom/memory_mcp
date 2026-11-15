@@ -1,6 +1,6 @@
 # OIDC provider resilience
 
-**Status:** Proposed implementation contract, distilled from the incident analysis and the user's request to prepare a plan. No implementation or execution method has been approved by this document.
+**Status:** Implemented. Discovery and JWKS loading shipped as a cancellable background worker; covered by `crates/memory-mcp/tests/{oidc_provider_transport,oidc_jwks,http_oidc_resilience}.rs` and recorded in the [ADR-0057 amendment](../../adr/0057-additive-browser-auth-methods.md).
 
 ## Problem and evidence
 

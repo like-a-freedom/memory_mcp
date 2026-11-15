@@ -56,15 +56,16 @@ installed base.
 
 ## Updating a row
 
-When the interop runner executes a client against a deployed
-`memory_mcp_http` instance, the runner writes a row with:
+Rows are updated by hand after driving a client through the steps above
+against a deployed `memory_mcp_http` instance. Record:
 
 - the pinned version of the client (commit hash for source builds,
   semver for tagged releases);
 - the protocol header used during the run (`2026-07-28` is the
   modern profile);
-- per-step pass/fail and an evidence path under
-  `docs/operations/interop-evidence/<client>/<date>/`.
+- per-step pass/fail, and store any captured evidence under
+  `docs/operations/interop-evidence/<client>/<date>/` (create the
+  directory on first use — no runner ships in-tree).
 - a `Pass` / `Fail` in the `Result` column. A `Fail` records a compatibility
   issue for follow-up; it does not block the single-user project release.
 

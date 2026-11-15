@@ -2,7 +2,7 @@
 //!
 //! `cargo run -p xtask -- <command>`
 //!
-//! Two commands exist because two contracts do:
+//! The commands exist because the contracts do:
 //!
 //!   * `package` produces the release artifacts the release workflow attaches
 //!     to a GitHub Release. Its output shape is a published contract.
@@ -10,13 +10,12 @@
 //!     embedded, so a bundler that changes its output fails the build instead
 //!     of shipping a UI that cannot boot.
 //!   * `check-observability` runs the recording-rule, alert and dashboard
-//!     checkers, so 45 rules, 20 alerts and 2 dashboards cannot drift away
+//!     checkers, so 42 rules, 18 alerts and 2 dashboards cannot drift away
 //!     from the metrics the crate exports without anything noticing.
 //!
-//! Two of the three replaced Python tooling under `scripts/ci`; the
-//! repository runs nothing outside cargo. The observability checkers are still
-//! Python, and this subcommand is the cargo entry point that makes them
-//! reachable from a cargo-only CI.
+//! `package` and `check-ui-bundle` replaced Python tooling under `scripts/ci`;
+//! the observability checkers are still Python, and this subcommand is the
+//! cargo entry point that makes them reachable from a cargo-only CI.
 
 mod bundle;
 mod memory;

@@ -4,7 +4,7 @@ Rust-based MCP server for agent long-term memory. Two composition roots share th
 
 ## Code Navigation
 
-Use octocode MCP tools before reading files:
+If the `octocode` MCP server is available in your session, prefer it before reading files:
 
 | Tool | Use for |
 |------|---------|
@@ -15,13 +15,14 @@ Use octocode MCP tools before reading files:
 
 **Workflow:** graphrag overview → semantic_search → view_signatures → read sections.
 
-**Never:** run grep/rg/find (use semantic_search), read whole files for structure (use view_signatures), guess file locations (use graphrag first).
+Without those tools, use ordinary file reads and search; never guess file locations blindly.
 
 ## Skills
 
 | Skill | When to use |
 |-------|-------------|
 | `memory-mcp` | MCP tool schemas, arguments, response format, memory ops |
+| `memory-cli` | `memory_mcp` shell CLI: capture, recall, ingestion, re-embedding |
 | `mcp-design` | Design or review MCP tools |
 | `rust-skills` | Rust layout, modules, feature flags, workspace conventions |
 | `keenable-cli` | Web search and page fetch |
@@ -33,8 +34,8 @@ cargo build                              # Build everything
 cargo test -p memory_mcp                 # Test production crate (prefer narrowing:
                                          #   -p <crate>, --test <target>, or a name filter)
 cargo check                              # Fast compile check
-cargo clippy --workspace --all-targets \ # Lint (zero warnings required)
-  --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
+# Lint (zero warnings required) — same feature set as CI:
+cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings
 cargo fmt --all --check                  # Format check (zero diff)
 cargo fmt --all                          # Auto-format
 cargo run -- serve                       # Start MCP server (stdio)
@@ -45,8 +46,10 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 
 ## Boundaries
 
+Paths like `src/…` below are relative to `crates/memory-mcp/src/`.
+
 **Never:**
-- Add business logic to `main.rs` — keeps CLI parsing + mode dispatch only
+- Add business logic to `main.rs` — it only calls `runner::run()`; parsing lives in `cli.rs`, dispatch in `runner.rs`
 - Put new business logic in `src/service/` — use cases belong in the owning
   context's `api.rs`
 - Give a use case a shared service container — inject the narrow ports it needs
@@ -63,7 +66,7 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 - Changing dependencies in `Cargo.toml`
 
 **Always:**
-- Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings` before shipping
+- Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings` before shipping
 - Add tests for new functionality
 - Follow the design principles below
 
@@ -102,8 +105,8 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 
 ## Design Principles
 
-1. **`main.rs` stays thin** — CLI parsing and mode dispatch only
-2. **Context-local use cases** — business logic lives in the owning context's public interface (`src/{identity,tenancy,provisioning,operations,knowledge,memory,embedding}/api.rs`); transport handlers in `src/mcp/`, `src/http/` and `src/control/` are thin adapters. Do not put new business logic in `src/service/`, and do not add a shared service container that capabilities depend on: a capability takes the narrow ports it needs, not the whole context. Container-shaped entry points live in `src/service/memory_container_shims/` and `src/service/cli/`, the only modules allowed to name `MemoryService`. See [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md).
+1. **`main.rs` stays thin** — it only calls `runner::run()`; parsing lives in `cli.rs`, dispatch in `runner.rs`
+2. **Context-local use cases** — business logic lives in the owning context's public interface (`src/{identity,tenancy,provisioning,operations,knowledge,memory,embedding}/api.rs`); transport handlers in `src/mcp/`, `src/http/` and `src/control/` are thin adapters. Do not put new business logic in `src/service/`, and do not add a shared service container that capabilities depend on: a capability takes the narrow ports it needs, not the whole context. Container-shaped entry points live in `src/service/memory_container_shims/` and `src/service/cli/`; see Reference Files for the modules that may name `MemoryService`. See [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md).
 3. **Tool responses are decision-ready** — includes `guidance` for next steps
 4. **Bi-temporal model** — `t_ref` (valid time) and `t_ingested` (transaction time); never delete, only invalidate
 5. **One Active Namespace** — storage is selected once at startup; do not add request-level partitioning
@@ -183,6 +186,6 @@ Read on demand:
 - [`docs/compatibility/`](docs/compatibility/) — scope/namespace compatibility contract
 - [`docs/evals/`](docs/evals/) — evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
 - [`hooks/README.md`](hooks/README.md) — lifecycle hooks contract and editor-by-editor configuration
-- [`crates/memory-mcp/src/`](crates/memory-mcp/src/) — production source tree; `identity/`, `tenancy/`, `provisioning/`, `operations/`, `knowledge/`, `memory/` and `embedding/` are the bounded contexts, while `mcp/`, `http/`, `control/` and `service/` hold transport adapters. A context takes narrow injected ports. `MemoryService` survives only at the composition edge: `service/memory_container_shims/`, `service/capability_deps.rs`, `service/retrieval_deps_from_container.rs`, `service/cli/`, and the entry points that construct one (`service/core/`, `runner.rs`, `mcp/`, `cli/`, `tools/`, `http/runtime/`). No bounded context names it (see [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md)).
+- [`crates/memory-mcp/src/`](crates/memory-mcp/src/) — production source tree; `identity/`, `tenancy/`, `provisioning/`, `operations/`, `knowledge/`, `memory/` and `embedding/` are the bounded contexts, while `mcp/`, `http/`, `control/` and `service/` hold transport adapters. A context takes narrow injected ports. `MemoryService` is confined to the composition edge: `service/memory_container_shims/`, `service/capability_deps.rs`, `service/retrieval_deps_from_container.rs`, `service/cli/`, `service/core/`, `bootstrap/`, `runner.rs`, and the transport/worker modules that construct or drive one (`mcp/`, `cli/`, `tools/`, `http/`, `platform/`, `eval_support/`, `service/apps/`, `service/fs_watch/`). No bounded context uses it in production code (test modules inside contexts construct one). See [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md).
 - [`crates/eval-harness/`](crates/eval-harness/) — private evaluation package (Criterion benches, profiles, corpora references)
-- [`crates/xtask/`](crates/xtask/) — build automation: `cargo run -p xtask -- package <build-dir> <target>` produces the release artifacts, `-- check-ui-bundle <dist>` asserts the console bundle's shape before it is embedded, and `-- check-observability` regenerates the dashboards and checks the recording rules, alerts and panels against the metrics the crate exports. `-- check-toolchain-pin` requires the `Dockerfile` tags and the CI setup action to name the channel `rust-toolchain.toml` pins, which rustup would otherwise override silently. Every check CI runs is a `cargo` command; the observability checkers are the one exception and are Python behind that command, qualified by [ADR-0070](docs/adr/0070-observability-checkers-through-cargo.md) (see [ADR-0064](docs/adr/0064-run-ci-on-cargo-only.md))
+- [`crates/xtask/`](crates/xtask/) — build automation: `cargo run -p xtask -- package <build-dir> <target>` produces the release artifacts, `-- check-ui-bundle <dist>` asserts the console bundle's shape before it is embedded, and `-- check-observability` regenerates the dashboards and checks the recording rules, alerts and panels against the metrics the crate exports. `-- check-toolchain-pin` requires the `Dockerfile` tags and the CI setup action to name the channel `rust-toolchain.toml` pins, which rustup would otherwise override silently. CI's build, lint and test gates are `cargo` commands; the observability checkers are Python behind `xtask check-observability`, qualified by [ADR-0070](docs/adr/0070-observability-checkers-through-cargo.md) (see [ADR-0064](docs/adr/0064-run-ci-on-cargo-only.md)), and the docker job asserts image behaviour with shell steps.

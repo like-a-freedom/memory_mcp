@@ -80,7 +80,7 @@ flowchart TD
     Hooks -->|"hidden lifecycle CLI\nsubcommands"| CLI["CLI layer\nserve, reembed, init"]
     Operator --> CLI
 
-    MCP --> Tools["Protocol-agnostic tools\ningest, extract, resolve, retrieve, explain, invalidate"]
+    MCP --> Tools["Protocol-agnostic tools\ningest, extract, resolve, assemble_context,\nexplain, invalidate, open_app, app_command"]
     CLI --> Tools
     Tools --> Capabilities["Capabilities\nthin adapters"]
     Capabilities --> Contexts["Bounded contexts\nidentity, tenancy, provisioning,\noperations, knowledge, memory, embedding"]
@@ -94,12 +94,13 @@ flowchart TD
 
 **Important boundaries**
 
-- `main.rs` is thin: argument parsing and dispatch only.
+- `main.rs` is thin: it starts `runner::run()`. Argument parsing lives in
+  `cli.rs`, mode dispatch in `runner.rs`.
 - `mcp/` is a protocol adapter; business logic lives in the owning context's
   `api.rs`. `service/` is a legacy bridge pending expiry.
 - Each use case takes the narrow ports it needs, not a shared service
   container. Capabilities adapt the legacy context into those ports.
-- `tools/` and `service/capabilities/` are reusable from both MCP and CLI.
+- `tools/` and the owning context's `capabilities/` are reusable from both MCP and CLI.
 - Storage is selected once at startup. Requests do not choose a namespace.
 - Facts and claims are never deleted. They are invalidated while preserving
   historical traceability.
@@ -308,8 +309,6 @@ path.
 
 ```bash
 cargo run --release -- serve
-# or
-make serve-release
 ```
 
 For local NER workloads, run the MCP server from a release build. The development
@@ -1121,6 +1120,7 @@ still marked `No`.
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | HTTP ingress | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_IMAGE` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64) |
+| `MEMORY_MCP_MEM_LIMIT` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64); server container `mem_limit`, default `768m` |
 | `MEMORY_MCP_SERVER_CMD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_MCP_SERVER_CWD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | Metrics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
@@ -1140,6 +1140,7 @@ still marked `No`.
 | `SURREALDB_DB_NAME` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDED` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDING_DIMENSION` | Embeddings | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_MEM_LIMIT` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64); SurrealDB container `mem_limit`, default `512m` |
 | `SURREALDB_NAMESPACE` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 
 </details>
@@ -1242,7 +1243,7 @@ The following settings are optional for power users. They are read by the same e
 | `RETRIEVAL_RERANKER_MODEL_DIR` | path | unset | Local reranker model directory; requires `EMBEDDINGS_PROVIDER=local-candle`, any other provider is a startup error |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
 | `ANNO_MAX_INPUT_BYTES` | integer in `1..=1048576` | `1048576` | Maximum whole-input UTF-8 byte length for `NER_EXTRACTOR=anno`. Larger input is refused without truncation or chunking; persisted oversized episodes remain stored but extraction does not write facts, entities, edges, or an extraction projection. An explicit override with another extractor is a startup error. Use `65536` for the constrained memory profile |
-| `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
+| `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX; local-path when `NER_CACHE_DIR` is set, otherwise acquires its checkpoint at startup), `urchade/gliner_multi-v2.1` (classic Candle GLiNER; acquisition deferred to background refresh), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER; acquires its checkpoint at startup). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
 | `NER_CACHE_DIR` | path | `<data>/models/ner` | Artifact store root for model-backed extractors (Anno ONNX, classic GLiNER, VAGO LFM2) |
 | `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for model-backed extractors; trimmed, lowercased, deduplicated in first-declared order |
 | `NER_THRESHOLD` | floating-point number | unset (each backend's evaluated default; anno-onnx uses `0.5`) | Confidence threshold for model-backed extractors; explicit in-range values override the backend default |
@@ -1650,7 +1651,8 @@ grouped by what reads them:
 | Variable | Read by | Purpose |
 | --- | --- | --- |
 | `MEMORY_MCP_UI_DIST` | Build (`build.rs`) | UI bundle directory; see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging) |
-| `CARGO_*`, `OUT_DIR`, `GIT_COMMIT` | Cargo | Supplied by Cargo during compilation |
+| `CARGO_*`, `OUT_DIR` | Cargo | Supplied by Cargo during compilation |
+| `GIT_COMMIT` | Eval-harness build environment | Optional commit stamp read at compile time (`option_env!`); supplied externally by CI or the caller, never by Cargo |
 | `DIOXUS_CLI_VERSION`, `WASM_TARGET` | Dockerfile | Image build args |
 | `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`, `MEMORY_MCP_HTTP_TEST_SEED_RESERVED`, `MEMORY_MCP_HTTP_TEST_SEED_SESSION`, `MEMORY_MCP_HTTP_TEST_FAULT_POINT`, `MEMORY_MCP_HTTP_TEST_FAULT_AT` | memory-mcp tests | Bootstrap, seeding, and fault injection behind the `test-fixtures` feature; a startup error outside a test build |
 | `LOCAL_ADMIN_TEST_CONTROL_URL`, `LOCAL_ADMIN_TEST_CONTROL_USERNAME`, `LOCAL_ADMIN_TEST_CONTROL_PASSWORD` | memory-mcp tests | Control-registry endpoint for the local-admin tests |
@@ -1830,8 +1832,9 @@ LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 ### Classic GLiNER (background refresh)
 
 `NER_EXTRACTOR=urchade/gliner_multi-v2.1` is the only model-backed
-selector that performs remote acquisition. The classic GLiNER backend
-follows these rules so MCP readiness never waits on the network:
+selector that never downloads during startup: its build path reads the
+local artifact store only, so MCP readiness never waits on the network.
+The classic GLiNER backend follows these rules:
 
 - **First install** with no local cache: the MCP `initialize` request
   succeeds immediately. Extraction is unavailable in this process; the
@@ -1846,10 +1849,16 @@ follows these rules so MCP readiness never waits on the network:
   MCP (and therefore Zed) to activate it. Retrying `extract` in the
   same process cannot activate the model: the active extractor and
   fingerprint are immutable for the process lifetime.
-- **Download-free alternatives**: `NER_EXTRACTOR=anno` (the default),
-  `NER_EXTRACTOR=regex`, and `NER_EXTRACTOR=anno-onnx` (CPU only, manual
-  checkpoint) do not perform network acquisition. Anno and Regex are
-  the recommended choices for offline installs.
+- **Other model-backed selectors acquire during startup**: `anno-onnx`
+  (when `NER_CACHE_DIR` is unset) and
+  `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` fetch their checkpoint from
+  Hugging Face while the extractor is built, before the server starts;
+  an unreachable upstream with no cached checkpoint fails extractor
+  construction instead of deferring it.
+- **Download-free alternatives**: `NER_EXTRACTOR=anno` (the default) and
+  `NER_EXTRACTOR=regex` build no model and never perform network
+  acquisition; `anno-onnx` with an explicit `NER_CACHE_DIR` also stays
+  local. Anno and Regex are the recommended choices for offline installs.
 - **Operational failures** (inaccessible `NER_CACHE_DIR`, missing read
   permissions) remain explicit startup errors and never silently
   downgrade extraction.
@@ -2368,7 +2377,7 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md): Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md): evaluation architecture and design
 - [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md): compact tool responses design
-- [`docs/adr/`](docs/adr/): Architecture Decision Records (82 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
+- [`docs/adr/`](docs/adr/): Architecture Decision Records (79 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
 - [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md): scope/namespace compatibility contract
 - [`docs/operations/`](docs/operations/): operator runbooks, including the [local administrator runbook](docs/operations/LOCAL_ADMIN.md), protocol conformance, credential rotation, known limitations, and the SurrealDB restore drill
 - [`docs/performance/`](docs/performance/): memory profile and NER performance measurements

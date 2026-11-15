@@ -1,7 +1,7 @@
 # ADR-0082: Perf evaluation surface lives in eval-harness
 
 - Status: accepted — 2026-10-10
-- Relates to: [ADR-0021](0021-eval-harness-isolated.md) (eval-harness is
+- Relates to: [ADR-0021](0021-adopt-a-virtual-cargo-workspace.md) (eval-harness is
   private and one-way dependent on `memory_mcp`), [ADR-0034](0034-allocator-and-accelerator-default-policy.md)
   (allocator/accelerator defaults; Criterion benches for micro-benchmarks),
   [ADR-0048](0048-bounded-runtime-observability.md) (bounded labels),

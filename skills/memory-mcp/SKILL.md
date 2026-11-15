@@ -6,8 +6,8 @@ compatibility: Requires a configured `memory-mcp` MCP server. This skill is MCP-
 
 # Memory MCP
 
-Use the MCP surface for agent-initiated memory work. Choose one branch —
-capture, canonicalize, recall, or app session — before calling a tool, and
+Use the MCP surface for agent-initiated memory work. Choose one branch:
+capture, canonicalize, recall, or app session, before calling a tool, and
 finish it before switching. Use an app only when a canonical tool cannot
 express the session-backed intent.
 
@@ -35,7 +35,7 @@ empty, failed, or conflicting result.
 
 The eight operations are `ingest`, `extract`, `resolve`, `assemble_context`,
 `explain`, `invalidate`, `open_app`, and `app_command`. Call them by their fully
-qualified host name — never a bare raw name.
+qualified host name; never use a bare raw name.
 
 Read [MCP tool reference](references/mcp-tools.md) for exact fields, responses,
 and app routing. The reference owns details; this file owns behavior and order.
@@ -62,7 +62,7 @@ Use when verified source material must outlive the current session.
    a new episode first, so it is not a re-extraction.
 
    A result with no extracted facts is `episode-only`: the source is stored but
-   nothing durable is recallable. Free-form prose extracts nothing — only
+   nothing durable is recallable. Free-form prose extracts nothing; only
    structured summaries do. To capture facts, ingest content shaped as a
    summary: markdown section headings (`## Decisions`, `## Facts`,
    `## Pending items`) with bullet items, or `Decision: …` / `Fact: …` lines.

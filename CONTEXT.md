@@ -24,16 +24,20 @@ in ADR-0016.
 
 ## Module seams
 
+Paths below are relative to `crates/memory-mcp/src/`.
+
 > Target reorganization per **ADR-0058**: `identity`, `tenancy`,
 > `provisioning`, `operations`, `memory`, `knowledge`, and the technical
 > `embedding` capability; a small pure `shared` kernel is separate from
 > technical `platform` and privileged `bootstrap` wiring. Console delivery
 > remains the layer-free `ui` adapter. These names are not all aggregates.
 > The bounded-context `api.rs` seams below are live. The reorganisation is
-> complete: no bounded context reaches the legacy container, and the
-> container-shaped entry points that do read it live under
-> `service/memory_container_shims/`. The target transaction boundaries and
-> acyclic API graph live in the ADR/spec.
+> complete: no bounded context reaches the legacy container in production
+> code, and the container-shaped entry points that read it live at the
+> composition edge — `service/memory_container_shims/`,
+> `service/capability_deps.rs`, `service/retrieval_deps_from_container.rs`,
+> `service/cli/`, and the transport/worker modules. The target transaction
+> boundaries and acyclic API graph live in the ADR/spec.
 >
 > **A file in the tree is code only if a `mod` declaration reaches it.** An
 > undeclared `.rs` file is invisible to rustc, so no lint, no warning and no
@@ -86,8 +90,8 @@ in ADR-0016.
   `src/service/retrieval_deps_from_container.rs` — the transport-adapter edge
   that contains the service container. Each module adapts `MemoryService` (the
   former `ServiceContext`) into the narrow port its use case declares, so the
-  container appears in no capability signature. This is the only place the
-  container is read; see [ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md).
+  container appears in no capability signature; transport handlers and workers
+  may still hold it directly. See [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md).
 - `src/embedding/service.rs` — embedding generation, query embedding caching,
   and background retry logic. Holds the `EmbeddingService` struct that owns
   embedding-specific concerns.

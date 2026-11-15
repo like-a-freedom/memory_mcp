@@ -64,6 +64,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.38.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.2...v1.38.0
 [1.37.2]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.1...v1.37.2
 [1.37.1]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.0...v1.37.1
 [1.37.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.36.0...v1.37.0
