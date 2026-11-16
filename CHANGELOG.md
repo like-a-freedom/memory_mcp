@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.39.0] - 2026-11-16
+
+### Added
+- Remote SurrealDB connections now use TLS for `wss://` and `https://` endpoints.
+- The optional `eval-support` feature exposes a bound remote client constructor with an explicit embedding dimension for evaluation fixtures.
+
+### Changed
+- **Breaking for source builds:** the minimum supported Rust version is now 1.100.0 (up from 1.99.0). CI and Docker builds follow rolling stable.
+
+### Fixed
+- Triple-based retrieval now selects source fact IDs as values so related facts resolve correctly.
+
 ## [1.38.0] - 2026-11-09
 
 ### Other
@@ -64,6 +76,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.39.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.38.0...v1.39.0
 [1.38.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.2...v1.38.0
 [1.37.2]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.1...v1.37.2
 [1.37.1]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.0...v1.37.1
