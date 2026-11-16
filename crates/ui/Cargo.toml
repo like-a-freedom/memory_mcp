@@ -26,28 +26,10 @@ dioxus-web = "=0.7.10"
 dioxus-cli-config = { version = "=0.7.10", features = ["web"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-gloo-net = { version = "=0.7.0", features = ["http"] }
-gloo-storage = { version = "=0.4.0" }
-# Direct use of the browser platform. Every one is already in the lock file and
-# already compiled into this crate's WebAssembly through `dioxus-web` and
-# `gloo-net`: naming them here adds no crate to the graph and no byte to the
-# bundle, and it replaces the `new Function` bridge the CSP refuses.
-#
-# Every version here must keep matching what `dioxus-web` already resolves to.
-# `gloo-timers` is the live example: this graph resolves 0.3.0, and a 0.4
-# requirement would link a second copy of the crate into the bundle, which is the
-# one thing this list exists to avoid. Each pin is exact (`=`), so `cargo update`
-# cannot move one out of step; raising a pin is a deliberate change, made after
-# re-reading what `dioxus-web` resolves to in `Cargo.lock`.
-#
-# `Document`, `Element` and `Node` exist for one question asked in
-# `components/modal.rs`: whether focus already sits inside a modal frame that has
-# just mounted. The answer is what lets a panel's own control claim focus first
-# without the frame pulling it back. `Element` and `Node` arrive with `Document`
-# and with `dioxus-web`'s own `mounted` feature; `HtmlElement` is deliberately
-# absent because the focus itself goes through Dioxus's `MountedData::set_focus`,
-# which calls it inside `dioxus-web`.
-gloo-timers = { version = "=0.4.0", features = ["futures"] }
+# Browser APIs used directly by the UI. Keep the wasm-bindgen bindings aligned
+# with Dioxus's resolved versions to avoid duplicate browser bindings.
+gloo-net = { version = "=0.8.0", features = ["http"] }
+gloo-timers = { version = "=0.4.1", features = ["futures"] }
 js-sys = "=0.3.107"
 wasm-bindgen-futures = "=0.4.80"
 web-sys = { version = "=0.3.107", features = [

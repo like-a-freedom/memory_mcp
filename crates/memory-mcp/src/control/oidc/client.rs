@@ -865,7 +865,7 @@ mod tests {
         let token = jsonwebtoken::encode(
             &header,
             &id_token_claims(provider.base_url(), "user-1"),
-            &jsonwebtoken::EncodingKey::from_secret(b"secret"),
+            &jsonwebtoken::EncodingKey::from_secret(b"secret").expect("fixture secret key"),
         )
         .expect("token signs");
 

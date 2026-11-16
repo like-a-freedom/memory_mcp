@@ -341,7 +341,7 @@ mod tests {
         let token = encode(
             &Header::new(Algorithm::HS256),
             &valid_claims("user-1", FAR_FUTURE),
-            &EncodingKey::from_secret(b"untrusted"),
+            &EncodingKey::from_secret(b"untrusted").expect("fixture secret key"),
         )
         .expect("test token");
         let observed = validate_token(&token, &oidc_client(&config())).await;

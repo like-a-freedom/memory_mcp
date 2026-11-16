@@ -331,7 +331,7 @@ mod controlled {
         fn keys(&self, kid: &str) {
             *self.reply.lock().expect("source") = Ok(HashMap::from([(
                 kid.into(),
-                DecodingKey::from_secret(b"controlled-cache-key"),
+                DecodingKey::from_secret(b"controlled-cache-key").expect("fixture secret key"),
             )]));
         }
         fn fail(&self) {
