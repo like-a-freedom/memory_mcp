@@ -1,6 +1,6 @@
 # AGENTS.md — Memory MCP
 
-Rust-based MCP server for agent long-term memory. Two composition roots share the same protocol-agnostic capabilities: `memory_mcp` (CLI and stdio MCP) and `memory_mcp_http` (multi-user Streamable HTTP SaaS). The server ingests episodes, extracts entities and facts, resolves aliases, and assembles context with bi-temporal validity. Workspace `rust-version` is `1.99.0`. The `Dockerfile` tags and the CI setup action must name that same channel — `cargo run -p xtask -- check-toolchain-pin` requires it, because rustup resolves `rust-toolchain.toml` over the image default and would otherwise let a stale tag pass silently. See [README.md](README.md) for setup.
+Rust-based MCP server for agent long-term memory. Two composition roots share the same protocol-agnostic capabilities: `memory_mcp` (CLI and stdio MCP) and `memory_mcp_http` (multi-user Streamable HTTP SaaS). The server ingests episodes, extracts entities and facts, resolves aliases, and assembles context with bi-temporal validity. The workspace MSRV (`rust-version`) is `1.100.0`; `rust-toolchain.toml` selects rolling `stable`. Docker uses the official rolling `rust:slim-trixie` tags, and the CI setup action also selects `stable`. `cargo run -p xtask -- check-toolchain-pin` verifies those channel selectors agree. The stable compiler may advance without a repository change. See [README.md](README.md) for setup.
 
 ## Code Navigation
 

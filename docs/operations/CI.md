@@ -38,17 +38,18 @@ retroactively use a newer workflow. Create a new version/tag after merging.
 | macOS | — | `macos-15` |
 | Windows | `windows-2025` | `windows-11-arm` |
 
-Every enabled job runs on a native host with Rust **1.99.0**, matching
-`rust-version` and `rust-toolchain.toml`. There are no 32-bit targets or
-emulated Linux builds. Runner labels come from the
+Every enabled job runs on a native host using the rolling `stable` channel,
+matching `rust-toolchain.toml`. The workspace `rust-version = 1.100.0` is the
+minimum supported compiler, not a pinned toolchain. There are no 32-bit targets
+or emulated Linux builds. Runner labels come from the
 [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
-The channel also has to appear in the `Dockerfile` `FROM` tags and in the setup
-action, because a pin that lags is silently overridden by `rust-toolchain.toml`
-rather than rejected. `cargo run -p xtask -- check-toolchain-pin` requires all
-three to agree and runs in the `quality` job; the same job runs
-`cargo run -p xtask -- check-observability` to keep the recording rules, alerts
-and dashboards in step with the exported metrics.
+The Dockerfile uses the official rolling `rust:slim-trixie` tags, and the CI
+setup action selects `stable` as well. `cargo run -p xtask -- check-toolchain-pin`
+requires those three selectors to agree and runs in the `quality` job; it does
+not freeze the stable compiler version, which can advance upstream. The same job
+runs `cargo run -p xtask -- check-observability` to keep the recording rules,
+alerts and dashboards in step with the exported metrics.
 
 Each archive contains `memory_mcp` and `memory_mcp_http` with `fs-watch`,
 `mcp-apps`, `streamable-http` and `control-plane`. It excludes the browser UI

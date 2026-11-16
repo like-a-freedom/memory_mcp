@@ -6,6 +6,12 @@
 //! renders its own chrome around both of its routes without either page
 //! repeating it.
 
+// Dioxus 0.7.10's Routable derive triggers unreachable_code in generated code on current stable.
+#![expect(
+    unreachable_code,
+    reason = "Dioxus 0.7.10's Routable derive emits unreachable generated code"
+)]
+
 use dioxus::prelude::*;
 use dioxus_router::{Routable, Router as DioxusRouter};
 

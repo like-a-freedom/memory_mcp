@@ -143,7 +143,7 @@ the part worth keeping, so nobody reintroduces those claims.
 
 | Tool | Version observed | Notes |
 |---|---|---|
-| `rustc` / `cargo` | `1.99.0` | The channel `rust-toolchain.toml` pins, and the one the `Dockerfile` and CI build on. It was `1.97.1` when this procedure was first run; `check-toolchain-pin` keeps the three equal |
+| `rustc` / `cargo` | `1.100.0` | `stable` resolved to `1.100.0` when this row was last checked. `rust-toolchain.toml`, CI and the official `rust:slim-trixie` Docker tags all select rolling stable; `check-toolchain-pin` checks the channel selectors, not a fixed compiler version |
 | Docker | `29.4.0` (`docker compose` available) | `docker build` and `docker compose config` were both run |
 | `dx` (Dioxus CLI) | `0.7.10`, present at review time | The bundle reviewed in §2.6 was built with it; the image pins the same version as `DIOXUS_CLI_VERSION` in `Dockerfile`, which must stay equal to the UI crate's `dioxus = "=0.7.10"` requirement — `cargo xtask check-ui-bundle` asserts the bundle that pin produces (§2.6) |
 | `surreal` CLI | **absent** | Not needed: the registry runs as a container |

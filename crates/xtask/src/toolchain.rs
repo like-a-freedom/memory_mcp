@@ -90,28 +90,30 @@ fn toolchain_channel(file: &str) -> Option<String> {
         .map(|value| value.trim().trim_matches('"').to_owned())
 }
 
-/// The `rust:<version>` the `Dockerfile` builds from. Every stage has to agree:
-/// a `ui-builder` and a `builder` on different channels would compile the console
-/// and the binary that embeds it under different toolchains.
+/// The Rust toolchain selected by the Dockerfile's `FROM` tags. Every stage
+/// has to agree: a `ui-builder` and a `builder` on different channels would
+/// compile the console and the binary that embeds it under different toolchains.
 ///
-/// `None` covers disagreement as well as absence, so a stage left behind cannot
-/// read as a version the caller then compares and accepts.
+/// Docker Hub's unversioned `rust:slim[-<suite>]` tags follow stable. `None`
+/// covers disagreement as well as absence, so a stage left behind cannot read
+/// as a channel the caller then compares and accepts.
 fn dockerfile_base(dockerfile: &str) -> Option<String> {
-    let mut versions: Vec<&str> = dockerfile
+    let mut channels: Vec<&str> = dockerfile
         .lines()
         .filter_map(|line| line.trim().strip_prefix("FROM rust:"))
         .filter_map(|tag| tag.split('-').next())
-        .filter(|version| !version.is_empty())
+        .map(|channel| if channel == "slim" { "stable" } else { channel })
+        .filter(|channel| !channel.is_empty())
         .collect();
 
     // `dedup` only collapses neighbours, so a stage repeated after a differing
-    // one still leaves more than one distinct version behind.
-    versions.sort_unstable();
-    versions.dedup();
+    // one still leaves more than one distinct channel behind.
+    channels.sort_unstable();
+    channels.dedup();
 
-    match versions.as_slice() {
+    match channels.as_slice() {
         [only] => Some((*only).to_owned()),
-        // Absent, or stages that disagree: neither is a version to compare.
+        // Absent, or stages that disagree: neither is a channel to compare.
         [] | [_, _, ..] => None,
     }
 }
@@ -181,6 +183,14 @@ mod tests {
 
     /// One stage left behind is the drift this check exists for, so it has to
     /// read as disagreement rather than as a version it can average away.
+    #[test]
+    fn the_official_slim_trixie_tag_tracks_stable() {
+        assert_eq!(
+            dockerfile_base("FROM rust:slim-trixie AS builder\n").as_deref(),
+            Some("stable")
+        );
+    }
+
     #[test]
     fn a_stage_left_on_another_toolchain_is_not_a_match() {
         let mixed = "FROM rust:1.99-slim-trixie AS ui-builder\n\

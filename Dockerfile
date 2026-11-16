@@ -35,15 +35,10 @@
 # only after re-running `dx --version` / `dx bundle --help` and re-checking this
 # layout.
 # ─────────────────────────────────────────────────────────────────────────────
-# The toolchain here must be the one `rust-toolchain.toml` pins, not a floor.
-# `COPY . .` brings that file into /src, and rustup honours it over the image's
-# own default, so a tag behind the pin does not fail the build — it silently
-# installs and runs the pinned toolchain instead, leaving the tag describing a
-# toolchain no layer ever used. That drift is invisible until a toolchain change
-# turns into a behavioural one, which is how `rust:1.97.1` survived the move to
-# 1.99 and left the console bundling against a different LLVM than the tag
-# claimed. `xtask check-toolchain-pin` keeps the two equal and runs in CI.
-FROM rust:1.99.0-slim-trixie AS ui-builder
+# These official unversioned tags follow Rust stable on Debian Trixie. The
+# repository toolchain file and CI setup action also select `stable`; the xtask
+# check keeps all three selectors aligned while stable itself advances upstream.
+FROM rust:slim-trixie AS ui-builder
 
 WORKDIR /src
 
@@ -105,7 +100,7 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/r
 # Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and
 # embeds it at compile time through `MEMORY_MCP_UI_DIST`.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM rust:1.99.0-slim-trixie AS builder
+FROM rust:slim-trixie AS builder
 
 WORKDIR /src
 

@@ -68,12 +68,10 @@ runs:
         (Join-Path $target 'deps') >> $env:GITHUB_PATH
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
       with:
-        # The channel `rust-toolchain.toml` pins, not `rust-version`. Naming the
-        # floor here made CI build on a different toolchain than a local checkout
-        # and than the image, so a behavioural toolchain change reached the
-        # release artefacts untested. `xtask check-toolchain-pin` keeps the three
-        # equal; that check runs in the quality job below.
-        toolchain: 1.99.0
+        # Use the same rolling channel as `rust-toolchain.toml` and the official
+        # `rust:slim-trixie` image tags. `rust-version` is only the MSRV floor.
+        # `xtask check-toolchain-pin` checks that all three selectors agree.
+        toolchain: stable
         target: ${{ inputs.target }}
         components: rustfmt,clippy
         # Keep the setup action from injecting project-wide flags; clippy owns

@@ -125,10 +125,7 @@ pub(crate) fn has_unstructured_colon_value(content: &str) -> bool {
             return false;
         };
         let value = value.trim();
-        if key.trim().is_empty() || value.is_empty() || key.contains(" is ") {
-            return false;
-        }
-        true
+        !(key.trim().is_empty() || value.is_empty() || key.contains(" is "))
     })
 }
 
