@@ -85,6 +85,36 @@ async fn compare_with_corrected_unguarded_sql(
 }
 
 #[tokio::test]
+async fn seed_triple_fixture_batches_fact_inserts() {
+    let database = format!(
+        "triple_seed_batch_{}",
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    );
+    let db = Arc::new(
+        SurrealDbClient::connect_in_memory_with_dimension(&database, FIXTURE_NAMESPACE, "warn", 1)
+            .await
+            .expect("connect dimension-specific embedded database"),
+    );
+    db.apply_migrations(FIXTURE_NAMESPACE)
+        .await
+        .expect("apply current schema migrations");
+    let db_port: Arc<dyn DbClient> = db.clone();
+    let observer = SqlOverrideDbClient::new(db_port, None);
+    let query_calls = observer.query_counter();
+
+    seed_triple_fixture(&observer, FIXTURE_NAMESPACE, 129, 1)
+        .await
+        .expect("seed fixture across bounded fact batches");
+
+    assert_eq!(query_calls.load(Ordering::Relaxed), 2);
+    let facts = db
+        .query("SELECT fact_id FROM fact", None, FIXTURE_NAMESPACE)
+        .await
+        .expect("select seeded fact IDs");
+    assert_eq!(facts.as_array().map(Vec::len), Some(129));
+}
+
+#[tokio::test]
 async fn fixture_persists_expected_records_and_corrected_oracle_returns_source_fact() {
     let (db, _) = fixture().await;
     let facts = db
@@ -294,22 +324,50 @@ async fn zero_limit_returns_no_facts() {
 async fn limit_one_selects_an_eligible_fact_without_requiring_row_order() {
     let (db, store) = fixture().await;
     let db_port: Arc<dyn DbClient> = db;
-    let rows = compare_with_corrected_unguarded_sql(db_port, &store, "match", 1).await;
-
-    assert_eq!(rows.len(), 1);
-    assert!(
-        rows[0]
-            .get("fact_id")
-            .and_then(Value::as_str)
-            .is_some_and(|id| {
-                [
-                    "fact:triple-fixture-0000",
-                    "fact:triple-fixture-0001",
-                    "fact:triple-fixture-0002",
-                ]
-                .contains(&id)
-            })
+    let candidate_rows = store
+        .select_facts_by_triple("match", FIXED_CUTOFF, 1)
+        .await
+        .expect("candidate triple query");
+    assert_eq!(candidate_rows.len(), 1);
+    let candidate_fact_id = candidate_rows[0]
+        .get("fact_id")
+        .and_then(Value::as_str)
+        .expect("selected fact ID");
+    let alternate_fact_id = [
+        "fact:triple-fixture-0000",
+        "fact:triple-fixture-0001",
+        "fact:triple-fixture-0002",
+    ]
+    .into_iter()
+    .find(|fact_id| *fact_id != candidate_fact_id)
+    .expect("an alternate eligible fact ID");
+    let alternate_sql = corrected_unguarded_triple_sql().replace(
+        "LIMIT $limit",
+        &format!("AND fact_id = '{alternate_fact_id}' LIMIT $limit"),
     );
+    let corrected_db: Arc<dyn DbClient> =
+        Arc::new(SqlOverrideDbClient::new(db_port, Some(&alternate_sql)));
+    let corrected_store = KnowledgeStoreClient::new(corrected_db, FIXTURE_NAMESPACE);
+    let corrected_rows = corrected_store
+        .select_facts_by_triple("match", FIXED_CUTOFF, 1)
+        .await
+        .expect("alternate eligible triple query");
+
+    assert_eq!(corrected_rows.len(), 1);
+
+    let eligible_fact_ids = [
+        "fact:triple-fixture-0000",
+        "fact:triple-fixture-0001",
+        "fact:triple-fixture-0002",
+    ];
+    let alternate_fact_id = corrected_rows[0]
+        .get("fact_id")
+        .and_then(Value::as_str)
+        .expect("alternate fact ID");
+
+    assert!(eligible_fact_ids.contains(&candidate_fact_id));
+    assert!(eligible_fact_ids.contains(&alternate_fact_id));
+    assert_ne!(candidate_fact_id, alternate_fact_id);
 }
 
 #[tokio::test]

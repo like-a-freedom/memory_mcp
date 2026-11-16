@@ -13,7 +13,7 @@ use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::local::Mem;
 use surrealdb::engine::local::RocksDb;
-use surrealdb::engine::remote::ws::{Client, Ws};
+use surrealdb::engine::remote::ws::{Client, Ws, Wss};
 use surrealdb::opt::auth::Root;
 use surrealdb::types::Value as SurrealValue;
 
@@ -22,7 +22,8 @@ use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 
 use super::helpers::{
-    ensure_dir_exists, find_version_in_json, is_missing_table_error, normalize_url, surreal_to_json,
+    SurrealRemoteEndpoint, ensure_dir_exists, find_version_in_json, is_missing_table_error,
+    surreal_remote_endpoint, surreal_to_json,
 };
 use super::json_conversion::surreal_records_to_json;
 use super::queries::{build_create_query, build_select_one_query, build_update_query};
@@ -403,9 +404,32 @@ impl SurrealDbClient {
         target: &crate::config::SurrealTargetConfig,
         log_level: &str,
     ) -> Result<Self, MemoryError> {
-        let db = Surreal::new::<Ws>(target.url.as_str())
+        Self::connect_bound_with_embedding_dimension(
+            target,
+            log_level,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+        .await
+    }
+
+    /// Connects a bound remote client with an explicit embedding dimension for
+    /// evaluation fixtures. This constructor is absent from regular builds.
+    #[cfg(feature = "eval-support")]
+    pub async fn connect_bound_with_dimension(
+        target: &crate::config::SurrealTargetConfig,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
+        Self::connect_bound_with_embedding_dimension(target, log_level, fact_embedding_dimension)
             .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
+    }
+
+    async fn connect_bound_with_embedding_dimension(
+        target: &crate::config::SurrealTargetConfig,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
+        let db = Self::connect_remote_endpoint(&target.url).await?;
         db.signin(Root {
             username: target.username.clone(),
             password: target.password.clone(),
@@ -420,7 +444,7 @@ impl SurrealDbClient {
             engine: DbEngine::Remote(Arc::new(db)),
             active_namespace: target.namespace.clone(),
             logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         })
@@ -601,12 +625,18 @@ impl SurrealDbClient {
         Ok(DbEngine::Local(Arc::new(db)))
     }
 
+    async fn connect_remote_endpoint(url: &str) -> Result<Surreal<Client>, MemoryError> {
+        let endpoint = surreal_remote_endpoint(url)?;
+        let result = match endpoint {
+            SurrealRemoteEndpoint::Ws(address) => Surreal::new::<Ws>(address.as_str()).await,
+            SurrealRemoteEndpoint::Wss(address) => Surreal::new::<Wss>(address.as_str()).await,
+        };
+        result.map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))
+    }
+
     /// Connects to remote WebSocket instance.
     async fn connect_remote(config: &SurrealConfig) -> Result<DbEngine, MemoryError> {
-        let url = normalize_url(config.url.as_deref().unwrap_or(""));
-        let db = Surreal::new::<Ws>(url.as_str())
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
+        let db = Self::connect_remote_endpoint(config.url.as_deref().unwrap_or("")).await?;
 
         db.signin(Root {
             username: config.username.clone(),

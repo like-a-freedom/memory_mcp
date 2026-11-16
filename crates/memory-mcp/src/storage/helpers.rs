@@ -37,6 +37,37 @@ pub fn is_missing_table_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("table")
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SurrealRemoteEndpoint {
+    Ws(String),
+    Wss(String),
+}
+
+pub(crate) fn surreal_remote_endpoint(url: &str) -> Result<SurrealRemoteEndpoint, MemoryError> {
+    let normalized = normalize_url(url);
+    let (address, secure) = match normalized.split_once("://") {
+        Some(("ws", address)) => (address, false),
+        Some(("wss", address)) => (address, true),
+        Some(_) => {
+            return Err(MemoryError::ConfigInvalid(
+                "remote SurrealDB URL must use ws://, wss://, http://, or https://".to_string(),
+            ));
+        }
+        None => (normalized.as_str(), false),
+    };
+    if address.is_empty() {
+        return Err(MemoryError::ConfigInvalid(
+            "remote SurrealDB WebSocket address is empty".to_string(),
+        ));
+    }
+    let address = address.to_owned();
+    Ok(if secure {
+        SurrealRemoteEndpoint::Wss(address)
+    } else {
+        SurrealRemoteEndpoint::Ws(address)
+    })
+}
+
 #[cfg(test)]
 fn is_table_already_exists_error(message: &str) -> bool {
     let lowered = message.to_lowercase();
@@ -372,6 +403,54 @@ mod tests {
             record_id_from_json_value(&serde_json::json!({"RecordId": {"table": "triple"}})),
             None
         );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_strips_ws_scheme() {
+        assert_eq!(
+            surreal_remote_endpoint("ws://db.example.com/rpc").unwrap(),
+            SurrealRemoteEndpoint::Ws("db.example.com/rpc".to_owned())
+        );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_strips_wss_scheme() {
+        assert_eq!(
+            surreal_remote_endpoint("wss://db.example.com/rpc").unwrap(),
+            SurrealRemoteEndpoint::Wss("db.example.com/rpc".to_owned())
+        );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_maps_http_to_ws_rpc() {
+        assert_eq!(
+            surreal_remote_endpoint("http://db.example.com").unwrap(),
+            SurrealRemoteEndpoint::Ws("db.example.com/rpc".to_owned())
+        );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_maps_https_to_wss_rpc() {
+        assert_eq!(
+            surreal_remote_endpoint("https://db.example.com").unwrap(),
+            SurrealRemoteEndpoint::Wss("db.example.com/rpc".to_owned())
+        );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_preserves_bare_sdk_address() {
+        assert_eq!(
+            surreal_remote_endpoint("db.example.com:8000").unwrap(),
+            SurrealRemoteEndpoint::Ws("db.example.com:8000".to_owned())
+        );
+    }
+
+    #[test]
+    fn surreal_remote_endpoint_rejects_non_websocket_scheme() {
+        assert!(matches!(
+            surreal_remote_endpoint("mem://"),
+            Err(MemoryError::ConfigInvalid(_))
+        ));
     }
 
     #[test]

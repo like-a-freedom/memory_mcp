@@ -8,6 +8,7 @@ use serde_json::{Map, Value, json};
 
 pub const FIXED_CUTOFF: &str = "2026-11-13T15:52:35.269Z";
 pub const FIXTURE_NAMESPACE: &str = "org";
+const FIXTURE_FACT_BATCH_SIZE: usize = 128;
 
 pub fn corrected_unguarded_triple_sql() -> &'static str {
     "SELECT fact_id, fact_type, content, quote, source_episode, t_valid, t_ingested, \
@@ -60,27 +61,29 @@ pub async fn seed_triple_fixture(
         })
         .collect::<Vec<_>>();
 
-    db.query(
-        "FOR $fact IN $facts {\n\
-             CREATE type::record(\"fact\", $fact.record_key) CONTENT {
-                 fact_id: $fact.fact_id,\n\
-                 fact_type: \"note\",\n\
-                 content: $fact.content,\n\
-                 quote: $fact.content,\n\
-                 source_episode: \"episode:triple-fixture\",\n\
-                 t_valid: type::datetime(\"2026-11-13T14:00:00Z\"),\n\
-                 t_ingested: type::datetime(\"2026-11-13T14:00:00Z\"),\n\
-                 confidence: 0.9,\n\
-                 entity_links: [],\n\
-                 embedding: $fact.embedding,\n\
-                 policy_tags: [],\n\
-                 provenance: { ingestion_method: \"manual\" }\n\
-             };\n\
-         };",
-        Some(json!({ "facts": facts })),
-        namespace,
-    )
-    .await?;
+    for batch in facts.chunks(FIXTURE_FACT_BATCH_SIZE) {
+        db.query(
+            "FOR $fact IN $facts {\n\
+                 CREATE type::record(\"fact\", $fact.record_key) CONTENT {\n\
+                     fact_id: $fact.fact_id,\n\
+                     fact_type: \"note\",\n\
+                     content: $fact.content,\n\
+                     quote: $fact.content,\n\
+                     source_episode: \"episode:triple-fixture\",\n\
+                     t_valid: type::datetime(\"2026-11-13T14:00:00Z\"),\n\
+                     t_ingested: type::datetime(\"2026-11-13T14:00:00Z\"),\n\
+                     confidence: 0.9,\n\
+                     entity_links: [],\n\
+                     embedding: $fact.embedding,\n\
+                     policy_tags: [],\n\
+                     provenance: { ingestion_method: \"manual\" }\n\
+                 };\n\
+             };",
+            Some(json!({ "facts": batch })),
+            namespace,
+        )
+        .await?;
+    }
 
     let triples = [
         (
