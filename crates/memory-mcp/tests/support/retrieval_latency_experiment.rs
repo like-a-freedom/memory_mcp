@@ -18,124 +18,38 @@ use tokio::time::timeout;
 
 use super::oracle;
 use super::{
-    ContainerEvidenceError, EffectiveResources, ResourceMode, RunConfig, inspect_container_details,
-    row_digest,
+    ContainerEvidenceError, EffectiveResources, RunConfig, inspect_container_details, row_digest,
 };
 
+const WARMUP_COUNT: usize = 5;
+const SAMPLE_COUNT: usize = 20;
+const SAMPLE_LIMIT: usize = 40;
+const TRIPLE_COUNT: usize = 5;
+
+fn candidate_guarded_triple_sql() -> String {
+    guarded_triple_sql_with_else(oracle::corrected_unguarded_triple_sql())
+}
+
+fn guarded_triple_sql_with_else(else_body: &str) -> String {
+    format!(
+        "IF array::len((SELECT VALUE source_fact_id FROM triple \
+         WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query))) = 0 \
+         {{ [] }} ELSE {{ {else_body} }}"
+    )
+}
 const DOCKER_COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 const DOCKER_POLL_INTERVAL: Duration = Duration::from_millis(10);
-const QUIESCENCE_TIMEOUT: Duration = Duration::from_secs(60);
-const QUIESCENCE_MIN_SAMPLE_INTERVAL: Duration = Duration::from_millis(500);
-const QUIESCENCE_STABLE_INTERVALS: usize = 5;
-const QUIESCENCE_MAX_CPU_PERCENT: u128 = 1;
-const QUIESCENCE_MAX_IO_BYTES_PER_SECOND: u128 = 1024 * 1024;
-
-fn unix_timestamp_ns() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_nanos())
-}
-
-fn emit_diagnostic_event(phase: &str, details: &str) {
-    eprintln!(
-        "memory_triple_latency_diagnostic ts_unix_ns={} phase={phase} {details}",
-        unix_timestamp_ns()
-    );
-}
-
-fn emit_query_timing_event(
-    started_at_unix_ns: u128,
-    ended_at_unix_ns: u128,
-    elapsed_ns: u128,
-    context: &str,
-) {
-    eprintln!(
-        "memory_triple_latency_diagnostic ts_start_unix_ns={started_at_unix_ns} ts_end_unix_ns={ended_at_unix_ns} elapsed_ns={elapsed_ns} phase=query {context}"
-    );
-}
 
 #[derive(Debug)]
 struct DockerEvidence {
     server_version: String,
-    container_id: String,
-    docker_socket_path: String,
     resources: EffectiveResources,
     host_architecture: String,
     image_architecture: String,
     emulation: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ContainerActivity {
-    cpu_time_ns: u64,
-    read_bytes: u64,
-    write_bytes: u64,
-}
-
-fn parse_container_activity(stats: &Value) -> Result<ContainerActivity, String> {
-    let cpu_time_ns = stats
-        .pointer("/cpu_stats/cpu_usage/total_usage")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| "Docker stats omitted the container CPU counter".to_owned())?;
-    let io_entries = stats
-        .pointer("/blkio_stats/io_service_bytes_recursive")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "Docker stats omitted recursive block I/O counters".to_owned())?;
-
-    let mut activity = ContainerActivity {
-        cpu_time_ns,
-        read_bytes: 0,
-        write_bytes: 0,
-    };
-    let mut found_io_counter = false;
-    for entry in io_entries {
-        let operation = entry
-            .get("op")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "Docker block I/O counter omitted its operation".to_owned())?;
-        let value = entry
-            .get("value")
-            .and_then(Value::as_u64)
-            .ok_or_else(|| "Docker block I/O counter omitted its byte value".to_owned())?;
-        let counter = if operation.eq_ignore_ascii_case("read") {
-            &mut activity.read_bytes
-        } else if operation.eq_ignore_ascii_case("write") {
-            &mut activity.write_bytes
-        } else {
-            continue;
-        };
-        *counter = counter
-            .checked_add(value)
-            .ok_or_else(|| "Docker block I/O counter overflowed".to_owned())?;
-        found_io_counter = true;
-    }
-    if !found_io_counter {
-        return Err("Docker stats contained no read or write counters".to_owned());
-    }
-    Ok(activity)
-}
-
-fn container_activity_is_quiet(
-    previous: ContainerActivity,
-    current: ContainerActivity,
-    elapsed: Duration,
-) -> bool {
-    let elapsed_ns = elapsed.as_nanos();
-    let Some(cpu_delta_ns) = current.cpu_time_ns.checked_sub(previous.cpu_time_ns) else {
-        return false;
-    };
-    let Some(read_delta_bytes) = current.read_bytes.checked_sub(previous.read_bytes) else {
-        return false;
-    };
-    let Some(write_delta_bytes) = current.write_bytes.checked_sub(previous.write_bytes) else {
-        return false;
-    };
-    let io_delta_bytes = u128::from(read_delta_bytes) + u128::from(write_delta_bytes);
-
-    elapsed_ns >= Duration::from_millis(500).as_nanos()
-        && u128::from(cpu_delta_ns) * 100 <= elapsed_ns * QUIESCENCE_MAX_CPU_PERCENT
-        && io_delta_bytes * 1_000_000_000 <= elapsed_ns * QUIESCENCE_MAX_IO_BYTES_PER_SECOND
-}
+const DOCKER_OVERRIDE_ENV: &[&str] = &["DOCKER_HOST", "DOCKER_CONTEXT"];
 
 struct DatabaseSession {
     name: String,
@@ -187,13 +101,6 @@ impl SampleCase {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum ConnectionMode {
-    NewConnection,
-    ReusedConnection,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Observation {
     elapsed_ns: u128,
@@ -210,22 +117,12 @@ struct FixtureMetadata {
 }
 
 #[derive(Serialize)]
-struct CalibrationRecord {
-    case: &'static str,
-    limit: usize,
-    resource_mode: &'static str,
-    connection_mode: ConnectionMode,
-    sample_pairs_ns: Vec<[u128; 2]>,
-    max_noise_fraction: Option<f64>,
-}
-
-#[derive(Serialize)]
 struct SampleRecord {
     case: &'static str,
-    limit: usize,
-    resource_mode: &'static str,
-    connection_mode: ConnectionMode,
     elapsed_ns: Vec<u128>,
+    min_ns: u128,
+    median_ns: u128,
+    max_ns: u128,
     row_count: usize,
     sha256: String,
     query_call_count: usize,
@@ -244,19 +141,51 @@ struct LatencyReport {
     resource_mode: &'static str,
     effective_resources: EffectiveResources,
     fixture: FixtureMetadata,
-    measurement_resolution_ns: u128,
-    calibration: Vec<CalibrationRecord>,
+    connection_mode: &'static str,
+    limit: usize,
+    warmup_count: usize,
+    sample_count: usize,
     samples: Vec<SampleRecord>,
 }
 
+#[derive(Serialize)]
+struct GuardPairRecord {
+    order: &'static str,
+    baseline_ns: u128,
+    candidate_ns: u128,
+}
+
+#[derive(Serialize)]
+struct GuardCaseRecord {
+    case: &'static str,
+    row_count: usize,
+    sha256: String,
+    pairs: Vec<GuardPairRecord>,
+}
+
+#[derive(Serialize)]
+struct GuardComparisonReport {
+    schema: &'static str,
+    server_version: String,
+    sdk_version: &'static str,
+    image_id: String,
+    storage_engine: &'static str,
+    host_architecture: String,
+    image_architecture: String,
+    emulation: bool,
+    resource_mode: &'static str,
+    effective_resources: EffectiveResources,
+    fixture: FixtureMetadata,
+    warmup_count: usize,
+    pair_count: usize,
+    cases: Vec<GuardCaseRecord>,
+}
+
 pub(super) async fn verify_remote_triple_compatibility(config: &RunConfig) -> Result<(), String> {
-    let docker = inspect_disposable_container(config)?;
-    emit_diagnostic_event("fixture_setup_start", "case=compatibility");
+    inspect_disposable_container(config)?;
     let session = open_database(config, true).await?;
-    emit_diagnostic_event("fixture_setup_end", "case=compatibility");
     let result = async {
-        wait_for_container_quiescence(&docker, "compatibility")?;
-        for (query_index, (query, limit, expected)) in [
+        for (query, limit, expected) in [
             ("subject-match", 40, &["fact:triple-fixture-0000"][..]),
             ("predicate-match", 40, &["fact:triple-fixture-0001"][..]),
             ("object-match", 40, &["fact:triple-fixture-0002"][..]),
@@ -264,66 +193,297 @@ pub(super) async fn verify_remote_triple_compatibility(config: &RunConfig) -> Re
             ("quote 'snow' 日本語", 40, &[][..]),
             ("triple-fixture-no-match-query", 40, &[][..]),
             ("subject-match", 0, &[][..]),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let context = format!(
-                "case=compatibility limit={limit} mode=compatibility query_index={query_index}"
+        ] {
+            measure_query(&session, query, limit, expected).await?;
+        }
+        Ok(())
+    }
+    .await;
+    let cleanup = remove_database(&session).await;
+    combine_result_and_cleanup(result, cleanup)
+}
+
+pub(super) async fn verify_guard_candidate_compatibility(config: &RunConfig) -> Result<(), String> {
+    inspect_disposable_container(config)?;
+    let session = open_database(config, true).await?;
+    let result = async {
+        let candidate_sql = candidate_guarded_triple_sql();
+        let (candidate_store, candidate_calls) = make_override_store(&session, &candidate_sql);
+
+        for (query, expected) in [
+            ("triple-fixture-no-match-query", &[][..]),
+            ("subject-match", &["fact:triple-fixture-0000"][..]),
+            ("predicate-match", &["fact:triple-fixture-0001"][..]),
+            ("quote 'snow' 日本語", &[][..]),
+        ] {
+            let vars = oracle::corrected_triple_vars(query, oracle::FIXED_CUTOFF, 40);
+            let raw = timeout(
+                super::QUERY_TIMEOUT,
+                session
+                    .client
+                    .query(&candidate_sql, Some(vars), &session.namespace),
+            )
+            .await
+            .map_err(|_| "raw candidate query exceeded 10 seconds".to_owned())?
+            .map_err(|_| "raw candidate query failed".to_owned())?;
+            validate_raw_fact_rows(&raw, expected)?;
+
+            let before = candidate_calls.load(Ordering::Relaxed);
+            let candidate_rows = timeout(
+                super::QUERY_TIMEOUT,
+                candidate_store.select_facts_by_triple(query, oracle::FIXED_CUTOFF, 40),
+            )
+            .await
+            .map_err(|_| "public candidate lookup exceeded 10 seconds".to_owned())?
+            .map_err(|_| "public candidate lookup failed".to_owned())?;
+            if candidate_calls.load(Ordering::Relaxed) - before != 1 {
+                return Err(
+                    "one public candidate lookup did not issue exactly one SQL call".to_owned(),
+                );
+            }
+            validate_fact_rows(&candidate_rows, expected)?;
+
+            let baseline_rows = timeout(
+                super::QUERY_TIMEOUT,
+                session
+                    .store
+                    .select_facts_by_triple(query, oracle::FIXED_CUTOFF, 40),
+            )
+            .await
+            .map_err(|_| "public baseline lookup exceeded 10 seconds".to_owned())?
+            .map_err(|_| "public baseline lookup failed".to_owned())?;
+            if oracle::normalized_rows(&baseline_rows) != oracle::normalized_rows(&candidate_rows) {
+                return Err("candidate changed eligible fact rows or projection".to_owned());
+            }
+        }
+
+        let skipped_branch_sql =
+            guarded_triple_sql_with_else("THROW 'candidate fact branch entered'");
+        let (skipped_branch_store, _) = make_override_store(&session, &skipped_branch_sql);
+        let skipped = timeout(
+            super::QUERY_TIMEOUT,
+            skipped_branch_store.select_facts_by_triple(
+                "triple-fixture-no-match-query",
+                oracle::FIXED_CUTOFF,
+                40,
+            ),
+        )
+        .await
+        .map_err(|_| "skipped-branch query exceeded 10 seconds".to_owned())?
+        .map_err(|_| "no-match unexpectedly entered the failing fact branch".to_owned())?;
+        if !skipped.is_empty() {
+            return Err(
+                "skipping the failing fact branch did not return an empty array".to_owned(),
             );
-            let observation = measure_query(&session, query, limit, expected, &context).await?;
-            if observation.row_count != expected.len() {
+        }
+        let entered = timeout(
+            super::QUERY_TIMEOUT,
+            skipped_branch_store.select_facts_by_triple("subject-match", oracle::FIXED_CUTOFF, 40),
+        )
+        .await
+        .map_err(|_| "entered-branch query exceeded 10 seconds".to_owned())?
+        .expect_err("the selected fact branch deliberately throws");
+        if !entered
+            .to_string()
+            .contains("candidate fact branch entered")
+        {
+            return Err("the selected fact branch error was not propagated".to_owned());
+        }
+
+        let malformed_sql = guarded_triple_sql_with_else("{ malformed: true }");
+        let malformed = timeout(
+            super::QUERY_TIMEOUT,
+            session.client.query(
+                &malformed_sql,
+                Some(oracle::corrected_triple_vars(
+                    "subject-match",
+                    oracle::FIXED_CUTOFF,
+                    40,
+                )),
+                &session.namespace,
+            ),
+        )
+        .await
+        .map_err(|_| "malformed-result query exceeded 10 seconds".to_owned())?
+        .map_err(|_| "malformed-result query failed before producing a value".to_owned())?;
+        if malformed.as_array().is_none_or(Vec::is_empty)
+            || validate_raw_fact_rows(&malformed, &["fact:triple-fixture-0000"]).is_ok()
+        {
+            return Err(
+                "malformed candidate output was indistinguishable from a valid empty result"
+                    .to_owned(),
+            );
+        }
+
+        timeout(
+            super::QUERY_TIMEOUT,
+            session
+                .client
+                .query("REMOVE TABLE triple", None, &session.namespace),
+        )
+        .await
+        .map_err(|_| "removing the disposable triple table exceeded 10 seconds".to_owned())?
+        .map_err(|_| "could not remove the disposable triple table".to_owned())?;
+        for (label, rows) in [
+            (
+                "baseline",
+                timeout(
+                    super::QUERY_TIMEOUT,
+                    session
+                        .store
+                        .select_facts_by_triple("subject-match", oracle::FIXED_CUTOFF, 40),
+                )
+                .await
+                .map_err(|_| "missing-table baseline lookup exceeded 10 seconds".to_owned())?
+                .map_err(|_| "baseline missing-table behavior changed".to_owned())?,
+            ),
+            (
+                "candidate",
+                timeout(
+                    super::QUERY_TIMEOUT,
+                    candidate_store.select_facts_by_triple(
+                        "subject-match",
+                        oracle::FIXED_CUTOFF,
+                        40,
+                    ),
+                )
+                .await
+                .map_err(|_| "missing-table candidate lookup exceeded 10 seconds".to_owned())?
+                .map_err(|_| "candidate missing-table behavior changed".to_owned())?,
+            ),
+        ] {
+            if !rows.is_empty() {
                 return Err(format!(
-                    "remote compatibility case {query:?} returned an unexpected row count"
+                    "{label} lookup returned rows after its triple table was removed"
                 ));
             }
         }
         Ok(())
     }
     .await;
-    emit_diagnostic_event("cleanup_start", "case=compatibility");
     let cleanup = remove_database(&session).await;
-    emit_diagnostic_event("cleanup_end", "case=compatibility");
+    combine_result_and_cleanup(result, cleanup)
+}
+
+pub(super) async fn compare_guard_candidate(config: &RunConfig) -> Result<(), String> {
+    let docker = inspect_disposable_container(config)?;
+    let session = open_database(config, true).await?;
+    let result = async {
+        let candidate_sql = candidate_guarded_triple_sql();
+        let (candidate_store, candidate_calls) = make_override_store(&session, &candidate_sql);
+        let mut cases = Vec::new();
+
+        for (case, query, expected) in [
+            (
+                "populated_no_match",
+                "triple-fixture-no-match-query",
+                &[][..],
+            ),
+            (
+                "positive_match",
+                "subject-match",
+                &["fact:triple-fixture-0000"][..],
+            ),
+        ] {
+            for warmup in 0..WARMUP_COUNT {
+                measure_guard_pair(
+                    &session.store,
+                    &session.query_calls,
+                    &candidate_store,
+                    &candidate_calls,
+                    query,
+                    expected,
+                    warmup % 2 == 1,
+                )
+                .await?;
+            }
+
+            let mut pairs = Vec::with_capacity(SAMPLE_COUNT);
+            let mut expected_digest = None;
+            let mut expected_count = None;
+            for pair in 0..SAMPLE_COUNT {
+                let (baseline, candidate, order) = measure_guard_pair(
+                    &session.store,
+                    &session.query_calls,
+                    &candidate_store,
+                    &candidate_calls,
+                    query,
+                    expected,
+                    pair % 2 == 1,
+                )
+                .await?;
+                if baseline.digest != candidate.digest || baseline.row_count != candidate.row_count
+                {
+                    return Err("candidate changed rows during the paired comparison".to_owned());
+                }
+                if expected_digest
+                    .as_ref()
+                    .is_some_and(|digest| digest != &baseline.digest)
+                    || expected_count.is_some_and(|count| count != baseline.row_count)
+                {
+                    return Err("query result varied across paired samples".to_owned());
+                }
+                expected_digest.get_or_insert_with(|| baseline.digest.clone());
+                expected_count.get_or_insert(baseline.row_count);
+                pairs.push(GuardPairRecord {
+                    order,
+                    baseline_ns: baseline.elapsed_ns,
+                    candidate_ns: candidate.elapsed_ns,
+                });
+            }
+
+            let row_count = expected_count
+                .ok_or_else(|| "paired comparison did not collect any rows".to_owned())?;
+            let sha256 = expected_digest
+                .ok_or_else(|| "paired comparison did not collect a row digest".to_owned())?;
+            cases.push(GuardCaseRecord {
+                case,
+                row_count,
+                sha256,
+                pairs,
+            });
+        }
+
+        let report = GuardComparisonReport {
+            schema: "memory-triple-guard-ab/v1",
+            server_version: docker.server_version,
+            sdk_version: super::SDK_VERSION,
+            image_id: config.image_id.clone(),
+            storage_engine: super::STORAGE_ENGINE,
+            host_architecture: docker.host_architecture,
+            image_architecture: docker.image_architecture,
+            emulation: docker.emulation,
+            resource_mode: config.resource_mode.label(),
+            effective_resources: docker.resources,
+            fixture: FixtureMetadata {
+                fact_count: super::FACT_COUNT,
+                embedding_dimension: super::EMBEDDING_DIMENSION,
+                triple_count: TRIPLE_COUNT,
+                cutoff: oracle::FIXED_CUTOFF,
+            },
+            warmup_count: WARMUP_COUNT,
+            pair_count: SAMPLE_COUNT,
+            cases,
+        };
+        write_json_report(&config.report, &report)
+    }
+    .await;
+    let cleanup = remove_database(&session).await;
     combine_result_and_cleanup(result, cleanup)
 }
 
 pub(super) async fn capture_remote_latency(config: &RunConfig) -> Result<(), String> {
     let docker = inspect_disposable_container(config)?;
-    let server_version = docker.server_version.clone();
-
     let mut samples = Vec::new();
-    let mut calibration = Vec::new();
     for case in SampleCase::ALL {
-        emit_diagnostic_event("fixture_setup_start", &format!("case={}", case.label()));
         let session = open_database(config, case.has_fixture()).await?;
-        emit_diagnostic_event("fixture_setup_end", &format!("case={}", case.label()));
-        let capture_result = async {
-            wait_for_container_quiescence(&docker, case.label())?;
-            for limit in [0, 1, 3, 40] {
-                let (sample_record, calibration_record) =
-                    capture_new_connection_condition(config, &session, case, limit).await?;
-                samples.push(sample_record);
-                calibration.push(calibration_record);
-            }
-
-            for limit in [0, 1, 3, 40] {
-                let (sample_record, calibration_record) =
-                    capture_reused_connection_condition(config, &session, case, limit).await?;
-                samples.push(sample_record);
-                calibration.push(calibration_record);
-            }
-            Ok(())
-        }
-        .await;
-        emit_diagnostic_event("cleanup_start", &format!("case={}", case.label()));
+        let result = capture_case(&session, case).await;
         let cleanup = remove_database(&session).await;
-        emit_diagnostic_event("cleanup_end", &format!("case={}", case.label()));
-        combine_result_and_cleanup(capture_result, cleanup)?;
+        samples.push(combine_result_and_cleanup(result, cleanup)?);
     }
-
     let report = LatencyReport {
-        schema: "memory-triple-latency/v2",
-        server_version,
+        schema: "memory-triple-latency/v4",
+        server_version: docker.server_version,
         sdk_version: super::SDK_VERSION,
         image_id: config.image_id.clone(),
         storage_engine: super::STORAGE_ENGINE,
@@ -338,39 +498,63 @@ pub(super) async fn capture_remote_latency(config: &RunConfig) -> Result<(), Str
             triple_count: super::fixture_triples().len(),
             cutoff: oracle::FIXED_CUTOFF,
         },
-        measurement_resolution_ns: measurement_resolution_ns(),
-        calibration,
+        connection_mode: "reused_connection",
+        limit: SAMPLE_LIMIT,
+        warmup_count: WARMUP_COUNT,
+        sample_count: SAMPLE_COUNT,
         samples,
     };
-    write_report(config, &report)?;
+    write_report(config, &report)
+}
 
-    let calibration_is_valid = report
-        .calibration
-        .iter()
-        .all(|record| record.max_noise_fraction.is_some_and(|noise| noise <= 0.03));
-    if !calibration_is_valid {
-        return Err("latency report was written, but at least one A/A calibration was invalid or exceeded 3% noise".to_owned());
+async fn capture_case(session: &DatabaseSession, case: SampleCase) -> Result<SampleRecord, String> {
+    for _ in 0..WARMUP_COUNT {
+        measure_query(
+            session,
+            case.query(),
+            SAMPLE_LIMIT,
+            case.expected_fact_ids(SAMPLE_LIMIT),
+        )
+        .await?;
     }
-
-    Ok(())
+    let mut observations = Vec::with_capacity(SAMPLE_COUNT);
+    for _ in 0..SAMPLE_COUNT {
+        observations.push(
+            measure_query(
+                session,
+                case.query(),
+                SAMPLE_LIMIT,
+                case.expected_fact_ids(SAMPLE_LIMIT),
+            )
+            .await?,
+        );
+    }
+    make_sample_record(case, observations)
 }
 
 fn inspect_disposable_container(config: &RunConfig) -> Result<DockerEvidence, String> {
-    let tag_id = docker(&["image", "inspect", "--format", "{{.Id}}", super::IMAGE_TAG])?;
+    let endpoint = resolve_docker_endpoint()?;
+    let tag_id = docker(
+        &endpoint,
+        &["image", "inspect", "--format", "{{.Id}}", super::IMAGE_TAG],
+    )?;
     if tag_id.trim() != config.image_id {
         return Err("configured image ID does not match the local SurrealDB 3.3.5 tag".to_owned());
     }
 
     let publish_filter = format!("publish={}", config.port);
-    let container_ids = docker(&[
-        "ps",
-        "--filter",
-        &publish_filter,
-        "--filter",
-        "status=running",
-        "--format",
-        "{{.ID}}",
-    ])?;
+    let container_ids = docker(
+        &endpoint,
+        &[
+            "ps",
+            "--filter",
+            &publish_filter,
+            "--filter",
+            "status=running",
+            "--format",
+            "{{.ID}}",
+        ],
+    )?;
     let container_ids = container_ids
         .lines()
         .map(str::trim)
@@ -383,7 +567,7 @@ fn inspect_disposable_container(config: &RunConfig) -> Result<DockerEvidence, St
         );
     }
 
-    let container_json = docker(&["inspect", container_ids[0]])?;
+    let container_json = docker(&endpoint, &["inspect", container_ids[0]])?;
     let inspections: Value = serde_json::from_str(&container_json)
         .map_err(|_| "Docker returned invalid container inspection JSON".to_owned())?;
     let [inspection] = inspections
@@ -405,13 +589,16 @@ fn inspect_disposable_container(config: &RunConfig) -> Result<DockerEvidence, St
     let resources = inspect_container_details(inspection, config)
         .map_err(|error: ContainerEvidenceError| error.to_string())?;
 
-    let image_metadata = docker(&[
-        "image",
-        "inspect",
-        "--format",
-        "{{.Os}}|{{.Architecture}}",
-        &config.image_id,
-    ])?;
+    let image_metadata = docker(
+        &endpoint,
+        &[
+            "image",
+            "inspect",
+            "--format",
+            "{{.Os}}|{{.Architecture}}",
+            &config.image_id,
+        ],
+    )?;
     let (image_os, image_architecture) = image_metadata
         .trim()
         .split_once('|')
@@ -420,7 +607,10 @@ fn inspect_disposable_container(config: &RunConfig) -> Result<DockerEvidence, St
         return Err("the disposable SurrealDB image must target Linux".to_owned());
     }
 
-    let host_metadata = docker(&["info", "--format", "{{.OSType}}|{{.Architecture}}"])?;
+    let host_metadata = docker(
+        &endpoint,
+        &["info", "--format", "{{.OSType}}|{{.Architecture}}"],
+    )?;
     let (host_os, host_architecture) = host_metadata
         .trim()
         .split_once('|')
@@ -430,23 +620,9 @@ fn inspect_disposable_container(config: &RunConfig) -> Result<DockerEvidence, St
     }
     let emulation =
         canonical_architecture(host_architecture) != canonical_architecture(image_architecture);
-    let docker_endpoint = docker(&[
-        "context",
-        "inspect",
-        "--format",
-        "{{.Endpoints.docker.Host}}",
-    ])?;
-    let docker_socket_path = docker_endpoint
-        .trim()
-        .strip_prefix("unix://")
-        .filter(|path| !path.is_empty())
-        .ok_or_else(|| "exact container stats require a local Unix Docker socket".to_owned())?
-        .to_owned();
 
     Ok(DockerEvidence {
         server_version: format!("SurrealDB {}", super::SERVER_VERSION),
-        container_id: long_id.to_owned(),
-        docker_socket_path,
         resources,
         host_architecture: host_architecture.to_owned(),
         image_architecture: image_architecture.to_owned(),
@@ -462,87 +638,77 @@ fn canonical_architecture(architecture: &str) -> &str {
     }
 }
 
-fn docker(args: &[&str]) -> Result<String, String> {
-    run_bounded_command(Path::new("docker"), args, DOCKER_COMMAND_TIMEOUT)
-}
-
-fn read_container_activity(
-    docker_socket_path: &str,
-    container_id: &str,
-) -> Result<ContainerActivity, String> {
-    let stats_url = format!("http://localhost/v1.41/containers/{container_id}/stats?stream=false");
-    let args = [
-        "--silent",
-        "--show-error",
-        "--fail",
-        "--max-time",
-        "8",
-        "--unix-socket",
-        docker_socket_path,
-        stats_url.as_str(),
-    ];
-    let response = run_bounded_command(Path::new("curl"), &args, DOCKER_COMMAND_TIMEOUT)?;
-    let stats: Value = serde_json::from_str(&response)
-        .map_err(|_| "Docker Engine returned invalid container stats JSON".to_owned())?;
-    parse_container_activity(&stats)
-}
-
-fn wait_for_container_quiescence(docker: &DockerEvidence, case: &str) -> Result<(), String> {
-    emit_diagnostic_event(
-        "quiescence_start",
-        &format!(
-            "case={case} stable_intervals={QUIESCENCE_STABLE_INTERVALS} max_cpu_percent={QUIESCENCE_MAX_CPU_PERCENT} max_io_bytes_per_second={QUIESCENCE_MAX_IO_BYTES_PER_SECOND} timeout_seconds={}",
-            QUIESCENCE_TIMEOUT.as_secs()
-        ),
-    );
-
-    let started_at = Instant::now();
-    let mut previous: Option<(ContainerActivity, Instant)> = None;
-    let mut stable_intervals = 0;
-    loop {
-        if started_at.elapsed() >= QUIESCENCE_TIMEOUT {
-            return Err(format!(
-                "SurrealDB container did not remain below the quiescence thresholds for {QUIESCENCE_STABLE_INTERVALS} intervals within {} seconds",
-                QUIESCENCE_TIMEOUT.as_secs()
-            ));
-        }
-
-        let request_started = Instant::now();
-        let current = read_container_activity(&docker.docker_socket_path, &docker.container_id)?;
-        let sampled_at = Instant::now();
-        if let Some((prior, prior_sampled_at)) = previous {
-            let elapsed = sampled_at.duration_since(prior_sampled_at);
-            let quiet = container_activity_is_quiet(prior, current, elapsed);
-            stable_intervals = if quiet { stable_intervals + 1 } else { 0 };
-            emit_diagnostic_event(
-                "quiescence_sample",
-                &format!(
-                    "case={case} interval_ns={} cpu_delta_ns={} read_delta_bytes={} write_delta_bytes={} quiet={quiet} stable_intervals={stable_intervals}",
-                    elapsed.as_nanos(),
-                    current.cpu_time_ns.saturating_sub(prior.cpu_time_ns),
-                    current.read_bytes.saturating_sub(prior.read_bytes),
-                    current.write_bytes.saturating_sub(prior.write_bytes)
-                ),
-            );
-            if stable_intervals >= QUIESCENCE_STABLE_INTERVALS {
-                emit_diagnostic_event(
-                    "quiescence_end",
-                    &format!("case={case} stable_intervals={stable_intervals}"),
-                );
-                return Ok(());
-            }
-        } else {
-            emit_diagnostic_event(
-                "quiescence_sample",
-                &format!("case={case} interval_ns=0 quiet=false stable_intervals=0"),
-            );
-        }
-        previous = Some((current, sampled_at));
-
-        let remaining_interval =
-            QUIESCENCE_MIN_SAMPLE_INTERVAL.saturating_sub(request_started.elapsed());
-        thread::sleep(remaining_interval);
+fn resolve_docker_endpoint() -> Result<String, String> {
+    let docker_host = std::env::var_os("DOCKER_HOST");
+    let docker_context = std::env::var_os("DOCKER_CONTEXT");
+    if docker_host.is_some() && docker_context.is_some() {
+        return Err(
+            "DOCKER_HOST and DOCKER_CONTEXT conflict; set only one Docker override".to_owned(),
+        );
     }
+
+    let docker_host = docker_host
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "DOCKER_HOST must be valid UTF-8".to_owned())
+        })
+        .transpose()?;
+    let docker_context = docker_context
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "DOCKER_CONTEXT must be valid UTF-8".to_owned())
+        })
+        .transpose()?;
+
+    if let Some(host) = docker_host {
+        return docker_endpoint_from_host(host);
+    }
+
+    let mut args = Vec::with_capacity(7);
+    if let Some(context) = docker_context.as_deref() {
+        if context.is_empty() {
+            return Err("DOCKER_CONTEXT must name a Docker context".to_owned());
+        }
+        args.extend(["--context", context]);
+    }
+    args.extend([
+        "context",
+        "inspect",
+        "--format",
+        "{{.Endpoints.docker.Host}}",
+    ]);
+    if let Some(context) = docker_context.as_deref() {
+        args.push(context);
+    }
+
+    let host = run_bounded_command_with_env(
+        Path::new("docker"),
+        &args,
+        DOCKER_COMMAND_TIMEOUT,
+        DOCKER_OVERRIDE_ENV,
+    )?;
+    docker_endpoint_from_host(host.trim().to_owned())
+}
+
+fn docker_endpoint_from_host(host: String) -> Result<String, String> {
+    host.strip_prefix("unix://")
+        .filter(|path| path.starts_with('/'))
+        .ok_or_else(|| "preflight requires a local Unix socket Docker endpoint".to_owned())?;
+    Ok(host)
+}
+
+fn docker(endpoint: &str, args: &[&str]) -> Result<String, String> {
+    let mut pinned_args = Vec::with_capacity(args.len() + 2);
+    pinned_args.extend(["--host", endpoint]);
+    pinned_args.extend_from_slice(args);
+    run_bounded_command_with_env(
+        Path::new("docker"),
+        &pinned_args,
+        DOCKER_COMMAND_TIMEOUT,
+        DOCKER_OVERRIDE_ENV,
+    )
 }
 
 fn run_bounded_command(
@@ -550,15 +716,29 @@ fn run_bounded_command(
     args: &[&str],
     timeout: Duration,
 ) -> Result<String, String> {
+    run_bounded_command_with_env(executable, args, timeout, &[])
+}
+
+fn run_bounded_command_with_env(
+    executable: &Path,
+    args: &[&str],
+    timeout: Duration,
+    env_to_remove: &[&str],
+) -> Result<String, String> {
     let mut stdout = tempfile::tempfile()
         .map_err(|_| "external command output buffer could not be created".to_owned())?;
     let child_stdout = stdout
         .try_clone()
         .map_err(|_| "external command output buffer could not be duplicated".to_owned())?;
-    let mut child = Command::new(executable)
+    let mut command = Command::new(executable);
+    command
         .args(args)
         .stdout(Stdio::from(child_stdout))
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+    for name in env_to_remove {
+        command.env_remove(name);
+    }
+    let mut child = command
         .spawn()
         .map_err(|_| "external command could not be started".to_owned())?;
 
@@ -636,18 +816,6 @@ async fn open_database(config: &RunConfig, seed_fixture: bool) -> Result<Databas
     Ok(make_database_session(name, namespace, client))
 }
 
-async fn reconnect_database(
-    config: &RunConfig,
-    database: &DatabaseSession,
-) -> Result<DatabaseSession, String> {
-    let client = connect_database(config, &database.namespace, &database.name).await?;
-    Ok(make_database_session(
-        database.name.clone(),
-        database.namespace.clone(),
-        client,
-    ))
-}
-
 async fn connect_database(
     config: &RunConfig,
     namespace: &str,
@@ -689,6 +857,52 @@ async fn connect_database(
         Err(_) => return Err("connection setup timed out".to_owned()),
     };
     Ok(Arc::new(client))
+}
+
+fn make_override_store(
+    session: &DatabaseSession,
+    query: &str,
+) -> (KnowledgeStoreClient, Arc<AtomicUsize>) {
+    let db: Arc<dyn DbClient> = session.client.clone();
+    let adapter = oracle::SqlOverrideDbClient::new(db, Some(query));
+    let query_calls = adapter.query_counter();
+    let db: Arc<dyn DbClient> = Arc::new(adapter);
+    (
+        KnowledgeStoreClient::new(db, session.namespace.clone()),
+        query_calls,
+    )
+}
+
+fn validate_raw_fact_rows(rows: &Value, expected_fact_ids: &[&str]) -> Result<(), String> {
+    let rows = rows
+        .as_array()
+        .ok_or_else(|| "raw triple query result was not an array".to_owned())?;
+    validate_fact_rows(rows, expected_fact_ids)
+}
+
+fn validate_fact_rows(rows: &[Value], expected_fact_ids: &[&str]) -> Result<(), String> {
+    let mut fact_ids = rows
+        .iter()
+        .map(|row| {
+            row.get("fact_id")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| "triple lookup returned a row without a fact ID".to_owned())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if rows.iter().any(|row| row.get("embedding").is_some()) {
+        return Err("triple projection unexpectedly returned embeddings".to_owned());
+    }
+    fact_ids.sort();
+    let mut expected = expected_fact_ids
+        .iter()
+        .map(|fact_id| (*fact_id).to_owned())
+        .collect::<Vec<_>>();
+    expected.sort();
+    if fact_ids != expected {
+        return Err("triple result differed from independently specified fixture IDs".to_owned());
+    }
+    Ok(())
 }
 
 fn make_database_session(
@@ -762,54 +976,43 @@ async fn measure_query(
     query: &str,
     limit: usize,
     expected_fact_ids: &[&str],
-    context: &str,
 ) -> Result<Observation, String> {
-    let before = session.query_calls.load(Ordering::Relaxed);
-    let started_at_unix_ns = unix_timestamp_ns();
+    measure_store_query(
+        &session.store,
+        &session.query_calls,
+        query,
+        limit,
+        expected_fact_ids,
+    )
+    .await
+}
+
+async fn measure_store_query(
+    store: &KnowledgeStoreClient,
+    query_calls: &AtomicUsize,
+    query: &str,
+    limit: usize,
+    expected_fact_ids: &[&str],
+) -> Result<Observation, String> {
+    let before = query_calls.load(Ordering::Relaxed);
     let started = Instant::now();
     let query_result = timeout(
         super::QUERY_TIMEOUT,
-        session
-            .store
-            .select_facts_by_triple(query, oracle::FIXED_CUTOFF, limit),
+        store.select_facts_by_triple(query, oracle::FIXED_CUTOFF, limit),
     )
     .await;
     let elapsed_ns = started.elapsed().as_nanos();
-    let ended_at_unix_ns = unix_timestamp_ns();
-    emit_query_timing_event(started_at_unix_ns, ended_at_unix_ns, elapsed_ns, context);
     let rows = query_result
         .map_err(|_| "triple query exceeded 10 seconds".to_owned())?
         .map_err(|_| "public triple lookup failed".to_owned())?;
-    let query_call_count = session.query_calls.load(Ordering::Relaxed) - before;
+    let query_call_count = query_calls.load(Ordering::Relaxed) - before;
     if query_call_count != 1 {
         return Err(format!(
             "one public triple lookup issued {query_call_count} SQL calls"
         ));
     }
 
-    let mut fact_ids = rows
-        .iter()
-        .map(|row| {
-            row.get("fact_id")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| "triple lookup returned a row without a fact ID".to_owned())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    fact_ids.sort();
-    let mut expected = expected_fact_ids
-        .iter()
-        .map(|fact_id| (*fact_id).to_owned())
-        .collect::<Vec<_>>();
-    expected.sort();
-    if fact_ids != expected {
-        return Err(
-            "remote triple result did not match the independently specified fixture IDs".to_owned(),
-        );
-    }
-    if rows.iter().any(|row| row.get("embedding").is_some()) {
-        return Err("triple projection unexpectedly returned embeddings".to_owned());
-    }
+    validate_fact_rows(&rows, expected_fact_ids)?;
 
     Ok(Observation {
         elapsed_ns,
@@ -818,250 +1021,109 @@ async fn measure_query(
     })
 }
 
-async fn measure_new_connection_query(
-    config: &RunConfig,
-    database: &DatabaseSession,
-    case: SampleCase,
-    limit: usize,
-    context: &str,
-) -> Result<Observation, String> {
-    let session = reconnect_database(config, database).await?;
-    measure_query(
-        &session,
-        case.query(),
-        limit,
-        case.expected_fact_ids(limit),
-        context,
-    )
-    .await
-}
-
-async fn capture_new_connection_condition(
-    config: &RunConfig,
-    database: &DatabaseSession,
-    case: SampleCase,
-    limit: usize,
-) -> Result<(SampleRecord, CalibrationRecord), String> {
-    let mut pairs = Vec::with_capacity(5);
-    for pair_index in 0..5 {
-        let first_context = format!(
-            "case={} limit={limit} mode=new_connection stage=calibration pair={pair_index} side=a",
-            case.label()
-        );
-        let second_context = format!(
-            "case={} limit={limit} mode=new_connection stage=calibration pair={pair_index} side=b",
-            case.label()
-        );
-        let first =
-            measure_new_connection_query(config, database, case, limit, &first_context).await?;
-        let second =
-            measure_new_connection_query(config, database, case, limit, &second_context).await?;
-        if first.row_count != second.row_count || first.digest != second.digest {
-            return Err("new-connection A/A query results differed".to_owned());
-        }
-        pairs.push([first.elapsed_ns, second.elapsed_ns]);
-    }
-    let calibration = make_calibration_record(
-        config.resource_mode,
-        case,
-        limit,
-        ConnectionMode::NewConnection,
-        pairs,
-    );
-
-    let mut observations = Vec::with_capacity(5);
-    for sample_index in 0..5 {
-        let context = format!(
-            "case={} limit={limit} mode=new_connection stage=sample index={sample_index}",
-            case.label()
-        );
-        observations
-            .push(measure_new_connection_query(config, database, case, limit, &context).await?);
-    }
-    let sample = make_sample_record(
-        config.resource_mode,
-        case,
-        limit,
-        ConnectionMode::NewConnection,
-        observations,
-    )?;
-    Ok((sample, calibration))
-}
-
-async fn capture_reused_connection_condition(
-    config: &RunConfig,
-    session: &DatabaseSession,
-    case: SampleCase,
-    limit: usize,
-) -> Result<(SampleRecord, CalibrationRecord), String> {
-    for warmup_index in 0..5 {
-        let context = format!(
-            "case={} limit={limit} mode=reused_connection stage=warmup index={warmup_index}",
-            case.label()
-        );
-        measure_query(
-            session,
-            case.query(),
-            limit,
-            case.expected_fact_ids(limit),
-            &context,
+async fn measure_guard_pair(
+    baseline_store: &KnowledgeStoreClient,
+    baseline_calls: &AtomicUsize,
+    candidate_store: &KnowledgeStoreClient,
+    candidate_calls: &AtomicUsize,
+    query: &str,
+    expected_fact_ids: &[&str],
+    candidate_first: bool,
+) -> Result<(Observation, Observation, &'static str), String> {
+    let (baseline, candidate, order) = if candidate_first {
+        let candidate = measure_store_query(
+            candidate_store,
+            candidate_calls,
+            query,
+            SAMPLE_LIMIT,
+            expected_fact_ids,
         )
         .await?;
-    }
-
-    let mut pairs = Vec::with_capacity(5);
-    for pair_index in 0..5 {
-        let first_context = format!(
-            "case={} limit={limit} mode=reused_connection stage=calibration pair={pair_index} side=a",
-            case.label()
-        );
-        let second_context = format!(
-            "case={} limit={limit} mode=reused_connection stage=calibration pair={pair_index} side=b",
-            case.label()
-        );
-        let first = measure_query(
-            session,
-            case.query(),
-            limit,
-            case.expected_fact_ids(limit),
-            &first_context,
+        let baseline = measure_store_query(
+            baseline_store,
+            baseline_calls,
+            query,
+            SAMPLE_LIMIT,
+            expected_fact_ids,
         )
         .await?;
-        let second = measure_query(
-            session,
-            case.query(),
-            limit,
-            case.expected_fact_ids(limit),
-            &second_context,
+        (baseline, candidate, "BA")
+    } else {
+        let baseline = measure_store_query(
+            baseline_store,
+            baseline_calls,
+            query,
+            SAMPLE_LIMIT,
+            expected_fact_ids,
         )
         .await?;
-        if first.row_count != second.row_count || first.digest != second.digest {
-            return Err("reused-connection A/A query results differed".to_owned());
-        }
-        pairs.push([first.elapsed_ns, second.elapsed_ns]);
+        let candidate = measure_store_query(
+            candidate_store,
+            candidate_calls,
+            query,
+            SAMPLE_LIMIT,
+            expected_fact_ids,
+        )
+        .await?;
+        (baseline, candidate, "AB")
+    };
+    if baseline.row_count != candidate.row_count || baseline.digest != candidate.digest {
+        return Err("candidate changed rows during the paired comparison".to_owned());
     }
-    let calibration = make_calibration_record(
-        config.resource_mode,
-        case,
-        limit,
-        ConnectionMode::ReusedConnection,
-        pairs,
-    );
-
-    let mut observations = Vec::with_capacity(5);
-    for sample_index in 0..5 {
-        let context = format!(
-            "case={} limit={limit} mode=reused_connection stage=sample index={sample_index}",
-            case.label()
-        );
-        observations.push(
-            measure_query(
-                session,
-                case.query(),
-                limit,
-                case.expected_fact_ids(limit),
-                &context,
-            )
-            .await?,
-        );
-    }
-    let sample = make_sample_record(
-        config.resource_mode,
-        case,
-        limit,
-        ConnectionMode::ReusedConnection,
-        observations,
-    )?;
-    Ok((sample, calibration))
-}
-
-fn make_calibration_record(
-    resource_mode: ResourceMode,
-    case: SampleCase,
-    limit: usize,
-    connection_mode: ConnectionMode,
-    pairs: Vec<[u128; 2]>,
-) -> CalibrationRecord {
-    CalibrationRecord {
-        case: case.label(),
-        limit,
-        resource_mode: resource_mode.label(),
-        connection_mode,
-        max_noise_fraction: max_calibration_noise(&pairs),
-        sample_pairs_ns: pairs,
-    }
-}
-
-fn max_calibration_noise(pairs: &[[u128; 2]]) -> Option<f64> {
-    pairs
-        .iter()
-        .map(|[first, second]| {
-            let maximum = (*first).max(*second);
-            (maximum != 0).then(|| first.abs_diff(*second) as f64 / maximum as f64)
-        })
-        .collect::<Option<Vec<_>>>()?
-        .into_iter()
-        .reduce(f64::max)
+    Ok((baseline, candidate, order))
 }
 
 fn make_sample_record(
-    resource_mode: ResourceMode,
     case: SampleCase,
-    limit: usize,
-    connection_mode: ConnectionMode,
     observations: Vec<Observation>,
 ) -> Result<SampleRecord, String> {
-    let first = observations
-        .first()
-        .ok_or_else(|| "no timed samples were collected".to_owned())?;
+    if observations.len() != SAMPLE_COUNT {
+        return Err("descriptive capture requires exactly 20 timed samples".to_owned());
+    }
+    let first = &observations[0];
     if observations.iter().any(|observation| {
         observation.row_count != first.row_count || observation.digest != first.digest
     }) {
         return Err("timed query result rows varied across samples".to_owned());
     }
+    let elapsed_ns = observations
+        .iter()
+        .map(|observation| observation.elapsed_ns)
+        .collect::<Vec<_>>();
+    let mut sorted = elapsed_ns.clone();
+    sorted.sort_unstable();
+    let lower = sorted[SAMPLE_COUNT / 2 - 1];
+    let upper = sorted[SAMPLE_COUNT / 2];
     Ok(SampleRecord {
         case: case.label(),
-        limit,
-        resource_mode: resource_mode.label(),
-        connection_mode,
-        elapsed_ns: observations
-            .iter()
-            .map(|observation| observation.elapsed_ns)
-            .collect(),
+        min_ns: sorted[0],
+        median_ns: lower + (upper - lower) / 2,
+        max_ns: sorted[SAMPLE_COUNT - 1],
+        elapsed_ns,
         row_count: first.row_count,
         sha256: first.digest.clone(),
         query_call_count: observations.len(),
     })
 }
 
-fn measurement_resolution_ns() -> u128 {
-    let mut previous = Instant::now();
-    let mut smallest = None;
-    for _ in 0..10_000 {
-        let current = Instant::now();
-        let elapsed = current.duration_since(previous).as_nanos();
-        if elapsed > 0 {
-            smallest = Some(smallest.map_or(elapsed, |value: u128| value.min(elapsed)));
-        }
-        previous = current;
-    }
-    smallest.unwrap_or(0)
+fn write_report(config: &RunConfig, report: &LatencyReport) -> Result<(), String> {
+    write_json_report(&config.report, report)
 }
 
-fn write_report(config: &RunConfig, report: &LatencyReport) -> Result<(), String> {
+fn write_json_report<T: Serialize>(path: &Path, report: &T) -> Result<(), String> {
     let encoded = serde_json::to_vec_pretty(report)
-        .map_err(|_| "latency report serialization failed".to_owned())?;
+        .map_err(|_| "experiment report serialization failed".to_owned())?;
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&config.report)
+        .open(path)
         .map_err(|_| {
             "report path could not be created without overwriting an existing file".to_owned()
         })?;
     if file.write_all(&encoded).is_err() {
         drop(file);
-        let _ = fs::remove_file(&config.report);
-        return Err("latency report could not be written".to_owned());
+        let _ = fs::remove_file(path);
+        return Err("experiment report could not be written".to_owned());
     }
     Ok(())
 }
@@ -1071,115 +1133,275 @@ mod tests {
     use super::*;
 
     #[test]
-    fn docker_stats_parser_sums_read_and_write_bytes_by_operation() {
-        let stats = serde_json::json!({
-            "cpu_stats": {
-                "cpu_usage": {"total_usage": 1234}
-            },
-            "blkio_stats": {
-                "io_service_bytes_recursive": [
-                    {"op": "read", "value": 100},
-                    {"op": "write", "value": 200},
-                    {"op": "read", "value": 300},
-                    {"op": "sync", "value": 400}
-                ]
-            }
-        });
+    fn descriptive_samples_preserve_raw_order_and_report_median_and_range() {
+        let observations = (1..=20)
+            .rev()
+            .map(|index| Observation {
+                elapsed_ns: index * 10,
+                row_count: 1,
+                digest: "same-rows".to_owned(),
+            })
+            .collect();
+        let record = make_sample_record(SampleCase::PositiveMatch, observations)
+            .expect("complete descriptive sample");
+        let encoded = serde_json::to_value(record).expect("serialize samples");
+        assert_eq!(encoded["min_ns"], 10);
+        assert_eq!(encoded["median_ns"], 105);
+        assert_eq!(encoded["max_ns"], 200);
+        assert_eq!(encoded["elapsed_ns"][0], 200);
+        assert_eq!(encoded["elapsed_ns"][19], 10);
+        assert_eq!(encoded["query_call_count"], 20);
+    }
 
-        assert_eq!(
-            parse_container_activity(&stats).expect("valid Docker stats"),
-            ContainerActivity {
-                cpu_time_ns: 1234,
-                read_bytes: 400,
-                write_bytes: 200,
-            }
+    #[test]
+    fn descriptive_samples_reject_an_incomplete_capture() {
+        let observations = vec![
+            Observation {
+                elapsed_ns: 1000,
+                row_count: 0,
+                digest: "empty".to_owned()
+            };
+            19
+        ];
+        assert!(make_sample_record(SampleCase::EmptyTable, observations).is_err());
+    }
+
+    #[test]
+    fn descriptive_samples_reject_changed_result_rows() {
+        let mut observations = vec![
+            Observation {
+                elapsed_ns: 1000,
+                row_count: 1,
+                digest: "first".to_owned()
+            };
+            20
+        ];
+        observations[19].digest = "different".to_owned();
+        assert!(make_sample_record(SampleCase::PositiveMatch, observations).is_err());
+    }
+
+    #[test]
+    fn descriptive_samples_keep_large_outliers_without_failing_the_capture() {
+        let mut observations = vec![
+            Observation {
+                elapsed_ns: 1000,
+                row_count: 0,
+                digest: "empty".to_owned()
+            };
+            20
+        ];
+        observations[0].elapsed_ns = 1_000_000;
+        let record = make_sample_record(SampleCase::EmptyTable, observations)
+            .expect("outliers are descriptive, not a failure");
+        let encoded = serde_json::to_value(record).expect("serialize samples");
+        assert_eq!(encoded["median_ns"], 1000);
+        assert_eq!(encoded["max_ns"], 1_000_000);
+        assert_eq!(encoded["elapsed_ns"][0], 1_000_000);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_remote_host_override_is_rejected_before_any_docker_command() {
+        if run_docker_endpoint_test_child("remote-host") {
+            return;
+        }
+
+        spawn_docker_endpoint_test_child(
+            "remote-host",
+            "experiment::tests::docker_remote_host_override_is_rejected_before_any_docker_command",
+            Some("tcp://remote.example:2376"),
+            None,
         );
     }
 
+    #[cfg(unix)]
     #[test]
-    fn container_quiescence_accepts_low_cpu_and_io_rates() {
-        let previous = ContainerActivity {
-            cpu_time_ns: 1_000_000_000,
-            read_bytes: 10_000_000,
-            write_bytes: 20_000_000,
-        };
-        let current = ContainerActivity {
-            cpu_time_ns: 1_005_000_000,
-            read_bytes: 10_100_000,
-            write_bytes: 20_100_000,
-        };
+    fn conflicting_docker_host_and_context_overrides_are_rejected_before_cli_use() {
+        if run_docker_endpoint_test_child("conflicting-overrides") {
+            return;
+        }
 
-        assert!(container_activity_is_quiet(
-            previous,
-            current,
-            Duration::from_secs(1)
-        ));
-    }
-
-    #[test]
-    fn container_quiescence_rejects_cpu_above_one_percent() {
-        let previous = ContainerActivity {
-            cpu_time_ns: 1_000_000_000,
-            read_bytes: 10_000_000,
-            write_bytes: 20_000_000,
-        };
-        let current = ContainerActivity {
-            cpu_time_ns: 1_011_000_000,
-            read_bytes: 10_000_000,
-            write_bytes: 20_000_000,
-        };
-
-        assert!(!container_activity_is_quiet(
-            previous,
-            current,
-            Duration::from_secs(1)
-        ));
-    }
-
-    #[test]
-    fn container_quiescence_rejects_io_above_one_mib_per_second() {
-        let previous = ContainerActivity {
-            cpu_time_ns: 1_000_000_000,
-            read_bytes: 10_000_000,
-            write_bytes: 20_000_000,
-        };
-        let current = ContainerActivity {
-            cpu_time_ns: 1_001_000_000,
-            read_bytes: 10_600_000,
-            write_bytes: 20_600_000,
-        };
-
-        assert!(!container_activity_is_quiet(
-            previous,
-            current,
-            Duration::from_secs(1)
-        ));
-    }
-
-    fn records_for_mode(mode: ResourceMode) -> (CalibrationRecord, SampleRecord) {
-        let calibration = make_calibration_record(
-            mode,
-            SampleCase::EmptyTable,
-            0,
-            ConnectionMode::NewConnection,
-            vec![[100, 101]; 5],
+        spawn_docker_endpoint_test_child(
+            "conflicting-overrides",
+            "experiment::tests::conflicting_docker_host_and_context_overrides_are_rejected_before_cli_use",
+            Some("unix:///tmp/docker-host.sock"),
+            Some("local"),
         );
-        let sample = make_sample_record(
-            mode,
-            SampleCase::EmptyTable,
-            0,
-            ConnectionMode::NewConnection,
-            vec![
-                Observation {
-                    elapsed_ns: 100,
-                    row_count: 0,
-                    digest: "empty-digest".to_owned(),
-                };
-                5
-            ],
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_host_override_is_pinned_and_removed_from_child_environment() {
+        if run_docker_endpoint_test_child("pinned-host") {
+            return;
+        }
+
+        spawn_docker_endpoint_test_child(
+            "pinned-host",
+            "experiment::tests::docker_host_override_is_pinned_and_removed_from_child_environment",
+            Some("unix:///tmp/resolved-docker.sock"),
+            None,
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_context_is_resolved_before_inspection_and_then_pinned() {
+        if run_docker_endpoint_test_child("pinned-context") {
+            return;
+        }
+
+        spawn_docker_endpoint_test_child(
+            "pinned-context",
+            "experiment::tests::docker_context_is_resolved_before_inspection_and_then_pinned",
+            None,
+            Some("local"),
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_remote_context_is_rejected_before_daemon_inspection() {
+        if run_docker_endpoint_test_child("remote-context") {
+            return;
+        }
+
+        spawn_docker_endpoint_test_child(
+            "remote-context",
+            "experiment::tests::docker_remote_context_is_rejected_before_daemon_inspection",
+            None,
+            Some("remote"),
+        );
+    }
+
+    #[cfg(unix)]
+    fn run_docker_endpoint_test_child(mode: &str) -> bool {
+        const CHILD_MODE: &str = "MEMORY_TRIPLE_DOCKER_TEST_CHILD";
+        let Ok(child_mode) = std::env::var(CHILD_MODE) else {
+            return false;
+        };
+        assert_eq!(child_mode, mode);
+
+        let config = crate::parse_config(&crate::valid_values()).expect("valid test configuration");
+        let result = inspect_disposable_container(&config);
+        let log_path =
+            std::env::var("MEMORY_TRIPLE_DOCKER_TEST_LOG").expect("child Docker log path");
+
+        match mode {
+            "remote-host" => {
+                let error = result.expect_err("remote Docker hosts must be rejected");
+                assert!(
+                    error.contains("local Unix socket"),
+                    "unexpected error: {error}"
+                );
+                assert!(!Path::new(&log_path).exists(), "Docker CLI must not run");
+            }
+            "conflicting-overrides" => {
+                let error = result.expect_err("conflicting Docker overrides must be rejected");
+                assert!(error.contains("conflict"), "unexpected error: {error}");
+                assert!(!Path::new(&log_path).exists(), "Docker CLI must not run");
+            }
+            "pinned-host" => {
+                assert!(result.is_err(), "the fake Docker CLI should stop preflight");
+                let log = std::fs::read_to_string(log_path).expect("Docker CLI invocation log");
+                assert!(
+                    log.contains(
+                        "host=;context=;args=--host unix:///tmp/resolved-docker.sock image inspect"
+                    ),
+                    "Docker CLI was not pinned to the resolved host: {log}"
+                );
+            }
+            "pinned-context" => {
+                assert!(result.is_err(), "the fake Docker CLI should stop preflight");
+                let log = std::fs::read_to_string(log_path).expect("Docker CLI invocation log");
+                assert!(
+                    log.contains(
+                        "--context local context inspect --format {{.Endpoints.docker.Host}} local"
+                    ),
+                    "selected context was not resolved explicitly: {log}"
+                );
+                assert!(
+                    log.contains(
+                        "host=;context=;args=--host unix:///tmp/context.sock image inspect"
+                    ),
+                    "Docker CLI was not pinned to the resolved context endpoint: {log}"
+                );
+            }
+            "remote-context" => {
+                let error = result.expect_err("remote Docker contexts must be rejected");
+                assert!(
+                    error.contains("local Unix socket"),
+                    "unexpected error: {error}"
+                );
+                let log = std::fs::read_to_string(log_path).expect("context inspection log");
+                assert!(log.contains("--context remote context inspect"), "{log}");
+                assert!(
+                    !log.contains("image inspect"),
+                    "daemon inspection must not run: {log}"
+                );
+            }
+            _ => panic!("unexpected child mode: {mode}"),
+        }
+        true
+    }
+
+    #[cfg(unix)]
+    fn spawn_docker_endpoint_test_child(
+        mode: &str,
+        test_name: &str,
+        docker_host: Option<&str>,
+        docker_context: Option<&str>,
+    ) {
+        use std::os::unix::fs::PermissionsExt;
+
+        const CHILD_MODE: &str = "MEMORY_TRIPLE_DOCKER_TEST_CHILD";
+        const DOCKER_LOG: &str = "MEMORY_TRIPLE_DOCKER_TEST_LOG";
+        let directory = tempfile::tempdir().expect("temporary Docker test directory");
+        let bin = directory.path().join("bin");
+        std::fs::create_dir(&bin).expect("create fake Docker bin directory");
+        let fake_docker = bin.join("docker");
+        std::fs::write(
+            &fake_docker,
+            r#"#!/bin/sh
+printf 'host=%s;context=%s;args=%s\n' "${DOCKER_HOST-}" "${DOCKER_CONTEXT-}" "$*" >> "$MEMORY_TRIPLE_DOCKER_TEST_LOG"
+case "$*" in
+  "--context remote context inspect --format {{.Endpoints.docker.Host}} remote") printf '%s\n' 'tcp://remote.example:2376'; exit 0 ;;
+  "--context local context inspect --format {{.Endpoints.docker.Host}} local") printf '%s\n' 'unix:///tmp/context.sock'; exit 0 ;;
+esac
+exit 1
+"#,
         )
-        .expect("five timed observations should form a sample record");
-        (calibration, sample)
+        .expect("write fake Docker executable");
+        let mut permissions = std::fs::metadata(&fake_docker)
+            .expect("fake Docker metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&fake_docker, permissions)
+            .expect("make fake Docker executable runnable");
+
+        let log_path = directory.path().join("docker.log");
+        let mut command = Command::new(std::env::current_exe().expect("test executable path"));
+        command
+            .args(["--exact", test_name, "--nocapture", "--test-threads=1"])
+            .env(CHILD_MODE, mode)
+            .env(DOCKER_LOG, &log_path)
+            .env("PATH", &bin)
+            .env_remove("DOCKER_HOST")
+            .env_remove("DOCKER_CONTEXT");
+        if let Some(docker_host) = docker_host {
+            command.env("DOCKER_HOST", docker_host);
+        }
+        if let Some(docker_context) = docker_context {
+            command.env("DOCKER_CONTEXT", docker_context);
+        }
+
+        let output = command.output().expect("run isolated Docker test child");
+        assert!(
+            output.status.success(),
+            "child test failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
     }
 
     #[cfg(unix)]
@@ -1219,39 +1441,21 @@ mod tests {
         assert!(!still_running.success(), "timed-out child is still running");
     }
 
-    #[test]
-    fn latency_records_name_connection_reuse_instead_of_cache_state() {
-        let (calibration, sample) = records_for_mode(ResourceMode::DockerDefault);
-        let calibration =
-            serde_json::to_value(calibration).expect("calibration record should serialize");
-        let sample = serde_json::to_value(sample).expect("sample record should serialize");
-
-        assert_eq!(calibration["connection_mode"], "new_connection");
-        assert_eq!(sample["connection_mode"], "new_connection");
-    }
-
-    #[test]
-    fn latency_records_report_memory_512m_resource_mode() {
-        let (calibration, sample) = records_for_mode(ResourceMode::Memory512m);
-
-        assert_eq!(calibration.resource_mode, "memory-512m");
-        assert_eq!(sample.resource_mode, "memory-512m");
-        assert_eq!(sample.query_call_count, 5);
-    }
-
-    #[test]
-    fn latency_records_report_docker_default_resource_mode() {
-        let (calibration, sample) = records_for_mode(ResourceMode::DockerDefault);
-
-        assert_eq!(calibration.resource_mode, "docker-default");
-        assert_eq!(sample.resource_mode, "docker-default");
-    }
-
-    #[test]
-    fn latency_report_serializes_only_allowlisted_fields() {
-        let (calibration, sample) = records_for_mode(ResourceMode::Memory512m);
-        let report = LatencyReport {
-            schema: "memory-triple-latency/v2",
+    fn sample_report() -> LatencyReport {
+        let sample = make_sample_record(
+            SampleCase::EmptyTable,
+            vec![
+                Observation {
+                    elapsed_ns: 100,
+                    row_count: 0,
+                    digest: "empty-digest".to_owned()
+                };
+                20
+            ],
+        )
+        .expect("complete samples");
+        LatencyReport {
+            schema: "memory-triple-latency/v4",
             server_version: "SurrealDB 3.3.5".to_owned(),
             sdk_version: "3.3.5",
             image_id: "sha256:test".to_owned(),
@@ -1272,30 +1476,39 @@ mod tests {
                 triple_count: 5,
                 cutoff: "2026-11-13T15:52:35.269Z",
             },
-            measurement_resolution_ns: 1,
-            calibration: vec![calibration],
+            connection_mode: "reused_connection",
+            limit: 40,
+            warmup_count: 5,
+            sample_count: 20,
             samples: vec![sample],
-        };
+        }
+    }
 
-        let encoded = serde_json::to_value(report).expect("latency report should serialize");
-        assert_eq!(encoded["schema"], "memory-triple-latency/v2");
+    #[test]
+    fn latency_report_serializes_only_allowlisted_fields() {
+        let encoded = serde_json::to_value(sample_report()).expect("serialize report");
+        assert_eq!(encoded["schema"], "memory-triple-latency/v4");
+        assert_eq!(encoded["connection_mode"], "reused_connection");
+        assert_eq!(encoded["sample_count"], 20);
         assert_eq!(
             sorted_object_keys(&encoded),
             vec![
-                "calibration",
+                "connection_mode",
                 "effective_resources",
                 "emulation",
                 "fixture",
                 "host_architecture",
                 "image_architecture",
                 "image_id",
-                "measurement_resolution_ns",
+                "limit",
                 "resource_mode",
+                "sample_count",
                 "samples",
                 "schema",
                 "sdk_version",
                 "server_version",
                 "storage_engine",
+                "warmup_count"
             ]
         );
         assert_eq!(
@@ -1304,7 +1517,7 @@ mod tests {
                 "cpu_period_micros",
                 "cpu_quota_micros",
                 "memory_limit_bytes",
-                "memory_swap_limit_bytes",
+                "memory_swap_limit_bytes"
             ]
         );
         assert_eq!(
@@ -1317,28 +1530,31 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted_object_keys(&encoded["calibration"][0]),
-            vec![
-                "case",
-                "connection_mode",
-                "limit",
-                "max_noise_fraction",
-                "resource_mode",
-                "sample_pairs_ns",
-            ]
-        );
-        assert_eq!(
             sorted_object_keys(&encoded["samples"][0]),
             vec![
                 "case",
-                "connection_mode",
                 "elapsed_ns",
-                "limit",
+                "max_ns",
+                "median_ns",
+                "min_ns",
                 "query_call_count",
-                "resource_mode",
                 "row_count",
-                "sha256",
+                "sha256"
             ]
+        );
+    }
+
+    #[test]
+    fn latency_report_does_not_overwrite_an_existing_artifact() {
+        let directory = tempfile::tempdir().expect("temporary report directory");
+        let path = directory.path().join("report.json");
+        std::fs::write(&path, "previous evidence").expect("existing artifact");
+        let mut config = crate::parse_config(&crate::valid_values()).expect("valid configuration");
+        config.report = path.clone();
+        assert!(write_report(&config, &sample_report()).is_err());
+        assert_eq!(
+            std::fs::read_to_string(path).expect("preserved evidence"),
+            "previous evidence"
         );
     }
 

@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 const ENV_URL: &str = "MEMORY_TRIPLE_TEST_URL";
 const ENV_IMAGE_ID: &str = "MEMORY_TRIPLE_TEST_IMAGE_ID";
 const ENV_RESOURCE_MODE: &str = "MEMORY_TRIPLE_TEST_RESOURCE_MODE";
-const ENV_ASSERT_SPEEDUP: &str = "MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP";
+
 const ENV_REPORT: &str = "MEMORY_TRIPLE_TEST_REPORT";
 const IMAGE_ID: &str = "sha256:f40e356e40dd2094e5a743ad8b1353f646cf3a660541e92b9f6cce003d3be2dd";
 const IMAGE_TAG: &str = "surrealdb/surrealdb:v3.3.5";
@@ -82,15 +82,7 @@ fn parse_config(values: &HashMap<String, String>) -> Result<RunConfig, String> {
             ));
         }
     };
-    match required(ENV_ASSERT_SPEEDUP)?.as_str() {
-        "0" => {}
-        "1" => {
-            return Err(format!(
-                "{ENV_ASSERT_SPEEDUP}=1 requires candidate query support"
-            ));
-        }
-        _ => return Err(format!("{ENV_ASSERT_SPEEDUP} must be 0 or 1")),
-    }
+
     let report = PathBuf::from(required(ENV_REPORT)?);
     if report.exists() {
         return Err(format!("{ENV_REPORT} must not already exist"));
@@ -175,7 +167,6 @@ fn valid_values() -> HashMap<String, String> {
         (ENV_URL.to_owned(), "ws://127.0.0.1:8000".to_owned()),
         (ENV_IMAGE_ID.to_owned(), IMAGE_ID.to_owned()),
         (ENV_RESOURCE_MODE.to_owned(), "memory-512m".to_owned()),
-        (ENV_ASSERT_SPEEDUP.to_owned(), "0".to_owned()),
         (
             ENV_REPORT.to_owned(),
             "target/assemble-context-latency-test.json".to_owned(),
@@ -200,6 +191,20 @@ fn valid_experiment_configuration_is_accepted() {
 }
 
 #[test]
+fn baseline_configuration_needs_only_endpoint_image_resource_and_report() {
+    let values = HashMap::from([
+        (ENV_URL.to_owned(), "ws://127.0.0.1:8000".to_owned()),
+        (ENV_IMAGE_ID.to_owned(), IMAGE_ID.to_owned()),
+        (ENV_RESOURCE_MODE.to_owned(), "docker-default".to_owned()),
+        (
+            ENV_REPORT.to_owned(),
+            "target/descriptive-baseline-test.json".to_owned(),
+        ),
+    ]);
+    assert!(parse_config(&values).is_ok());
+}
+
+#[test]
 fn missing_url_is_rejected_with_its_variable_name() {
     let mut values = valid_values();
     values.remove(ENV_URL);
@@ -221,14 +226,6 @@ fn missing_resource_mode_is_rejected_with_its_variable_name() {
     values.remove(ENV_RESOURCE_MODE);
 
     assert!(parse_config(&values).is_err_and(|error| error.contains(ENV_RESOURCE_MODE)));
-}
-
-#[test]
-fn missing_speedup_flag_is_rejected_with_its_variable_name() {
-    let mut values = valid_values();
-    values.remove(ENV_ASSERT_SPEEDUP);
-
-    assert!(parse_config(&values).is_err_and(|error| error.contains(ENV_ASSERT_SPEEDUP)));
 }
 
 #[test]
@@ -262,24 +259,6 @@ fn url_with_credentials_query_or_fragment_is_rejected() {
         ENV_URL.to_owned(),
         "ws://root:root@localhost:8000/?database=unsafe#fragment".to_owned(),
     );
-
-    assert!(parse_config(&values).is_err());
-}
-
-#[test]
-fn baseline_harness_rejects_speedup_assertion_without_a_candidate() {
-    let mut values = valid_values();
-    values.insert(ENV_ASSERT_SPEEDUP.to_owned(), "1".to_owned());
-
-    let error = parse_config(&values)
-        .expect_err("baseline-only capture must not accept a candidate speedup assertion");
-    assert!(error.contains("candidate"), "unexpected error: {error}");
-}
-
-#[test]
-fn unsupported_speedup_flag_is_rejected() {
-    let mut values = valid_values();
-    values.insert(ENV_ASSERT_SPEEDUP.to_owned(), "true".to_owned());
 
     assert!(parse_config(&values).is_err());
 }
@@ -804,20 +783,14 @@ fn assert_inspection_failure_category(
 }
 
 fn environment_values() -> HashMap<String, String> {
-    [
-        ENV_URL,
-        ENV_IMAGE_ID,
-        ENV_RESOURCE_MODE,
-        ENV_ASSERT_SPEEDUP,
-        ENV_REPORT,
-    ]
-    .into_iter()
-    .filter_map(|name| {
-        std::env::var(name)
-            .ok()
-            .map(|value| (name.to_owned(), value))
-    })
-    .collect()
+    [ENV_URL, ENV_IMAGE_ID, ENV_RESOURCE_MODE, ENV_REPORT]
+        .into_iter()
+        .filter_map(|name| {
+            std::env::var(name)
+                .ok()
+                .map(|value| (name.to_owned(), value))
+        })
+        .collect()
 }
 
 #[tokio::test]
@@ -839,10 +812,30 @@ async fn remote_triple_compatibility() {
 
 #[tokio::test]
 #[ignore = "requires a disposable loopback SurrealDB 3.3.5 Docker container"]
+async fn remote_guard_candidate_compatibility() {
+    let config =
+        parse_config(&environment_values()).expect("valid remote experiment configuration");
+    experiment::verify_guard_candidate_compatibility(&config)
+        .await
+        .expect("guard candidate must preserve remote triple contracts");
+}
+
+#[tokio::test]
+#[ignore = "requires a disposable loopback SurrealDB 3.3.5 Docker container"]
+async fn remote_guard_candidate_paired_comparison() {
+    let config =
+        parse_config(&environment_values()).expect("valid remote experiment configuration");
+    experiment::compare_guard_candidate(&config)
+        .await
+        .expect("paired candidate comparison should preserve results and write raw timings");
+}
+
+#[tokio::test]
+#[ignore = "requires a disposable loopback SurrealDB 3.3.5 Docker container"]
 async fn remote_latency_capture() {
     let config =
         parse_config(&environment_values()).expect("valid remote experiment configuration");
     experiment::capture_remote_latency(&config)
         .await
-        .expect("remote latency experiment should complete with valid calibration");
+        .expect("descriptive baseline should complete with correct results");
 }

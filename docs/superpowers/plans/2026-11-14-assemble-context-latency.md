@@ -10,9 +10,9 @@
 
 **Spec:** [Design and acceptance contract](../specs/2026-11-14-assemble-context-latency-design.md).
 
-## Authorized execution update (November 15, 2026)
+## Authorized execution update (November 16, 2026)
 
-The user deferred Task 2 and authorized production inspection, backup, application-only rollout, rollback, and verification while preserving production data. Task 2 is deferred, not passed. Preserve invalid reports and the reserved report path. Tasks 3 and 4 remain deferred because their acceptance evidence is absent; do not add speculative guards or instrumentation. Complete correctness validation and restored-copy checks first. Production checks do not replace TDD or establish calibrated latency.
+The user resumed Task 2 and approved the descriptive v4 baseline plus a second simplification pass. The current protocol is Spec B; historical calibration restrictions are superseded for new runs only. Keep historical classifications without reclassifying them; raw reports and diagnostics were later removed during merge preparation, with results and recorded SHA-256 identifiers retained in the runbook. Guard/read-view/correctness gates and production safety remain in force. The user subsequently authorized a local feature branch and commit for merge preparation only; no merge or push is authorized.
 
 ### Authorized application-only rollout
 
@@ -28,13 +28,14 @@ If an application health check fails while the SurrealDB container ID remains un
 - Do not change dependencies, migrations, generated code, MCP tools, or application-facing APIs. Do not edit `Cargo.toml` or `Cargo.lock`.
 - A bound client uses one Active Namespace. Do not add request-level namespace, database, or table selection.
 - Preserve production data. Use a checked backup and isolated restored data for experiments. Do not expose credentials or run unbounded production load.
+- Resolve one local Unix Docker endpoint before daemon inspection. Reject simultaneous `DOCKER_HOST` and `DOCKER_CONTEXT` overrides and remote endpoints; clear both variables from subprocesses and pin Docker CLI inspection to the resolved endpoint.
 - Preserve FTS terms and per-term limits, alias expansion, ANN K/EF, EUCLIDEAN/F32, admission thresholds, reranking, graph budgets, and ordering behavior.
 - Preserve temporal and access filtering, provenance, access tracking, query-log policy, cache defaults, and job cadences. Do not delete facts.
 - Keep query ownership in `knowledge` and orchestration in `memory`. Add no business logic to transport, `main.rs`, `service/`, or a shared container.
 - Preserve `MemoryError` and existing missing-table handling. Never convert syntax, permission, decoding, or transport failures into successful empty results.
 - Use controlled ports for unit tests and real databases, network, filesystem, and process-global recorders for integration tests. Use bounded waits and permits, not sleeps for ordering.
 - New telemetry and artifacts exclude raw queries, SQL literals, memory content, credentials, and request, tenant, or record labels.
-- Do not commit, create branches, or modify unrelated user work. Deployment requires the verification and rollback procedure above. Plans, specifications, and ADRs for this work must be in English.
+- Do not modify unrelated user work. Deployment requires the verification and rollback procedure above. Plans, specifications, and ADRs for this work must be in English. The later user request explicitly authorizes creating a local feature branch and commit for merge preparation; it does not authorize a merge or push.
 
 ## Review focus
 
@@ -42,7 +43,7 @@ If an application health check fails while the SurrealDB container ID remains un
 2. `limit=0`, `1`, `3`, and `40` preserve the output limit without relying on unspecified row order. Task 1 covers each limit.
 3. Temporal cutoff and invalidation behavior remain unchanged. Task 1 tests visibility at the cutoff, excludes facts valid or ingested after it, and checks invalidation recorded at or after the cutoff; existing semantic-quality and access tests cover downstream policy.
 4. A guard distinguishes a real empty array from malformed output and preserves entered-branch errors. Task 3 checks both branches through the real result conversion.
-5. Docker image/backend identity, URL-to-published-loopback host correspondence, Docker CLI timeouts, read-view semantics, calibration noise, and missing resource measurements do not become unsupported claims. Tasks 2 and 3 record these gates and leave unresolved claims blocked.
+5. Docker image/backend identity, URL-to-published-loopback host correspondence, Docker CLI timeouts, read-view semantics, timing spread, and missing resource measurements do not become unsupported claims. Tasks 2 and 3 record these gates and leave unresolved claims blocked.
 
 ## File map
 
@@ -97,98 +98,35 @@ Do not modify `tests/common/storage_memory.rs`, shared decoding, migrations, ANN
 
   Expected: independently expected positive IDs, all named temporal-boundary cases, and adjacent query contracts pass. `limit=0` returns no rows; the store SQL still uses the corrected projection. No new dependency, API, or schema change appears.
 
-## Task 2: Capture the corrected unguarded baseline
+## Task 2: Capture a descriptive corrected baseline
 
-**Current status (2026-11-15):** Remote compatibility passes on the disposable SurrealDB 3.3.5 image. The original `v1` `docker-default` report at `/tmp/memory-triple-latency-docker-default-20261115.json` is `INVALID`: 20 of 24 A/A records exceeded 3%, with maximum noise 0.4195653025770974. That run created and seeded databases between observations and accumulated 105 GB of Docker block I/O. The revised `v2` report at `/tmp/memory-triple-latency-docker-default-20261115-connection-modes-01.json` is also `INVALID`: 16 of 24 records exceeded 3%, with maximum noise 0.3192349170251424. It prepared one database per case and seeded each fixture once. Host `iostat` peaked at 53,331 transactions/s and 321.26 MB/s; Docker block I/O increased by about 0.4 GB. The v2 logs were not timestamp-aligned with individual query samples, and the process snapshot did not identify the I/O source. Preserve both reports. Do not run another latency capture until the variability source is identified and removed or the environment is isolated to control it. The next report path, `/tmp/memory-triple-latency-docker-default-20261115-connection-modes-02.json`, is reserved, not ready to run. Any later capture must use timestamped host and Docker I/O logs aligned with per-query sample intervals, kept outside the report allowlist. Do not run `memory-512m`, evaluate the guard, or add stage metrics while the baseline is invalid. The retrieval-quality evaluation was `INVALID` because the provider could not initialize for all 37 cases; the weekly `memory-perf` smoke test passed.
+**Files:** tests/retrieval_latency_remote.rs and tests/support/retrieval_latency_experiment.rs under crates/memory-mcp; the runbook and this spec/plan. No production query change.
 
-A compatibility-only diagnostic run confirmed that the test-local container gate works. It samples Docker Engine CPU and block-I/O counters over the local Unix socket and requires five consecutive intervals at or below 1% CPU and 1 MiB/s combined I/O, with a 60-second timeout. Fixture setup took about 4.65 seconds. The gate then observed five quiet intervals of about 2.0 seconds each before the first query: CPU deltas ranged from 0.7 to 4.0 ms, reads were zero, and writes ranged from 0 to 24 KiB. Host `iostat` still reported 430.32 MB/s during setup and 50.94 MB/s at gate completion. These observations do not identify the I/O source or show that it caused the A/A noise. The gate monitors the container only and does not satisfy the host-isolation prerequisite. No latency capture was run in this diagnostic session. The two earlier reports are `INVALID`; Task 2 is deferred by the user, and its baseline acceptance gate remains unsatisfied.
+**Interfaces:** Keep verify_remote_triple_compatibility(config) and capture_remote_latency(config). Use corrected_unguarded_triple_sql(), the unchanged public store method, and the current deterministic fixture. New reports use memory-triple-latency/v4.
 
-**Files:** Create `retrieval_latency_remote.rs` and the runbook. Modify `tests/support/retrieval_latency_experiment.rs` for the test-local remote harness and bounded Docker CLI runner. Extend the test oracle only for remote fixture setup or report encoding required by the spec.
+- [x] Add RED regressions for median/min/max with raw acquisition order preserved, incomplete captures, changed rows, and visible outliers. Add a RED configuration test requiring only the four endpoint/image/resource/report values.
+- [x] Replace calibration and connection-mode branches with three cases at limit 40, five warmups, and twenty timed queries on a reused connection. Keep row/digest/one-call checks and create-new artifact handling.
+- [x] Remove calibration/CI functions and tests, new-connection timing, quiescence/stats polling, timestamp diagnostics, lifecycle probes, timer-resolution probing, and the unused ASSERT_SPEEDUP input. Keep loopback/image/engine/resource preflight, pinned Docker endpoint, bounded commands, setup/query deadlines, and generated-database cleanup.
+- [x] Run ordinary harness and triple contracts, full crate tests, formatting, and required workspace Clippy. Expected: ordinary tests pass; external measurements remain ignored by default.
+- [x] Run live compatibility and one bounded descriptive capture per resource mode on fresh disposable disk-backed SurrealDB 3.3.5 containers. Use unique artifacts and no production data. Expected: three records per completed mode, twenty samples and twenty query calls per record, correct rows/digests, and honest summary statistics. Record a bounded failure as unavailable, not as fabricated timing.
+- [x] Record reports, resource evidence, limits, cleanup, and validation in the runbook. Keep historical v1–v3 reports INVALID under their original rules. Mark this task complete only under the approved v4 completion contract.
 
-**Interfaces:** Variant A is `corrected_unguarded_triple_sql()` from Task 1. Use one test-local forwarding `DbClient` around one persistent bound client so the public store and real `query_rows` conversion remain in the measurement path. The ignored tests are `remote_triple_compatibility` and `remote_latency_capture`.
+Post-fix application checks remain separate evidence: the previous retrieval-quality run was INVALID because its real provider was unavailable for all 37 cases; the weekly memory-perf smoke passed. These do not establish SQL or production latency. Do not rerun unrelated model-dependent evaluations merely to complete the descriptive SQL baseline.
 
-- [x] **Step 1: Add loopback configuration and fixture tests before the ignored experiment.** Test each required variable missing in turn, invalid speedup/resource mode/image ID, and non-loopback or malformed URL rejection before connection. Test deterministic fixture metadata: 2191 ordered fact IDs, 2048 values per vector, and the five exact triple source tuples. Test that row digests remain stable under row and object-key reordering. Exercise the test-local container-evidence validator with synthetic inspection JSON, including a URL-host mismatch, nonzero `NanoCpus`, and nonempty `CpusetCpus`, and assert each policy failure category separately. Add a fake-executable test for Docker CLI timeout and child termination. These tests cover harness policy and subprocess management, not Docker daemon behavior or live container state; the ignored run must verify live CLI inspection output. Keep helpers inside the integration test target.
+Task 2 outcome (November 16, 2026): complete under v4. The docker-default report contains all three cases and twenty observations each. The memory-512m compatibility run was OOM-killed and cleanup reached its deadline; that mode is unavailable and has no timing report. Both disposable containers were removed. See the runbook for measurements and validation. Task 3 remains optional and unimplemented.
 
-- [x] **Step 2: Run the focused test-target checks and observe RED for missing configuration/fixture behavior.**
+## Task 3: Evaluate the optional guard
 
-  Run: `cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote`
+**Files:** knowledge_store.rs, triple contracts, the test-local remote experiment, and runbook only if justified.
 
-  Expected: new configuration/fixture contract assertions fail for the missing behavior, not because an external server is unavailable. Remote measurements remain ignored in ordinary test runs.
+**Interfaces:** Same corrected A, proposed B, DbClient query boundary, public store signature, and fixture. Section C of the spec owns all acceptance rules.
 
-- [x] **Step 3: Implement the minimal loopback-only test harness.** Read only the five `MEMORY_TRIPLE_TEST_*` variables defined in Spec B. Parse and validate all values before opening a connection; accept only `ws` URLs on `localhost` or literal loopback IPs, an image ID matching `sha256:` plus 64 lowercase hex digits, resource modes `docker-default` or `memory-512m`, and `MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=0`. Reject `1` until Task 3 implements candidate-query support; reject any other value. Require Docker's published `HostIp` to equal a literal URL IP, or any loopback IP for `localhost`. Verify `CpuQuota=0`, `CpuPeriod=0`, `NanoCpus=0`, and empty `CpusetCpus` for both resource modes; missing or malformed values fail preflight. Give each Docker CLI invocation a 10-second timeout and terminate and reap its child on timeout. Create the report with `create_new` so an existing artifact is never overwritten. Set a 30-second SDK setup deadline and 10-second query timeout. Use generated unique databases and remove only those databases during cleanup.
-
-- [x] **Step 4: Add corrected-baseline capture with deterministic synthetic data.** Seed 2191 facts, 2048-dimensional deterministic vectors, and five triples at cutoff `2026-11-13T15:52:35.269Z`. For each case, limit, and connection mode, collect five timed samples and five A/A pairs. Prepare one database per case and seed it once. `new_connection` opens a new bound connection to the prepared database for each timed query; `reused_connection` runs five untimed calls before its samples on one connection. Neither mode claims cold or warm server-cache state. Do not create, seed, or remove databases between timed queries. Normalize result rows as multisets and compute the Spec B SHA-256 digest. Exclude connection setup, authentication, database creation, migrations, seeding, report serialization, and cleanup from timing. Write only the Spec B allowlisted fields. Run once per resource mode and use a distinct report path for each run.
-
-- [x] **Step 5: Run local configuration and embedded/remote compatibility tests.**
-
-  ```bash
-  cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote
-  cargo test -p memory_mcp --features eval-support --locked --test triple_retrieval_contract
-  ```
-
-  Expected: test-target unit checks and local database contracts pass. If Docker or an isolated server is unavailable, mark the remote baseline `BLOCKED`; do not substitute the embedded memory engine and claim remote-server evidence.
-
-- [ ] **Step 6: Capture the unguarded baseline before any guard edit.** Do not start another capture yet. First identify and remove the source of high variability or isolate the environment so that source cannot affect measurements. The v2 monitor logs were not timestamp-aligned with individual query samples, and the process snapshot did not identify the I/O source. Before a later capture, prepare timestamped host and Docker I/O logs aligned with per-query sample intervals. Keep these diagnostics outside the allowlisted JSON report. If the test harness cannot provide per-query timing markers without changing the report schema, add and verify test-only diagnostics before capturing. The current container quiescence gate is a container-only check and does not establish host quiescence or satisfy this prerequisite. Then provision only a disposable loopback 3.3.5 server with image tag `surrealdb/surrealdb:v3.3.5`, resolved to an immutable image ID. Measure one resource mode per invocation. Run `docker-default` first and inspect its report before deciding whether to provision and run `memory-512m`. Each invocation uses five A/A calibration pairs for every case/limit/connection-mode combination, `MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=0`, and `--ignored --test-threads=1`. Record every sample, engine and image identity, noise, effective resource measurements, and cleanup in the runbook. Do not infer a cause from cumulative post-run counters.
-
-  The command below is reserved for the next allowed `docker-default` capture. Do not run it until the variability source is controlled and the timestamped diagnostics are ready. It supplies all five required environment variables and writes to a distinct, create-new report path:
-
-  ```bash
-  MEMORY_TRIPLE_TEST_URL=ws://127.0.0.1:33127 \
-  MEMORY_TRIPLE_TEST_IMAGE_ID=sha256:f40e356e40dd2094e5a743ad8b1353f646cf3a660541e92b9f6cce003d3be2dd \
-  MEMORY_TRIPLE_TEST_RESOURCE_MODE=docker-default \
-  MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=0 \
-  MEMORY_TRIPLE_TEST_REPORT=/tmp/memory-triple-latency-docker-default-20261115-connection-modes-02.json \
-  cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote remote_latency_capture -- --exact --ignored --test-threads=1 --nocapture
-  ```
-
-  Expected: complete corrected-unguarded samples, row digests, one query call per timed sample, timestamped diagnostic events, and maximum A/A calibration noise at or below 3%. Missing server/resource evidence is `BLOCKED`; noise above 3% is `INVALID`. If the report is invalid, preserve it and stop. Do not lower the threshold, provision `memory-512m`, or proceed to Tasks 3 or 4 on invalid evidence. Do not rerun until the variability source is controlled, and use a fresh path for every allowed rerun.
-
-  Only after `docker-default` passes every baseline gate may `memory-512m` be considered. Use a separately verified disposable container with exactly 536870912-byte memory and memory-swap limits, unrestricted CPU settings, and a new report path such as `/tmp/memory-triple-latency-memory-512m-20261115-connection-modes-01.json`. Do not stop or remove a container that is still needed by another run.
-
-- [x] **Step 7: Capture the post-fix, pre-guard application baselines.** Run `cargo run -p eval-harness --locked --bin memory-eval -- run --profile evals/profiles/retrieval_quality.json --artifact target/evals/assemble-context-retrieval-quality.json` and `cargo run --release -p eval-harness --locked --bin memory-perf -- run --profile evals/perf/profiles/perf-weekly.json --artifact target/perf/assemble-context-perf.json --baseline evals/perf/baselines/perf-weekly-local.json --host-tag local`. Check that the artifact paths do not already exist before running. Record unavailable model files, invalid denominators, or host/profile mismatches without changing profiles or baselines.
-
-## Task 3: Evaluate and, only if justified, add the empty-path guard
-
-**Files:** Modify `knowledge_store.rs`, the triple contract tests, the remote experiment, and the runbook only if the guard passes every gate.
-
-**Interfaces:** Consume the corrected unguarded SQL and baseline from Tasks 1 and 2. The public method signature and `DbClient::query` boundary remain unchanged. The test harness compares A (corrected unguarded SQL) with B (guard candidate SQL) through the same public store and client.
-
-- [ ] **Step 1: Decide whether an A/B comparison is justified.** Review Task 2's calibrated empty-table and no-match samples. Proceed only when the empty-path duration is repeatable and above the A/A noise and timer resolution. Otherwise record `guard not justified` with the measured values and skip the rest of Task 3.
-
-- [ ] **Step 2: Verify SurrealDB 3.3.5 syntax and read-view semantics before adopting the candidate.** Inspect exact versioned engine and block transaction sources. Record immutable source links with line anchors and the actual production backend identity if established by authorized evidence. The memory-engine transaction snapshot is not proof that block reads share a read view. If the backend or snapshot behavior remains unknown, record `guard BLOCKED` and stop this task without changing production code.
-
-- [ ] **Step 3: Add test-only candidate compatibility and timing cases.** Use the proposed block in Spec C as B, with the corrected unguarded query as A. Introduce candidate mode only with this implemented B variant; `MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=1` remains rejected unless the candidate is selected. Assert exact flat-array empty and positive results through `BoundDbClient`; distinguish non-array results from empty arrays. Inject a failing fact branch to prove it is skipped for empty triples and propagates when entered. Compare missing-table and supported error behavior.
-
-- [ ] **Step 4: Run compatibility against the isolated 3.3.5 backend.**
-
-  Run: `cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote remote_triple_compatibility -- --exact --ignored --test-threads=1`
-
-  Expected: both branches return the expected flat arrays; skipped branches do not run; entered-branch errors propagate; corrected positive facts, missing-table handling, and result shape match. Any malformed result, error mismatch, or unproven read view blocks the guard.
-
-- [ ] **Step 5: Measure the candidate before production implementation.** For each resource mode captured in Task 2, run the ignored candidate test with that mode selected and a distinct report path. Run five rounds of A/A plus AB and BA pairs in both connection modes. Apply Spec C thresholds: empty/no-match positive-limit median(B)/median(A) <= `0.50`; positive and zero-limit cases do not regress beyond `max(3%, observed calibration noise)`; A/A noise <= `3%`. Preserve all samples and unavailable resource reasons.
-
-  Run once per resource mode, setting `MEMORY_TRIPLE_TEST_RESOURCE_MODE` and a unique `MEMORY_TRIPLE_TEST_REPORT` for each invocation: `MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=1 cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote remote_latency_capture -- --exact --ignored --test-threads=1`
-
-  Expected: every gate passes. If the speedup target fails, the corrected baseline is too noisy, or resources regress beyond calibrated noise, record the result and do not implement the guard.
-
-- [ ] **Step 6: Add a deterministic query-policy regression and observe RED.** Only after Step 5 passes, test `empty_triple_lookup_submits_guarded_corrected_query` through a recording `DbClient`. Assert one call, the bound namespace, unchanged `query/cutoff/limit` variables, the triple existence guard before the corrected fact SELECT, and flat empty output. Test that `limit=0` submits the corrected unguarded query. Keep a quoted sentinel only in variables.
-
-  Run: `cargo test -p memory_mcp --features eval-support --locked --test triple_retrieval_contract empty_triple_lookup_submits_guarded_corrected_query -- --exact`
-
-  Expected: RED because the production query does not yet contain a guard. A compiler or setup error is not the expected RED.
-
-- [ ] **Step 7: Implement the minimal owner-local guard and verify GREEN.** Keep the corrected SELECT as the guarded block's fact branch. Do not change decoder behavior, add a two-call fallback, change the API, or add logging. Keep zero-limit execution on the corrected unguarded SELECT.
-
-  Run:
-
-  ```bash
-  cargo test -p memory_mcp --features eval-support --locked --test triple_retrieval_contract
-  cargo test -p memory_mcp --features eval-support --locked --test retrieval_latency_remote remote_triple_compatibility -- --exact --ignored --test-threads=1
-  ```
-
-  Run `remote_latency_capture` once per resource mode with `MEMORY_TRIPLE_TEST_ASSERT_SPEEDUP=1` and a unique report path for each invocation.
-
-  Expected: contract tests, real-engine compatibility, and the measured A/B gate pass. If Task 3 was skipped, do not run or report a guard candidate.
+- [x] Task 2's populated no-match median was 191.387 ms, so a candidate was worth evaluating; the empty-table median was only 0.374 ms.
+- [x] Verified SurrealDB 3.3.5's statement transaction, deferred IF/ELSE branch execution, and RocksDB snapshot behavior against immutable commit `5c3383fe1841e10f7fc67fdf41b6d0671cbc1b13`; links and source paths are recorded in the runbook.
+- [x] Added candidate compatibility cases and ran them against the disposable server. The first RED was an inconsistent fixture expectation, corrected to `predicate-match` / `fact:triple-fixture-0001`; the live rerun passed.
+- [x] Compared A/B with five warmups and twenty alternating-order pairs per case on one prepared database/reused client. The raw A/B report was captured during evaluation and then removed during merge preparation. Its SHA-256 is recorded in the runbook; the summarized results remain, but the missing report cannot be independently rechecked. No-match improvement exceeded 2x in both orders; positive-case medians were 3–6% slower with overlapping, variable paired distributions.
+- [x] **Decision: do not add the production guard.** Positive-case non-regression is inconclusive under Section C, so the guard's acceptance gate is not met. The deterministic policy test and production query change are correctly skipped; no public contract changed. Only `docker-default` was measured; `memory-512m` remains unavailable.
+- [x] Candidate compatibility and paired comparison passed for the measured local mode. No post-implementation rerun applies because no production guard was implemented; the runbook records the mode-specific result and limitation.
 
 ## Task 4: Add stage metrics only when measurements justify them
 
@@ -196,19 +134,19 @@ A compatibility-only diagnostic run confirmed that the test-local container gate
 
 **Interfaces:** Reuse `StageTimer::new(&'static str, &'static str)` and its existing Drop behavior. Keep the recorder and registry visibility unchanged. If selected, use fixed stage names from Spec D only.
 
-- [ ] **Step 1: Write the evidence-based decision in the runbook.** Identify a recurring application-level latency result after Task 1 and optional Task 3, the work that current metrics cannot localize, and why selected stage boundaries answer that question. If no such question remains, record `stage metrics not justified` and skip Task 4 code changes.
+- [x] **Step 1: Record the decision in the runbook.** No recurring application-level latency result remains to localize: the retrieval-quality evaluation was invalid because its provider was unavailable, while the weekly perf smoke does not establish a recurring assemble-context issue. Record `stage metrics not justified`.
 
-- [ ] **Step 2: Add tests for only the selected scopes before instrumentation.** Use a dedicated integration target and the public `shared_test_handle()`. Cover successful entered scopes, the selected error/drop boundary, cache-hit behavior when access tracking is selected, and unchanged compact/full response shape when serialization is selected. For an async ordering claim, use permits and bounded waits, not sleeps. Recorder installation failure is a test failure.
+- [x] **Steps 2–5 skipped:** no metric scopes were selected, so no instrumentation, metric test target, or observability check was added for this task.
 
-- [ ] **Step 3: Run the selected metric test and observe RED.**
+- [x] **Step 3 skipped:** no selected metric test exists because Task 4 was not justified.
 
   Run: `cargo test -p memory_mcp --features fs-watch,mcp-apps,streamable-http,eval-support --locked --test assemble_context_stage_metrics`
 
   Expected: the selected new metric deltas are missing before instrumentation. If no metrics were justified, this target is not created and this step is skipped.
 
-- [ ] **Step 4: Add block-scoped timers at the selected ownership boundaries.** Keep existing timer scopes unchanged. Add only fixed names in `DECLARED_STAGES`; do not add a metric family, dynamic labels, awaits, SQL, or payload copies.
+- [x] **Step 4 skipped:** no block-scoped timers or metric names were selected because Task 4 was not justified.
 
-- [ ] **Step 5: Run selected metric tests and existing behavioral contracts.**
+- [x] **Step 5 skipped:** no metric instrumentation was added, so the conditional metric test and observability validation were not run.
 
   ```bash
   cargo test -p memory_mcp --features fs-watch,mcp-apps,streamable-http,eval-support --locked --test assemble_context_stage_metrics
@@ -222,8 +160,8 @@ A compatibility-only diagnostic run confirmed that the test-local container gate
 
 - [x] Run `cargo fmt --all --check`.
 - [x] Run applicable triple retrieval and existing query/quality tests from Tasks 1 and 3.
-- [ ] Run the metrics test only if Task 4 was justified.
+- [x] Metrics test not run; Task 4 was not justified.
 - [x] Run `cargo test -p memory_mcp --locked`.
-- [x] Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings`.
+- [x] Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures,eval-support --locked -- -D warnings`.
 - [x] Update the English runbook with actual test output, baseline/candidate identities, RED/GREEN results, guard decision, any metrics decision, artifacts, cleanup, and unresolved gates.
-- [x] Preserve all user WIP. Do not commit. Do not deploy without the verification and rollback procedure above. Report any unavailable server, native resource, model, or permission as blocked rather than passing.
+- [x] Preserve all user WIP. Do not deploy without the verification and rollback procedure above. Report any unavailable server, native resource, model, or permission as blocked rather than passing. The later merge-preparation request authorizes a local branch and commit only; no merge or push is part of this plan.
