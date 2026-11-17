@@ -34,6 +34,8 @@ fn is_loopback_public_url(url: &str) -> bool {
 }
 
 pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
+    super::super::storage_inventory::preflight(&cfg.control_db, &cfg.tenant_db)?;
+
     // Reject the test-only bootstrap env var unless the
     // `test-fixtures` feature is enabled (Task 5.8).
     // The literal is intentional: a production build
@@ -278,7 +280,7 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
     #[cfg(not(any(test, feature = "test-fixtures")))]
     if cfg.control_db.url.starts_with("mem://") || cfg.tenant_db.url.starts_with("mem://") {
         return Err(MemoryError::ConfigInvalid(
-            "mem:// is test-only; production HTTP SaaS requires remote SurrealDB or documented embedded RocksDB"
+            "mem:// is test-only; production HTTP SaaS requires remote SurrealDB or embedded SurrealKV"
                 .into(),
         ));
     }

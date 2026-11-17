@@ -153,7 +153,7 @@ async fn bootstrap_one(
     let store = stores.tenants();
     // Idempotent: a previous bootstrap that already reached
     // Ready means the recovery test restarted the fixture
-    // against the same rocksdb path; do NOT regress.
+    // against the same SurrealKV path; do NOT regress.
     if let Some(existing) = store.find_tenant_by_id(&tenant_id).await?
         && existing.status == TenantStatus::Ready
     {

@@ -20,6 +20,7 @@ pub mod router;
 pub mod runtime;
 pub mod server;
 pub mod shutdown;
+mod storage_inventory;
 pub mod subscriptions;
 pub mod sync;
 pub mod tasks;

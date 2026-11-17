@@ -31,7 +31,7 @@ pub use target::SurrealTargetConfig;
 // rather than a second hand-rolled one that could disagree about what a
 // value means. Gated to the profile that is that composition root.
 #[cfg(feature = "streamable-http")]
-pub(crate) use helpers::{parse_bool_env, parse_env};
+pub(crate) use helpers::{experimental_upgrade_from_3x, parse_bool_env, parse_env};
 
 #[cfg(test)]
 pub(crate) fn env_lock() -> &'static std::sync::Mutex<()> {

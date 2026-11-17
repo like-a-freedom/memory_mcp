@@ -50,7 +50,7 @@ pub enum PrivilegedEngine {
     /// Production remote (Ws-backed) engine. The HTTP binary
     /// builds this from `SurrealTargetConfig`.
     Remote(Arc<Surreal<Client>>),
-    /// Production embedded (RocksDB) engine.
+    /// Production embedded (SurrealKV) engine.
     Local(Arc<Surreal<Db>>),
     /// Test-only in-memory engine. `Surreal::new::<Mem>(())`
     /// returns a `Surreal<Db>`; the kv engine is in-memory.
@@ -89,7 +89,7 @@ impl PrivilegedEngine {
                     .use_ns(namespace)
                     .use_db("memory")
                     .await
-                    .expect("rocksdb bind");
+                    .expect("SurrealKV bind");
                 Arc::new(SurrealDbClient::from_prebound(session, namespace, "warn"))
             }
             Self::Remote(_db) => {

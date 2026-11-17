@@ -81,7 +81,7 @@ impl StorageBackend {
 
 /// Configuration for SurrealDB connection.
 ///
-/// Supports both embedded (RocksDB) and remote (WebSocket) modes.
+/// Supports both embedded (SurrealKV) and remote (WebSocket) modes.
 /// For local development, prefer embedded mode. For remote deployments, use a
 /// dedicated least-privileged database user instead of root credentials.
 ///
@@ -106,10 +106,12 @@ pub struct SurrealConfig {
     pub password: String,
     /// Logging level (trace, debug, info, warn, error).
     pub log_level: String,
-    /// If true, use embedded RocksDB engine.
+    /// If true, use the embedded SurrealKV engine.
     pub embedded: bool,
-    /// Optional path to RocksDB data directory.
+    /// Optional path to the embedded SurrealKV data directory.
     pub data_dir: Option<String>,
+    /// Allow the embedded SurrealDB 4 engine to convert a v3 datastore.
+    pub upgrade_from_3x: bool,
     /// Environment variables whose values were supplied by zero-config defaults.
     pub(crate) defaulted_variables: Vec<&'static str>,
     /// Existing legacy executable-relative data directory selected for compatibility.
@@ -136,8 +138,9 @@ impl SurrealConfig {
     /// | `SURREALDB_DB_NAME` | No | Database name (default: `memory`) |
     /// | `SURREALDB_URL` | Yes (remote) | WebSocket URL |
     /// | `SURREALDB_EMBEDDED` | No | Set to `true` or `false`; inferred from URL when unset |
-    /// | `SURREALDB_DATA_DIR` | No | Path to RocksDB data directory (user data directory by default) |
+    /// | `SURREALDB_DATA_DIR` | No | Path to the SurrealKV data directory (user data directory by default) |
     /// | `SURREALDB_NAMESPACE` | No | One namespace (default: `main`) |
+    /// | `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | No | Set to `true` to allow embedded SurrealDB 4 to convert a v3 datastore (default: `false`) |
     /// | `SURREALDB_USERNAME` | Yes (remote) | Database username (`root` in embedded mode by default) |
     /// | `SURREALDB_PASSWORD` | Yes (remote) | Database password (`root` in embedded mode by default) |
     /// | `RUST_LOG` | No | Logging level (default: "info") |
@@ -213,6 +216,11 @@ impl SurrealConfig {
         }
 
         let (data_dir, legacy_data_dir) = if let Ok(explicit) = env::var("SURREALDB_DATA_DIR") {
+            if embedded && explicit.trim().is_empty() {
+                return Err(MemoryError::ConfigInvalid(
+                    "SURREALDB_DATA_DIR must not be empty in embedded mode".into(),
+                ));
+            }
             (Some(explicit), None)
         } else if embedded {
             let resolution = resolve_embedded_data_dir();
@@ -224,6 +232,7 @@ impl SurrealConfig {
 
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
         let query_logging_enabled = parse_bool_env("QUERY_LOGGING_ENABLED").unwrap_or(false);
+        let upgrade_from_3x = super::helpers::experimental_upgrade_from_3x();
         let query_log_retention_days = parse_env::<u32>("QUERY_LOG_RETENTION_DAYS")?
             .unwrap_or(DEFAULT_QUERY_LOG_RETENTION_DAYS);
 
@@ -240,6 +249,7 @@ impl SurrealConfig {
             log_level,
             embedded,
             data_dir,
+            upgrade_from_3x,
             defaulted_variables,
             legacy_data_dir,
             lifecycle,
@@ -296,6 +306,7 @@ pub struct SurrealConfigBuilder {
     log_level: String,
     embedded: bool,
     data_dir: Option<String>,
+    upgrade_from_3x: bool,
     defaulted_variables: Vec<&'static str>,
     legacy_data_dir: Option<String>,
     lifecycle: LifecycleConfig,
@@ -316,6 +327,7 @@ impl Default for SurrealConfigBuilder {
             log_level: String::new(),
             embedded: false,
             data_dir: None,
+            upgrade_from_3x: false,
             defaulted_variables: Vec::new(),
             legacy_data_dir: None,
             lifecycle: LifecycleConfig::default(),
@@ -438,6 +450,7 @@ impl SurrealConfigBuilder {
             log_level: self.log_level,
             embedded: self.embedded,
             data_dir: self.data_dir,
+            upgrade_from_3x: self.upgrade_from_3x,
             defaulted_variables: self.defaulted_variables,
             legacy_data_dir: self.legacy_data_dir,
             lifecycle: self.lifecycle,
@@ -467,6 +480,7 @@ mod tests {
         "SURREALDB_USERNAME",
         "SURREALDB_PASSWORD",
         "SURREALDB_DATA_DIR",
+        "SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X",
         "RUST_LOG",
         "QUERY_LOGGING_ENABLED",
         "QUERY_LOG_RETENTION_DAYS",
@@ -535,6 +549,71 @@ mod tests {
         for key in SURREAL_CONFIG_ENV_KEYS {
             unsafe { env::remove_var(key) };
         }
+    }
+
+    #[test]
+    fn embedded_upgrade_opt_in_defaults_off_without_changing_the_data_dir() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        let xdg_data_home = TempDir::new().expect("temporary XDG data directory");
+        unsafe { env::set_var("XDG_DATA_HOME", xdg_data_home.path()) };
+        let expected_path = xdg_data_home.path().join("memory_mcp");
+        std::fs::create_dir_all(&expected_path).expect("create data directory");
+
+        let config = SurrealConfig::from_env().expect("zero-config environment should be valid");
+
+        assert!(!config.upgrade_from_3x);
+        assert_eq!(config.data_dir.as_deref(), expected_path.to_str());
+    }
+
+    #[test]
+    fn explicitly_empty_embedded_data_dir_is_rejected() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREALDB_DATA_DIR", "   ") };
+
+        let error = SurrealConfig::from_env().expect_err("empty embedded path must fail closed");
+
+        assert!(error.to_string().contains("SURREALDB_DATA_DIR"));
+    }
+
+    #[test]
+    fn embedded_upgrade_opt_in_accepts_explicit_true() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X", "true") };
+
+        let config = SurrealConfig::from_env().expect("config from env");
+
+        assert!(config.upgrade_from_3x);
+    }
+
+    #[test]
+    fn embedded_upgrade_opt_in_accepts_explicit_false() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X", "false") };
+
+        let config = SurrealConfig::from_env().expect("config from env");
+
+        assert!(!config.upgrade_from_3x);
+    }
+
+    #[test]
+    fn an_unrecognized_embedded_upgrade_value_does_not_enable_conversion() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X", "treu") };
+
+        let config =
+            SurrealConfig::from_env().expect("unrecognized value follows boolean convention");
+
+        assert!(!config.upgrade_from_3x);
     }
 
     #[test]

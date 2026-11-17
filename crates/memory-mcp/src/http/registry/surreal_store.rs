@@ -788,13 +788,16 @@ impl SurrealRegistryStore {
                 .await
                 .map_err(|err| map_storage_error("mem engine init", err))?;
             RegistryDb::Local(Arc::new(db))
-        } else if let Some(rest) = url.strip_prefix("rocksdb://") {
+        } else if let Some(rest) = url
+            .strip_prefix("surrealkv://")
+            .or_else(|| url.strip_prefix("rocksdb://"))
+        {
             use surrealdb::opt::Config as SurrealOptConfig;
             use surrealdb::opt::auth::Root;
             use surrealdb::opt::capabilities::Capabilities;
             if rest.trim().is_empty() {
                 return Err(MemoryError::Validation(
-                    "rocksdb registry path is empty".into(),
+                    "SurrealKV registry path is empty".into(),
                 ));
             }
             let root = Root {
@@ -804,12 +807,17 @@ impl SurrealRegistryStore {
             let cfg = SurrealOptConfig::default()
                 .user(root.clone())
                 .capabilities(Capabilities::default());
-            let db = Surreal::new::<surrealdb::engine::local::RocksDb>((rest, cfg))
+            let cfg = if crate::config::experimental_upgrade_from_3x() {
+                cfg.datastore_option("experimental_upgrade_from_3x", true)
+            } else {
+                cfg
+            };
+            let db = Surreal::new::<surrealdb::engine::local::SurrealKv>((rest, cfg))
                 .await
-                .map_err(|err| map_storage_error("rocksdb init", err))?;
+                .map_err(|err| map_storage_error("SurrealKV init", err))?;
             db.signin(root)
                 .await
-                .map_err(|err| map_storage_error("rocksdb auth", err))?;
+                .map_err(|err| map_storage_error("SurrealKV auth", err))?;
             RegistryDb::Local(Arc::new(db))
         } else if let Some(rest) = url.strip_prefix("ws://") {
             let db = Surreal::new::<Ws>(rest)

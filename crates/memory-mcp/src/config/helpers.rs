@@ -32,6 +32,14 @@ pub fn parse_bool_env(var_name: &str) -> Option<bool> {
     })
 }
 
+/// Whether embedded SurrealDB 4 may convert an existing v3 datastore.
+///
+/// Unknown values follow the project's existing boolean convention and remain
+/// disabled, which keeps a typo from silently authorizing a conversion.
+pub(crate) fn experimental_upgrade_from_3x() -> bool {
+    parse_bool_env("SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X").unwrap_or(false)
+}
+
 /// Returns whether a URL selects a supported remote SurrealDB connection.
 pub(crate) fn is_remote_url(url: Option<&str>) -> bool {
     let Some(raw) = url.map(str::trim) else {

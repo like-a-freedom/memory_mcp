@@ -84,6 +84,13 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "021_query_log_retrieval_diagnostics.surql",
             sql: include_str!("../../migrations/021_query_log_retrieval_diagnostics.surql"),
         },
+        // Migration 034 defines edge.provenance, which 022 extends with nested
+        // fields. Keep the historical SQL immutable and order the runner by
+        // this dependency for fresh SurrealDB 4 catalogs.
+        MigrationScript {
+            file_name: "034_edge_provenance_schema_fix.surql",
+            sql: include_str!("../../migrations/034_edge_provenance_schema_fix.surql"),
+        },
         MigrationScript {
             file_name: "022_structured_provenance.surql",
             sql: include_str!("../../migrations/022_structured_provenance.surql"),
@@ -131,10 +138,6 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
         MigrationScript {
             file_name: "033_claim_identity_version.surql",
             sql: include_str!("../../migrations/033_claim_identity_version.surql"),
-        },
-        MigrationScript {
-            file_name: "034_edge_provenance_schema_fix.surql",
-            sql: include_str!("../../migrations/034_edge_provenance_schema_fix.surql"),
         },
         MigrationScript {
             file_name: "035_claim_legacy_identity_optional.surql",
@@ -1469,6 +1472,69 @@ mod tests {
             versioned_migrations()
                 .iter()
                 .any(|migration| { migration.file_name == "034_edge_provenance_schema_fix.surql" })
+        );
+    }
+
+    #[tokio::test]
+    async fn provenance_migrations_apply_when_both_are_pending_and_when_034_is_applied() {
+        let fresh_namespace = "migration_order_fresh";
+        let fresh_client = SurrealDbClient::connect_in_memory("memory", &fresh_namespace, "error")
+            .await
+            .expect("connect fresh in-memory SurrealDB");
+
+        run_migrations(&fresh_client, &fresh_namespace)
+            .await
+            .expect("fresh catalog should apply 034 before nested provenance fields in 022");
+
+        let namespace = "migration_resume_partial";
+        let client = SurrealDbClient::connect_in_memory("memory", &namespace, "error")
+            .await
+            .expect("connect partially migrated in-memory SurrealDB");
+        let initial_schema = render_sql_template(
+            include_str!("../../migrations/__Initial.surql"),
+            client.migration_embedding_dimension(),
+        );
+        match client
+            .execute_migration_script(&initial_schema, &namespace)
+            .await
+        {
+            Ok(()) => {}
+            Err(MemoryError::Storage(message)) => assert!(
+                is_tolerable_initial_schema_error(&message),
+                "initial schema failed for an unexpected reason: {message}"
+            ),
+            Err(error) => panic!("initial schema failed with an unexpected error: {error}"),
+        }
+        ensure_migration_runner_schema(&client, &namespace)
+            .await
+            .expect("create migration runner schema");
+        let migration_034 = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "034_edge_provenance_schema_fix.surql")
+            .expect("034 is registered");
+        apply_versioned_migration(&client, &namespace, migration_034)
+            .await
+            .expect("apply 034 while 022 remains pending");
+
+        run_migrations(&client, &namespace)
+            .await
+            .expect("pending 022 should apply while already-applied 034 remains skipped");
+
+        let migration_034_id = migration_record_id("034_edge_provenance_schema_fix.surql");
+        let migration_022_id = migration_record_id("022_structured_provenance.surql");
+        assert!(
+            client
+                .select_one(&migration_034_id, &namespace)
+                .await
+                .expect("read 034 ledger")
+                .is_some()
+        );
+        assert!(
+            client
+                .select_one(&migration_022_id, &namespace)
+                .await
+                .expect("read 022 ledger")
+                .is_some()
         );
     }
 

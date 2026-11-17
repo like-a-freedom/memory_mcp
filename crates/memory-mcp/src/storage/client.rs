@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::local::Mem;
-use surrealdb::engine::local::RocksDb;
+
 use surrealdb::engine::remote::ws::{Client, Ws, Wss};
 use surrealdb::opt::auth::Root;
 use surrealdb::types::Value as SurrealValue;
@@ -299,8 +299,7 @@ enum DbEngine {
     /// Embedded test backend (in-memory kv). Test fixtures and
     /// bootstrap use this; production never opens a Mem engine.
     /// The handle is `Surreal<Db>` underneath because `Mem` is
-    /// just a configuration marker; the actual kv engine is
-    /// RocksDB with a temporary directory.
+    /// just a configuration marker; the actual kv engine is in-memory.
     Mem(Arc<Surreal<Db>>),
 }
 
@@ -491,7 +490,7 @@ impl SurrealDbClient {
         }
     }
 
-    /// Wraps an already-bound embedded (RocksDB) client.
+    /// Wraps an already-bound embedded (SurrealKV) client.
     /// The caller MUST have called `use_ns(...).use_db(...)` on
     /// `db` exactly once before passing it in; this constructor
     /// never rebinds. stdio never calls this constructor.
@@ -572,8 +571,8 @@ impl SurrealDbClient {
         })
     }
 
-    /// Maps an embedded RocksDB initialization error into an actionable startup
-    /// error. RocksDB remains the final ownership arbiter; only known lock /
+    /// Maps an embedded SurrealKV initialization error into an actionable startup
+    /// error. SurrealKV remains the final ownership arbiter; only known lock /
     /// resource-busy signatures are translated.
     fn map_embedded_init_error(data_dir: &Path, message: &str) -> MemoryError {
         let lowered = message.to_ascii_lowercase();
@@ -593,7 +592,7 @@ impl SurrealDbClient {
         }
     }
 
-    /// Connects to embedded RocksDB instance.
+    /// Connects to embedded SurrealKV instance.
     async fn connect_embedded(config: &SurrealConfig) -> Result<DbEngine, MemoryError> {
         use surrealdb::opt::{Config as SurrealOptConfig, capabilities::Capabilities};
 
@@ -608,8 +607,13 @@ impl SurrealDbClient {
         let cfg = SurrealOptConfig::new()
             .user(root.clone())
             .capabilities(Capabilities::default());
+        let cfg = if config.upgrade_from_3x {
+            cfg.datastore_option("experimental_upgrade_from_3x", true)
+        } else {
+            cfg
+        };
 
-        let db = Surreal::new::<RocksDb>((data_dir.clone(), cfg))
+        let db = Surreal::new::<surrealdb::engine::local::SurrealKv>((data_dir.clone(), cfg))
             .await
             .map_err(|err| Self::map_embedded_init_error(&data_dir, &err.to_string()))?;
 
@@ -1197,7 +1201,7 @@ mod tests {
     fn embedded_init_error_retains_generic_wording_for_unrelated_failures() {
         let data_dir = PathBuf::from("/tmp/data-dir");
         let error =
-            SurrealDbClient::map_embedded_init_error(&data_dir, "unsupported rocksdb options");
+            SurrealDbClient::map_embedded_init_error(&data_dir, "unsupported engine options");
         assert!(matches!(error, MemoryError::Storage(_)));
         assert!(error.to_string().contains("SurrealDB embedded init failed"));
         assert!(!error.to_string().contains("SURREALDB_DATA_DIR"));

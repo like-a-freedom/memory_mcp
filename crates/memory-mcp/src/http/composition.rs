@@ -29,21 +29,19 @@ pub struct HttpProductionComposition {
 
 impl HttpProductionComposition {
     /// Connect the control Registry and the privileged tenant engine
-    /// from config. Embedded RocksDB permits one process handle per
-    /// path, so both targets pointing at the same endpoint share one
-    /// connection; remote deployments may use independent connections.
+    /// from config. The physical local-store inventory runs before either
+    /// engine opens; equivalent local paths with matching credentials share
+    /// one process handle. Remote deployments may use independent connections.
     /// The fault injector defaults to [`NoFaults`]; callers wanting a
     /// test injector should construct the composition manually.
     pub async fn connect(config: &HttpConfig) -> Result<Self, MemoryError> {
+        let inventory = super::storage_inventory::preflight(&config.control_db, &config.tenant_db)?;
         let store = SurrealRegistryStore::connect(&config.control_db)
             .await
             .map_err(|err| {
                 MemoryError::Storage(format!("control registry storage connect failed: {err}"))
             })?;
-        let engine = if config.control_db.url == config.tenant_db.url
-            && config.control_db.username == config.tenant_db.username
-            && config.control_db.password == config.tenant_db.password
-        {
+        let engine = if inventory.share_control_engine_with_tenants {
             store.privileged_engine()
         } else {
             SurrealRegistryStore::connect_engine(&config.tenant_db)
@@ -170,5 +168,116 @@ mod tests {
             .await;
 
         assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn local_control_and_tenant_aliases_share_one_surreal_kv_engine() {
+        let directory = tempfile::tempdir().expect("temporary storage parent");
+        let store_path = directory.path().join("shared");
+        let mut config = HttpConfig::default_for_test();
+        config.control_db.url = format!("surrealkv://{}", store_path.display());
+        config.tenant_db.url = format!("rocksdb://{}", store_path.display());
+        config.tenant_db.database = "tenant".into();
+        config.tenant_db.namespace = "tenant".into();
+
+        let composition = HttpProductionComposition::connect(&config).await;
+
+        assert!(
+            composition.is_ok(),
+            "equivalent local aliases must reuse the open engine"
+        );
+    }
+
+    #[tokio::test]
+    async fn overlapping_local_store_paths_are_rejected_before_any_engine_opens() {
+        let directory = tempfile::tempdir().expect("temporary storage parent");
+        let control_path = directory.path().join("control");
+        let tenant_path = control_path.join("tenant");
+        let mut config = HttpConfig::default_for_test();
+        config.control_db.url = format!("surrealkv://{}", control_path.display());
+        config.tenant_db.url = format!("surrealkv://{}", tenant_path.display());
+        config.tenant_db.database = "tenant".into();
+        config.tenant_db.namespace = "tenant".into();
+
+        let result = HttpProductionComposition::connect(&config).await;
+
+        assert!(
+            matches!(result, Err(MemoryError::ConfigInvalid(_))),
+            "overlapping physical stores must be rejected as invalid configuration"
+        );
+        assert!(
+            !control_path.exists(),
+            "preflight must reject overlapping stores before creating the control path"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn local_control_and_tenant_symlink_aliases_share_one_engine() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().expect("temporary storage parent");
+        let store_path = directory.path().join("shared");
+        std::fs::create_dir(&store_path).expect("create physical store path");
+        let alias_path = directory.path().join("alias");
+        symlink(&store_path, &alias_path).expect("create path alias");
+        let mut config = HttpConfig::default_for_test();
+        config.control_db.url = format!("surrealkv://{}", store_path.display());
+        config.tenant_db.url = format!("rocksdb://{}", alias_path.display());
+        config.tenant_db.database = "tenant".into();
+        config.tenant_db.namespace = "tenant".into();
+
+        let composition = HttpProductionComposition::connect(&config).await;
+
+        assert!(
+            composition.is_ok(),
+            "symlink-equivalent local targets must reuse the open engine"
+        );
+    }
+
+    #[tokio::test]
+    async fn identical_control_and_tenant_bindings_are_rejected_before_opening_storage() {
+        let directory = tempfile::tempdir().expect("temporary storage parent");
+        let store_path = directory.path().join("shared");
+        let mut config = HttpConfig::default_for_test();
+        config.control_db.url = format!("surrealkv://{}", store_path.display());
+        config.tenant_db.url = config.control_db.url.clone();
+        config.tenant_db.database = config.control_db.database.clone();
+        config.tenant_db.namespace = config.control_db.namespace.clone();
+
+        let result = HttpProductionComposition::connect(&config).await;
+
+        assert!(
+            matches!(result, Err(MemoryError::ConfigInvalid(_))),
+            "control and tenant cannot bind the same database"
+        );
+        assert!(
+            !store_path.exists(),
+            "invalid bindings must be rejected before any engine creates its path"
+        );
+    }
+
+    #[tokio::test]
+    async fn one_physical_store_cannot_have_conflicting_credentials() {
+        let directory = tempfile::tempdir().expect("temporary storage parent");
+        let store_path = directory.path().join("shared");
+        let mut config = HttpConfig::default_for_test();
+        config.control_db.url = format!("surrealkv://{}", store_path.display());
+        config.tenant_db.url = config.control_db.url.clone();
+        config.tenant_db.username = "another-user".into();
+        config.tenant_db.password = "another-password".into();
+        config.tenant_db.database = "tenant".into();
+        config.tenant_db.namespace = "tenant".into();
+
+        let result = HttpProductionComposition::connect(&config).await;
+
+        assert!(
+            matches!(result, Err(MemoryError::ConfigInvalid(_))),
+            "conflicting credentials for one physical path must fail preflight"
+        );
+        assert!(
+            !store_path.exists(),
+            "credential conflicts must be rejected before the engine creates its path"
+        );
     }
 }

@@ -55,11 +55,7 @@ serde_json = "1.0.154"
 sha2 = "0.11"
 strsim = "0.11.1"
 subtle = "2.6.1"
-# Held on 3.x: surrealdb 4.0.0 dropped the `kv-rocksdb` feature (only
-# `kv-mem`/`kv-surrealkv` remain), which would break the documented
-# `rocksdb://` storage contract. An upgrade needs a storage-migration
-# decision, not a version bump.
-surrealdb = { version = "3.3.5", features = ["kv-rocksdb", "kv-mem"] }
+surrealdb = { version = "4.0.1", features = ["kv-surrealkv", "kv-mem"] }
 tar = { version = "0.4", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.21"
