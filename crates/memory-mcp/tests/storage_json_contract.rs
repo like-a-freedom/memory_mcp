@@ -309,26 +309,13 @@ async fn update_returns_a_plain_json_record() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn server_version_returns_none_when_database_info_has_no_version()
--> Result<(), Box<dyn Error>> {
+async fn server_version_uses_the_sdk_version_operation() -> Result<(), Box<dyn Error>> {
     let fixture = StorageMemoryFixture::start(1, 17).await?;
     let client = fixture.connect_adapter().await?;
-    let info = fixture.query_json("INFO FOR DB;").await?;
-    let info_fields = info
-        .as_array()
-        .and_then(|results| results.first())
-        .and_then(serde_json::Value::as_object)
-        .ok_or("INFO FOR DB must return one object")?;
 
-    assert!(
-        !info_fields
-            .keys()
-            .any(|field| field.to_ascii_lowercase().contains("version")),
-        "INFO FOR DB unexpectedly exposed a version field: {info_fields:?}"
-    );
     let version = client.server_version(&fixture.namespace).await?;
 
-    assert_eq!(version, None);
+    assert!(version.is_some_and(|value| value.starts_with("SurrealDB ")));
     Ok(())
 }
 

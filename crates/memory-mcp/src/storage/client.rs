@@ -22,11 +22,14 @@ use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 
 use super::helpers::{
-    SurrealRemoteEndpoint, ensure_dir_exists, find_version_in_json, is_missing_table_error,
-    surreal_remote_endpoint, surreal_to_json,
+    SurrealRemoteEndpoint, ensure_dir_exists, is_missing_table_error, surreal_remote_endpoint,
 };
 use super::json_conversion::surreal_records_to_json;
 use super::queries::{build_create_query, build_select_one_query, build_update_query};
+use super::v4_maintenance::{
+    DatabaseIdentity, DatabaseProvenance, IndexBuildState, IndexInspection, MaintenanceKey,
+    MaintenanceRecord, ManagedIndex, ServerVersion, V4MaintenancePort, parse_server_version,
+};
 
 /// Low-level database operations used by startup, migrations, and test fixtures.
 ///
@@ -269,6 +272,7 @@ impl BoundDbClient {
 pub struct SurrealDbClient {
     engine: DbEngine,
     active_namespace: String,
+    active_database: Option<String>,
     logger: StdoutLogger,
     fact_embedding_dimension: usize,
     #[cfg(feature = "eval-support")]
@@ -371,6 +375,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
+            active_database: Some(database.to_string()),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
@@ -442,6 +447,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Remote(Arc::new(db)),
             active_namespace: target.namespace.clone(),
+            active_database: Some(target.database.clone()),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
@@ -483,6 +489,7 @@ impl SurrealDbClient {
         Self {
             engine: DbEngine::Remote(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
+            active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
@@ -514,6 +521,7 @@ impl SurrealDbClient {
         Self {
             engine: DbEngine::Local(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
+            active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
@@ -546,6 +554,7 @@ impl SurrealDbClient {
         Self {
             engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
+            active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
             #[cfg(feature = "eval-support")]
@@ -564,6 +573,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine,
             active_namespace,
+            active_database: Some(config.db_name.clone()),
             logger: StdoutLogger::new(&config.log_level),
             fact_embedding_dimension: config.embedding.fallback_dimension(),
             #[cfg(feature = "eval-support")]
@@ -668,28 +678,24 @@ impl SurrealDbClient {
         }
     }
 
-    /// Ask the connected SurrealDB instance for a server version string.
-    /// Returns Ok(None) if the information cannot be retrieved.
+    /// Records the selected database name for maintenance operations on an
+    /// already-bound SDK client whose binding happened outside this adapter.
+    pub(crate) fn with_database_identity(mut self, database: impl Into<String>) -> Self {
+        self.active_database = Some(database.into());
+        self
+    }
+
+    /// Ask the connected SurrealDB instance for its semantic version.
     pub async fn server_version(&self, namespace: &str) -> Result<Option<String>, MemoryError> {
         self.ensure_active_namespace(namespace)?;
-        let sql = "INFO FOR DB";
-        let res = match &self.engine {
-            DbEngine::Local(db) => db.query(sql).await,
-            DbEngine::Mem(db) => db.query(sql).await,
-            DbEngine::Remote(db) => db.query(sql).await,
-        };
+        let version = match &self.engine {
+            DbEngine::Local(db) => db.version().await,
+            DbEngine::Mem(db) => db.version().await,
+            DbEngine::Remote(db) => db.version().await,
+        }
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB version lookup failed: {err}")))?;
 
-        let mut response = match res {
-            Ok(r) => r,
-            Err(_) => return Ok(None),
-        };
-
-        let surreal_val = response
-            .take::<SurrealValue>(0)
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?;
-
-        let json = surreal_to_json(surreal_val);
-        Ok(find_version_in_json(&json))
+        Ok(Some(format!("SurrealDB {version}")))
     }
 
     /// Logs a database operation event.
@@ -732,6 +738,15 @@ impl SurrealDbClient {
     }
 
     /// Execute a query that returns a SurrealValue (internal helper).
+    async fn maintenance_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+    ) -> Result<Value, MemoryError> {
+        let result = sql_query_take(self, &self.active_namespace, sql, vars).await?;
+        Ok(super::json_conversion::surreal_to_json(result))
+    }
+
     async fn execute_query(
         &self,
         sql: &str,
@@ -888,6 +903,408 @@ impl SurrealDbClient {
     ) -> Result<(), MemoryError> {
         sql_query_take(self, namespace, sql, vars).await?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl V4MaintenancePort for SurrealDbClient {
+    async fn server_version(&self) -> Result<ServerVersion, MemoryError> {
+        let display = self
+            .server_version(&self.active_namespace)
+            .await?
+            .ok_or_else(|| {
+                MemoryError::Storage("SurrealDB version operation returned no version".into())
+            })?;
+        let raw = display.strip_prefix("SurrealDB ").unwrap_or(&display);
+        parse_server_version(raw)
+    }
+
+    async fn database_identity(&self) -> Result<DatabaseIdentity, MemoryError> {
+        let database = self.active_database.clone().ok_or_else(|| {
+            MemoryError::ConfigInvalid(
+                "SurrealDB maintenance requires a client bound with its database identity".into(),
+            )
+        })?;
+        Ok(DatabaseIdentity {
+            namespace: self.active_namespace.clone(),
+            database,
+        })
+    }
+
+    async fn read_provenance(&self) -> Result<Option<DatabaseProvenance>, MemoryError> {
+        let value = self
+            .maintenance_query(
+                "SELECT * FROM memory_v4_maintenance_provenance:current;",
+                None,
+            )
+            .await?;
+        let Some(row) = first_json_row(value) else {
+            return Ok(None);
+        };
+        let Some(provenance) = row.get("provenance").cloned() else {
+            return Err(MemoryError::Storage(
+                "SurrealDB maintenance provenance record is malformed".into(),
+            ));
+        };
+        serde_json::from_value(provenance)
+            .map(Some)
+            .map_err(|error| {
+                MemoryError::Storage(format!(
+                    "SurrealDB maintenance provenance is invalid: {error}"
+                ))
+            })
+    }
+
+    async fn create_provenance(&self, provenance: DatabaseProvenance) -> Result<bool, MemoryError> {
+        let record = json!({"provenance": provenance});
+        match self
+            .maintenance_query(
+                "CREATE ONLY memory_v4_maintenance_provenance:current CONTENT $record;",
+                Some(json!({"record": record})),
+            )
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(error) if is_record_already_exists_error(&error.to_string()) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn read_claim(
+        &self,
+        key: &MaintenanceKey,
+    ) -> Result<Option<MaintenanceRecord>, MemoryError> {
+        self.ensure_maintenance_key(key)?;
+        let query = format!(
+            "SELECT * FROM memory_v4_maintenance_claim:{};",
+            key.revision
+        );
+        let value = self.maintenance_query(&query, None).await?;
+        let Some(row) = first_json_row(value) else {
+            return Ok(None);
+        };
+        let claim: MaintenanceRecord = serde_json::from_value(row).map_err(|error| {
+            MemoryError::Storage(format!("SurrealDB maintenance claim is malformed: {error}"))
+        })?;
+        if claim.key.namespace != key.namespace
+            || claim.key.database != key.database
+            || claim.key.revision != key.revision
+        {
+            return Err(MemoryError::Storage(
+                "SurrealDB maintenance claim key does not match the active database".into(),
+            ));
+        }
+        Ok(Some(claim))
+    }
+
+    async fn create_claim(&self, record: &MaintenanceRecord) -> Result<bool, MemoryError> {
+        let key = self.key_for_record(record).await?;
+        if key.revision != record.key.revision {
+            return Err(MemoryError::ConfigInvalid(
+                "SurrealDB maintenance claim revision does not match the active database".into(),
+            ));
+        }
+        let content = serde_json::to_value(record).map_err(|error| {
+            MemoryError::Storage(format!(
+                "could not serialize SurrealDB maintenance claim: {error}"
+            ))
+        })?;
+        let query = format!(
+            "CREATE ONLY memory_v4_maintenance_claim:{} CONTENT $record;",
+            key.revision
+        );
+        match self
+            .maintenance_query(&query, Some(json!({"record": content})))
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(error) if is_record_already_exists_error(&error.to_string()) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn replace_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        self.update_claim(expected_attempt_id, record).await
+    }
+
+    async fn save_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        self.update_claim(expected_attempt_id, record).await
+    }
+
+    async fn inspect_index(&self, index: ManagedIndex) -> Result<IndexInspection, MemoryError> {
+        let table_query = format!("INFO FOR TABLE {};", index.table);
+        let table_info = self.maintenance_query(&table_query, None).await?;
+        let table_info = first_json_row(table_info);
+        let actual_definition = table_info
+            .as_ref()
+            .and_then(Value::as_object)
+            .and_then(|info| info.get("indexes"))
+            .and_then(Value::as_object)
+            .and_then(|indexes| indexes.get(index.name))
+            .and_then(Value::as_str);
+        let definition_matches =
+            index_info_matches(actual_definition, index, self.fact_embedding_dimension);
+        if !definition_matches {
+            return Ok(IndexInspection {
+                definition_matches: false,
+                state: IndexBuildState::Missing,
+            });
+        }
+
+        let index_query = format!("INFO FOR INDEX {} ON TABLE {};", index.name, index.table);
+        let index_info = self.maintenance_query(&index_query, None).await?;
+        let index_info = first_json_row(index_info);
+        let state = index_build_state(index_info.as_ref().and_then(Value::as_object));
+        Ok(IndexInspection {
+            definition_matches,
+            state,
+        })
+    }
+
+    async fn rebuild_index(&self, index: ManagedIndex) -> Result<(), MemoryError> {
+        let query = format!("REBUILD INDEX {} ON TABLE {};", index.name, index.table);
+        self.maintenance_query(&query, None).await?;
+        Ok(())
+    }
+}
+
+impl SurrealDbClient {
+    fn ensure_maintenance_key(&self, key: &MaintenanceKey) -> Result<(), MemoryError> {
+        let identity = self.active_database.as_deref().ok_or_else(|| {
+            MemoryError::ConfigInvalid(
+                "SurrealDB maintenance requires a client bound with its database identity".into(),
+            )
+        })?;
+        if key.namespace != self.active_namespace
+            || key.database != identity
+            || key.revision != "surrealdb_4_index_rebuild_v1"
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "SurrealDB maintenance key does not match the active database".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn key_for_record(
+        &self,
+        record: &MaintenanceRecord,
+    ) -> Result<MaintenanceKey, MemoryError> {
+        let identity = self.database_identity().await?;
+        let key = MaintenanceKey {
+            namespace: identity.namespace,
+            database: identity.database,
+            revision: "surrealdb_4_index_rebuild_v1",
+        };
+        self.ensure_maintenance_key(&key)?;
+        if record.key.namespace != key.namespace || record.key.database != key.database {
+            return Err(MemoryError::ConfigInvalid(
+                "SurrealDB maintenance claim does not match the active database".into(),
+            ));
+        }
+        Ok(key)
+    }
+
+    async fn update_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        let key = self.key_for_record(record).await?;
+        let content = serde_json::to_value(record).map_err(|error| {
+            MemoryError::Storage(format!(
+                "could not serialize SurrealDB maintenance claim: {error}"
+            ))
+        })?;
+        let query = format!(
+            "UPDATE memory_v4_maintenance_claim:{} CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
+            key.revision
+        );
+        let value = self
+            .maintenance_query(
+                &query,
+                Some(json!({
+                    "record": content,
+                    "expected_attempt_id": expected_attempt_id,
+                })),
+            )
+            .await?;
+        Ok(match value {
+            Value::Array(rows) => !rows.is_empty(),
+            Value::Object(_) => true,
+            _ => false,
+        })
+    }
+}
+
+fn first_json_row(value: Value) -> Option<Value> {
+    match value {
+        Value::Array(rows) => rows.into_iter().next(),
+        Value::Object(_) => Some(value),
+        _ => None,
+    }
+}
+
+fn index_info_matches(
+    actual_definition: Option<&str>,
+    index: ManagedIndex,
+    fact_embedding_dimension: usize,
+) -> bool {
+    let expected_definition = index.definition.replace(
+        "__FACT_EMBEDDING_DIMENSION__",
+        &fact_embedding_dimension.to_string(),
+    );
+    actual_definition
+        .is_some_and(|definition| normalize_sql(definition) == normalize_sql(&expected_definition))
+}
+
+fn normalize_sql(sql: &str) -> String {
+    let mut tokens = tokenize_sql(sql);
+    if tokens.last().is_some_and(|token| token == ";") {
+        tokens.pop();
+    }
+
+    if tokens.len() >= 5
+        && tokens[0] == "define"
+        && tokens[1] == "index"
+        && tokens[2] == "if"
+        && tokens[3] == "not"
+        && tokens[4] == "exists"
+    {
+        tokens.drain(2..5);
+    }
+
+    let mut normalized = Vec::with_capacity(tokens.len());
+    let mut position = 0;
+    while position < tokens.len() {
+        if tokens[position] == "on"
+            && tokens
+                .get(position + 1)
+                .is_some_and(|token| token == "table")
+            && tokens
+                .get(position + 3)
+                .is_some_and(|token| matches!(token.as_str(), "fields" | "columns"))
+        {
+            normalized.push("on".to_owned());
+            position += 2;
+            continue;
+        }
+
+        normalized.push(if tokens[position] == "columns" {
+            "fields".to_owned()
+        } else {
+            tokens[position].clone()
+        });
+        position += 1;
+    }
+
+    normalized.join(" ")
+}
+
+fn tokenize_sql(sql: &str) -> Vec<String> {
+    let characters = sql.chars().collect::<Vec<_>>();
+    let mut tokens = Vec::new();
+    let mut position = 0;
+
+    while position < characters.len() {
+        let character = characters[position];
+        if character.is_whitespace() {
+            position += 1;
+            continue;
+        }
+
+        if matches!(character, '\'' | '"' | '`') {
+            let quote = character;
+            let start = position;
+            position += 1;
+            while position < characters.len() {
+                if characters[position] == '\\' && position + 1 < characters.len() {
+                    position += 2;
+                    continue;
+                }
+                if characters[position] == quote {
+                    if characters.get(position + 1) == Some(&quote) {
+                        position += 2;
+                        continue;
+                    }
+                    position += 1;
+                    break;
+                }
+                position += 1;
+            }
+            let quoted = characters[start..position].iter().collect::<String>();
+            if quote == '`' && quoted.ends_with('`') {
+                let identifier = &quoted[1..quoted.len() - 1];
+                if !identifier.is_empty()
+                    && identifier.chars().all(|character| {
+                        character.is_ascii_alphanumeric() || matches!(character, '_' | '$')
+                    })
+                {
+                    tokens.push(identifier.to_ascii_lowercase());
+                } else {
+                    tokens.push(quoted);
+                }
+            } else {
+                tokens.push(quoted);
+            }
+            continue;
+        }
+
+        if character.is_ascii_alphanumeric() || matches!(character, '_' | '$') {
+            let start = position;
+            position += 1;
+            while position < characters.len()
+                && (characters[position].is_ascii_alphanumeric()
+                    || matches!(characters[position], '_' | '$'))
+            {
+                position += 1;
+            }
+            tokens.push(
+                characters[start..position]
+                    .iter()
+                    .collect::<String>()
+                    .to_ascii_lowercase(),
+            );
+            continue;
+        }
+
+        tokens.push(character.to_string());
+        position += 1;
+    }
+
+    tokens
+}
+
+fn index_build_state(info: Option<&serde_json::Map<String, Value>>) -> IndexBuildState {
+    let building = info
+        .and_then(|info| info.get("building"))
+        .and_then(Value::as_object);
+    if building
+        .and_then(|building| building.get("active"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return IndexBuildState::Building;
+    }
+    let status = building
+        .and_then(|building| building.get("status"))
+        .or_else(|| info.and_then(|info| info.get("status").or_else(|| info.get("state"))))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match status.as_str() {
+        "ready" | "complete" | "completed" => IndexBuildState::Ready,
+        "building" | "pending" | "initializing" => IndexBuildState::Building,
+        "failed" | "error" => IndexBuildState::Failed,
+        _ => IndexBuildState::Unknown,
     }
 }
 
@@ -1165,6 +1582,35 @@ mod tests {
 
     use super::*;
     use crate::storage::table_scope::ReleaseOwnedTable;
+
+    #[test]
+    fn index_definition_normalization_preserves_predicate_negation() {
+        let with_negation =
+            normalize_sql("DEFINE INDEX idx ON TABLE fact FIELDS state WHERE state IS NOT NONE;");
+        let without_negation =
+            normalize_sql("DEFINE INDEX idx ON TABLE fact FIELDS state WHERE state IS NONE;");
+
+        assert_ne!(with_negation, without_negation);
+    }
+
+    #[test]
+    fn index_definition_normalization_preserves_string_literal_case() {
+        let uppercase =
+            normalize_sql("DEFINE INDEX idx ON TABLE fact FIELDS label WHERE label = 'A';");
+        let lowercase =
+            normalize_sql("DEFINE INDEX idx ON TABLE fact FIELDS label WHERE label = 'a';");
+
+        assert_ne!(uppercase, lowercase);
+    }
+
+    #[test]
+    fn index_definition_normalization_accepts_only_known_catalog_syntax_variants() {
+        let authored =
+            normalize_sql("DEFINE INDEX IF NOT EXISTS idx ON TABLE fact COLUMNS `label`;");
+        let canonical = normalize_sql("DEFINE INDEX idx ON fact FIELDS label;");
+
+        assert_eq!(authored, canonical);
+    }
 
     #[test]
     fn embedded_init_error_translates_lock_signatures_actionably() {

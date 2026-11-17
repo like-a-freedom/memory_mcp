@@ -29,6 +29,7 @@ pub(crate) mod migrations;
 pub(crate) mod queries;
 pub mod table_scope;
 mod types;
+pub(crate) mod v4_maintenance;
 pub(crate) mod value_helpers;
 
 // Re-export the public API
