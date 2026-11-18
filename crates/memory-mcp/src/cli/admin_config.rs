@@ -14,6 +14,7 @@ use crate::http::config::{BrowserAuthMethod, resolve_auth_methods};
 /// Configuration for the admin CLI commands.
 pub struct AdminCliConfig {
     pub control_db: SurrealTargetConfig,
+    pub allow_remote_v4_index_rebuild: bool,
     pub session_key: [u8; 32],
     pub csrf_key: [u8; 32],
     pub public_base_url: String,
@@ -43,6 +44,9 @@ impl AdminCliConfig {
         let public_base_url = std::env::var("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")
             .unwrap_or_else(|_| "https://localhost".into());
         let operator_identities = parse_csv_env("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES");
+        let allow_remote_v4_index_rebuild =
+            crate::config::parse_bool_env("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+                .unwrap_or(false);
 
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
@@ -54,6 +58,7 @@ impl AdminCliConfig {
 
         Ok(Self {
             control_db,
+            allow_remote_v4_index_rebuild,
             session_key,
             csrf_key,
             public_base_url,

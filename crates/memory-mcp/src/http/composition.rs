@@ -121,6 +121,7 @@ impl HttpProductionComposition {
                 #[cfg(feature = "control-plane")]
                 Some(local_admin_store),
                 engine,
+                config.allow_remote_v4_index_rebuild,
             ),
             tenant_migrations: migrations,
             fault_injector: Arc::new(NoFaults),
@@ -162,7 +163,7 @@ impl HttpProductionComposition {
             .with_remote_v4_index_rebuild_ack(config.allow_remote_v4_index_rebuild);
 
         store
-            .preflight_v4_catalog_for_maintenance(config.allow_remote_v4_index_rebuild)
+            .preflight_v4_catalog_for_maintenance(config.allow_remote_v4_index_rebuild, recovery)
             .await?;
 
         let mut ready_tenants = Vec::new();
@@ -199,7 +200,7 @@ impl HttpProductionComposition {
         ));
         for (namespace, database) in &targets_to_preflight {
             migrations
-                .preflight_target_for_maintenance(namespace, database)
+                .preflight_target_for_maintenance(namespace, database, recovery)
                 .await?;
         }
 

@@ -565,14 +565,17 @@ pub async fn build_runtime_with_options(
             catalog_digest: crate::storage::migrations::ready_schema_catalog_digest(),
             dimension,
         };
+        let maintenance_lease = registry.acquire_maintenance_client(tenant).await?;
         let migrations =
-            crate::http::leases::migration::SurrealTenantMigrations::new(registry.tenant_engine()?);
+            crate::http::leases::migration::SurrealTenantMigrations::new(registry.tenant_engine()?)
+                .with_remote_v4_index_rebuild_ack(registry.allow_remote_v4_index_rebuild());
         options
             .ready_schema_upgrades
             .run(key, || async {
                 crate::provisioning::api::ensure_ready_schema(&migrations, binding, dimension).await
             })
             .await?;
+        drop(maintenance_lease);
 
         if tenant.schema_version < crate::http::leases::migration::CURRENT_SCHEMA_VERSION {
             let tenant_store = registry.tenants();

@@ -32,6 +32,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
         tenants: isolation_tenants(),
         extra_env: Vec::new(),
         storage_url: "mem://".into(),
+        ..HttpServerConfig::default()
     })
     .await;
     let client = fixture.client().clone();
@@ -272,6 +273,7 @@ async fn alternate_tenants_ingest_then_recall_isolated() {
         tenants: isolation_tenants(),
         extra_env: Vec::new(),
         storage_url: "mem://".into(),
+        ..HttpServerConfig::default()
     })
     .await;
     let client = fixture.client().clone();
@@ -409,6 +411,7 @@ async fn alternate_tenants_ingest_independent_quotas() {
             ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY".into(), "2".into()),
         ],
         storage_url: "mem://".into(),
+        ..HttpServerConfig::default()
     };
     let fixture = HttpServerFixture::spawn(config).await;
     let client = fixture.client().clone();

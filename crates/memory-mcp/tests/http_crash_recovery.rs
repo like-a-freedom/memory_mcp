@@ -85,9 +85,14 @@ async fn open_registry_at(dir: &TempDir) -> RegistryHandle {
         database: "control".into(),
         namespace: "control".into(),
     };
+    let tenant_target = SurrealTargetConfig {
+        database: "tenant".into(),
+        namespace: "tenant".into(),
+        ..target.clone()
+    };
     HttpProductionComposition::connect(&HttpConfig {
-        control_db: target.clone(),
-        tenant_db: target,
+        control_db: target,
+        tenant_db: tenant_target,
         ..HttpConfig::default_for_test()
     })
     .await
@@ -893,6 +898,7 @@ fn fixture_config(
         tenants: vec![TestTenant::new(tenant_name, api_key)],
         extra_env,
         storage_url: format!("rocksdb://{}", dir.path().display()),
+        ..HttpServerConfig::default()
     }
 }
 

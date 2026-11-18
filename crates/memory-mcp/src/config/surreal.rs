@@ -218,6 +218,11 @@ impl SurrealConfig {
             defaulted_variables.push("SURREALDB_PASSWORD");
         }
 
+        let local_url_data_dir = url.as_deref().and_then(|value| {
+            value
+                .strip_prefix("surrealkv://")
+                .or_else(|| value.strip_prefix("rocksdb://"))
+        });
         let (data_dir, legacy_data_dir) = if let Ok(explicit) = env::var("SURREALDB_DATA_DIR") {
             if embedded && explicit.trim().is_empty() {
                 return Err(MemoryError::ConfigInvalid(
@@ -226,9 +231,18 @@ impl SurrealConfig {
             }
             (Some(explicit), None)
         } else if embedded {
-            let resolution = resolve_embedded_data_dir();
-            defaulted_variables.push("SURREALDB_DATA_DIR");
-            (Some(resolution.path), resolution.legacy_path)
+            if let Some(path) = local_url_data_dir {
+                if path.trim().is_empty() {
+                    return Err(MemoryError::ConfigInvalid(
+                        "SURREALDB_URL must include a local SurrealKV path".into(),
+                    ));
+                }
+                (Some(path.to_owned()), None)
+            } else {
+                let resolution = resolve_embedded_data_dir();
+                defaulted_variables.push("SURREALDB_DATA_DIR");
+                (Some(resolution.path), resolution.legacy_path)
+            }
         } else {
             (None, None)
         };
@@ -578,6 +592,45 @@ mod tests {
 
         assert!(!config.upgrade_from_3x);
         assert_eq!(config.data_dir.as_deref(), expected_path.to_str());
+    }
+
+    #[test]
+    fn embedded_local_url_selects_the_data_dir_when_no_override_is_set() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        let directory = TempDir::new().expect("temporary storage directory");
+        let expected_path = directory.path().join("from-url");
+        unsafe {
+            env::set_var(
+                "SURREALDB_URL",
+                format!("surrealkv://{}", expected_path.display()),
+            );
+        }
+
+        let config = SurrealConfig::from_env().expect("local URL should select embedded storage");
+
+        assert_eq!(config.data_dir.as_deref(), expected_path.to_str());
+    }
+
+    #[test]
+    fn explicit_data_dir_overrides_a_local_url_path() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        let url_dir = TempDir::new().expect("temporary URL directory");
+        let explicit_dir = TempDir::new().expect("temporary explicit directory");
+        unsafe {
+            env::set_var(
+                "SURREALDB_URL",
+                format!("surrealkv://{}", url_dir.path().display()),
+            );
+            env::set_var("SURREALDB_DATA_DIR", explicit_dir.path());
+        }
+
+        let config = SurrealConfig::from_env().expect("explicit data directory is valid");
+
+        assert_eq!(config.data_dir.as_deref(), explicit_dir.path().to_str());
     }
 
     #[test]

@@ -345,9 +345,9 @@ async fn http_maintenance_migrates_registry_and_a_ready_tenant() {
 
     let tenant = SurrealDbClient::connect_bound(
         &SurrealTargetConfig {
-            url: tenant_target.url,
-            username: tenant_target.username,
-            password: tenant_target.password,
+            url: tenant_target.url.clone(),
+            username: tenant_target.username.clone(),
+            password: tenant_target.password.clone(),
             namespace: tenant_namespace.clone(),
             database: tenant_database,
         },
@@ -372,6 +372,34 @@ async fn http_maintenance_migrates_registry_and_a_ready_tenant() {
             "tenant catalog missing {table}: {schema}"
         );
     }
+
+    let mut runtime_config = memory_mcp::http::config::HttpConfig::default_for_test();
+    runtime_config.control_db = control_target;
+    runtime_config.tenant_db = tenant_target;
+    runtime_config.allow_remote_v4_index_rebuild = expected_version.starts_with('4');
+    let composition =
+        memory_mcp::http::composition::HttpProductionComposition::connect(&runtime_config)
+            .await
+            .expect("connect production HTTP composition with remote maintenance acknowledgement");
+    composition
+        .registry
+        .ensure_local_plan(&memory_mcp::models::registry::Plan::default())
+        .await
+        .expect("provision the runtime's local plan");
+    let ready_tenant = composition
+        .registry
+        .tenants()
+        .find_tenant_by_id(&tenant_id)
+        .await
+        .expect("load ready tenant")
+        .expect("ready tenant exists");
+    memory_mcp::http::runtime::storage::build_runtime_with_options(
+        &composition.registry,
+        &ready_tenant,
+        memory_mcp::http::runtime::storage::RuntimeOptions::default(),
+    )
+    .await
+    .expect("runtime binding retains the remote v4 maintenance acknowledgement");
 }
 
 async fn add_remote_fact(service: &MemoryService, content: &str, day: u32) -> String {

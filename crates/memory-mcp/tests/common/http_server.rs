@@ -16,7 +16,7 @@ use std::time::Duration;
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
-const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const SERVER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
@@ -40,6 +40,11 @@ pub struct HttpServerConfig {
     /// Storage URL the binary connects to. Defaults to `mem://`; tests
     /// that need durable composition pass `rocksdb://...`.
     pub storage_url: String,
+    /// How long `spawn` waits for the child to print its bound address.
+    /// A cold SurrealDB 4 store runs catalog migrations before binding,
+    /// which can take well over the old ten-second budget; tests that
+    /// assert the deadline itself override this.
+    pub startup_timeout: Duration,
 }
 
 impl Default for HttpServerConfig {
@@ -48,6 +53,7 @@ impl Default for HttpServerConfig {
             tenants: Vec::new(),
             extra_env: Vec::new(),
             storage_url: "mem://".to_string(),
+            startup_timeout: DEFAULT_SERVER_STARTUP_TIMEOUT,
         }
     }
 }
@@ -65,6 +71,11 @@ impl HttpServerConfig {
 
     pub fn with_storage_url(mut self, url: impl Into<String>) -> Self {
         self.storage_url = url.into();
+        self
+    }
+
+    pub fn with_startup_timeout(mut self, timeout: Duration) -> Self {
+        self.startup_timeout = timeout;
         self
     }
 }
@@ -132,7 +143,7 @@ impl HttpServerFixture {
                 eprintln!("server stderr: {line}");
             }
         });
-        let addr = match tokio::time::timeout(SERVER_STARTUP_TIMEOUT, &mut bound).await {
+        let addr = match tokio::time::timeout(config.startup_timeout, &mut bound).await {
             Ok(Ok(Ok(addr))) => addr,
             Ok(Ok(Err(error))) => {
                 stop_startup_child(&mut child).await;
@@ -150,7 +161,7 @@ impl HttpServerFixture {
                 let _ = tokio::time::timeout(Duration::from_secs(1), &mut stderr_drain).await;
                 panic!(
                     "HTTP server did not report its bound address within {}s",
-                    SERVER_STARTUP_TIMEOUT.as_secs()
+                    config.startup_timeout.as_secs()
                 );
             }
         };

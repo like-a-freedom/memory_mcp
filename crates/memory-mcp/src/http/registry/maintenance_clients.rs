@@ -274,6 +274,7 @@ impl MaintenanceClients {
         engine: super::PrivilegedEngine,
         generation: u64,
         dimension: Option<usize>,
+        allow_remote_v4_index_rebuild: bool,
         config: MaintenanceClientPoolConfig,
     ) -> Self {
         Self::new(
@@ -281,6 +282,7 @@ impl MaintenanceClients {
                 engine,
                 generation,
                 dimension,
+                allow_remote_v4_index_rebuild,
             }),
             config,
         )
@@ -571,6 +573,7 @@ struct EngineFactory {
     engine: super::PrivilegedEngine,
     generation: u64,
     dimension: Option<usize>,
+    allow_remote_v4_index_rebuild: bool,
 }
 
 #[async_trait::async_trait]
@@ -587,7 +590,8 @@ impl MaintenanceClientFactory for EngineFactory {
                 database: key.database.clone(),
             };
             let migrations =
-                crate::http::leases::migration::SurrealTenantMigrations::new(self.engine.clone());
+                crate::http::leases::migration::SurrealTenantMigrations::new(self.engine.clone())
+                    .with_remote_v4_index_rebuild_ack(self.allow_remote_v4_index_rebuild);
             crate::provisioning::api::ensure_ready_schema(
                 &migrations,
                 &binding,

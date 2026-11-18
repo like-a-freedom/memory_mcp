@@ -376,6 +376,7 @@ pub struct RegistryHandle {
     pub(crate) local_admin_store:
         Option<Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>>,
     engine: Option<Arc<PrivilegedEngine>>,
+    allow_remote_v4_index_rebuild: bool,
     engine_generation: u64,
     maintenance_dimension: Option<usize>,
     maintenance_client_pool_config: maintenance_clients::MaintenanceClientPoolConfig,
@@ -439,6 +440,7 @@ impl RegistryHandle {
             #[cfg(feature = "control-plane")]
             local_admin_store,
             engine: None,
+            allow_remote_v4_index_rebuild: false,
             engine_generation: 0,
             maintenance_dimension: None,
             maintenance_client_pool_config:
@@ -466,6 +468,7 @@ impl RegistryHandle {
             #[cfg(feature = "control-plane")]
             local_admin_store: None,
             engine: Some(engine),
+            allow_remote_v4_index_rebuild: false,
             engine_generation,
             maintenance_dimension: None,
             maintenance_client_pool_config:
@@ -522,6 +525,7 @@ impl RegistryHandle {
                 (*engine).clone(),
                 self.engine_generation,
                 None,
+                self.allow_remote_v4_index_rebuild,
                 self.maintenance_client_pool_config,
             ),
         ));
@@ -538,6 +542,7 @@ impl RegistryHandle {
                 (**engine).clone(),
                 self.engine_generation,
                 dimension,
+                self.allow_remote_v4_index_rebuild,
                 self.maintenance_client_pool_config,
             ))
         });
@@ -556,6 +561,7 @@ impl RegistryHandle {
                 (**engine).clone(),
                 self.engine_generation,
                 self.maintenance_dimension,
+                self.allow_remote_v4_index_rebuild,
                 config,
             ))
         });
@@ -725,6 +731,7 @@ impl RegistryHandle {
             Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>,
         >,
         engine: PrivilegedEngine,
+        allow_remote_v4_index_rebuild: bool,
     ) -> Self {
         let engine = Arc::new(engine);
         let engine_generation = next_engine_generation();
@@ -732,6 +739,7 @@ impl RegistryHandle {
             (*engine).clone(),
             engine_generation,
             None,
+            allow_remote_v4_index_rebuild,
             maintenance_clients::MaintenanceClientPoolConfig::default(),
         ));
         Self {
@@ -740,12 +748,17 @@ impl RegistryHandle {
             #[cfg(feature = "control-plane")]
             local_admin_store,
             engine: Some(engine),
+            allow_remote_v4_index_rebuild,
             engine_generation,
             maintenance_dimension: None,
             maintenance_client_pool_config:
                 maintenance_clients::MaintenanceClientPoolConfig::default(),
             maintenance_clients: Some(maintenance_clients),
         }
+    }
+
+    pub(crate) fn allow_remote_v4_index_rebuild(&self) -> bool {
+        self.allow_remote_v4_index_rebuild
     }
 }
 

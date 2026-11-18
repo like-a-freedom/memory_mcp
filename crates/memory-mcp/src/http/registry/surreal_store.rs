@@ -36,7 +36,7 @@ use crate::storage::v4_maintenance::{
     DatabaseIdentity, DatabaseProvenance, DatabaseRole, IndexBuildState, IndexInspection,
     MaintenanceKey, MaintenanceKeyRecord, MaintenanceRecord, ManagedIndex, RecoveryAuthorization,
     ServerCompatibility, ServerVersion, V4CatalogIntent, V4MaintenancePort,
-    managed_indexes_for_role, parse_server_version, preflight_v4_catalog_with_intent,
+    managed_indexes_for_role, parse_server_version, preflight_v4_catalog_with_recovery,
     run_v4_catalog_maintenance_with_intent,
 };
 
@@ -979,6 +979,7 @@ impl SurrealRegistryStore {
         self.preflight_v4_catalog_with_intent(
             allow_remote_v4_index_rebuild,
             V4CatalogIntent::Startup,
+            RecoveryAuthorization::None,
         )
         .await
     }
@@ -986,10 +987,12 @@ impl SurrealRegistryStore {
     pub(crate) async fn preflight_v4_catalog_for_maintenance(
         &self,
         allow_remote_v4_index_rebuild: bool,
+        recovery: RecoveryAuthorization,
     ) -> Result<ServerCompatibility, MemoryError> {
         self.preflight_v4_catalog_with_intent(
             allow_remote_v4_index_rebuild,
             V4CatalogIntent::PreStartMaintenance,
+            recovery,
         )
         .await
     }
@@ -998,13 +1001,15 @@ impl SurrealRegistryStore {
         &self,
         allow_remote_v4_index_rebuild: bool,
         intent: V4CatalogIntent,
+        recovery: RecoveryAuthorization,
     ) -> Result<ServerCompatibility, MemoryError> {
-        preflight_v4_catalog_with_intent(
+        preflight_v4_catalog_with_recovery(
             self,
             DatabaseRole::Registry,
             self.db.is_remote(),
             allow_remote_v4_index_rebuild,
             intent,
+            recovery,
         )
         .await
     }

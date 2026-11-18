@@ -76,6 +76,7 @@ impl HttpStateTestBuilder {
             registry_backend,
             Some(local_store),
             engine,
+            false,
         );
         let mut config = super::config::HttpConfig::default_for_test();
         config.browser_auth = Some(BrowserAuthMethods {

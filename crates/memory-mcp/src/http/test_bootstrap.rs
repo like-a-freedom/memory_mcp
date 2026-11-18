@@ -118,9 +118,10 @@ pub async fn apply_test_seed_session(state: &Arc<HttpState>) -> Result<(), Memor
 /// `apply_test_bootstrap` so tests can call it without
 /// mutating the process environment.
 pub async fn apply_bootstrap_entries(state: &Arc<HttpState>, raw: &str) -> Result<(), MemoryError> {
-    let migrations: Arc<dyn ApplyMigrations> = Arc::new(SurrealTenantMigrations::new(
-        state.registry.tenant_engine()?,
-    ));
+    let migrations: Arc<dyn ApplyMigrations> = Arc::new(
+        SurrealTenantMigrations::new(state.registry.tenant_engine()?)
+            .with_remote_v4_index_rebuild_ack(state.registry.allow_remote_v4_index_rebuild()),
+    );
     for entry in raw.split(',') {
         let (name, key) = entry.split_once('=').ok_or_else(|| {
             MemoryError::ConfigInvalid("bootstrap entry must be <name>=<api_key>".into())

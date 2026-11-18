@@ -20,6 +20,7 @@ const ENV_KEYS: &[&str] = &[
     "SURREALDB_CONTROL_PASSWORD",
     "SURREALDB_CONTROL_DB",
     "SURREALDB_CONTROL_NAMESPACE",
+    "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD",
 ];
 
 static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
@@ -107,6 +108,17 @@ fn defaults_optional_admin_environment_values() {
 
     assert_eq!(loaded.public_base_url, "https://localhost");
     assert!(loaded.operator_identities.is_empty());
+    assert!(!loaded.allow_remote_v4_index_rebuild);
+}
+
+#[test]
+fn reads_remote_v4_rebuild_acknowledgement_for_admin_commands() {
+    let mut variables = valid_environment();
+    variables.push(("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD", "true"));
+
+    let loaded = with_environment(&variables).expect("configuration loads");
+
+    assert!(loaded.allow_remote_v4_index_rebuild);
 }
 
 #[test]

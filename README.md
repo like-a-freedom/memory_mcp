@@ -467,9 +467,10 @@ cargo run --quiet --bin memory_mcp
 ```
 
 `mem://` and `surrealkv://` are not remote URL schemes. The legacy
-`rocksdb://` alias is also local and now opens SurrealKV. For the default local
-store, set `SURREALDB_DATA_DIR` to choose its directory; otherwise the server
-uses a user-owned data directory.
+`rocksdb://` alias is also local and now opens SurrealKV. For stdio, the path in
+a `surrealkv://` or `rocksdb://` URL selects the store unless
+`SURREALDB_DATA_DIR` is set; the explicit variable takes precedence. With
+neither set, the server uses a user-owned data directory.
 
 ### Filesystem ingestion (optional, inside `serve`)
 
@@ -1000,8 +1001,9 @@ but it now opens SurrealKV. Use `surrealkv://` in new local URL configuration.
 First decide which physical stores the running profile uses:
 
 - The stdio server has one primary store. Its directory comes from
-  `SURREALDB_DATA_DIR` or the resolved default. A remote `SURREALDB_URL` does
-  not need local conversion.
+  `SURREALDB_DATA_DIR`, the path in a local `SURREALDB_URL`, or the resolved
+  default, in that order. A remote `SURREALDB_URL` does not need local
+  conversion.
 - The HTTP server has a control Registry target and a tenant target, configured
   by `SURREALDB_CONTROL_URL` and `SURREALDB_TENANT_URL`. For file-backed targets,
   the path in each URL identifies its local store. Back up every distinct path;
@@ -1268,7 +1270,7 @@ and not by the same code path — check the row before assuming one applies:
 | `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Conditional | Database password. Required in remote mode |
 | `SURREALDB_URL` | URL | unset (embedded) | Conditional | Remote `ws`, `wss`, `http`, or `https` URL, or local file-backed `surrealkv://` URL. The legacy `rocksdb://` alias also opens SurrealKV |
 | `SURREALDB_EMBEDDED` | boolean | inferred from `SURREALDB_URL` | No | Explicit `true`/`false`; remote URLs select remote mode and all other URLs select embedded mode when unset |
-| `SURREALDB_DATA_DIR` | path | `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Custom embedded data directory; an existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
+| `SURREALDB_DATA_DIR` | path | local URL path; else `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Explicit embedded data directory; takes precedence over a local `SURREALDB_URL`. An existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
 | `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | boolean | `false` | No | Allows embedded SurrealDB 4 to convert an existing v3 store. Set during conversion and any retry; fresh stores and remote servers do not need it. See [Upgrade to v1.40.0](#upgrade-to-v1400) |
 | `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | boolean | `false` | Conditional | Explicit acknowledgement for remote v4 catalog and index maintenance. Remote-only; see [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `SURREALDB_EMBEDDING_DIMENSION` | unsigned integer | unset | No | Existing vector dimension override; the provider fallback is `384` for `local-candle` and `1536` for other embedding providers |

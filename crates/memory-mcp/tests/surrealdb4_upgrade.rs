@@ -373,21 +373,25 @@ fn assert_refusal_is_actionable(engine: LegacyEngine) {
 }
 
 #[test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 fn refuses_legacy_rocksdb_without_opt_in_or_file_changes() {
     assert_refusal_is_actionable(LegacyEngine::RocksDb);
 }
 
 #[test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 fn refuses_legacy_surrealkv_without_opt_in_or_file_changes() {
     assert_refusal_is_actionable(LegacyEngine::SurrealKv);
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn interrupted_primary_rocksdb_conversion_resumes_and_restarts() {
     assert_interrupted_primary_conversion(LegacyEngine::RocksDb).await;
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn interrupted_primary_surrealkv_conversion_resumes_and_restarts() {
     assert_interrupted_primary_conversion(LegacyEngine::SurrealKv).await;
 }
@@ -410,11 +414,13 @@ async fn assert_interrupted_primary_conversion(engine: LegacyEngine) {
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn interrupted_http_rocksdb_conversion_resumes_and_restarts() {
     assert_interrupted_http_conversion(LegacyEngine::RocksDb).await;
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn interrupted_http_surrealkv_conversion_resumes_and_restarts() {
     assert_interrupted_http_conversion(LegacyEngine::SurrealKv).await;
 }
@@ -444,11 +450,13 @@ async fn assert_interrupted_http_conversion(engine: LegacyEngine) {
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn converts_legacy_rocksdb_and_restores_the_cold_copy_with_v3_sdk() {
     assert_converts_and_restores(LegacyEngine::RocksDb).await;
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn converts_legacy_surrealkv_and_restores_the_cold_copy_with_v3_sdk() {
     assert_converts_and_restores(LegacyEngine::SurrealKv).await;
 }
@@ -470,11 +478,13 @@ async fn assert_converts_and_restores(engine: LegacyEngine) {
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn http_registry_and_tenant_alias_convert_legacy_rocksdb_once() {
     assert_http_shared_store_conversion(LegacyEngine::RocksDb).await;
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn http_registry_and_tenant_alias_convert_legacy_surrealkv_once() {
     assert_http_shared_store_conversion(LegacyEngine::SurrealKv).await;
 }
@@ -495,6 +505,7 @@ async fn assert_http_shared_store_conversion(engine: LegacyEngine) {
 }
 
 #[tokio::test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 async fn partial_http_conversion_reports_resume_or_coordinated_restore() {
     let directory = TempDir::new().expect("temporary test root");
     let control = directory.path().join("legacy-control");
@@ -531,6 +542,7 @@ async fn partial_http_conversion_reports_resume_or_coordinated_restore() {
 }
 
 #[test]
+#[ignore = "requires the pinned SurrealDB 3.3.5 fixture runner"]
 fn http_registry_refusal_is_actionable_and_preserves_shared_store() {
     let directory = TempDir::new().expect("temporary test root");
     let store = directory.path().join("legacy-control-and-tenant");

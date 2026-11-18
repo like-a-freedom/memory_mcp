@@ -281,6 +281,7 @@ async fn load_20_active_tenants_under_expected_qps() {
         tenants: tenants.clone(),
         extra_env: Vec::new(),
         storage_url: "mem://".into(),
+        ..HttpServerConfig::default()
     };
     let fixture = HttpServerFixture::spawn(config).await;
 

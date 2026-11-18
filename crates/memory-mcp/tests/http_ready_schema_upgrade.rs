@@ -270,7 +270,7 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
 }
 
 #[tokio::test]
-async fn wrong_existing_index_definition_denies_admission_and_can_be_retried() {
+async fn wrong_existing_index_definition_denies_admission_and_requires_explicit_recovery() {
     let (registry, db, _migrations, tenant) = ready_legacy_fixture().await;
     db.query(
         "DEFINE INDEX episode_episode_id ON episode FIELDS source_id",
@@ -284,8 +284,8 @@ async fn wrong_existing_index_definition_denies_admission_and_can_be_retried() {
     let result = build_runtime_with_options(&registry, &tenant, options.clone()).await;
 
     assert!(
-        matches!(&result, Err(memory_mcp::MemoryError::Storage(message)) if message.contains("episode_episode_id") && message.contains("incompatible definition")),
-        "same-name wrong-definition index must deny activation: {:?}",
+        matches!(&result, Err(memory_mcp::MemoryError::Unavailable(message)) if message.contains("schema catalog may have applied partially") && message.contains("episode_episode_id") && message.contains("incompatible definition")),
+        "a partially applied catalog must keep tenant activation closed: {:?}",
         result.as_ref().err()
     );
     let stored = registry
@@ -303,10 +303,12 @@ async fn wrong_existing_index_definition_denies_admission_and_can_be_retried() {
     )
     .await
     .expect("repair the catalog definition for retry");
-    let runtime = build_runtime_with_options(&registry, &tenant, options)
-        .await
-        .expect("failed upgrades are retried instead of cached");
-    drop(runtime);
+    let retry = build_runtime_with_options(&registry, &tenant, options).await;
+    assert!(
+        matches!(&retry, Err(memory_mcp::MemoryError::Unavailable(message)) if message.contains("--recover-ambiguous") && message.contains("readiness remains closed")),
+        "ordinary startup must not take over an ambiguous catalog attempt: {:?}",
+        retry.as_ref().err()
+    );
 }
 
 #[tokio::test]
@@ -323,8 +325,8 @@ async fn ready_catalog_upgrade_refuses_to_overwrite_a_migration_checksum() {
     let result = build_runtime_with_options(&registry, &tenant, RuntimeOptions::default()).await;
 
     assert!(
-        matches!(&result, Err(memory_mcp::MemoryError::ConfigInvalid(message)) if message.contains("054_query_index_coverage.surql") && message.contains("modified")),
-        "checksum drift must refuse activation without rewriting the record: {:?}",
+        matches!(&result, Err(memory_mcp::MemoryError::Unavailable(message)) if message.contains("schema catalog may have applied partially") && message.contains("054_query_index_coverage.surql") && message.contains("modified")),
+        "checksum drift must keep readiness closed without rewriting the record: {:?}",
         result.as_ref().err()
     );
     let checksum = db
@@ -484,8 +486,8 @@ async fn missing_source_context_index_blocks_readiness_after_migration_ledger_is
     .await;
 
     assert!(
-        matches!(&result, Err(memory_mcp::MemoryError::Storage(message)) if message.contains("episode_source_context") && message.contains("missing")),
-        "readiness must reject a missing indexed source-context field: {:?}",
+        matches!(&result, Err(memory_mcp::MemoryError::Unavailable(message)) if message.contains("schema catalog may have applied partially") && message.contains("episode_source_context") && message.contains("missing")),
+        "readiness must keep closed after a missing indexed source-context field: {:?}",
         result.as_ref().err()
     );
 }

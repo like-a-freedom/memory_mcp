@@ -27,7 +27,11 @@ async fn startup_deadline_kills_and_reaps_a_live_child_without_an_address() {
         .args(["--exact", "live_child_without_an_address", "--ignored"])
         .env("STARTUP_CHILD_PID", &pid_file);
     let attempt = tokio::spawn(async move {
-        HttpServerFixture::spawn_command(HttpServerConfig::default(), command).await
+        HttpServerFixture::spawn_command(
+            HttpServerConfig::default().with_startup_timeout(Duration::from_secs(10)),
+            command,
+        )
+        .await
     });
     let outcome = tokio::time::timeout(Duration::from_secs(13), attempt)
         .await

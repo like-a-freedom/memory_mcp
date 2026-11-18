@@ -65,8 +65,6 @@ jobs:
     name: Lint, tests and evaluation
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    env:
-      SURREALDB3_FIXTURE_BIN: ${{ github.workspace }}/target/surrealdb3-fixture/debug/sdb3-fixture
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup
@@ -118,7 +116,13 @@ jobs:
         # reject-a-configured-inbox behavior is actually observed.
         run: cargo test -p memory_mcp --no-default-features --test fs_watch_process_disabled --locked
       - name: Optional feature tests
-        run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
+        # The embedded SurrealDB HTTP integration targets (crash recovery,
+        # durable tasks, isolation, subscriptions) document `--test-threads=1`:
+        # they each drive a full provisioning/migration path, and concurrent
+        # in-process engines starve each other until the convergence and
+        # subprocess-startup deadlines expire. Run the row serially so the
+        # documented contract holds in CI as well.
+        run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- --test-threads=1
       - name: Embedding mode and dimension transition tests
         # The retrieval/mode contract target is gated by eval-support and is
         # excluded from the ordinary optional-feature invocation above.
@@ -347,7 +351,7 @@ jobs:
           retention-days: 7
 
   docker:
-    needs: [release-ref, quality]
+    needs: [release-ref, quality, surrealdb-remote-compat]
     # Same policy as `native`: no image build on push — releases publish,
     # pull requests build and smoke-test without publishing.
     if: github.event_name != 'push'

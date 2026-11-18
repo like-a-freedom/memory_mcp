@@ -156,6 +156,7 @@ impl SurrealTenantMigrations {
             namespace,
             database,
             crate::storage::v4_maintenance::V4CatalogIntent::Startup,
+            crate::storage::v4_maintenance::RecoveryAuthorization::None,
         )
         .await
     }
@@ -164,11 +165,13 @@ impl SurrealTenantMigrations {
         &self,
         namespace: &str,
         database: &str,
+        recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
     ) -> Result<(), MemoryError> {
         self.preflight_target_with_intent(
             namespace,
             database,
             crate::storage::v4_maintenance::V4CatalogIntent::PreStartMaintenance,
+            recovery,
         )
         .await
     }
@@ -178,17 +181,19 @@ impl SurrealTenantMigrations {
         namespace: &str,
         database: &str,
         intent: crate::storage::v4_maintenance::V4CatalogIntent,
+        recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
     ) -> Result<(), MemoryError> {
         let client = self
             .bound_client(namespace, database)
             .await?
             .with_database_identity(database.to_owned());
-        crate::storage::v4_maintenance::preflight_v4_catalog_with_intent(
+        crate::storage::v4_maintenance::preflight_v4_catalog_with_recovery(
             &client,
             crate::storage::v4_maintenance::DatabaseRole::HttpTenant,
             self.is_remote(),
             self.allow_remote_v4_index_rebuild,
             intent,
+            recovery,
         )
         .await?;
         Ok(())

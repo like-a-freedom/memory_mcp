@@ -61,9 +61,13 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
 
 async fn connect(config: &AdminCliConfig) -> Result<Arc<SurrealRegistryStore>, MemoryError> {
     Ok(Arc::new(
-        SurrealRegistryStore::connect(&config.control_db)
-            .await
-            .map_err(|e| MemoryError::Storage(format!("control registry connect: {e}")))?,
+        SurrealRegistryStore::connect_with_v4_maintenance(
+            &config.control_db,
+            config.allow_remote_v4_index_rebuild,
+            crate::storage::v4_maintenance::RecoveryAuthorization::None,
+        )
+        .await
+        .map_err(|e| MemoryError::Storage(format!("control registry connect: {e}")))?,
     ))
 }
 
@@ -356,5 +360,15 @@ mod tests {
             ),
             "the refusal must list the known tokens, got {refused:?}"
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires an isolated loopback SurrealDB 4.0.1 server and admin config env"]
+    async fn admin_connection_honors_remote_v4_rebuild_acknowledgement() {
+        let config = AdminCliConfig::from_env().expect("admin environment is valid");
+
+        connect(&config)
+            .await
+            .expect("admin connection should migrate the remote v4 registry");
     }
 }
