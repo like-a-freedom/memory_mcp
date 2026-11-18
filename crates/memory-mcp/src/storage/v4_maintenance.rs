@@ -192,6 +192,36 @@ pub(crate) enum IndexBuildState {
     Unknown,
 }
 
+/// Interpret the `building` object of a SurrealDB `INFO FOR INDEX` row.
+///
+/// SurrealDB 4 reports `started`, `cleaning`, `indexing`, `ready`,
+/// `aborted` and `error`. Its `active` field describes the caller's own
+/// compaction pass rather than durable build state, so it says nothing
+/// about whether a build is running.
+pub(crate) fn index_build_state_from_info(
+    info: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> IndexBuildState {
+    use serde_json::Value;
+
+    let building = info
+        .and_then(|info| info.get("building"))
+        .and_then(Value::as_object);
+    let status = building
+        .and_then(|building| building.get("status"))
+        .or_else(|| info.and_then(|info| info.get("status").or_else(|| info.get("state"))))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match status.as_str() {
+        "ready" | "complete" | "completed" => IndexBuildState::Ready,
+        "started" | "cleaning" | "indexing" | "building" | "pending" | "initializing" => {
+            IndexBuildState::Building
+        }
+        "aborted" | "failed" | "error" => IndexBuildState::Failed,
+        _ => IndexBuildState::Unknown,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct IndexInspection {
     pub(crate) definition_matches: bool,
@@ -217,8 +247,24 @@ pub(crate) enum MaintenanceOutcome {
 }
 
 pub(crate) const MAINTENANCE_REVISION: &str = "surrealdb_4_index_rebuild_v2";
-const REBUILD_TIMEOUT: Duration = Duration::from_secs(120);
+/// Default bound for one `REBUILD INDEX`. SurrealDB 4 blocks the statement
+/// until the index is ready again, so a large store legitimately needs
+/// longer than a minute; operators can raise it with
+/// `SURREALDB_V4_MAINTENANCE_TIMEOUT_SECS`.
+pub(crate) const DEFAULT_REBUILD_TIMEOUT_SECS: u64 = 1800;
+const REBUILD_TIMEOUT_ENV: &str = "SURREALDB_V4_MAINTENANCE_TIMEOUT_SECS";
 const REBUILD_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+fn rebuild_timeout_from(raw: Option<&str>) -> Duration {
+    raw.and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|secs| *secs > 0)
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| Duration::from_secs(DEFAULT_REBUILD_TIMEOUT_SECS))
+}
+
+fn rebuild_timeout() -> Duration {
+    rebuild_timeout_from(std::env::var(REBUILD_TIMEOUT_ENV).ok().as_deref())
+}
 
 #[async_trait]
 pub(crate) trait V4MaintenancePort: Send + Sync {
@@ -414,22 +460,22 @@ pub(crate) async fn preflight_v4_catalog_with_recovery<P: V4MaintenancePort>(
                     index.name
                 )));
             }
-            IndexBuildState::Failed => {
+            IndexBuildState::Failed if recovery == RecoveryAuthorization::None => {
                 return Err(MemoryError::Unavailable(format!(
-                    "index `{}` has a failed server-side build; resolve it before applying the schema catalog",
+                    "index `{}` has a failed server-side build; resolve it before applying the schema catalog, or rerun the pre-start maintenance command with explicit ambiguous-recovery confirmation to rebuild it",
                     index.name
                 )));
             }
-            IndexBuildState::Unknown => {
+            IndexBuildState::Unknown if recovery == RecoveryAuthorization::None => {
                 return Err(MemoryError::Unavailable(format!(
-                    "index `{}` has an unknown server-side build state; inspect it before applying the schema catalog",
+                    "index `{}` has an unknown server-side build state; inspect it before applying the schema catalog, or rerun the pre-start maintenance command with explicit ambiguous-recovery confirmation",
                     index.name
                 )));
             }
             IndexBuildState::Ready if !inspection.definition_matches => {
                 return Err(index_definition_error(index));
             }
-            IndexBuildState::Ready | IndexBuildState::Missing => {}
+            _ => {}
         }
     }
 
@@ -531,22 +577,22 @@ where
                     index.name
                 )));
             }
-            IndexBuildState::Failed => {
+            IndexBuildState::Failed if recovery == RecoveryAuthorization::None => {
                 return Err(MemoryError::Unavailable(format!(
-                    "index `{}` has a failed server-side build; resolve it before applying the schema catalog",
+                    "index `{}` has a failed server-side build; resolve it before applying the schema catalog, or rerun the pre-start maintenance command with explicit ambiguous-recovery confirmation to rebuild it",
                     index.name
                 )));
             }
-            IndexBuildState::Unknown => {
+            IndexBuildState::Unknown if recovery == RecoveryAuthorization::None => {
                 return Err(MemoryError::Unavailable(format!(
-                    "index `{}` has an unknown server-side build state; inspect it before applying the schema catalog",
+                    "index `{}` has an unknown server-side build state; inspect it before applying the schema catalog, or rerun the pre-start maintenance command with explicit ambiguous-recovery confirmation",
                     index.name
                 )));
             }
             IndexBuildState::Ready if !inspection.definition_matches => {
                 return Err(index_definition_error(index));
             }
-            IndexBuildState::Ready | IndexBuildState::Missing => {}
+            _ => {}
         }
     }
 
@@ -631,11 +677,11 @@ where
                 "index `{}` has an active server-side build",
                 index.name
             )),
-            IndexBuildState::Failed => Some(format!(
+            IndexBuildState::Failed if recovery == RecoveryAuthorization::None => Some(format!(
                 "index `{}` has a failed server-side build",
                 index.name
             )),
-            IndexBuildState::Unknown => Some(format!(
+            IndexBuildState::Unknown if recovery == RecoveryAuthorization::None => Some(format!(
                 "index `{}` has an unknown server-side build state",
                 index.name
             )),
@@ -643,6 +689,8 @@ where
                 Some(index_definition_error(index).to_string())
             }
             IndexBuildState::Ready | IndexBuildState::Missing => None,
+            // A failed or unknown build is rebuilt under explicit recovery.
+            IndexBuildState::Failed | IndexBuildState::Unknown => None,
         };
         if let Some(error) = error {
             mark_claim_failed_before_catalog(port, &mut claim).await?;
@@ -653,6 +701,15 @@ where
     }
 
     if let Err(error) = apply_catalog().await {
+        if provenance == DatabaseProvenance::FreshV4 {
+            // A fresh database has no legacy index data and the catalog is
+            // idempotent DDL, so a first-start failure is retryable without
+            // the ambiguous-recovery ceremony that an upgraded store needs.
+            mark_claim_failed_before_catalog(port, &mut claim).await?;
+            return Err(MemoryError::Unavailable(format!(
+                "schema catalog failed on a fresh SurrealDB 4 database ({error}); no legacy rebuild was submitted, so the next start retries it"
+            )));
+        }
         claim.state = ClaimState::Ambiguous;
         claim.current_index = None;
         claim.updated_at_ms = now_ms();
@@ -683,6 +740,10 @@ where
         }
         match inspection.state {
             IndexBuildState::Ready => {}
+            // An interrupted build is rebuilt below under explicit recovery;
+            // ordinary startup still refuses it.
+            IndexBuildState::Failed | IndexBuildState::Unknown
+                if recovery == RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume => {}
             IndexBuildState::Failed => {
                 mark_claim_failed(port, &mut claim, index.name).await?;
                 return Err(MemoryError::Unavailable(format!(
@@ -759,7 +820,7 @@ async fn execute_maintenance<P: V4MaintenancePort>(
             .indexes
             .insert(index.name.to_owned(), IndexProgress::Submitted);
         persist_claim(port, &mut claim).await?;
-        let rebuild = tokio::time::timeout(REBUILD_TIMEOUT, port.rebuild_index(*index)).await;
+        let rebuild = tokio::time::timeout(rebuild_timeout(), port.rebuild_index(*index)).await;
         match rebuild {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
@@ -778,7 +839,7 @@ async fn execute_maintenance<P: V4MaintenancePort>(
             }
         }
 
-        match wait_for_index_ready(port, *index).await {
+        match wait_for_index_ready(port, *index, rebuild_timeout()).await {
             Ok(()) => {
                 claim
                     .indexes
@@ -831,8 +892,9 @@ impl std::fmt::Display for IndexWaitFailure {
 async fn wait_for_index_ready<P: V4MaintenancePort>(
     port: &P,
     index: ManagedIndex,
+    timeout: Duration,
 ) -> Result<(), IndexWaitFailure> {
-    let deadline = Instant::now() + REBUILD_TIMEOUT;
+    let deadline = Instant::now() + timeout;
     loop {
         let inspection = port
             .inspect_index(index)
@@ -1139,17 +1201,19 @@ pub(crate) fn registry_audit_index() -> ManagedIndex {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
     use std::sync::Mutex;
+    use std::time::Duration;
 
     use async_trait::async_trait;
 
     use super::{
-        ClaimState, DatabaseIdentity, DatabaseProvenance, DatabaseRole, IndexBuildState,
-        IndexInspection, IndexProgress, MAINTENANCE_REVISION, MaintenanceKey, MaintenanceKeyRecord,
-        MaintenanceOutcome, MaintenanceRecord, ManagedIndex, RecoveryAuthorization,
-        ServerCompatibility, ServerVersion, V4CatalogIntent, V4MaintenancePort,
-        classify_server_version, establish_database_provenance, managed_indexes_for_role,
-        parse_server_version, preflight_v4_catalog, preflight_v4_catalog_with_intent,
-        registry_audit_index, run_v4_catalog_maintenance, run_v4_catalog_maintenance_with_intent,
+        ClaimState, DEFAULT_REBUILD_TIMEOUT_SECS, DatabaseIdentity, DatabaseProvenance,
+        DatabaseRole, IndexBuildState, IndexInspection, IndexProgress, MAINTENANCE_REVISION,
+        MaintenanceKey, MaintenanceKeyRecord, MaintenanceOutcome, MaintenanceRecord, ManagedIndex,
+        RecoveryAuthorization, ServerCompatibility, ServerVersion, V4CatalogIntent,
+        V4MaintenancePort, classify_server_version, establish_database_provenance,
+        managed_indexes_for_role, parse_server_version, preflight_v4_catalog,
+        preflight_v4_catalog_with_intent, rebuild_timeout_from, registry_audit_index,
+        run_v4_catalog_maintenance, run_v4_catalog_maintenance_with_intent,
     };
     use crate::error::MemoryError;
 
@@ -1168,6 +1232,7 @@ mod tests {
         fail_post_rebuild_inspection: bool,
         fail_definition_on_post_catalog_inspection: Option<&'static str>,
         running_build: bool,
+        failed_build_state: bool,
         unknown_build_state: bool,
         missing_until_catalog: Option<&'static str>,
         fail_completion_write: bool,
@@ -1192,6 +1257,7 @@ mod tests {
                     fail_post_rebuild_inspection: false,
                     fail_definition_on_post_catalog_inspection: None,
                     running_build: false,
+                    failed_build_state: false,
                     unknown_build_state: false,
                     missing_until_catalog: None,
                     fail_completion_write: false,
@@ -1263,6 +1329,93 @@ mod tests {
         recovery: RecoveryAuthorization,
     ) -> Result<MaintenanceOutcome, MemoryError> {
         run_v4_catalog_maintenance(port, role, false, false, recovery, || async { Ok(()) }).await
+    }
+
+    #[tokio::test]
+    async fn explicit_recovery_rebuilds_an_aborted_index_build() {
+        // `INFO FOR INDEX` reports `aborted` after an interrupted local
+        // builder. Ordinary startup must refuse, and the operator's explicit
+        // recovery must be able to rebuild instead of dead-ending.
+        let port = FakePort::with_preexisting_database();
+        port.state
+            .lock()
+            .expect("fake port mutex")
+            .failed_build_state = true;
+
+        let error = run_test_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            RecoveryAuthorization::None,
+        )
+        .await
+        .expect_err("an aborted server-side build blocks ordinary startup");
+        assert!(error.to_string().contains("failed server-side build"));
+        assert_eq!(port.rebuild_calls(), 0);
+
+        let outcome = run_test_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume,
+        )
+        .await
+        .expect("explicit recovery rebuilds the aborted index");
+        assert_eq!(outcome, MaintenanceOutcome::Completed);
+        assert_eq!(
+            port.rebuild_calls(),
+            managed_indexes_for_role(DatabaseRole::PrimaryMemory).len()
+        );
+    }
+
+    #[tokio::test]
+    async fn fresh_database_catalog_failure_is_retryable_without_operator_recovery() {
+        // A brand-new store has nothing to rebuild, so a first-start catalog
+        // failure must leave a claim that the next start retries on its own
+        // instead of demanding the ambiguous-recovery ceremony.
+        let port = FakePort::new("4.0.1", None);
+        port.state
+            .lock()
+            .expect("fake port mutex")
+            .database_is_empty = true;
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Err(MemoryError::Storage("simulated catalog failure".into())) },
+        )
+        .await
+        .expect_err("the catalog failure is reported");
+        assert!(error.to_string().contains("simulated catalog failure"));
+        assert_eq!(
+            port.claim().expect("claim recorded").state,
+            ClaimState::Failed
+        );
+
+        let outcome = run_test_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            RecoveryAuthorization::None,
+        )
+        .await
+        .expect("a fresh database retries its own catalog without operator recovery");
+        assert_eq!(outcome, MaintenanceOutcome::Completed);
+    }
+
+    #[test]
+    fn maintenance_timeout_honours_an_explicit_override() {
+        assert_eq!(
+            rebuild_timeout_from(Some("2700")),
+            Duration::from_secs(2700)
+        );
+        for invalid in [Some("0"), Some("soon"), Some(" "), None] {
+            assert_eq!(
+                rebuild_timeout_from(invalid),
+                Duration::from_secs(DEFAULT_REBUILD_TIMEOUT_SECS),
+                "{invalid:?} must fall back to the documented default"
+            );
+        }
     }
 
     #[async_trait]
@@ -1375,6 +1528,12 @@ mod tests {
                     state: IndexBuildState::Building,
                 });
             }
+            if state.failed_build_state {
+                return Ok(IndexInspection {
+                    definition_matches: true,
+                    state: IndexBuildState::Failed,
+                });
+            }
             if state.unknown_build_state {
                 return Ok(IndexInspection {
                     definition_matches: true,
@@ -1406,6 +1565,7 @@ mod tests {
                     "response lost after submission".into(),
                 ));
             }
+            state.failed_build_state = false;
             Ok(())
         }
     }

@@ -1040,6 +1040,26 @@ Before converting any embedded v3 store:
    Fresh stores do not need the conversion flag. If conversion or maintenance is
    interrupted, keep the flag enabled and rerun the command while the application
    remains offline. After it succeeds, remove the flag and start the service.
+
+   An interrupted index rebuild leaves the maintenance claim incomplete and the
+   index reporting an aborted build. Once every other v4 process is stopped and
+   you have confirmed that no server-side rebuild is still running, rerun the
+   command with both recovery flags:
+
+   ```bash
+   # Stdio primary store
+   env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp surrealdb-v4-maintenance \
+     --role primary --recover-ambiguous --confirm-no-prior-submitter-can-resume
+
+   # HTTP Registry and configured ready tenant stores
+   env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp_http surrealdb-v4-maintenance \
+     --recover-ambiguous --confirm-no-prior-submitter-can-resume
+   ```
+
+   The recovery run rebuilds the aborted index from the start. Give it enough
+   time: one rebuild is bounded by `SURREALDB_V4_MAINTENANCE_TIMEOUT_SECS`
+   (default `1800`), which a large fact or embedding table may need raised.
+   Without the flags, an interrupted or aborted rebuild keeps startup closed.
 5. Keep the external backup. Do not delete `_rocksdb_backup/`; it is not a
    substitute for the coordinated backup set.
 
@@ -1231,6 +1251,7 @@ still marked `No`.
 | `RETRIEVAL_RERANKER_MODEL_DIR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `RUST_LOG` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | Storage | No | [Upgrade to v1.40.0](#upgrade-to-v1400) |
+| `SURREALDB_V4_MAINTENANCE_TIMEOUT_SECS` | Storage | No | [Upgrade to v1.40.0](#upgrade-to-v1400) |
 | `SURREALDB_DATA_DIR` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_DB_NAME` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDED` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
@@ -1273,6 +1294,7 @@ and not by the same code path — check the row before assuming one applies:
 | `SURREALDB_DATA_DIR` | path | local URL path; else `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Explicit embedded data directory; takes precedence over a local `SURREALDB_URL`. An existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
 | `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | boolean | `false` | No | Allows embedded SurrealDB 4 to convert an existing v3 store. Set during conversion and any retry; fresh stores and remote servers do not need it. See [Upgrade to v1.40.0](#upgrade-to-v1400) |
 | `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | boolean | `false` | Conditional | Explicit acknowledgement for remote v4 catalog and index maintenance. Remote-only; see [Streamable HTTP environment variables](#streamable-http-environment-variables) |
+| `SURREALDB_V4_MAINTENANCE_TIMEOUT_SECS` | unsigned integer | `1800` | No | Bound in seconds for one SurrealDB 4 `REBUILD INDEX` and for waiting on its build. Raise it for a large fact or embedding table; `0` or an invalid value falls back to the default |
 | `SURREALDB_EMBEDDING_DIMENSION` | unsigned integer | unset | No | Existing vector dimension override; the provider fallback is `384` for `local-candle` and `1536` for other embedding providers |
 
 The default local path uses embedded SurrealKV with no external service,

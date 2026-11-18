@@ -1754,28 +1754,7 @@ fn normalize_index_definition(definition: &str) -> String {
 }
 
 fn registry_index_build_state(info: Option<&Value>) -> IndexBuildState {
-    let building = info
-        .and_then(|info| info.get("building"))
-        .and_then(Value::as_object);
-    if building
-        .and_then(|building| building.get("active"))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-    {
-        return IndexBuildState::Building;
-    }
-    let status = building
-        .and_then(|building| building.get("status"))
-        .or_else(|| info.and_then(|info| info.get("status").or_else(|| info.get("state"))))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    match status.as_str() {
-        "ready" | "complete" | "completed" => IndexBuildState::Ready,
-        "building" | "pending" | "initializing" => IndexBuildState::Building,
-        "failed" | "error" => IndexBuildState::Failed,
-        _ => IndexBuildState::Unknown,
-    }
+    crate::storage::v4_maintenance::index_build_state_from_info(info.and_then(Value::as_object))
 }
 
 /// OIDC policy guard fragment shared by every OIDC-only session and
@@ -4989,6 +4968,30 @@ mod tests {
                 .len(),
             1,
             "the refusal must not have removed anything"
+        );
+    }
+
+    #[test]
+    fn registry_index_build_state_matches_the_surrealdb_4_report() {
+        // The registry reads the same `INFO FOR INDEX` shape as the primary
+        // store: `aborted`/`error` are failures, in-progress phases are
+        // builds, and `active` is only the caller's compaction state.
+        let aborted = serde_json::json!({"building": {"status": "aborted"}});
+        assert_eq!(
+            registry_index_build_state(Some(&aborted)),
+            IndexBuildState::Failed
+        );
+
+        let indexing = serde_json::json!({"building": {"status": "indexing"}});
+        assert_eq!(
+            registry_index_build_state(Some(&indexing)),
+            IndexBuildState::Building
+        );
+
+        let compacting = serde_json::json!({"building": {"status": "ready", "active": true}});
+        assert_eq!(
+            registry_index_build_state(Some(&compacting)),
+            IndexBuildState::Ready
         );
     }
 }

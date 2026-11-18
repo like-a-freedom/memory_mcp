@@ -1325,28 +1325,7 @@ fn tokenize_sql(sql: &str) -> Vec<String> {
 }
 
 fn index_build_state(info: Option<&serde_json::Map<String, Value>>) -> IndexBuildState {
-    let building = info
-        .and_then(|info| info.get("building"))
-        .and_then(Value::as_object);
-    if building
-        .and_then(|building| building.get("active"))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-    {
-        return IndexBuildState::Building;
-    }
-    let status = building
-        .and_then(|building| building.get("status"))
-        .or_else(|| info.and_then(|info| info.get("status").or_else(|| info.get("state"))))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    match status.as_str() {
-        "ready" | "complete" | "completed" => IndexBuildState::Ready,
-        "building" | "pending" | "initializing" => IndexBuildState::Building,
-        "failed" | "error" => IndexBuildState::Failed,
-        _ => IndexBuildState::Unknown,
-    }
+    crate::storage::v4_maintenance::index_build_state_from_info(info)
 }
 
 /// Runs a SurrealDB query with optional variable bindings on the correct engine
@@ -2211,5 +2190,51 @@ mod tests {
             .expect("select fact")
             .expect("fact exists");
         assert!(fact.get("scope").is_none());
+        assert!(fact.get("visibility_scope").is_none());
+    }
+
+    fn index_info(value: serde_json::Value) -> serde_json::Map<String, Value> {
+        value.as_object().cloned().expect("index info object")
+    }
+
+    #[test]
+    fn index_build_state_reports_aborted_as_failed() {
+        // SurrealDB 4 spells an interrupted local builder `aborted`, and a
+        // failed durable build `error`. Both must be actionable failures
+        // rather than an unknown state that blocks recovery forever.
+        for status in ["aborted", "error"] {
+            let info = index_info(serde_json::json!({
+                "building": {"status": status, "active": false, "compacting": false, "queued": false}
+            }));
+            assert_eq!(
+                index_build_state(Some(&info)),
+                IndexBuildState::Failed,
+                "status `{status}` is a failed index build"
+            );
+        }
+    }
+
+    #[test]
+    fn index_build_state_reports_in_progress_statuses_as_building() {
+        for status in ["started", "cleaning", "indexing"] {
+            let info = index_info(serde_json::json!({
+                "building": {"status": status, "active": false}
+            }));
+            assert_eq!(
+                index_build_state(Some(&info)),
+                IndexBuildState::Building,
+                "status `{status}` is a durable build in progress"
+            );
+        }
+    }
+
+    #[test]
+    fn index_build_state_ignores_caller_local_compaction() {
+        // SurrealDB 4 reports `active` for the caller's own compaction pass,
+        // not for durable build state, so it must not be read as a build.
+        let info = index_info(serde_json::json!({
+            "building": {"status": "ready", "active": true}
+        }));
+        assert_eq!(index_build_state(Some(&info)), IndexBuildState::Ready);
     }
 }
