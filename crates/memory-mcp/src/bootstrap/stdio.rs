@@ -51,6 +51,66 @@ fn log_version_probe_failure(logger: &crate::logging::StdoutLogger, err: &Memory
     logger.log(event, err.log_level());
 }
 
+pub(crate) async fn apply_primary_catalog(
+    client: &Arc<SurrealDbClient>,
+    namespace: &str,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+) -> Result<(), MemoryError> {
+    apply_primary_catalog_with_intent(
+        client,
+        namespace,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        recovery,
+        crate::storage::v4_maintenance::V4CatalogIntent::Startup,
+    )
+    .await
+}
+
+pub(crate) async fn apply_primary_catalog_for_maintenance(
+    client: &Arc<SurrealDbClient>,
+    namespace: &str,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+) -> Result<(), MemoryError> {
+    apply_primary_catalog_with_intent(
+        client,
+        namespace,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        recovery,
+        crate::storage::v4_maintenance::V4CatalogIntent::PreStartMaintenance,
+    )
+    .await
+}
+
+async fn apply_primary_catalog_with_intent(
+    client: &Arc<SurrealDbClient>,
+    namespace: &str,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+    intent: crate::storage::v4_maintenance::V4CatalogIntent,
+) -> Result<(), MemoryError> {
+    crate::storage::v4_maintenance::run_v4_catalog_maintenance_with_intent(
+        client.as_ref(),
+        crate::storage::v4_maintenance::DatabaseRole::PrimaryMemory,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        recovery,
+        intent,
+        || async {
+            let db_client: Arc<dyn DbClient> = client.clone();
+            apply_startup_migrations(&db_client, namespace).await
+        },
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn build_memory_service_from_env(
     mode: EmbeddingActivationMode,
     ner_progress: std::sync::Arc<dyn crate::embedding::model_artifacts::ModelProgressSink>,
@@ -104,8 +164,16 @@ pub async fn build_memory_service_from_env(
     let client_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
     let versions_event = build_startup_versions_event(client_version, server_version.as_deref());
     startup_logger.log(versions_event, crate::logging::LogLevel::Info);
-    let db_client = Arc::new(db_client) as Arc<dyn DbClient>;
-    apply_startup_migrations(&db_client, &active_namespace).await?;
+    let db_client = Arc::new(db_client);
+    apply_primary_catalog(
+        &db_client,
+        &active_namespace,
+        !config.embedded,
+        config.allow_remote_v4_index_rebuild,
+        crate::storage::v4_maintenance::RecoveryAuthorization::None,
+    )
+    .await?;
+    let db_client = db_client as Arc<dyn DbClient>;
     let (decision, target) = resolve_embedding_startup(
         &config.embedding,
         &db_client,
@@ -329,6 +397,38 @@ pub(crate) fn forced_embedding_runtime_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn primary_catalog_records_verified_v4_completion() {
+        use crate::storage::v4_maintenance::{ClaimState, MaintenanceKey, V4MaintenancePort};
+
+        let client = Arc::new(
+            SurrealDbClient::connect_in_memory("primary_catalog", "main", "warn")
+                .await
+                .expect("isolated memory database"),
+        );
+        apply_primary_catalog(
+            &client,
+            "main",
+            false,
+            false,
+            crate::storage::v4_maintenance::RecoveryAuthorization::None,
+        )
+        .await
+        .expect("primary catalog");
+        let identity = client.database_identity().await.expect("identity");
+        let key = MaintenanceKey {
+            namespace: identity.namespace,
+            database: identity.database,
+            revision: crate::storage::v4_maintenance::MAINTENANCE_REVISION,
+        };
+        let record = client
+            .read_claim(&key)
+            .await
+            .expect("claim read")
+            .expect("durable claim");
+        assert_eq!(record.state, ClaimState::Completed);
+    }
 
     /// A probe that could not run is classified by the error that stopped
     /// it. The rendered line is asserted, because `RUST_LOG` filters on the

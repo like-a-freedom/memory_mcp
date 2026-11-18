@@ -32,6 +32,13 @@ use crate::error::MemoryError;
 use crate::http::config::BrowserAuthMethod;
 #[cfg(feature = "control-plane")]
 use crate::service::local_admin::contracts::LocalKeyFingerprints;
+use crate::storage::v4_maintenance::{
+    DatabaseIdentity, DatabaseProvenance, DatabaseRole, IndexBuildState, IndexInspection,
+    MaintenanceKey, MaintenanceKeyRecord, MaintenanceRecord, ManagedIndex, RecoveryAuthorization,
+    ServerCompatibility, ServerVersion, V4CatalogIntent, V4MaintenancePort,
+    managed_indexes_for_role, parse_server_version, preflight_v4_catalog_with_intent,
+    run_v4_catalog_maintenance_with_intent,
+};
 
 /// Backing connection variant. Both arms hold the already-connected
 /// `Surreal<C>` handle. The variant is selected at startup based on
@@ -48,6 +55,10 @@ impl RegistryDb {
             RegistryDb::Remote(db) => db.as_ref(),
             RegistryDb::Local(db) => db.as_ref(),
         }
+    }
+
+    fn is_remote(&self) -> bool {
+        matches!(self, Self::Remote(_))
     }
 }
 
@@ -68,6 +79,7 @@ pub trait SurrealHandle: Send + Sync {
         result_index: usize,
     ) -> Result<Vec<Value>, MemoryError>;
     async fn ping(&self) -> bool;
+    async fn server_version(&self) -> Result<String, MemoryError>;
 }
 
 /// Read one statement's result as a list of rows.
@@ -175,6 +187,14 @@ impl SurrealHandle for Surreal<Client> {
             Err(_) => false,
         }
     }
+    async fn server_version(&self) -> Result<String, MemoryError> {
+        self.version()
+            .await
+            .map(|version| version.to_string())
+            .map_err(|error| {
+                MemoryError::Storage(format!("SurrealDB version lookup failed: {error}"))
+            })
+    }
 }
 
 #[async_trait]
@@ -245,6 +265,14 @@ impl SurrealHandle for Surreal<Db> {
             Ok(mut response) => response.take_errors().is_empty(),
             Err(_) => false,
         }
+    }
+    async fn server_version(&self) -> Result<String, MemoryError> {
+        self.version()
+            .await
+            .map(|version| version.to_string())
+            .map_err(|error| {
+                MemoryError::Storage(format!("SurrealDB version lookup failed: {error}"))
+            })
     }
 }
 
@@ -764,8 +792,18 @@ impl SurrealRegistryStore {
     /// is responsible for `use_ns`/`use_db` if needed; the store
     /// rebinds on every call so concurrent use is safe.
     pub async fn connect(target: &crate::config::SurrealTargetConfig) -> Result<Self, MemoryError> {
+        Self::connect_with_v4_maintenance(target, false, RecoveryAuthorization::None).await
+    }
+
+    pub(crate) async fn connect_with_v4_maintenance(
+        target: &crate::config::SurrealTargetConfig,
+        allow_remote_v4_index_rebuild: bool,
+        recovery: RecoveryAuthorization,
+    ) -> Result<Self, MemoryError> {
         let store = Self::connect_unmigrated(target).await?;
-        store.apply_migrations().await?;
+        store
+            .apply_migrations_with_v4_maintenance(allow_remote_v4_index_rebuild, recovery)
+            .await?;
         Ok(store)
     }
 
@@ -779,7 +817,7 @@ impl SurrealRegistryStore {
         Ok(store.privileged_engine())
     }
 
-    async fn connect_unmigrated(
+    pub(crate) async fn connect_unmigrated(
         target: &crate::config::SurrealTargetConfig,
     ) -> Result<Self, MemoryError> {
         let url = target.url.trim();
@@ -930,6 +968,155 @@ impl SurrealRegistryStore {
         }
     }
 
+    pub(crate) async fn preflight_v4_catalog(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+    ) -> Result<ServerCompatibility, MemoryError> {
+        self.preflight_v4_catalog_with_intent(
+            allow_remote_v4_index_rebuild,
+            V4CatalogIntent::Startup,
+        )
+        .await
+    }
+
+    pub(crate) async fn preflight_v4_catalog_for_maintenance(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+    ) -> Result<ServerCompatibility, MemoryError> {
+        self.preflight_v4_catalog_with_intent(
+            allow_remote_v4_index_rebuild,
+            V4CatalogIntent::PreStartMaintenance,
+        )
+        .await
+    }
+
+    async fn preflight_v4_catalog_with_intent(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+        intent: V4CatalogIntent,
+    ) -> Result<ServerCompatibility, MemoryError> {
+        preflight_v4_catalog_with_intent(
+            self,
+            DatabaseRole::Registry,
+            self.db.is_remote(),
+            allow_remote_v4_index_rebuild,
+            intent,
+        )
+        .await
+    }
+
+    fn ensure_registry_maintenance_key(&self, key: &MaintenanceKey) -> Result<(), MemoryError> {
+        if key.namespace != self.namespace
+            || key.database != self.database
+            || key.revision != crate::storage::v4_maintenance::MAINTENANCE_REVISION
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "SurrealDB maintenance key does not match the active registry database".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_registry_maintenance_record_key(
+        &self,
+        key: &MaintenanceKeyRecord,
+    ) -> Result<(), MemoryError> {
+        if key.namespace != self.namespace
+            || key.database != self.database
+            || key.revision != crate::storage::v4_maintenance::MAINTENANCE_REVISION
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "SurrealDB maintenance record does not match the active registry database".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn update_registry_maintenance_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        self.ensure_registry_maintenance_record_key(&record.key)?;
+        let content = serde_json::to_value(record).map_err(|error| {
+            MemoryError::Storage(format!(
+                "could not serialize SurrealDB maintenance claim: {error}"
+            ))
+        })?;
+        let query = format!(
+            "UPDATE memory_v4_maintenance_claim:{} CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
+            record.key.revision
+        );
+        let rows = self
+            .handle()
+            .query_json(
+                &query,
+                Some(json!({
+                    "record": content,
+                    "expected_attempt_id": expected_attempt_id,
+                })),
+            )
+            .await
+            .map_err(|error| map_storage_error("update registry v4 maintenance claim", error))?;
+        Ok(!rows.is_empty())
+    }
+
+    /// Apply the registry catalog only after the v4 version, provenance and
+    /// remote-authorization checks have admitted the complete catalog.
+    pub async fn apply_migrations(&self) -> Result<Vec<String>, MemoryError> {
+        self.apply_migrations_with_v4_maintenance(false, RecoveryAuthorization::None)
+            .await
+    }
+
+    pub(crate) async fn apply_migrations_with_v4_maintenance(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+        recovery: RecoveryAuthorization,
+    ) -> Result<Vec<String>, MemoryError> {
+        self.apply_migrations_with_intent(
+            allow_remote_v4_index_rebuild,
+            recovery,
+            V4CatalogIntent::Startup,
+        )
+        .await
+    }
+
+    pub(crate) async fn apply_migrations_for_v4_maintenance(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+        recovery: RecoveryAuthorization,
+    ) -> Result<Vec<String>, MemoryError> {
+        self.apply_migrations_with_intent(
+            allow_remote_v4_index_rebuild,
+            recovery,
+            V4CatalogIntent::PreStartMaintenance,
+        )
+        .await
+    }
+
+    async fn apply_migrations_with_intent(
+        &self,
+        allow_remote_v4_index_rebuild: bool,
+        recovery: RecoveryAuthorization,
+        intent: V4CatalogIntent,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut verified = Vec::new();
+        run_v4_catalog_maintenance_with_intent(
+            self,
+            DatabaseRole::Registry,
+            self.db.is_remote(),
+            allow_remote_v4_index_rebuild,
+            recovery,
+            intent,
+            || async {
+                verified = self.apply_migrations_catalog().await?;
+                Ok(())
+            },
+        )
+        .await?;
+        Ok(verified)
+    }
+
     /// Apply the control-plane migration catalog with a durable ledger.
     ///
     /// The ledger is bootstrapped with idempotent DDL, then each migration is
@@ -938,7 +1125,7 @@ impl SurrealRegistryStore {
     /// different checksum. Every statement error is surfaced by `query_json`,
     /// and the final table postconditions fail startup if the control schema is
     /// incomplete.
-    pub async fn apply_migrations(&self) -> Result<Vec<String>, MemoryError> {
+    async fn apply_migrations_catalog(&self) -> Result<Vec<String>, MemoryError> {
         self.handle()
             .query_json(
                 "DEFINE TABLE IF NOT EXISTS migration_ledger SCHEMAFULL; \
@@ -1315,6 +1502,270 @@ impl SurrealRegistryStore {
             }
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl V4MaintenancePort for SurrealRegistryStore {
+    async fn server_version(&self) -> Result<ServerVersion, MemoryError> {
+        let display = self.handle().server_version().await?;
+        let raw = display.strip_prefix("SurrealDB ").unwrap_or(&display);
+        parse_server_version(raw)
+    }
+
+    async fn database_identity(&self) -> Result<DatabaseIdentity, MemoryError> {
+        Ok(DatabaseIdentity {
+            namespace: self.namespace.clone(),
+            database: self.database.clone(),
+        })
+    }
+
+    async fn database_is_empty(&self) -> Result<bool, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json("INFO FOR DB;", None)
+            .await
+            .map_err(|error| map_storage_error("inspect registry database", error))?;
+        let info = rows.into_iter().next().ok_or_else(|| {
+            MemoryError::Storage("SurrealDB database information returned no result".into())
+        })?;
+        let tables = info
+            .get("tables")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                MemoryError::Storage(
+                    "SurrealDB database information did not include a table catalog".into(),
+                )
+            })?;
+        Ok(tables.is_empty())
+    }
+
+    async fn read_provenance(&self) -> Result<Option<DatabaseProvenance>, MemoryError> {
+        let rows = match self
+            .handle()
+            .query_json(
+                "SELECT * FROM memory_v4_maintenance_provenance:current;",
+                None,
+            )
+            .await
+        {
+            Ok(rows) => rows,
+            Err(MemoryError::Storage(message))
+                if crate::storage::helpers::is_missing_table_error(&message) =>
+            {
+                return Ok(None);
+            }
+            Err(error) => return Err(map_storage_error("read registry v4 provenance", error)),
+        };
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let provenance = row.get("provenance").cloned().ok_or_else(|| {
+            MemoryError::Storage("SurrealDB maintenance provenance record is malformed".into())
+        })?;
+        serde_json::from_value(provenance)
+            .map(Some)
+            .map_err(|error| {
+                MemoryError::Storage(format!(
+                    "SurrealDB maintenance provenance is invalid: {error}"
+                ))
+            })
+    }
+
+    async fn create_provenance(&self, provenance: DatabaseProvenance) -> Result<bool, MemoryError> {
+        let record = json!({"provenance": provenance});
+        match self
+            .handle()
+            .query_json(
+                "CREATE ONLY memory_v4_maintenance_provenance:current CONTENT $record;",
+                Some(json!({"record": record})),
+            )
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(error) if crate::storage::is_record_already_exists_error(&error.to_string()) => {
+                Ok(false)
+            }
+            Err(error) => Err(map_storage_error("record registry v4 provenance", error)),
+        }
+    }
+
+    async fn read_claim(
+        &self,
+        key: &MaintenanceKey,
+    ) -> Result<Option<MaintenanceRecord>, MemoryError> {
+        self.ensure_registry_maintenance_key(key)?;
+        let query = format!(
+            "SELECT * FROM memory_v4_maintenance_claim:{};",
+            key.revision
+        );
+        let rows = match self.handle().query_json(&query, None).await {
+            Ok(rows) => rows,
+            Err(MemoryError::Storage(message))
+                if crate::storage::helpers::is_missing_table_error(&message) =>
+            {
+                return Ok(None);
+            }
+            Err(error) => {
+                return Err(map_storage_error(
+                    "read registry v4 maintenance claim",
+                    error,
+                ));
+            }
+        };
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let claim: MaintenanceRecord = serde_json::from_value(row).map_err(|error| {
+            MemoryError::Storage(format!("SurrealDB maintenance claim is malformed: {error}"))
+        })?;
+        if claim.key.namespace != key.namespace
+            || claim.key.database != key.database
+            || claim.key.revision != key.revision
+        {
+            return Err(MemoryError::Storage(
+                "SurrealDB maintenance claim key does not match the active registry database"
+                    .into(),
+            ));
+        }
+        Ok(Some(claim))
+    }
+
+    async fn create_claim(&self, record: &MaintenanceRecord) -> Result<bool, MemoryError> {
+        self.ensure_registry_maintenance_record_key(&record.key)?;
+        let content = serde_json::to_value(record).map_err(|error| {
+            MemoryError::Storage(format!(
+                "could not serialize SurrealDB maintenance claim: {error}"
+            ))
+        })?;
+        let query = format!(
+            "CREATE ONLY memory_v4_maintenance_claim:{} CONTENT $record;",
+            record.key.revision
+        );
+        match self
+            .handle()
+            .query_json(&query, Some(json!({"record": content})))
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(error) if crate::storage::is_record_already_exists_error(&error.to_string()) => {
+                Ok(false)
+            }
+            Err(error) => Err(map_storage_error(
+                "create registry v4 maintenance claim",
+                error,
+            )),
+        }
+    }
+
+    async fn replace_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        self.update_registry_maintenance_claim(expected_attempt_id, record)
+            .await
+    }
+
+    async fn save_claim(
+        &self,
+        expected_attempt_id: &str,
+        record: &MaintenanceRecord,
+    ) -> Result<bool, MemoryError> {
+        self.update_registry_maintenance_claim(expected_attempt_id, record)
+            .await
+    }
+
+    async fn inspect_index(&self, index: ManagedIndex) -> Result<IndexInspection, MemoryError> {
+        if !managed_indexes_for_role(DatabaseRole::Registry).contains(&index) {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "index `{}` is not managed for the registry database role",
+                index.name
+            )));
+        }
+        let table_rows = self
+            .handle()
+            .query_json(&format!("INFO FOR TABLE {};", index.table), None)
+            .await
+            .map_err(|error| map_storage_error("inspect registry index table", error))?;
+        let definition = table_rows
+            .first()
+            .and_then(|info| info.get("indexes"))
+            .and_then(Value::as_object)
+            .and_then(|indexes| indexes.get(index.name))
+            .and_then(Value::as_str);
+        let definition_matches = definition.is_some_and(|actual| {
+            normalize_index_definition(actual) == normalize_index_definition(index.definition)
+        });
+        if !definition_matches {
+            return Ok(IndexInspection {
+                definition_matches: false,
+                state: IndexBuildState::Missing,
+            });
+        }
+        let rows = self
+            .handle()
+            .query_json(
+                &format!("INFO FOR INDEX {} ON TABLE {};", index.name, index.table),
+                None,
+            )
+            .await
+            .map_err(|error| map_storage_error("inspect registry index build", error))?;
+        Ok(IndexInspection {
+            definition_matches,
+            state: registry_index_build_state(rows.first()),
+        })
+    }
+
+    async fn rebuild_index(&self, index: ManagedIndex) -> Result<(), MemoryError> {
+        if !managed_indexes_for_role(DatabaseRole::Registry).contains(&index) {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "index `{}` is not managed for the registry database role",
+                index.name
+            )));
+        }
+        self.handle()
+            .query_json(
+                &format!("REBUILD INDEX {} ON TABLE {};", index.name, index.table),
+                None,
+            )
+            .await
+            .map_err(|error| map_storage_error("rebuild registry index", error))?;
+        Ok(())
+    }
+}
+
+fn normalize_index_definition(definition: &str) -> String {
+    definition
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end_matches(';')
+        .to_ascii_lowercase()
+}
+
+fn registry_index_build_state(info: Option<&Value>) -> IndexBuildState {
+    let building = info
+        .and_then(|info| info.get("building"))
+        .and_then(Value::as_object);
+    if building
+        .and_then(|building| building.get("active"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return IndexBuildState::Building;
+    }
+    let status = building
+        .and_then(|building| building.get("status"))
+        .or_else(|| info.and_then(|info| info.get("status").or_else(|| info.get("state"))))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match status.as_str() {
+        "ready" | "complete" | "completed" => IndexBuildState::Ready,
+        "building" | "pending" | "initializing" => IndexBuildState::Building,
+        "failed" | "error" => IndexBuildState::Failed,
+        _ => IndexBuildState::Unknown,
     }
 }
 
@@ -3537,6 +3988,31 @@ mod tests {
             created_at: Utc::now(),
             version: 0,
         }
+    }
+
+    #[tokio::test]
+    async fn registry_catalog_finishes_its_v4_maintenance_record() {
+        use serde_json::Value;
+
+        let store = SurrealRegistryStore::connect_in_memory(
+            "registry_maintenance_namespace",
+            "registry_maintenance_database",
+        )
+        .await
+        .expect("registry schema and maintenance");
+
+        let claim = store
+            .handle()
+            .query_json(
+                "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+                None,
+            )
+            .await
+            .expect("read registry maintenance record");
+        let claim: Vec<Value> = claim;
+
+        assert_eq!(claim[0]["role"], "registry");
+        assert_eq!(claim[0]["state"], "completed");
     }
 
     #[tokio::test]

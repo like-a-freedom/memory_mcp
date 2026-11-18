@@ -36,6 +36,16 @@ fn is_loopback_public_url(url: &str) -> bool {
 pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
     super::super::storage_inventory::preflight(&cfg.control_db, &cfg.tenant_db)?;
 
+    let has_remote_target = [&cfg.control_db, &cfg.tenant_db].into_iter().any(|target| {
+        let url = target.url.trim();
+        url.starts_with("ws://") || url.starts_with("wss://")
+    });
+    if cfg.allow_remote_v4_index_rebuild && !has_remote_target {
+        return Err(MemoryError::ConfigInvalid(
+            "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD requires at least one remote HTTP storage target".into(),
+        ));
+    }
+
     // Reject the test-only bootstrap env var unless the
     // `test-fixtures` feature is enabled (Task 5.8).
     // The literal is intentional: a production build

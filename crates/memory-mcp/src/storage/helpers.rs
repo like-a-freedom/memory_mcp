@@ -2,9 +2,7 @@
 
 use std::path::Path;
 
-use regex::Regex;
 use serde_json::Value;
-use surrealdb::types::Value as SurrealValue;
 
 use crate::error::MemoryError;
 
@@ -157,10 +155,6 @@ fn indefinite_article(table: &str) -> &'static str {
     }
 }
 
-pub fn surreal_to_json(value: SurrealValue) -> Value {
-    super::json_conversion::surreal_to_json(value)
-}
-
 /// Reconstructs a `table:key` record-id string from a serialized SurrealDB
 /// record id.
 ///
@@ -231,54 +225,6 @@ pub(crate) fn normalize_surreal_json(v: &Value) -> Value {
         J::Null => J::Null,
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
-    }
-}
-
-/// Try to find a version-like field inside arbitrary JSON returned by the
-/// server info query. Searches keys for the substring "version" (case-ins).
-pub fn find_version_in_json(v: &Value) -> Option<String> {
-    use std::sync::LazyLock;
-
-    static VERSION_RE: LazyLock<Result<Regex, regex::Error>> =
-        LazyLock::new(|| Regex::new(r"\d+\.\d+(?:\.\d+)?"));
-
-    match v {
-        Value::String(s) => {
-            let version_match = VERSION_RE.as_ref().is_ok_and(|regex| regex.is_match(s));
-            if version_match || s.to_lowercase().contains("surreal") {
-                Some(s.clone())
-            } else {
-                None
-            }
-        }
-        Value::Object(map) => {
-            for (k, val) in map.iter() {
-                if k.to_lowercase().contains("version") {
-                    if let Some(s) = val.as_str() {
-                        return Some(s.to_string());
-                    } else if let Some(found) = find_version_in_json(val) {
-                        return Some(found);
-                    } else {
-                        return Some(val.to_string());
-                    }
-                }
-            }
-            for (_, val) in map.iter() {
-                if let Some(found) = find_version_in_json(val) {
-                    return Some(found);
-                }
-            }
-            None
-        }
-        Value::Array(arr) => {
-            for it in arr.iter() {
-                if let Some(found) = find_version_in_json(it) {
-                    return Some(found);
-                }
-            }
-            None
-        }
-        _ => None,
     }
 }
 

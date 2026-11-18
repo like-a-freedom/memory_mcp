@@ -112,6 +112,8 @@ pub struct SurrealConfig {
     pub data_dir: Option<String>,
     /// Allow the embedded SurrealDB 4 engine to convert a v3 datastore.
     pub upgrade_from_3x: bool,
+    /// Acknowledge the remote v4 catalog and index-maintenance window.
+    pub allow_remote_v4_index_rebuild: bool,
     /// Environment variables whose values were supplied by zero-config defaults.
     pub(crate) defaulted_variables: Vec<&'static str>,
     /// Existing legacy executable-relative data directory selected for compatibility.
@@ -141,6 +143,7 @@ impl SurrealConfig {
     /// | `SURREALDB_DATA_DIR` | No | Path to the SurrealKV data directory (user data directory by default) |
     /// | `SURREALDB_NAMESPACE` | No | One namespace (default: `main`) |
     /// | `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | No | Set to `true` to allow embedded SurrealDB 4 to convert a v3 datastore (default: `false`) |
+    /// | `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | No | Acknowledge the remote v4 catalog and index-maintenance window (default: `false`; remote only) |
     /// | `SURREALDB_USERNAME` | Yes (remote) | Database username (`root` in embedded mode by default) |
     /// | `SURREALDB_PASSWORD` | Yes (remote) | Database password (`root` in embedded mode by default) |
     /// | `RUST_LOG` | No | Logging level (default: "info") |
@@ -233,6 +236,13 @@ impl SurrealConfig {
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
         let query_logging_enabled = parse_bool_env("QUERY_LOGGING_ENABLED").unwrap_or(false);
         let upgrade_from_3x = super::helpers::experimental_upgrade_from_3x();
+        let allow_remote_v4_index_rebuild =
+            parse_bool_env("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD").unwrap_or(false);
+        if allow_remote_v4_index_rebuild && embedded {
+            return Err(MemoryError::ConfigInvalid(
+                "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD is only valid for remote storage".into(),
+            ));
+        }
         let query_log_retention_days = parse_env::<u32>("QUERY_LOG_RETENTION_DAYS")?
             .unwrap_or(DEFAULT_QUERY_LOG_RETENTION_DAYS);
 
@@ -250,6 +260,7 @@ impl SurrealConfig {
             embedded,
             data_dir,
             upgrade_from_3x,
+            allow_remote_v4_index_rebuild,
             defaulted_variables,
             legacy_data_dir,
             lifecycle,
@@ -451,6 +462,7 @@ impl SurrealConfigBuilder {
             embedded: self.embedded,
             data_dir: self.data_dir,
             upgrade_from_3x: self.upgrade_from_3x,
+            allow_remote_v4_index_rebuild: false,
             defaulted_variables: self.defaulted_variables,
             legacy_data_dir: self.legacy_data_dir,
             lifecycle: self.lifecycle,
@@ -481,6 +493,7 @@ mod tests {
         "SURREALDB_PASSWORD",
         "SURREALDB_DATA_DIR",
         "SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X",
+        "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD",
         "RUST_LOG",
         "QUERY_LOGGING_ENABLED",
         "QUERY_LOG_RETENTION_DAYS",
@@ -577,6 +590,23 @@ mod tests {
         let error = SurrealConfig::from_env().expect_err("empty embedded path must fail closed");
 
         assert!(error.to_string().contains("SURREALDB_DATA_DIR"));
+    }
+
+    #[test]
+    fn remote_v4_rebuild_ack_is_rejected_for_embedded_storage() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD", "true") };
+
+        let error = SurrealConfig::from_env()
+            .expect_err("remote-only acknowledgement must not authorize embedded storage");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+        );
     }
 
     #[test]

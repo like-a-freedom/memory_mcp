@@ -256,3 +256,16 @@ pub struct LifecycleRecallArgs {
     #[arg(long)]
     pub context: String,
 }
+
+#[derive(Debug, Args)]
+pub struct SurrealdbV4MaintenanceArgs {
+    /// Database role to maintain. The stdio binary supports `primary`.
+    #[arg(long, value_parser = ["primary"])]
+    pub role: String,
+    /// Recover an interrupted maintenance attempt after confirming prior submitters stopped.
+    #[arg(long, requires = "confirm_no_prior_submitter_can_resume")]
+    pub recover_ambiguous: bool,
+    /// Confirm that no earlier maintenance process or server-side rebuild can resume.
+    #[arg(long, requires = "recover_ambiguous")]
+    pub confirm_no_prior_submitter_can_resume: bool,
+}

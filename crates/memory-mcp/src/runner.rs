@@ -62,6 +62,10 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
 
         Some(Command::Init(args)) => commands::init::run(args).map_err(report_cli_error),
 
+        Some(Command::SurrealdbV4Maintenance(args)) => commands::run_surrealdb_v4_maintenance(args)
+            .await
+            .map_err(report_cli_error),
+
         // Admin commands: dispatch before MemoryService/NER construction.
         // Connects directly to the control registry via AdminCliConfig.
         #[cfg(all(feature = "streamable-http", feature = "control-plane"))]

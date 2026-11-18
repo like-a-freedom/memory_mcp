@@ -124,11 +124,173 @@ impl ApplyMigrations for NoopMigrations {
 /// App Sessions, Tasks, outbox, and task artifacts (040-045).
 pub struct SurrealTenantMigrations {
     engine: crate::http::registry::PrivilegedEngine,
+    allow_remote_v4_index_rebuild: bool,
 }
 
 impl SurrealTenantMigrations {
     pub fn new(engine: crate::http::registry::PrivilegedEngine) -> Self {
-        Self { engine }
+        Self {
+            engine,
+            allow_remote_v4_index_rebuild: false,
+        }
+    }
+
+    pub fn with_remote_v4_index_rebuild_ack(mut self, allow: bool) -> Self {
+        self.allow_remote_v4_index_rebuild = allow;
+        self
+    }
+
+    fn is_remote(&self) -> bool {
+        matches!(
+            self.engine,
+            crate::http::registry::PrivilegedEngine::Remote(_)
+        )
+    }
+
+    pub(crate) async fn preflight_target(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<(), MemoryError> {
+        self.preflight_target_with_intent(
+            namespace,
+            database,
+            crate::storage::v4_maintenance::V4CatalogIntent::Startup,
+        )
+        .await
+    }
+
+    pub(crate) async fn preflight_target_for_maintenance(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<(), MemoryError> {
+        self.preflight_target_with_intent(
+            namespace,
+            database,
+            crate::storage::v4_maintenance::V4CatalogIntent::PreStartMaintenance,
+        )
+        .await
+    }
+
+    async fn preflight_target_with_intent(
+        &self,
+        namespace: &str,
+        database: &str,
+        intent: crate::storage::v4_maintenance::V4CatalogIntent,
+    ) -> Result<(), MemoryError> {
+        let client = self
+            .bound_client(namespace, database)
+            .await?
+            .with_database_identity(database.to_owned());
+        crate::storage::v4_maintenance::preflight_v4_catalog_with_intent(
+            &client,
+            crate::storage::v4_maintenance::DatabaseRole::HttpTenant,
+            self.is_remote(),
+            self.allow_remote_v4_index_rebuild,
+            intent,
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn apply_migrations_with_recovery(
+        &self,
+        namespace: &str,
+        database: &str,
+        recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+    ) -> Result<u32, MemoryError> {
+        self.apply_migrations_with_intent(
+            namespace,
+            database,
+            recovery,
+            crate::storage::v4_maintenance::V4CatalogIntent::Startup,
+        )
+        .await
+    }
+
+    pub(crate) async fn apply_migrations_for_maintenance(
+        &self,
+        namespace: &str,
+        database: &str,
+        recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+    ) -> Result<u32, MemoryError> {
+        self.apply_migrations_with_intent(
+            namespace,
+            database,
+            recovery,
+            crate::storage::v4_maintenance::V4CatalogIntent::PreStartMaintenance,
+        )
+        .await
+    }
+
+    async fn apply_migrations_with_intent(
+        &self,
+        namespace: &str,
+        database: &str,
+        recovery: crate::storage::v4_maintenance::RecoveryAuthorization,
+        intent: crate::storage::v4_maintenance::V4CatalogIntent,
+    ) -> Result<u32, MemoryError> {
+        let client = Arc::new(
+            self.bound_client(namespace, database)
+                .await?
+                .with_database_identity(database.to_owned()),
+        );
+        crate::storage::v4_maintenance::run_v4_catalog_maintenance_with_intent(
+            client.as_ref(),
+            crate::storage::v4_maintenance::DatabaseRole::HttpTenant,
+            self.is_remote(),
+            self.allow_remote_v4_index_rebuild,
+            recovery,
+            intent,
+            || async {
+                client.apply_migrations_impl(namespace).await?;
+                const HTTP_MIGRATIONS: &[(&str, &str)] = &[
+                    (
+                        "040_app_sessions.surql",
+                        include_str!("../../../migrations/040_app_sessions.surql"),
+                    ),
+                    (
+                        "041_tenant_tasks.surql",
+                        include_str!("../../../migrations/041_tenant_tasks.surql"),
+                    ),
+                    (
+                        "042_tenant_change_event.surql",
+                        include_str!("../../../migrations/042_tenant_change_event.surql"),
+                    ),
+                    (
+                        "043_tenant_task_unique_fingerprint.surql",
+                        include_str!(
+                            "../../../migrations/043_tenant_task_unique_fingerprint.surql"
+                        ),
+                    ),
+                    (
+                        "044_task_artifacts.surql",
+                        include_str!("../../../migrations/044_task_artifacts.surql"),
+                    ),
+                    (
+                        "045_tenant_task_kind.surql",
+                        include_str!("../../../migrations/045_tenant_task_kind.surql"),
+                    ),
+                ];
+                for (migration_name, sql) in HTTP_MIGRATIONS {
+                    client.execute_migration_script(sql, namespace).await?;
+                    if *migration_name == "042_tenant_change_event.surql" {
+                        let outbox_client: Arc<dyn crate::storage::client::DbClient> =
+                            client.clone();
+                        let outbox = crate::storage::client::BoundDbClient::new(
+                            outbox_client,
+                            namespace.to_owned(),
+                        );
+                        crate::platform::persistence::outbox::ensure_tenant_sequence(&outbox)
+                            .await?;
+                    }
+                }
+                Ok(())
+            },
+        )
+        .await?;
+        Ok(CURRENT_SCHEMA_VERSION)
     }
 
     async fn ensure_namespace_bound(
@@ -179,7 +341,8 @@ impl SurrealTenantMigrations {
                 Ok(
                     crate::storage::client::SurrealDbClient::from_prebound_remote_with_dimension(
                         bound, namespace, "info", dimension,
-                    ),
+                    )
+                    .with_database_identity(database.to_owned()),
                 )
             }
             crate::http::registry::PrivilegedEngine::Local(db) => {
@@ -194,7 +357,8 @@ impl SurrealTenantMigrations {
                 Ok(
                     crate::storage::client::SurrealDbClient::from_prebound_with_dimension(
                         bound, namespace, "info", dimension,
-                    ),
+                    )
+                    .with_database_identity(database.to_owned()),
                 )
             }
             crate::http::registry::PrivilegedEngine::LocalMem(db) => {
@@ -209,7 +373,8 @@ impl SurrealTenantMigrations {
                 Ok(
                     crate::storage::client::SurrealDbClient::from_prebound_mem_with_dimension(
                         bound, namespace, "info", dimension,
-                    ),
+                    )
+                    .with_database_identity(database.to_owned()),
                 )
             }
         }
@@ -229,77 +394,56 @@ impl crate::provisioning::api::ReadySchemaUpgradePort for SurrealTenantMigration
             ));
         }
         let dimension = dimension.unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
-        let client = self
-            .bound_client_with_dimension(&binding.namespace, &binding.database, dimension)
-            .await?;
+        let client = Arc::new(
+            self.bound_client_with_dimension(&binding.namespace, &binding.database, dimension)
+                .await?
+                .with_database_identity(binding.database.clone()),
+        );
 
-        // The base catalog is the leased migration runner. Its checksums and
-        // per-migration leases make upgrades replayable across replicas and
-        // after a process crash. It also verifies the base schema postconditions.
-        client.apply_migrations_impl(&binding.namespace).await?;
+        crate::storage::v4_maintenance::run_v4_catalog_maintenance(
+            client.as_ref(),
+            crate::storage::v4_maintenance::DatabaseRole::HttpTenant,
+            self.is_remote(),
+            self.allow_remote_v4_index_rebuild,
+            crate::storage::v4_maintenance::RecoveryAuthorization::None,
+            || async {
+                // The base catalog is the leased migration runner. Its checksums and
+                // per-migration leases make upgrades replayable across replicas and
+                // after a process crash. It also verifies the base schema postconditions.
+                client.apply_migrations_impl(&binding.namespace).await?;
 
-        // HTTP 045 is the only expansion a ready HTTP tenant can lack after
-        // the 044 rollout. Replaying 040-044 here would repeat the immutable
-        // 042 outbox initialization on every runtime activation.
-        client
-            .execute_migration_script(
-                include_str!("../../../migrations/045_tenant_task_kind.surql"),
-                &binding.namespace,
-            )
-            .await?;
-        crate::storage::migrations::verify_schema_readiness(&client, &binding.namespace).await
+                // HTTP 045 is the only expansion a ready HTTP tenant can lack after
+                // the 044 rollout. Replaying 040-044 here would repeat the immutable
+                // 042 outbox initialization on every runtime activation.
+                client
+                    .execute_migration_script(
+                        include_str!("../../../migrations/045_tenant_task_kind.surql"),
+                        &binding.namespace,
+                    )
+                    .await?;
+                crate::storage::migrations::verify_schema_readiness(&client, &binding.namespace)
+                    .await
+            },
+        )
+        .await?;
+        Ok(())
     }
 }
 
 #[async_trait::async_trait]
 impl ApplyMigrations for SurrealTenantMigrations {
     async fn ensure_namespace(&self, namespace: &str, database: &str) -> Result<(), MemoryError> {
+        self.preflight_target(namespace, database).await?;
         self.ensure_namespace_bound(namespace, database).await
     }
 
     async fn apply_migrations(&self, namespace: &str, database: &str) -> Result<u32, MemoryError> {
-        let client = Arc::new(self.bound_client(namespace, database).await?);
-        client.apply_migrations_impl(namespace).await?;
-        const HTTP_MIGRATIONS: &[(&str, &str)] = &[
-            (
-                "040_app_sessions.surql",
-                include_str!("../../../migrations/040_app_sessions.surql"),
-            ),
-            (
-                "041_tenant_tasks.surql",
-                include_str!("../../../migrations/041_tenant_tasks.surql"),
-            ),
-            (
-                "042_tenant_change_event.surql",
-                include_str!("../../../migrations/042_tenant_change_event.surql"),
-            ),
-            (
-                "043_tenant_task_unique_fingerprint.surql",
-                include_str!("../../../migrations/043_tenant_task_unique_fingerprint.surql"),
-            ),
-            (
-                "044_task_artifacts.surql",
-                include_str!("../../../migrations/044_task_artifacts.surql"),
-            ),
-            (
-                "045_tenant_task_kind.surql",
-                include_str!("../../../migrations/045_tenant_task_kind.surql"),
-            ),
-        ];
-        for (migration_name, sql) in HTTP_MIGRATIONS {
-            client.execute_migration_script(sql, namespace).await?;
-            if *migration_name == "042_tenant_change_event.surql" {
-                // Migration 042 remains immutable and initializes the outbox
-                // sequence to zero. Replaying its idempotent DDL must not
-                // lower an existing high-water mark, so reconcile it from the
-                // durable event history immediately after the script.
-                let outbox_client: Arc<dyn crate::storage::client::DbClient> = client.clone();
-                let outbox =
-                    crate::storage::client::BoundDbClient::new(outbox_client, namespace.to_owned());
-                crate::platform::persistence::outbox::ensure_tenant_sequence(&outbox).await?;
-            }
-        }
-        Ok(CURRENT_SCHEMA_VERSION)
+        self.apply_migrations_with_recovery(
+            namespace,
+            database,
+            crate::storage::v4_maintenance::RecoveryAuthorization::None,
+        )
+        .await
     }
 }
 
@@ -802,6 +946,7 @@ mod tests {
         AccountStore, InMemoryStore, ProvisioningStore, TenantStore,
     };
     use crate::platform::fault_injection::NoFaults;
+    use crate::storage::client::DbClient;
     use chrono::Utc;
 
     /// Tests that just want to exercise the state machine
@@ -1209,6 +1354,50 @@ mod tests {
             .expect("tenant exists");
         assert_eq!(ready.status, TenantStatus::Ready);
         assert_eq!(ready.schema_version, CURRENT_SCHEMA_VERSION);
+    }
+
+    #[tokio::test]
+    async fn tenant_maintenance_completes_after_the_full_http_catalog() {
+        use crate::http::registry::SurrealRegistryStore;
+        use serde_json::Value;
+
+        let durable = SurrealRegistryStore::connect_in_memory("maintenance_control", "registry")
+            .await
+            .expect("registry schema");
+        let adapter = SurrealTenantMigrations::new(durable.privileged_engine());
+        let namespace = "tns_full_catalog_maintenance";
+        let database = "memory";
+
+        adapter
+            .ensure_namespace(namespace, database)
+            .await
+            .expect("create tenant namespace");
+        adapter
+            .apply_migrations(namespace, database)
+            .await
+            .expect("apply complete base and HTTP catalogs");
+
+        let client = adapter
+            .bound_client(namespace, database)
+            .await
+            .expect("bind tenant client");
+        let claim = client
+            .query(
+                "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+                None,
+                namespace,
+            )
+            .await
+            .expect("read completed maintenance claim");
+        let claim: Vec<Value> = serde_json::from_value(claim).expect("decode maintenance claim");
+        assert_eq!(claim[0]["role"], "http_tenant");
+        assert_eq!(claim[0]["state"], "completed");
+
+        let task_schema = client
+            .query("INFO FOR TABLE tenant_task;", None, namespace)
+            .await
+            .expect("read final HTTP schema");
+        assert!(task_schema.to_string().contains("kind"));
     }
 
     #[tokio::test]

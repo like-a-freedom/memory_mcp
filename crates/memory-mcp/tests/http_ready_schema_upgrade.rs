@@ -254,6 +254,19 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
         .expect("tenant remains registered");
     assert_eq!(persisted_tenant.status, TenantStatus::Ready);
     assert_eq!(persisted_tenant.schema_version, 45);
+
+    let maintenance = db
+        .query(
+            "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+            None,
+            &tenant.namespace_binding.namespace,
+        )
+        .await
+        .expect("read completed tenant maintenance");
+    let maintenance: Vec<Value> =
+        serde_json::from_value(maintenance).expect("decode tenant maintenance record");
+    assert_eq!(maintenance[0]["role"], "http_tenant");
+    assert_eq!(maintenance[0]["state"], "completed");
 }
 
 #[tokio::test]
@@ -327,22 +340,33 @@ async fn ready_catalog_upgrade_refuses_to_overwrite_a_migration_checksum() {
 }
 
 #[tokio::test]
-async fn two_runtime_replicas_share_the_migration_lease_and_advance_once() {
+async fn concurrent_ready_schema_activation_is_fenced_and_retryable() {
     let (registry, db, _migrations, tenant) = ready_legacy_fixture().await;
     let first = build_runtime_with_options(&registry, &tenant, RuntimeOptions::default());
     let second = build_runtime_with_options(&registry, &tenant, RuntimeOptions::default());
 
     let (first, second) = tokio::join!(first, second);
     assert!(
-        first.is_ok(),
-        "first replica upgrades: {:?}",
-        first.as_ref().err()
-    );
-    assert!(
-        second.is_ok(),
-        "second replica observes the same upgrade: {:?}",
+        first.is_ok() || second.is_ok(),
+        "one replica must complete the exclusive catalog: first={:?}, second={:?}",
+        first.as_ref().err(),
         second.as_ref().err()
     );
+    for result in [&first, &second] {
+        if let Err(error) = result {
+            let message = error.to_string();
+            assert!(
+                message.contains("active in another process")
+                    || message.contains("changed before catalog admission"),
+                "a competing replica must fail closed with a retryable claim conflict: {message}"
+            );
+        }
+    }
+    drop(first);
+    drop(second);
+    build_runtime_with_options(&registry, &tenant, RuntimeOptions::default())
+        .await
+        .expect("a replica can retry after the exclusive catalog completes");
 
     let applied = db
         .query(

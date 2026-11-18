@@ -10,6 +10,7 @@ pub mod ingest;
 pub mod init;
 pub mod invalidate;
 pub mod resolve;
+pub mod surrealdb_v4_maintenance;
 
 #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
 pub mod admin;
@@ -23,6 +24,7 @@ pub use extract::run as run_extract;
 pub use ingest::run as run_ingest;
 pub use invalidate::run as run_invalidate;
 pub use resolve::run as run_resolve;
+pub use surrealdb_v4_maintenance::run as run_surrealdb_v4_maintenance;
 
 #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
 pub use admin::run as run_admin;

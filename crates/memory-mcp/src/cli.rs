@@ -80,6 +80,8 @@ pub enum Command {
     /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
     LifecycleCapture(args::LifecycleCaptureArgs),
+    /// Run the explicit pre-start SurrealDB 4 maintenance for stdio storage.
+    SurrealdbV4Maintenance(args::SurrealdbV4MaintenanceArgs),
     /// Administrator commands: create/recover, and the deployment's browser
     /// authentication methods.
     ///
@@ -125,6 +127,7 @@ impl Command {
             Command::AssembleContext(_) => "cli.assemble_context",
             Command::LifecycleCapture(_) => "cli.lifecycle_capture",
             Command::LifecycleRecall(_) => "cli.lifecycle_recall",
+            Command::SurrealdbV4Maintenance(_) => "cli.surrealdb_v4_maintenance",
             #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
             Command::Admin(_) => "cli.admin",
         }
@@ -146,7 +149,10 @@ impl Command {
         }
 
         match self {
-            Command::Serve | Command::Reembed(_) | Command::Init(_) => None,
+            Command::Serve
+            | Command::Reembed(_)
+            | Command::Init(_)
+            | Command::SurrealdbV4Maintenance(_) => None,
             Command::Lifecycle(args) => one_shot!(run_lifecycle, args),
             Command::Ingest(args) => one_shot!(run_ingest, args),
             Command::Extract(args) => one_shot!(run_extract, args),
@@ -249,6 +255,47 @@ mod tests {
                 dry_run: true,
                 confirmed: false,
             }
+        );
+    }
+
+    #[test]
+    fn surrealdb_v4_maintenance_requires_the_primary_role() {
+        let cli = Cli::try_parse_from([
+            "memory_mcp",
+            "surrealdb-v4-maintenance",
+            "--role",
+            "primary",
+        ])
+        .expect("maintenance command should parse");
+        let Some(Command::SurrealdbV4Maintenance(args)) = cli.command else {
+            panic!("expected SurrealDB maintenance command");
+        };
+        assert_eq!(args.role, "primary");
+        assert!(!args.recover_ambiguous);
+        assert!(!args.confirm_no_prior_submitter_can_resume);
+    }
+
+    #[test]
+    fn surrealdb_v4_maintenance_requires_both_recovery_confirmations() {
+        assert!(
+            Cli::try_parse_from([
+                "memory_mcp",
+                "surrealdb-v4-maintenance",
+                "--role",
+                "primary",
+                "--recover-ambiguous",
+            ])
+            .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "memory_mcp",
+                "surrealdb-v4-maintenance",
+                "--role",
+                "primary",
+                "--confirm-no-prior-submitter-can-resume",
+            ])
+            .is_err()
         );
     }
 

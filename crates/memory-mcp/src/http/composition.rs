@@ -6,14 +6,31 @@
 //! from validated `HttpConfig`. Test composition names the in-memory
 //! adapters explicitly so a test states which adapters it uses.
 
+use std::collections::BTreeSet;
+use std::future::Future;
 use std::sync::Arc;
 
 use crate::error::MemoryError;
 
 use super::config::HttpConfig;
 use super::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
+use super::registry::storage::TenantStore;
 use super::registry::{RegistryBackend, RegistryHandle, SurrealRegistryStore};
 use crate::platform::fault_injection::{FaultInjector, NoFaults};
+
+async fn run_after_preflight<T, Preflight, PreflightFuture, Catalog, CatalogFuture>(
+    preflight: Preflight,
+    apply_catalog: Catalog,
+) -> Result<T, MemoryError>
+where
+    Preflight: FnOnce() -> PreflightFuture,
+    PreflightFuture: Future<Output = Result<(), MemoryError>>,
+    Catalog: FnOnce() -> CatalogFuture,
+    CatalogFuture: Future<Output = Result<T, MemoryError>>,
+{
+    preflight().await?;
+    apply_catalog().await
+}
 
 /// The production adapter bundle: durable control Registry plus the
 /// tenant migration worker. Selected once at startup; request
@@ -36,7 +53,7 @@ impl HttpProductionComposition {
     /// test injector should construct the composition manually.
     pub async fn connect(config: &HttpConfig) -> Result<Self, MemoryError> {
         let inventory = super::storage_inventory::preflight(&config.control_db, &config.tenant_db)?;
-        let store = SurrealRegistryStore::connect(&config.control_db)
+        let store = SurrealRegistryStore::connect_unmigrated(&config.control_db)
             .await
             .map_err(|err| {
                 MemoryError::Storage(format!("control registry storage connect failed: {err}"))
@@ -50,7 +67,30 @@ impl HttpProductionComposition {
                     MemoryError::Storage(format!("tenant engine storage connect failed: {err}"))
                 })?
         };
-        let migrations = Arc::new(SurrealTenantMigrations::new(engine.clone()));
+        let migrations = Arc::new(
+            SurrealTenantMigrations::new(engine.clone())
+                .with_remote_v4_index_rebuild_ack(config.allow_remote_v4_index_rebuild),
+        );
+        run_after_preflight(
+            || async {
+                store
+                    .preflight_v4_catalog(config.allow_remote_v4_index_rebuild)
+                    .await?;
+                migrations
+                    .preflight_target(&config.tenant_db.namespace, &config.tenant_db.database)
+                    .await
+            },
+            || async {
+                store
+                    .apply_migrations_with_v4_maintenance(
+                        config.allow_remote_v4_index_rebuild,
+                        crate::storage::v4_maintenance::RecoveryAuthorization::None,
+                    )
+                    .await?;
+                Ok(())
+            },
+        )
+        .await?;
         // The concrete durable store is shared by two trait objects: the
         // registry surface used by request handling and (under
         // `control-plane`) the local-admin surface used by the browser
@@ -70,6 +110,96 @@ impl HttpProductionComposition {
             tenant_migrations: migrations,
             fault_injector: Arc::new(NoFaults),
         })
+    }
+
+    /// Run the complete registry and ready-tenant catalogs without serving traffic.
+    /// Every configured and discovered target is checked before the first catalog write.
+    pub async fn run_surrealdb_v4_maintenance(
+        config: &HttpConfig,
+        recover_ambiguous: bool,
+        confirm_no_prior_submitter_can_resume: bool,
+    ) -> Result<(usize, usize), MemoryError> {
+        let recovery = match (recover_ambiguous, confirm_no_prior_submitter_can_resume) {
+            (false, false) => crate::storage::v4_maintenance::RecoveryAuthorization::None,
+            (true, true) => {
+                crate::storage::v4_maintenance::RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume
+            }
+            _ => {
+                return Err(MemoryError::ConfigInvalid(
+                    "ambiguous maintenance recovery requires both --recover-ambiguous and --confirm-no-prior-submitter-can-resume".into(),
+                ));
+            }
+        };
+        let inventory = super::storage_inventory::preflight(&config.control_db, &config.tenant_db)?;
+        let store = SurrealRegistryStore::connect_unmigrated(&config.control_db)
+            .await
+            .map_err(|err| {
+                MemoryError::Storage(format!("control registry storage connect failed: {err}"))
+            })?;
+        let engine = if inventory.share_control_engine_with_tenants {
+            store.privileged_engine()
+        } else {
+            SurrealRegistryStore::connect_engine(&config.tenant_db)
+                .await
+                .map_err(|err| {
+                    MemoryError::Storage(format!("tenant engine storage connect failed: {err}"))
+                })?
+        };
+        let migrations = SurrealTenantMigrations::new(engine)
+            .with_remote_v4_index_rebuild_ack(config.allow_remote_v4_index_rebuild);
+
+        store
+            .preflight_v4_catalog_for_maintenance(config.allow_remote_v4_index_rebuild)
+            .await?;
+
+        let mut ready_tenants = Vec::new();
+        if !crate::storage::v4_maintenance::V4MaintenancePort::database_is_empty(&store).await? {
+            let mut cursor = None;
+            loop {
+                let page = TenantStore::list_ready_tenants(&store, cursor.as_deref(), 100).await?;
+                if page.is_empty() {
+                    break;
+                }
+                cursor = page.last().map(|tenant| tenant.id.clone());
+                let page_finished = page.len() < 100;
+                ready_tenants.extend(page);
+                if page_finished {
+                    break;
+                }
+            }
+        }
+
+        let ready_tenant_count = ready_tenants.len();
+        let ready_bindings: BTreeSet<_> = ready_tenants
+            .into_iter()
+            .map(|tenant| {
+                (
+                    tenant.namespace_binding.namespace,
+                    tenant.namespace_binding.database,
+                )
+            })
+            .collect();
+        let mut targets_to_preflight = ready_bindings.clone();
+        targets_to_preflight.insert((
+            config.tenant_db.namespace.clone(),
+            config.tenant_db.database.clone(),
+        ));
+        for (namespace, database) in &targets_to_preflight {
+            migrations
+                .preflight_target_for_maintenance(namespace, database)
+                .await?;
+        }
+
+        store
+            .apply_migrations_for_v4_maintenance(config.allow_remote_v4_index_rebuild, recovery)
+            .await?;
+        for (namespace, database) in &ready_bindings {
+            migrations
+                .apply_migrations_for_maintenance(namespace, database, recovery)
+                .await?;
+        }
+
+        Ok((ready_tenant_count, ready_bindings.len()))
     }
 
     /// Connect with an explicit fault injector. Production code uses
@@ -168,6 +298,64 @@ mod tests {
             .await;
 
         assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn registry_catalog_runs_only_after_all_target_preflights() {
+        let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let preflight_events = events.clone();
+        let catalog_events = events.clone();
+
+        let result = run_after_preflight(
+            || async move {
+                let mut events = preflight_events.lock().expect("event lock");
+                events.push("registry-preflight");
+                events.push("tenant-preflight");
+                Ok::<(), MemoryError>(())
+            },
+            || async move {
+                catalog_events
+                    .lock()
+                    .expect("event lock")
+                    .push("registry-catalog");
+                Ok::<_, MemoryError>(())
+            },
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            *events.lock().expect("event lock"),
+            ["registry-preflight", "tenant-preflight", "registry-catalog"]
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_target_preflight_prevents_registry_catalog_mutation() {
+        let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let preflight_events = events.clone();
+        let catalog_events = events.clone();
+
+        let result = run_after_preflight(
+            || async move {
+                preflight_events
+                    .lock()
+                    .expect("event lock")
+                    .push("tenant-preflight");
+                Err(MemoryError::Unavailable("tenant preflight failed".into()))
+            },
+            || async move {
+                catalog_events
+                    .lock()
+                    .expect("event lock")
+                    .push("registry-catalog");
+                Ok::<_, MemoryError>(())
+            },
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(*events.lock().expect("event lock"), ["tenant-preflight"]);
     }
 
     #[tokio::test]

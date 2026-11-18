@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
@@ -203,13 +204,18 @@ pub(crate) enum RecoveryAuthorization {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum V4CatalogIntent {
+    Startup,
+    PreStartMaintenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MaintenanceOutcome {
     SkippedLegacyCompatible,
-    AlreadyComplete,
     Completed,
 }
 
-const MAINTENANCE_REVISION: &str = "surrealdb_4_index_rebuild_v1";
+pub(crate) const MAINTENANCE_REVISION: &str = "surrealdb_4_index_rebuild_v1";
 const REBUILD_TIMEOUT: Duration = Duration::from_secs(120);
 const REBUILD_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -217,6 +223,7 @@ const REBUILD_POLL_INTERVAL: Duration = Duration::from_millis(100);
 pub(crate) trait V4MaintenancePort: Send + Sync {
     async fn server_version(&self) -> Result<ServerVersion, MemoryError>;
     async fn database_identity(&self) -> Result<DatabaseIdentity, MemoryError>;
+    async fn database_is_empty(&self) -> Result<bool, MemoryError>;
     async fn read_provenance(&self) -> Result<Option<DatabaseProvenance>, MemoryError>;
     async fn create_provenance(&self, provenance: DatabaseProvenance) -> Result<bool, MemoryError>;
     async fn read_claim(
@@ -255,6 +262,13 @@ pub(crate) async fn establish_database_provenance<P: V4MaintenancePort>(
                     ));
                 }
                 None => {
+                    if provenance == DatabaseProvenance::FreshV4
+                        && !port.database_is_empty().await?
+                    {
+                        return Err(MemoryError::Unavailable(
+                            "cannot record fresh SurrealDB 4 provenance for a database that is not empty; run the pre-start maintenance command after restoring or migrating the database".into(),
+                        ));
+                    }
                     if !port.create_provenance(provenance.clone()).await? {
                         let existing = port.read_provenance().await?;
                         if existing != Some(provenance) {
@@ -270,97 +284,281 @@ pub(crate) async fn establish_database_provenance<P: V4MaintenancePort>(
     }
 }
 
-pub(crate) async fn run_v4_index_maintenance<P: V4MaintenancePort>(
+#[cfg(test)]
+pub(crate) async fn preflight_v4_catalog<P: V4MaintenancePort>(
     port: &P,
     role: DatabaseRole,
-    recovery: RecoveryAuthorization,
-) -> Result<MaintenanceOutcome, MemoryError> {
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+) -> Result<ServerCompatibility, MemoryError> {
+    preflight_v4_catalog_with_intent(
+        port,
+        role,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        V4CatalogIntent::Startup,
+    )
+    .await
+}
+
+pub(crate) async fn preflight_v4_catalog_with_intent<P: V4MaintenancePort>(
+    port: &P,
+    _role: DatabaseRole,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    intent: V4CatalogIntent,
+) -> Result<ServerCompatibility, MemoryError> {
     let version = port.server_version().await?;
-    match classify_server_version(&version)? {
-        ServerCompatibility::LegacyCompatible => {
-            return Ok(MaintenanceOutcome::SkippedLegacyCompatible);
-        }
-        ServerCompatibility::V4Maintenance => {}
+    let compatibility = classify_server_version(&version)?;
+    if compatibility == ServerCompatibility::LegacyCompatible {
+        return Ok(compatibility);
     }
 
+    if is_remote && !allow_remote_v4_index_rebuild {
+        return Err(MemoryError::ConfigInvalid(
+            "remote SurrealDB 4 catalog changes require SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true after all datastore-sharing nodes are on v4 and older writers are paused".into(),
+        ));
+    }
+
+    port.database_identity().await?;
+    let provenance = port.read_provenance().await?;
+    if provenance.is_none() {
+        let database_is_empty = port.database_is_empty().await?;
+        if intent == V4CatalogIntent::Startup && !database_is_empty {
+            return Err(MemoryError::Unavailable(
+                "SurrealDB 4 database has no recorded migration provenance; run the pre-start maintenance command before applying schema changes".into(),
+            ));
+        }
+    }
+
+    Ok(compatibility)
+}
+
+pub(crate) async fn run_v4_catalog_maintenance<P, F, Fut>(
+    port: &P,
+    role: DatabaseRole,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    recovery: RecoveryAuthorization,
+    apply_catalog: F,
+) -> Result<MaintenanceOutcome, MemoryError>
+where
+    P: V4MaintenancePort,
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<(), MemoryError>>,
+{
+    run_v4_catalog_maintenance_with_intent(
+        port,
+        role,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        recovery,
+        V4CatalogIntent::Startup,
+        apply_catalog,
+    )
+    .await
+}
+
+pub(crate) async fn run_v4_catalog_maintenance_with_intent<P, F, Fut>(
+    port: &P,
+    role: DatabaseRole,
+    is_remote: bool,
+    allow_remote_v4_index_rebuild: bool,
+    recovery: RecoveryAuthorization,
+    intent: V4CatalogIntent,
+    apply_catalog: F,
+) -> Result<MaintenanceOutcome, MemoryError>
+where
+    P: V4MaintenancePort,
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<(), MemoryError>>,
+{
+    let compatibility = preflight_v4_catalog_with_intent(
+        port,
+        role,
+        is_remote,
+        allow_remote_v4_index_rebuild,
+        intent,
+    )
+    .await?;
+    if compatibility == ServerCompatibility::LegacyCompatible {
+        apply_catalog().await?;
+        return Ok(MaintenanceOutcome::SkippedLegacyCompatible);
+    }
+
+    let version = port.server_version().await?;
     let identity = port.database_identity().await?;
     let key = MaintenanceKey::new(identity);
-    let provenance = port.read_provenance().await?.ok_or_else(|| {
-        MemoryError::Unavailable(
-            "SurrealDB 4 maintenance requires explicit fresh-v4 or pre-existing database provenance; run the pre-start maintenance command before schema migrations".into(),
-        )
-    })?;
+    let provenance = match port.read_provenance().await? {
+        Some(provenance) => provenance,
+        None if port.database_is_empty().await? => DatabaseProvenance::FreshV4,
+        None if intent == V4CatalogIntent::PreStartMaintenance => DatabaseProvenance::PreExisting,
+        None => {
+            return Err(MemoryError::Unavailable(
+                "SurrealDB 4 database has no recorded migration provenance; run the pre-start maintenance command before applying schema changes".into(),
+            ));
+        }
+    };
+    establish_database_provenance(port, provenance.clone()).await?;
     let indexes = managed_indexes_for_role(role);
-
     for index in indexes {
         let inspection = port.inspect_index(*index).await?;
-        if !inspection.definition_matches || inspection.state == IndexBuildState::Missing {
-            return Err(index_definition_error(index));
+        match inspection.state {
+            IndexBuildState::Building => {
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` has an active server-side build; wait for it to finish before applying the schema catalog",
+                    index.name
+                )));
+            }
+            IndexBuildState::Failed => {
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` has a failed server-side build; resolve it before applying the schema catalog",
+                    index.name
+                )));
+            }
+            IndexBuildState::Unknown => {
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` has an unknown server-side build state; inspect it before applying the schema catalog",
+                    index.name
+                )));
+            }
+            IndexBuildState::Ready if !inspection.definition_matches => {
+                return Err(index_definition_error(index));
+            }
+            IndexBuildState::Ready | IndexBuildState::Missing => {}
         }
-        if matches!(
-            inspection.state,
-            IndexBuildState::Building | IndexBuildState::Unknown
-        ) {
+    }
+
+    let mut claim = match port.read_claim(&key).await? {
+        Some(existing) if existing.state == ClaimState::Completed => {
+            verify_completed_claim_identity(&existing, role, &provenance)?;
+            let mut claim = new_claim(&key, role, provenance.clone(), &version, indexes);
+            for (name, progress) in existing.indexes {
+                if progress == IndexProgress::Verified {
+                    claim.indexes.insert(name, progress);
+                }
+            }
+            if !port.replace_claim(&existing.attempt_id, &claim).await? {
+                return Err(MemoryError::Unavailable(
+                    "completed maintenance claim changed before catalog admission; no schema changes were applied".into(),
+                ));
+            }
+            claim
+        }
+        Some(existing) => {
+            if existing.state == ClaimState::Active && recovery == RecoveryAuthorization::None {
+                return Err(MemoryError::Unavailable(
+                    "SurrealDB 4 maintenance is active in another process; wait for it to finish and retry. If that process stopped, verify no server-side index build is running before using explicit ambiguous recovery".into(),
+                ));
+            }
+            let safe_retry = if recovery == RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume
+            {
+                false
+            } else {
+                failed_claim_is_safe_to_retry(port, &existing, role, &provenance, indexes).await?
+            };
+            if recovery != RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume && !safe_retry {
+                return Err(recovery_required_error());
+            }
+            if existing.role != role_name(role) || existing.provenance != provenance {
+                return Err(MemoryError::Unavailable(
+                    "incomplete SurrealDB 4 maintenance claim belongs to a different role or provenance; refusing recovery".into(),
+                ));
+            }
+            let mut claim = new_claim(&key, role, provenance.clone(), &version, indexes);
+            for (name, progress) in existing.indexes {
+                if progress == IndexProgress::Verified {
+                    claim.indexes.insert(name, progress);
+                }
+            }
+            if !port.replace_claim(&existing.attempt_id, &claim).await? {
+                return Err(MemoryError::Unavailable(
+                    "maintenance claim changed before catalog admission; no schema changes were applied".into(),
+                ));
+            }
+            claim
+        }
+        None => {
+            let mut claim = new_claim(&key, role, provenance.clone(), &version, indexes);
+            if provenance == DatabaseProvenance::FreshV4 {
+                for progress in claim.indexes.values_mut() {
+                    *progress = IndexProgress::Verified;
+                }
+            }
+            if !port.create_claim(&claim).await? {
+                return Err(MemoryError::Unavailable(
+                    "another submitter acquired the SurrealDB 4 maintenance claim; no schema changes were applied".into(),
+                ));
+            }
+            claim
+        }
+    };
+
+    if let Err(error) = apply_catalog().await {
+        claim.state = ClaimState::Failed;
+        claim.current_index = None;
+        claim.updated_at_ms = now_ms();
+        if !port.save_claim(&claim.attempt_id, &claim).await? {
             return Err(MemoryError::Unavailable(format!(
-                "index `{}` has active or unknown server-side build state; keep readiness closed and verify it before maintenance",
-                index.name
+                "schema catalog failed ({error}) and its failure could not be durably recorded; keep readiness closed"
             )));
         }
+        return Err(error);
     }
 
-    let existing = port.read_claim(&key).await?;
-    if let Some(record) = existing {
-        if record.state == ClaimState::Completed {
-            verify_completed_record(port, &record, role, &provenance, indexes).await?;
-            return Ok(MaintenanceOutcome::AlreadyComplete);
+    for index in indexes {
+        let inspection = match port.inspect_index(*index).await {
+            Ok(inspection) => inspection,
+            Err(error) => {
+                mark_claim_ambiguous(port, &mut claim, index.name).await?;
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` could not be inspected after the schema catalog ({error}); keep readiness closed",
+                    index.name
+                )));
+            }
+        };
+        if !inspection.definition_matches || inspection.state == IndexBuildState::Missing {
+            mark_claim_failed(port, &mut claim, index.name).await?;
+            return Err(index_definition_error(index));
         }
-        if recovery != RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume {
-            return Err(recovery_required_error());
-        }
-
-        let old_attempt_id = record.attempt_id.clone();
-        if record.role != role_name(role) || record.provenance != provenance {
-            return Err(MemoryError::Unavailable(
-                "incomplete SurrealDB 4 maintenance claim belongs to a different role or provenance; refusing recovery".into(),
-            ));
-        }
-        let mut claim = new_claim(&key, role, provenance, &version, indexes);
-        for (name, state) in &record.indexes {
-            if *state == IndexProgress::Verified {
-                claim.indexes.insert(name.clone(), *state);
+        match inspection.state {
+            IndexBuildState::Ready => {}
+            IndexBuildState::Failed => {
+                mark_claim_failed(port, &mut claim, index.name).await?;
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` reports a failed build after the schema catalog; keep readiness closed",
+                    index.name
+                )));
+            }
+            IndexBuildState::Building | IndexBuildState::Unknown => {
+                mark_claim_ambiguous(port, &mut claim, index.name).await?;
+                return Err(MemoryError::Unavailable(format!(
+                    "index `{}` has active or unknown server-side build state after the schema catalog; keep readiness closed",
+                    index.name
+                )));
+            }
+            IndexBuildState::Missing => {
+                mark_claim_failed(port, &mut claim, index.name).await?;
+                return Err(index_definition_error(index));
             }
         }
-        if !port.replace_claim(&old_attempt_id, &claim).await? {
-            return Err(MemoryError::Unavailable(
-                "maintenance claim changed during recovery; no work was submitted".into(),
-            ));
-        }
-        execute_maintenance(port, claim, indexes).await?;
-        return Ok(MaintenanceOutcome::Completed);
     }
 
-    let mut claim = new_claim(&key, role, provenance.clone(), &version, indexes);
     if provenance == DatabaseProvenance::FreshV4 {
         for progress in claim.indexes.values_mut() {
             *progress = IndexProgress::Verified;
         }
-    }
-    if !port.create_claim(&claim).await? {
-        return Err(MemoryError::Unavailable(
-            "another submitter acquired the SurrealDB 4 maintenance claim; keep readiness closed and rerun only after the owner completes or an operator authorizes recovery".into(),
-        ));
-    }
-    if provenance == DatabaseProvenance::PreExisting {
-        execute_maintenance(port, claim, indexes).await?;
-    } else {
         claim.state = ClaimState::Completed;
+        claim.current_index = None;
         claim.updated_at_ms = now_ms();
         if !port.save_claim(&claim.attempt_id, &claim).await? {
             return Err(MemoryError::Unavailable(
-                "could not durably complete fresh-v4 maintenance provenance; keep readiness closed"
+                "fresh-v4 catalog completion could not be durably recorded; keep readiness closed"
                     .into(),
             ));
         }
+    } else {
+        execute_maintenance(port, claim, indexes).await?;
     }
 
     Ok(MaintenanceOutcome::Completed)
@@ -504,26 +702,38 @@ async fn wait_for_index_ready<P: V4MaintenancePort>(
     }
 }
 
-async fn verify_completed_record<P: V4MaintenancePort>(
+async fn failed_claim_is_safe_to_retry<P: V4MaintenancePort>(
     port: &P,
     record: &MaintenanceRecord,
     role: DatabaseRole,
     provenance: &DatabaseProvenance,
     indexes: &[ManagedIndex],
+) -> Result<bool, MemoryError> {
+    if record.state != ClaimState::Failed
+        || record.role != role_name(role)
+        || &record.provenance != provenance
+    {
+        return Ok(false);
+    }
+    let Some(index_name) = record.current_index.as_deref() else {
+        return Ok(true);
+    };
+    let Some(index) = indexes.iter().find(|index| index.name == index_name) else {
+        return Ok(false);
+    };
+    let inspection = port.inspect_index(*index).await?;
+    Ok(inspection.definition_matches && inspection.state == IndexBuildState::Ready)
+}
+
+fn verify_completed_claim_identity(
+    record: &MaintenanceRecord,
+    role: DatabaseRole,
+    provenance: &DatabaseProvenance,
 ) -> Result<(), MemoryError> {
     if record.role != role_name(role) || &record.provenance != provenance {
         return Err(MemoryError::Unavailable(
             "completed SurrealDB 4 maintenance record does not match the active database role or provenance".into(),
         ));
-    }
-    for index in indexes {
-        if record.indexes.get(index.name) != Some(&IndexProgress::Verified) {
-            return Err(index_definition_error(index));
-        }
-        let inspection = port.inspect_index(*index).await?;
-        if !inspection.definition_matches || inspection.state != IndexBuildState::Ready {
-            return Err(index_definition_error(index));
-        }
     }
     Ok(())
 }
@@ -713,6 +923,7 @@ const MEMORY_INDEXES: &[ManagedIndex] = &[
     },
 ];
 
+#[cfg(test)]
 const REGISTRY_AUDIT_INDEX: ManagedIndex = ManagedIndex {
     name: "idx_audit_event_account",
     table: "audit_event",
@@ -726,6 +937,7 @@ pub(crate) fn managed_indexes_for_role(role: DatabaseRole) -> &'static [ManagedI
     }
 }
 
+#[cfg(test)]
 pub(crate) fn registry_audit_index() -> ManagedIndex {
     REGISTRY_AUDIT_INDEX
 }
@@ -741,9 +953,9 @@ mod tests {
         ClaimState, DatabaseIdentity, DatabaseProvenance, DatabaseRole, IndexBuildState,
         IndexInspection, IndexProgress, MaintenanceKey, MaintenanceKeyRecord, MaintenanceOutcome,
         MaintenanceRecord, ManagedIndex, RecoveryAuthorization, ServerCompatibility, ServerVersion,
-        V4MaintenancePort, classify_server_version, establish_database_provenance,
-        managed_indexes_for_role, parse_server_version, registry_audit_index,
-        run_v4_index_maintenance,
+        V4CatalogIntent, V4MaintenancePort, classify_server_version, establish_database_provenance,
+        managed_indexes_for_role, parse_server_version, preflight_v4_catalog,
+        preflight_v4_catalog_with_intent, registry_audit_index, run_v4_catalog_maintenance,
     };
     use crate::error::MemoryError;
 
@@ -753,17 +965,22 @@ mod tests {
 
     struct FakePortState {
         version: ServerVersion,
+        database_is_empty: bool,
+        database_empty_reads: usize,
         provenance: Option<DatabaseProvenance>,
+        provenance_reads: usize,
         claim: Option<MaintenanceRecord>,
         fail_rebuild: bool,
         fail_post_rebuild_inspection: bool,
         fail_definition_on_second_inspection: Option<&'static str>,
         running_build: bool,
         unknown_build_state: bool,
+        missing_until_catalog: Option<&'static str>,
         fail_completion_write: bool,
         rebuild_calls: usize,
         inspections: HashMap<String, usize>,
         saved_records: Vec<MaintenanceRecord>,
+        events: Vec<&'static str>,
     }
 
     impl FakePort {
@@ -771,17 +988,22 @@ mod tests {
             Self {
                 state: Mutex::new(FakePortState {
                     version: parse_server_version(version).expect("valid test version"),
+                    database_is_empty: false,
+                    database_empty_reads: 0,
                     provenance,
+                    provenance_reads: 0,
                     claim: None,
                     fail_rebuild: false,
                     fail_post_rebuild_inspection: false,
                     fail_definition_on_second_inspection: None,
                     running_build: false,
                     unknown_build_state: false,
+                    missing_until_catalog: None,
                     fail_completion_write: false,
                     rebuild_calls: 0,
                     inspections: HashMap::new(),
                     saved_records: Vec::new(),
+                    events: Vec::new(),
                 }),
             }
         }
@@ -792,6 +1014,11 @@ mod tests {
 
         fn rebuild_calls(&self) -> usize {
             self.state.lock().expect("fake port mutex").rebuild_calls
+        }
+
+        fn preflight_reads(&self) -> (usize, usize) {
+            let state = self.state.lock().expect("fake port mutex");
+            (state.provenance_reads, state.database_empty_reads)
         }
 
         fn claim(&self) -> Option<MaintenanceRecord> {
@@ -809,6 +1036,37 @@ mod tests {
         fn set_fail_rebuild(&self, fail: bool) {
             self.state.lock().expect("fake port mutex").fail_rebuild = fail;
         }
+
+        fn record_catalog(&self) {
+            let mut state = self.state.lock().expect("fake port mutex");
+            assert!(
+                state
+                    .claim
+                    .as_ref()
+                    .is_some_and(|claim| claim.state == ClaimState::Active)
+            );
+            state.events.push("catalog");
+            state.missing_until_catalog = None;
+        }
+
+        fn hide_index_until_catalog(&self, index_name: &'static str) {
+            self.state
+                .lock()
+                .expect("fake port mutex")
+                .missing_until_catalog = Some(index_name);
+        }
+
+        fn events(&self) -> Vec<&'static str> {
+            self.state.lock().expect("fake port mutex").events.clone()
+        }
+    }
+
+    async fn run_test_catalog_maintenance(
+        port: &FakePort,
+        role: DatabaseRole,
+        recovery: RecoveryAuthorization,
+    ) -> Result<MaintenanceOutcome, MemoryError> {
+        run_v4_catalog_maintenance(port, role, false, false, recovery, || async { Ok(()) }).await
     }
 
     #[async_trait]
@@ -824,13 +1082,16 @@ mod tests {
             })
         }
 
+        async fn database_is_empty(&self) -> Result<bool, MemoryError> {
+            let mut state = self.state.lock().expect("fake port mutex");
+            state.database_empty_reads += 1;
+            Ok(state.database_is_empty)
+        }
+
         async fn read_provenance(&self) -> Result<Option<DatabaseProvenance>, MemoryError> {
-            Ok(self
-                .state
-                .lock()
-                .expect("fake port mutex")
-                .provenance
-                .clone())
+            let mut state = self.state.lock().expect("fake port mutex");
+            state.provenance_reads += 1;
+            Ok(state.provenance.clone())
         }
 
         async fn create_provenance(
@@ -857,6 +1118,7 @@ mod tests {
             if state.claim.is_some() {
                 return Ok(false);
             }
+            state.events.push("claim");
             state.claim = Some(record.clone());
             Ok(true)
         }
@@ -899,6 +1161,12 @@ mod tests {
 
         async fn inspect_index(&self, index: ManagedIndex) -> Result<IndexInspection, MemoryError> {
             let mut state = self.state.lock().expect("fake port mutex");
+            if state.missing_until_catalog == Some(index.name) {
+                return Ok(IndexInspection {
+                    definition_matches: false,
+                    state: IndexBuildState::Missing,
+                });
+            }
             if state.fail_post_rebuild_inspection && state.rebuild_calls > 0 {
                 return Err(MemoryError::Storage("inspection response lost".into()));
             }
@@ -932,6 +1200,7 @@ mod tests {
 
         async fn rebuild_index(&self, _index: ManagedIndex) -> Result<(), MemoryError> {
             let mut state = self.state.lock().expect("fake port mutex");
+            state.events.push("rebuild");
             state.rebuild_calls += 1;
             if state.fail_rebuild {
                 return Err(MemoryError::Storage(
@@ -964,7 +1233,7 @@ mod tests {
         };
         port.state.lock().expect("fake port mutex").claim = Some(old_claim);
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume,
@@ -983,6 +1252,10 @@ mod tests {
     #[tokio::test]
     async fn provenance_is_recorded_once_and_conflicts_fail_closed() {
         let port = FakePort::new("4.0.1", None);
+        port.state
+            .lock()
+            .expect("fake port mutex")
+            .database_is_empty = true;
 
         let compatibility = establish_database_provenance(&port, DatabaseProvenance::FreshV4)
             .await
@@ -1000,10 +1273,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fresh_v4_provenance_is_not_recorded_for_a_nonempty_database() {
+        let port = FakePort::new("4.0.1", None);
+
+        let error = establish_database_provenance(&port, DatabaseProvenance::FreshV4)
+            .await
+            .expect_err("a nonempty database cannot be classified as fresh v4");
+
+        assert!(error.to_string().contains("not empty"));
+        assert_eq!(port.state.lock().expect("fake port mutex").provenance, None);
+    }
+
+    #[tokio::test]
     async fn stable_surrealdb_3_skips_maintenance_without_provenance() {
         let port = FakePort::new("3.3.5", None);
 
-        let outcome = run_v4_index_maintenance(
+        let outcome = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1021,7 +1306,7 @@ mod tests {
         let port = FakePort::with_preexisting_database();
         let indexes = managed_indexes_for_role(DatabaseRole::PrimaryMemory);
 
-        let outcome = run_v4_index_maintenance(
+        let outcome = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1059,7 +1344,7 @@ mod tests {
         let port = FakePort::with_preexisting_database();
         port.state.lock().expect("fake port mutex").fail_rebuild = true;
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1076,7 +1361,7 @@ mod tests {
         );
 
         port.set_fail_rebuild(false);
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1086,7 +1371,7 @@ mod tests {
         assert!(error.to_string().contains("incomplete"));
         assert_eq!(port.rebuild_calls(), 1);
 
-        let outcome = run_v4_index_maintenance(
+        let outcome = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume,
@@ -1108,7 +1393,7 @@ mod tests {
             .expect("fake port mutex")
             .fail_post_rebuild_inspection = true;
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1134,7 +1419,7 @@ mod tests {
             .expect("fake port mutex")
             .unknown_build_state = true;
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1156,7 +1441,7 @@ mod tests {
         let port = FakePort::with_preexisting_database();
         port.state.lock().expect("fake port mutex").running_build = true;
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1164,7 +1449,7 @@ mod tests {
         .await
         .expect_err("active server work must block maintenance");
 
-        assert!(error.to_string().contains("server-side build state"));
+        assert!(error.to_string().contains("active server-side build"));
         assert!(port.claim().is_none());
         assert_eq!(port.rebuild_calls(), 0);
     }
@@ -1192,17 +1477,17 @@ mod tests {
             updated_at_ms: 1,
         });
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
         )
         .await
         .expect_err("a claim left before submission must not be taken over automatically");
-        assert!(error.to_string().contains("incomplete"));
+        assert!(error.to_string().contains("active in another process"));
         assert_eq!(port.rebuild_calls(), 0);
 
-        run_v4_index_maintenance(
+        run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::ConfirmNoPriorSubmitterCanResume,
@@ -1223,7 +1508,7 @@ mod tests {
             .expect("fake port mutex")
             .fail_completion_write = true;
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1240,14 +1525,14 @@ mod tests {
             ClaimState::Completed
         );
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
         )
         .await
         .expect_err("the incomplete claim blocks ordinary startup");
-        assert!(error.to_string().contains("incomplete"));
+        assert!(error.to_string().contains("active in another process"));
     }
 
     #[tokio::test]
@@ -1258,7 +1543,7 @@ mod tests {
             .expect("fake port mutex")
             .fail_definition_on_second_inspection = Some("edge_temporal_idx");
 
-        let error = run_v4_index_maintenance(
+        let error = run_test_catalog_maintenance(
             &port,
             DatabaseRole::PrimaryMemory,
             RecoveryAuthorization::None,
@@ -1288,10 +1573,13 @@ mod tests {
     async fn v4_maintenance_refuses_a_database_without_recorded_provenance() {
         let port = FakePort::new("4.0.1", None);
 
-        let error =
-            run_v4_index_maintenance(&port, DatabaseRole::Registry, RecoveryAuthorization::None)
-                .await
-                .expect_err("missing provenance must block v4 maintenance");
+        let error = run_test_catalog_maintenance(
+            &port,
+            DatabaseRole::Registry,
+            RecoveryAuthorization::None,
+        )
+        .await
+        .expect_err("missing provenance must block v4 maintenance");
 
         assert!(error.to_string().contains("provenance"));
     }
@@ -1323,6 +1611,410 @@ mod tests {
 
         assert!(classify_server_version(&prerelease).is_err());
         assert!(classify_server_version(&future_major).is_err());
+    }
+
+    #[tokio::test]
+    async fn schema_catalog_runs_under_an_exclusive_claim_before_index_rebuilds() {
+        let port = FakePort::with_preexisting_database();
+
+        let outcome = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                port.record_catalog();
+                Ok(())
+            },
+        )
+        .await
+        .expect("catalog and v4 maintenance should complete");
+
+        assert_eq!(outcome, MaintenanceOutcome::Completed);
+        assert_eq!(port.events().first(), Some(&"claim"));
+        assert_eq!(port.events().get(1), Some(&"catalog"));
+        assert_eq!(port.events().get(2), Some(&"rebuild"));
+        assert_eq!(
+            port.claim().expect("durable claim").state,
+            ClaimState::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn active_server_build_blocks_catalog_before_claim_or_mutation() {
+        let port = FakePort::with_preexisting_database();
+        port.state.lock().expect("fake port mutex").running_build = true;
+        let catalog_ran = std::sync::atomic::AtomicBool::new(false);
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                catalog_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("an existing server-side build must block catalog mutation");
+
+        assert!(error.to_string().contains("active server-side build"));
+        assert!(!catalog_ran.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+        assert_eq!(port.rebuild_calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn unknown_server_build_state_blocks_catalog_before_claim_or_mutation() {
+        let port = FakePort::with_preexisting_database();
+        port.state
+            .lock()
+            .expect("fake port mutex")
+            .unknown_build_state = true;
+        let catalog_ran = std::sync::atomic::AtomicBool::new(false);
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                catalog_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("an unknown server-side build state must fail closed");
+
+        assert!(
+            error
+                .to_string()
+                .contains("unknown server-side build state")
+        );
+        assert!(!catalog_ran.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+        assert_eq!(port.rebuild_calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn competing_startup_reports_active_maintenance_without_suggesting_takeover() {
+        let port = FakePort::with_preexisting_database();
+        let identity = DatabaseIdentity {
+            namespace: "test_namespace".into(),
+            database: "test_database".into(),
+        };
+        let key = MaintenanceKey::new(identity);
+        let version = parse_server_version("4.0.1").expect("valid test version");
+        let claim = super::new_claim(
+            &key,
+            DatabaseRole::HttpTenant,
+            DatabaseProvenance::PreExisting,
+            &version,
+            managed_indexes_for_role(DatabaseRole::HttpTenant),
+        );
+        port.state.lock().expect("fake port mutex").claim = Some(claim);
+        let catalog_ran = std::sync::atomic::AtomicBool::new(false);
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                catalog_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("a competing startup must not take the active claim");
+
+        assert!(error.to_string().contains("active in another process"));
+        assert!(!error.to_string().contains("recover-ambiguous"));
+        assert!(!catalog_ran.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn catalog_failure_without_rebuild_submission_can_be_retried() {
+        let port = FakePort::with_preexisting_database();
+
+        let first = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Err(MemoryError::Storage("catalog interrupted".into())) },
+        )
+        .await;
+        assert!(
+            first.is_err(),
+            "the interrupted catalog is persisted as failed"
+        );
+
+        let retry = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Ok(()) },
+        )
+        .await;
+
+        assert!(
+            retry.is_ok(),
+            "no index rebuild was submitted before catalog success"
+        );
+        assert_eq!(
+            port.claim().expect("durable claim").state,
+            ClaimState::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn corrected_definition_allows_retry_after_a_known_pre_rebuild_failure() {
+        let port = FakePort::with_preexisting_database();
+        port.state
+            .lock()
+            .expect("fake port mutex")
+            .fail_definition_on_second_inspection = Some("edge_temporal_idx");
+
+        let first = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Ok(()) },
+        )
+        .await;
+        assert!(
+            first.is_err(),
+            "the bad definition must fail the first attempt"
+        );
+
+        let retry = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Ok(()) },
+        )
+        .await;
+
+        assert!(retry.is_ok(), "a now-ready definition is safe to retry");
+        assert_eq!(
+            port.claim().expect("durable claim").state,
+            ClaimState::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn completed_claim_allows_catalog_to_restore_a_missing_managed_index() {
+        let port = FakePort::with_preexisting_database();
+        run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Ok(()) },
+        )
+        .await
+        .expect("initial catalog and maintenance");
+
+        port.hide_index_until_catalog("fact_t_valid");
+        let outcome = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                port.record_catalog();
+                Ok(())
+            },
+        )
+        .await
+        .expect("the catalog should restore the missing index before verification");
+
+        assert_eq!(outcome, MaintenanceOutcome::Completed);
+        assert_eq!(
+            port.claim().expect("completed claim").state,
+            ClaimState::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn completed_claim_does_not_bypass_remote_catalog_acknowledgement() {
+        let port = FakePort::with_preexisting_database();
+        run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            || async { Ok(()) },
+        )
+        .await
+        .expect("initial catalog and maintenance");
+        let catalog_ran = std::sync::atomic::AtomicBool::new(false);
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::HttpTenant,
+            true,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                catalog_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("a completed local claim must not authorize remote schema changes");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+        );
+        assert!(!catalog_ran.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn remote_v4_catalog_is_refused_before_claim_or_catalog_without_acknowledgement() {
+        let port = FakePort::with_preexisting_database();
+        let catalog_ran = std::sync::atomic::AtomicBool::new(false);
+
+        let error = run_v4_catalog_maintenance(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            true,
+            false,
+            RecoveryAuthorization::None,
+            || async {
+                catalog_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("remote v4 mutation requires operator acknowledgement");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+        );
+        assert!(!catalog_ran.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+    }
+
+    #[tokio::test]
+    async fn stable_surrealdb_3_preflight_allows_the_legacy_catalog_without_v4_mutations() {
+        let port = FakePort::new("3.3.5", None);
+
+        let compatibility = preflight_v4_catalog(&port, DatabaseRole::HttpTenant, true, false)
+            .await
+            .expect("stable SurrealDB 3 is compatible without v4 maintenance");
+
+        assert_eq!(compatibility, ServerCompatibility::LegacyCompatible);
+        assert!(port.events().is_empty());
+    }
+
+    #[tokio::test]
+    async fn remote_v4_preflight_refuses_before_any_durable_write_without_acknowledgement() {
+        let port = FakePort::with_preexisting_database();
+
+        let error = preflight_v4_catalog(&port, DatabaseRole::HttpTenant, true, false)
+            .await
+            .expect_err("remote v4 requires the maintenance-window acknowledgement");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+        );
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+    }
+
+    #[tokio::test]
+    async fn v4_preflight_rejects_unknown_provenance_without_mutating_the_database() {
+        let port = FakePort::new("4.0.1", None);
+
+        let error = preflight_v4_catalog(&port, DatabaseRole::PrimaryMemory, false, false)
+            .await
+            .expect_err("nonempty v4 databases need durable provenance before catalog changes");
+
+        assert!(error.to_string().contains("migration provenance"));
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+    }
+
+    #[tokio::test]
+    async fn explicit_prestart_preflight_reads_unknown_provenance_without_mutating() {
+        let port = FakePort::new("4.0.1", None);
+
+        let compatibility = preflight_v4_catalog_with_intent(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            V4CatalogIntent::PreStartMaintenance,
+        )
+        .await
+        .expect("explicit pre-start maintenance may inspect an existing database");
+
+        assert_eq!(compatibility, ServerCompatibility::V4Maintenance);
+        assert_eq!(port.preflight_reads(), (1, 1));
+        assert!(port.events().is_empty());
+        assert!(port.claim().is_none());
+    }
+
+    #[tokio::test]
+    async fn explicit_prestart_maintenance_marks_an_unrecorded_nonempty_v4_as_preexisting() {
+        let port = FakePort::new("4.0.1", None);
+
+        let outcome = super::run_v4_catalog_maintenance_with_intent(
+            &port,
+            DatabaseRole::PrimaryMemory,
+            false,
+            false,
+            RecoveryAuthorization::None,
+            super::V4CatalogIntent::PreStartMaintenance,
+            || async {
+                port.record_catalog();
+                Ok(())
+            },
+        )
+        .await
+        .expect("explicit pre-start intent admits an unrecorded existing database");
+
+        assert_eq!(outcome, MaintenanceOutcome::Completed);
+        assert_eq!(
+            port.state.lock().expect("fake port mutex").provenance,
+            Some(DatabaseProvenance::PreExisting)
+        );
+        assert_eq!(port.events().first(), Some(&"claim"));
+        assert_eq!(port.events().get(1), Some(&"catalog"));
+        assert_eq!(
+            port.rebuild_calls(),
+            managed_indexes_for_role(DatabaseRole::PrimaryMemory).len()
+        );
+        assert_eq!(
+            port.claim().map(|claim| claim.state),
+            Some(ClaimState::Completed)
+        );
     }
 
     #[test]

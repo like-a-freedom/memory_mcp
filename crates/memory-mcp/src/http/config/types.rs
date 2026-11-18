@@ -152,6 +152,9 @@ pub struct HttpConfig {
     pub task_sync_max_bytes: usize,
     pub control_db: SurrealTargetConfig,
     pub tenant_db: SurrealTargetConfig,
+    /// Acknowledges the remote v4 catalog and index-maintenance window.
+    #[serde(default)]
+    pub allow_remote_v4_index_rebuild: bool,
     pub api_key_pepper: String,
     /// Legacy flat keys retained for backward compatibility during
     /// incremental migration to `browser_auth`.
@@ -228,6 +231,10 @@ impl fmt::Debug for HttpConfig {
             .field("task_retention_secs", &self.task_retention_secs)
             .field("task_queue_capacity", &self.task_queue_capacity)
             .field("task_sync_max_bytes", &self.task_sync_max_bytes)
+            .field(
+                "allow_remote_v4_index_rebuild",
+                &self.allow_remote_v4_index_rebuild,
+            )
             .field("control_db", &RedactedTarget(&self.control_db))
             .field("tenant_db", &RedactedTarget(&self.tenant_db))
             .field("api_key_pepper", &REDACTED)
@@ -694,6 +701,9 @@ impl HttpConfig {
             database: require_env("SURREALDB_CONTROL_DB")?,
             namespace: require_env("SURREALDB_CONTROL_NAMESPACE")?,
         };
+        let allow_remote_v4_index_rebuild =
+            crate::config::parse_bool_env("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+                .unwrap_or(false);
         let tenant_db = SurrealTargetConfig {
             url: require_env("SURREALDB_TENANT_URL")?,
             username: require_env("SURREALDB_TENANT_USERNAME")?,
@@ -731,6 +741,7 @@ impl HttpConfig {
             task_sync_max_bytes,
             control_db,
             tenant_db,
+            allow_remote_v4_index_rebuild,
             api_key_pepper,
             keys,
             oidc_issuer,
@@ -808,6 +819,7 @@ impl HttpConfig {
             task_sync_max_bytes: DEFAULT_TASK_SYNC_MAX_BYTES,
             control_db,
             tenant_db,
+            allow_remote_v4_index_rebuild: false,
             api_key_pepper: "x".repeat(40),
             keys: HmacKeys {
                 identity_index: [0; 32],
@@ -890,6 +902,7 @@ mod tests {
             "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
             "MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS",
             "MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS",
+            "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD",
             "SURREALDB_CONTROL_URL",
             "SURREALDB_CONTROL_USERNAME",
             "SURREALDB_CONTROL_PASSWORD",
@@ -1008,6 +1021,33 @@ mod tests {
             ("SURREALDB_TENANT_DB", "tenant".into()),
             ("SURREALDB_TENANT_NAMESPACE", "tenant".into()),
         ]
+    }
+
+    #[test]
+    fn remote_v4_rebuild_ack_is_rejected_when_all_http_targets_are_local() {
+        let mut vars = base_required_env();
+        for (key, value) in &mut vars {
+            if matches!(*key, "SURREALDB_CONTROL_URL" | "SURREALDB_TENANT_URL") {
+                *value = "mem://".into();
+            }
+        }
+        vars.push(("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD", "true".into()));
+        let refs: Vec<(&str, &str)> = vars
+            .iter()
+            .map(|(key, value)| (*key, value.as_str()))
+            .collect();
+
+        with_env(&refs, || {
+            let config = HttpConfig::from_env().expect("config loads");
+            let error = config
+                .validate()
+                .expect_err("remote-only acknowledgement must not be silently ignored");
+            assert!(
+                error
+                    .to_string()
+                    .contains("SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD")
+            );
+        });
     }
 
     #[test]

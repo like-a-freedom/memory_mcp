@@ -931,13 +931,36 @@ impl V4MaintenancePort for SurrealDbClient {
         })
     }
 
+    async fn database_is_empty(&self) -> Result<bool, MemoryError> {
+        let value = self.maintenance_query("INFO FOR DB;", None).await?;
+        let info = first_json_row(value).ok_or_else(|| {
+            MemoryError::Storage("SurrealDB database information returned no result".into())
+        })?;
+        let tables = info
+            .get("tables")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                MemoryError::Storage(
+                    "SurrealDB database information did not include a table catalog".into(),
+                )
+            })?;
+        Ok(tables.is_empty())
+    }
+
     async fn read_provenance(&self) -> Result<Option<DatabaseProvenance>, MemoryError> {
-        let value = self
+        let value = match self
             .maintenance_query(
                 "SELECT * FROM memory_v4_maintenance_provenance:current;",
                 None,
             )
-            .await?;
+            .await
+        {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(None);
+            }
+            Err(error) => return Err(error),
+        };
         let Some(row) = first_json_row(value) else {
             return Ok(None);
         };
@@ -979,7 +1002,13 @@ impl V4MaintenancePort for SurrealDbClient {
             "SELECT * FROM memory_v4_maintenance_claim:{};",
             key.revision
         );
-        let value = self.maintenance_query(&query, None).await?;
+        let value = match self.maintenance_query(&query, None).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(None);
+            }
+            Err(error) => return Err(error),
+        };
         let Some(row) = first_json_row(value) else {
             return Ok(None);
         };
@@ -1050,8 +1079,7 @@ impl V4MaintenancePort for SurrealDbClient {
             .and_then(Value::as_object)
             .and_then(|indexes| indexes.get(index.name))
             .and_then(Value::as_str);
-        let definition_matches =
-            index_info_matches(actual_definition, index, self.fact_embedding_dimension);
+        let definition_matches = index_info_matches(actual_definition, index);
         if !definition_matches {
             return Ok(IndexInspection {
                 definition_matches: false,
@@ -1153,15 +1181,26 @@ fn first_json_row(value: Value) -> Option<Value> {
     }
 }
 
-fn index_info_matches(
-    actual_definition: Option<&str>,
-    index: ManagedIndex,
-    fact_embedding_dimension: usize,
-) -> bool {
-    let expected_definition = index.definition.replace(
-        "__FACT_EMBEDDING_DIMENSION__",
-        &fact_embedding_dimension.to_string(),
-    );
+fn index_info_matches(actual_definition: Option<&str>, index: ManagedIndex) -> bool {
+    let expected_definition = if index.definition.contains("__FACT_EMBEDDING_DIMENSION__") {
+        let Some(definition) = actual_definition else {
+            return false;
+        };
+        let tokens = tokenize_sql(definition);
+        let Some(dimension) = tokens.windows(2).find_map(|pair| {
+            (pair[0] == "dimension")
+                .then(|| pair[1].parse::<usize>().ok())
+                .flatten()
+                .filter(|dimension| *dimension > 0)
+        }) else {
+            return false;
+        };
+        index
+            .definition
+            .replace("__FACT_EMBEDDING_DIMENSION__", &dimension.to_string())
+    } else {
+        index.definition.to_owned()
+    };
     actual_definition
         .is_some_and(|definition| normalize_sql(definition) == normalize_sql(&expected_definition))
 }
@@ -1582,6 +1621,22 @@ mod tests {
 
     use super::*;
     use crate::storage::table_scope::ReleaseOwnedTable;
+
+    #[test]
+    fn stored_embedding_index_dimension_can_differ_from_runtime_dimension() {
+        let index = crate::storage::v4_maintenance::managed_indexes_for_role(
+            crate::storage::v4_maintenance::DatabaseRole::HttpTenant,
+        )
+        .iter()
+        .copied()
+        .find(|index| index.name == "fact_embedding_hnsw")
+        .expect("managed vector index");
+        let stored_definition = "DEFINE INDEX fact_embedding_hnsw ON TABLE fact FIELDS embedding HNSW DIMENSION 17 DIST EUCLIDEAN TYPE F32 EFC 150 M 12 M0 24 LM 0.40242960438184466f";
+
+        assert!(index_info_matches(Some(stored_definition), index));
+        let wrong_metric = stored_definition.replace("EUCLIDEAN", "COSINE");
+        assert!(!index_info_matches(Some(&wrong_metric), index));
+    }
 
     #[test]
     fn index_definition_normalization_preserves_predicate_negation() {

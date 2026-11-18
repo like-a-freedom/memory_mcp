@@ -2,8 +2,11 @@
 //! from environment, builds `HttpState`, runs the signal watcher,
 //! and serves until shutdown.
 
+use std::io::Write;
 use std::process::ExitCode;
 
+use clap::{Args, Parser, Subcommand};
+use memory_mcp::http::composition::HttpProductionComposition;
 use memory_mcp::http::config::HttpConfig;
 use memory_mcp::http::router;
 use memory_mcp::http::runtime::{bootstrap, signal as signal_watcher};
@@ -48,6 +51,73 @@ fn log_glibc_tunables() {
     memory_mcp::logging::emit(event, memory_mcp::logging::LogLevel::Debug);
 }
 
+#[derive(Debug, Parser)]
+#[command(name = "memory_mcp_http", version)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Run SurrealDB 4 maintenance without starting HTTP workers or a listener.
+    SurrealdbV4Maintenance(MaintenanceArgs),
+}
+
+#[derive(Debug, Args)]
+struct MaintenanceArgs {
+    /// Recover an interrupted maintenance attempt after confirming prior submitters stopped.
+    #[arg(long, requires = "confirm_no_prior_submitter_can_resume")]
+    recover_ambiguous: bool,
+    /// Confirm no earlier maintenance process or server-side rebuild can resume.
+    #[arg(long, requires = "recover_ambiguous")]
+    confirm_no_prior_submitter_can_resume: bool,
+}
+
+async fn run_maintenance(args: MaintenanceArgs) -> ExitCode {
+    let cfg = match HttpConfig::from_env() {
+        Ok(config) => config,
+        Err(err) => {
+            log_failure("http.maintenance_failed", &err);
+            return ExitCode::from(2);
+        }
+    };
+    if let Err(err) = cfg.validate() {
+        log_failure("http.maintenance_failed", &err);
+        return ExitCode::from(2);
+    }
+    match HttpProductionComposition::run_surrealdb_v4_maintenance(
+        &cfg,
+        args.recover_ambiguous,
+        args.confirm_no_prior_submitter_can_resume,
+    )
+    .await
+    {
+        Ok((ready_tenants, tenant_databases)) => {
+            let mut stdout = std::io::stdout().lock();
+            let response = serde_json::json!({
+                "status": "completed",
+                "role": "http",
+                "ready_tenants": ready_tenants,
+                "tenant_databases": tenant_databases,
+            });
+            if let Err(error) = serde_json::to_writer_pretty(&mut stdout, &response) {
+                log_failure("http.maintenance_failed", &error);
+                return ExitCode::FAILURE;
+            }
+            if let Err(error) = writeln!(stdout) {
+                log_failure("http.maintenance_failed", &error);
+                return ExitCode::FAILURE;
+            }
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            log_failure("http.maintenance_failed", &err);
+            ExitCode::from(2)
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let logger = StdoutLogger::from_env();
@@ -59,6 +129,14 @@ async fn main() -> ExitCode {
     // Build the process-wide `tracing` subscriber before anything logs, so the
     // sink and the format/colour environment are read once, up front.
     memory_mcp::logging::install();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => error.exit(),
+    };
+    if let Some(Command::SurrealdbV4Maintenance(args)) = cli.command {
+        return run_maintenance(args).await;
+    }
+
     let cfg = match HttpConfig::from_env() {
         Ok(c) => c,
         Err(err) => {
