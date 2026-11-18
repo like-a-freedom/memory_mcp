@@ -346,7 +346,11 @@ fn redact_quoted_value(message: &str) -> String {
 fn map_storage_error(context: &str, err: impl std::fmt::Display) -> MemoryError {
     let msg = redact_quoted_value(&err.to_string());
     let lower = msg.to_ascii_lowercase();
-    if is_unique_violation_message(&lower) {
+    if lower.contains("written by surrealdb 3.x") && lower.contains("refused by default") {
+        MemoryError::Storage(format!(
+            "{context}: stop all writers, make and verify a cold backup, then set SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true and retry. This refusal precedes conversion. Back up HTTP control and tenant stores together."
+        ))
+    } else if is_unique_violation_message(&lower) {
         MemoryError::Conflict(format!("{context}: {msg}"))
     } else if lower.contains("not found") || lower.contains("no record") {
         MemoryError::NotFound(format!("{context}: {msg}"))

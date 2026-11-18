@@ -32,6 +32,23 @@ where
     apply_catalog().await
 }
 
+fn tenant_storage_connect_error(config: &HttpConfig, error: MemoryError) -> MemoryError {
+    let has_embedded_target = [&config.control_db, &config.tenant_db]
+        .into_iter()
+        .any(|target| {
+            let url = target.url.trim();
+            url.starts_with("surrealkv://") || url.starts_with("rocksdb://")
+        });
+
+    if has_embedded_target {
+        MemoryError::Storage(format!(
+            "partial conversion possible. Keep HTTP offline. Resume with SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true or restore the full coordinated backup to clean directories. Cause: {error}"
+        ))
+    } else {
+        MemoryError::Storage(format!("tenant engine storage connect failed: {error}"))
+    }
+}
+
 /// The production adapter bundle: durable control Registry plus the
 /// tenant migration worker. Selected once at startup; request
 /// handling never replaces either member.
@@ -63,9 +80,7 @@ impl HttpProductionComposition {
         } else {
             SurrealRegistryStore::connect_engine(&config.tenant_db)
                 .await
-                .map_err(|err| {
-                    MemoryError::Storage(format!("tenant engine storage connect failed: {err}"))
-                })?
+                .map_err(|err| tenant_storage_connect_error(config, err))?
         };
         let migrations = Arc::new(
             SurrealTenantMigrations::new(engine.clone())
@@ -141,9 +156,7 @@ impl HttpProductionComposition {
         } else {
             SurrealRegistryStore::connect_engine(&config.tenant_db)
                 .await
-                .map_err(|err| {
-                    MemoryError::Storage(format!("tenant engine storage connect failed: {err}"))
-                })?
+                .map_err(|err| tenant_storage_connect_error(config, err))?
         };
         let migrations = SurrealTenantMigrations::new(engine)
             .with_remote_v4_index_rebuild_ack(config.allow_remote_v4_index_rebuild);

@@ -44,6 +44,8 @@ jobs:
     name: Lint, tests and evaluation
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    env:
+      SURREALDB3_FIXTURE_BIN: ${{ github.workspace }}/target/surrealdb3-fixture/debug/sdb3-fixture
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup
@@ -81,6 +83,8 @@ jobs:
           # is what ADR-0064 requires of CI.
           python3 -m pip install --quiet pyyaml
           cargo run --locked -p xtask -- check-observability
+      - name: SurrealDB 3.x embedded conversion and rollback
+        run: bash crates/memory-mcp/tests/support/run-surrealdb4-upgrade-tests.sh
       - name: Default workspace tests
         # Includes eval-harness/tests/storage_release_gates.rs; do not run that
         # target a second time in a dedicated step below.
