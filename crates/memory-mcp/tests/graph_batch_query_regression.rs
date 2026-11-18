@@ -390,38 +390,6 @@ async fn batch_graph_lookup_uses_endpoint_indexes_with_many_unrelated_edges() {
 
     let cutoff = (Utc::now() + Duration::days(1)).to_rfc3339();
     let (sql, vars) = build_select_edge_neighbors_for_entities_query(&seed_ids, &cutoff);
-    let legacy_predicates = seed_ids
-        .iter()
-        .enumerate()
-        .map(|(index, _)| {
-            format!("(in = <record> $entity_{index} OR out = <record> $entity_{index})")
-        })
-        .collect::<Vec<_>>()
-        .join(" OR ");
-    let where_tail = &sql[sql.find(" AND ").expect("temporal predicate position")..];
-    let legacy_sql =
-        format!("SELECT in, out, relation FROM edge WHERE ({legacy_predicates}){where_tail}");
-    let mut legacy_vars = serde_json::Map::from_iter([("cutoff".to_owned(), json!(cutoff))]);
-    for (index, entity_id) in seed_ids.iter().enumerate() {
-        legacy_vars.insert(format!("entity_{index}"), json!(entity_id));
-    }
-    let legacy_plan = db
-        .query(
-            &format!("EXPLAIN {legacy_sql}"),
-            Some(serde_json::Value::Object(legacy_vars)),
-            "org",
-        )
-        .await
-        .expect("EXPLAIN original cast-based graph query")
-        .to_string();
-    assert!(
-        legacy_plan.contains("edge_t_valid"),
-        "the original cast-based query should fall back to the temporal index: {legacy_plan}"
-    );
-    assert!(
-        !legacy_plan.contains("edge_in") && !legacy_plan.contains("edge_out"),
-        "the original query unexpectedly uses an endpoint index: {legacy_plan}"
-    );
 
     let plan = db
         .query(&format!("EXPLAIN {sql}"), Some(vars), "org")

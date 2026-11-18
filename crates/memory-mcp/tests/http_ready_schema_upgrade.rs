@@ -257,7 +257,7 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
 
     let maintenance = db
         .query(
-            "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+            "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2;",
             None,
             &tenant.namespace_binding.namespace,
         )

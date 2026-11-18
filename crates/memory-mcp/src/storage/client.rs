@@ -27,8 +27,9 @@ use super::helpers::{
 use super::json_conversion::surreal_records_to_json;
 use super::queries::{build_create_query, build_select_one_query, build_update_query};
 use super::v4_maintenance::{
-    DatabaseIdentity, DatabaseProvenance, IndexBuildState, IndexInspection, MaintenanceKey,
-    MaintenanceRecord, ManagedIndex, ServerVersion, V4MaintenancePort, parse_server_version,
+    DatabaseIdentity, DatabaseProvenance, IndexBuildState, IndexInspection, MAINTENANCE_REVISION,
+    MaintenanceKey, MaintenanceRecord, ManagedIndex, ServerVersion, V4MaintenancePort,
+    parse_server_version,
 };
 
 /// Low-level database operations used by startup, migrations, and test fixtures.
@@ -680,6 +681,7 @@ impl SurrealDbClient {
 
     /// Records the selected database name for maintenance operations on an
     /// already-bound SDK client whose binding happened outside this adapter.
+    #[cfg(feature = "streamable-http")]
     pub(crate) fn with_database_identity(mut self, database: impl Into<String>) -> Self {
         self.active_database = Some(database.into());
         self
@@ -1113,7 +1115,7 @@ impl SurrealDbClient {
         })?;
         if key.namespace != self.active_namespace
             || key.database != identity
-            || key.revision != "surrealdb_4_index_rebuild_v1"
+            || key.revision != MAINTENANCE_REVISION
         {
             return Err(MemoryError::ConfigInvalid(
                 "SurrealDB maintenance key does not match the active database".into(),
@@ -1130,7 +1132,7 @@ impl SurrealDbClient {
         let key = MaintenanceKey {
             namespace: identity.namespace,
             database: identity.database,
-            revision: "surrealdb_4_index_rebuild_v1",
+            revision: MAINTENANCE_REVISION,
         };
         self.ensure_maintenance_key(&key)?;
         if record.key.namespace != key.namespace || record.key.database != key.database {

@@ -5,12 +5,26 @@ All notable changes to this project will be documented in this file.
 ## [1.40.0] - 2026-11-18
 
 ### Changed
-- **Breaking for source integrations:** replace `kv-rocksdb` and `RocksDb` with `kv-surrealkv` and `SurrealKv` when configuring SurrealDB directly.
-- Existing embedded v3 stores require a one-way conversion. Stop all writers, make a cold backup of every distinct local store, and verify a restore with v1.39.0 on a disposable copy. Set `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true` for the first v1.40.0 start, allow a long startup timeout, and keep the flag set if conversion needs a retry. Remove it after conversion and maintenance complete. Never point a v3 binary at converted data.
+- Source integrations that configure SurrealDB directly must replace the removed `kv-rocksdb` feature and `RocksDb` type with `kv-surrealkv` and `SurrealKv`.
+- Existing embedded v3 stores require a one-way conversion. Stop all writers and make a cold backup of every distinct local store. Verify the backup by restoring it with v1.39.0 on a disposable copy. Before starting v1.40.0, run the maintenance command with `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true`:
+
+  ```bash
+  # Stdio primary store
+  env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp surrealdb-v4-maintenance --role primary
+
+  # HTTP Registry and configured ready tenant stores
+  env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp_http surrealdb-v4-maintenance
+  ```
+
+  Keep the application offline until the command completes. If it is interrupted, keep the flag enabled and retry. Remove the flag before starting the service. Never point a v3 binary at converted data.
 - To roll back, stop all v4 processes and restore the complete pre-upgrade backup set into clean paths. Keep the external backup and `_rocksdb_backup/`; the latter is not a substitute. Writes made after the backup will be lost. See the [upgrade guide](README.md#upgrade-to-v1400) and test the restore before upgrading.
 - `surrealkv://` is the preferred local file-backed URL. The existing `rocksdb://` application URL remains accepted as an alias, but now opens SurrealKV.
 - The v1.40.0 SDK works with stable remote SurrealDB 3.x and 4.x; tests cover 3.3.5 and 4.0.1. Remote v3 servers do not need an upgrade. Remote v4 catalog and index maintenance requires `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true`, all datastore-sharing nodes on v4, and a coordinated window with older writers stopped. See the [upgrade guide](README.md#upgrade-to-v1400) for the pre-start commands.
 - Lexical scores and near-tie vector rankings may differ under SurrealDB 4.
+
+### Evaluation
+- The PR and release profiles passed 150/150 and 154/154 cases. The response-size profile passed 61/61, with overall savings of 31.0% for context assembly and 17.9% for explanations.
+- The v1.39.0 retrieval-quality run was invalid because no embedding provider was configured, so there is no valid before-and-after retrieval comparison.
 
 ## [1.39.0] - 2026-11-16
 

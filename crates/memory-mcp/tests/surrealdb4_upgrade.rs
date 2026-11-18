@@ -235,10 +235,8 @@ fn interrupt_at_second_migration_checkpoint(mut command: Command) -> String {
     let stdout_reader = thread::spawn(move || read_pipe(stdout));
     let (sender, receiver) = std::sync::mpsc::channel();
     let stderr_reader = thread::spawn(move || {
-        for line in io::BufReader::new(stderr).lines() {
-            if let Ok(line) = line {
-                let _ = sender.send(line);
-            }
+        for line in io::BufReader::new(stderr).lines().map_while(Result::ok) {
+            let _ = sender.send(line);
         }
     });
     let deadline = Instant::now() + PROCESS_TIMEOUT;

@@ -1478,16 +1478,16 @@ mod tests {
     #[tokio::test]
     async fn provenance_migrations_apply_when_both_are_pending_and_when_034_is_applied() {
         let fresh_namespace = "migration_order_fresh";
-        let fresh_client = SurrealDbClient::connect_in_memory("memory", &fresh_namespace, "error")
+        let fresh_client = SurrealDbClient::connect_in_memory("memory", fresh_namespace, "error")
             .await
             .expect("connect fresh in-memory SurrealDB");
 
-        run_migrations(&fresh_client, &fresh_namespace)
+        run_migrations(&fresh_client, fresh_namespace)
             .await
             .expect("fresh catalog should apply 034 before nested provenance fields in 022");
 
         let namespace = "migration_resume_partial";
-        let client = SurrealDbClient::connect_in_memory("memory", &namespace, "error")
+        let client = SurrealDbClient::connect_in_memory("memory", namespace, "error")
             .await
             .expect("connect partially migrated in-memory SurrealDB");
         let initial_schema = render_sql_template(
@@ -1495,7 +1495,7 @@ mod tests {
             client.migration_embedding_dimension(),
         );
         match client
-            .execute_migration_script(&initial_schema, &namespace)
+            .execute_migration_script(&initial_schema, namespace)
             .await
         {
             Ok(()) => {}
@@ -1505,18 +1505,18 @@ mod tests {
             ),
             Err(error) => panic!("initial schema failed with an unexpected error: {error}"),
         }
-        ensure_migration_runner_schema(&client, &namespace)
+        ensure_migration_runner_schema(&client, namespace)
             .await
             .expect("create migration runner schema");
         let migration_034 = versioned_migrations()
             .iter()
             .find(|migration| migration.file_name == "034_edge_provenance_schema_fix.surql")
             .expect("034 is registered");
-        apply_versioned_migration(&client, &namespace, migration_034)
+        apply_versioned_migration(&client, namespace, migration_034)
             .await
             .expect("apply 034 while 022 remains pending");
 
-        run_migrations(&client, &namespace)
+        run_migrations(&client, namespace)
             .await
             .expect("pending 022 should apply while already-applied 034 remains skipped");
 
@@ -1524,14 +1524,14 @@ mod tests {
         let migration_022_id = migration_record_id("022_structured_provenance.surql");
         assert!(
             client
-                .select_one(&migration_034_id, &namespace)
+                .select_one(&migration_034_id, namespace)
                 .await
                 .expect("read 034 ledger")
                 .is_some()
         );
         assert!(
             client
-                .select_one(&migration_022_id, &namespace)
+                .select_one(&migration_022_id, namespace)
                 .await
                 .expect("read 022 ledger")
                 .is_some()

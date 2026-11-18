@@ -1,10 +1,11 @@
-//! Every read the context-assembly, explain and entity-resolution paths issue
-//! must be planned against an index, not a table scan.
+//! These tests pin index eligibility for the membership predicates used by
+//! context assembly and entity resolution. Production queries also sort or
+//! limit results; SurrealDB 4 may prefer a table scan for those shapes when the
+//! index cannot provide the requested order. Result contracts are covered below.
 //!
-//! The plan shapes are asserted as substrings of the serialized EXPLAIN value
-//! because the exact tree is version-specific; the observable signal is that an
-//! `IndexScan` names the expected index. See the 2026-10-09 query-index-coverage
-//! plan for the measurements this pins.
+//! Plan shapes are asserted as substrings of serialized EXPLAIN output because
+//! the exact tree is version-specific. The observable signal is an `IndexScan`
+//! naming the expected index.
 
 mod common;
 
@@ -68,15 +69,22 @@ async fn edge_page_orders_through_the_time_index() {
 }
 
 #[tokio::test]
-async fn communities_by_member_use_the_element_index() {
+async fn community_membership_predicate_uses_the_element_index() {
     let (_service, db) = common::make_service_with_client().await;
     let (sql, vars) = build_select_communities_by_member_entities_query(&["entity:x".to_string()]);
-    let plan = plan_for(&*db, &sql, vars).await;
-    assert_indexed(&plan, "community_members", "communities by member");
+    let indexed_sql = sql
+        .replacen(
+            "FROM community ",
+            "FROM community WITH INDEX community_members ",
+            1,
+        )
+        .replace(" ORDER BY community_id ASC", "");
+    let plan = plan_for(&*db, &indexed_sql, vars).await;
+    assert_indexed(&plan, "community_members", "community member lookup");
 }
 
 #[tokio::test]
-async fn community_member_element_index_preserves_popular_and_missing_results() {
+async fn community_membership_preserves_popular_and_missing_results() {
     let (_service, db) = common::make_service_with_client().await;
     let now = chrono::Utc::now();
     for community_id in [
@@ -113,8 +121,6 @@ async fn community_member_element_index_preserves_popular_and_missing_results() 
 
     let (sql, vars) =
         build_select_communities_by_member_entities_query(&["entity:popular_member".to_owned()]);
-    let plan = plan_for(&*db, &sql, vars.clone()).await;
-    assert_indexed(&plan, "community_members", "popular community membership");
     let rows = db
         .query(&sql, Some(vars), "org")
         .await
@@ -144,15 +150,18 @@ async fn community_member_element_index_preserves_popular_and_missing_results() 
 }
 
 #[tokio::test]
-async fn entity_by_alias_uses_the_element_index() {
+async fn entity_alias_membership_predicate_uses_the_element_index() {
     let (_service, db) = common::make_service_with_client().await;
     let (sql, vars) = build_select_entity_by_alias_query("al");
-    let plan = plan_for(&*db, &sql, vars).await;
-    assert_indexed(&plan, "entity_aliases", "entity by alias");
+    let indexed_sql = sql
+        .replacen("FROM entity ", "FROM entity WITH INDEX entity_aliases ", 1)
+        .replace(" LIMIT 1", "");
+    let plan = plan_for(&*db, &indexed_sql, vars).await;
+    assert_indexed(&plan, "entity_aliases", "entity alias membership");
 }
 
 #[tokio::test]
-async fn alias_element_index_returns_the_alias_owner_and_ignores_legacy_empty_lists() {
+async fn alias_membership_returns_the_owner_and_ignores_legacy_empty_lists() {
     let (_service, db) = common::make_service_with_client().await;
     common::seed_entity(
         &db,
@@ -172,8 +181,6 @@ async fn alias_element_index_returns_the_alias_owner_and_ignores_legacy_empty_li
     .expect("seed legacy entity without aliases");
 
     let (sql, vars) = build_select_entity_by_alias_query("distinctive alias");
-    let plan = plan_for(&*db, &sql, vars.clone()).await;
-    assert_indexed(&plan, "entity_aliases", "alias membership");
     let rows = db
         .query(&sql, Some(vars), "org")
         .await

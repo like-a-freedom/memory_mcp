@@ -45,10 +45,11 @@ impl EntityStoreClient {
     /// Find an entity ID by searching aliases. Returns `None` if no entity
     /// matches.
     ///
-    /// The query uses `CONTAINSANY` over a one-element array, not `CONTAINS`:
-    /// on SurrealDB 3.3 `CONTAINS` is never served by an index, while
-    /// `CONTAINSANY` is served by the `entity_aliases` array-element index
-    /// (`FIELDS aliases.*`). See `build_select_entity_by_alias_query`.
+    /// The membership predicate uses `CONTAINSANY` over a one-element array so
+    /// it can use the `entity_aliases` array-element index (`FIELDS aliases.*`).
+    /// SurrealDB 4 may still prefer a table scan for the production `LIMIT 1`
+    /// shape. See `build_select_entity_by_alias_query` and
+    /// `query_index_coverage.rs`.
     pub(crate) async fn find_entity_id_by_alias(
         &self,
         normalized_alias: &str,

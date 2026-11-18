@@ -215,7 +215,7 @@ pub(crate) enum MaintenanceOutcome {
     Completed,
 }
 
-pub(crate) const MAINTENANCE_REVISION: &str = "surrealdb_4_index_rebuild_v1";
+pub(crate) const MAINTENANCE_REVISION: &str = "surrealdb_4_index_rebuild_v2";
 const REBUILD_TIMEOUT: Duration = Duration::from_secs(120);
 const REBUILD_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -334,6 +334,7 @@ pub(crate) async fn preflight_v4_catalog_with_intent<P: V4MaintenancePort>(
     Ok(compatibility)
 }
 
+#[cfg(any(test, feature = "streamable-http"))]
 pub(crate) async fn run_v4_catalog_maintenance<P, F, Fut>(
     port: &P,
     role: DatabaseRole,
@@ -819,7 +820,9 @@ fn now_ms() -> u128 {
 fn role_name(role: DatabaseRole) -> &'static str {
     match role {
         DatabaseRole::PrimaryMemory => "primary_memory",
+        #[cfg(any(test, feature = "streamable-http"))]
         DatabaseRole::HttpTenant => "http_tenant",
+        #[cfg(any(test, feature = "streamable-http"))]
         DatabaseRole::Registry => "registry",
     }
 }
@@ -859,7 +862,9 @@ pub(crate) fn classify_server_version(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DatabaseRole {
     PrimaryMemory,
+    #[cfg(any(test, feature = "streamable-http"))]
     HttpTenant,
+    #[cfg(any(test, feature = "streamable-http"))]
     Registry,
 }
 
@@ -912,6 +917,16 @@ const MEMORY_INDEXES: &[ManagedIndex] = &[
         definition: "DEFINE INDEX inbox_revision_state_lease ON inbox_revision FIELDS state, lease_expires_at",
     },
     ManagedIndex {
+        name: "entity_aliases",
+        table: "entity",
+        definition: "DEFINE INDEX entity_aliases ON TABLE entity FIELDS aliases.*",
+    },
+    ManagedIndex {
+        name: "community_members",
+        table: "community",
+        definition: "DEFINE INDEX community_members ON TABLE community FIELDS member_entities.*",
+    },
+    ManagedIndex {
         name: "community_summary_search",
         table: "community",
         definition: "DEFINE INDEX community_summary_search ON TABLE community COLUMNS summary FULLTEXT ANALYZER memory_fts BM25(1.2,0.75)",
@@ -932,7 +947,10 @@ const REGISTRY_AUDIT_INDEX: ManagedIndex = ManagedIndex {
 
 pub(crate) fn managed_indexes_for_role(role: DatabaseRole) -> &'static [ManagedIndex] {
     match role {
-        DatabaseRole::PrimaryMemory | DatabaseRole::HttpTenant => MEMORY_INDEXES,
+        DatabaseRole::PrimaryMemory => MEMORY_INDEXES,
+        #[cfg(any(test, feature = "streamable-http"))]
+        DatabaseRole::HttpTenant => MEMORY_INDEXES,
+        #[cfg(any(test, feature = "streamable-http"))]
         DatabaseRole::Registry => &[],
     }
 }
@@ -951,11 +969,12 @@ mod tests {
 
     use super::{
         ClaimState, DatabaseIdentity, DatabaseProvenance, DatabaseRole, IndexBuildState,
-        IndexInspection, IndexProgress, MaintenanceKey, MaintenanceKeyRecord, MaintenanceOutcome,
-        MaintenanceRecord, ManagedIndex, RecoveryAuthorization, ServerCompatibility, ServerVersion,
-        V4CatalogIntent, V4MaintenancePort, classify_server_version, establish_database_provenance,
-        managed_indexes_for_role, parse_server_version, preflight_v4_catalog,
-        preflight_v4_catalog_with_intent, registry_audit_index, run_v4_catalog_maintenance,
+        IndexInspection, IndexProgress, MAINTENANCE_REVISION, MaintenanceKey, MaintenanceKeyRecord,
+        MaintenanceOutcome, MaintenanceRecord, ManagedIndex, RecoveryAuthorization,
+        ServerCompatibility, ServerVersion, V4CatalogIntent, V4MaintenancePort,
+        classify_server_version, establish_database_provenance, managed_indexes_for_role,
+        parse_server_version, preflight_v4_catalog, preflight_v4_catalog_with_intent,
+        registry_audit_index, run_v4_catalog_maintenance,
     };
     use crate::error::MemoryError;
 
@@ -1217,7 +1236,7 @@ mod tests {
         let key = MaintenanceKey {
             namespace: "test_namespace".to_owned(),
             database: "test_database".to_owned(),
-            revision: "surrealdb_4_index_rebuild_v1",
+            revision: MAINTENANCE_REVISION,
         };
         let old_claim = MaintenanceRecord {
             key: MaintenanceKeyRecord::from(&key),
@@ -1460,7 +1479,7 @@ mod tests {
         let key = MaintenanceKey {
             namespace: "test_namespace".to_owned(),
             database: "test_database".to_owned(),
-            revision: "surrealdb_4_index_rebuild_v1",
+            revision: MAINTENANCE_REVISION,
         };
         let mut indexes = BTreeMap::new();
         indexes.insert("edge_temporal_idx".to_owned(), IndexProgress::Intent);
@@ -2028,6 +2047,8 @@ mod tests {
             "claim_relation_right_active_idx",
             "claim_job_lease_idx",
             "inbox_revision_state_lease",
+            "entity_aliases",
+            "community_members",
             "community_summary_search",
             "fact_embedding_hnsw",
         ];
@@ -2039,6 +2060,11 @@ mod tests {
                 .collect();
             assert_eq!(actual, expected);
         }
+    }
+
+    #[test]
+    fn maintenance_revision_advances_when_the_rebuild_manifest_changes() {
+        assert_eq!(MAINTENANCE_REVISION, "surrealdb_4_index_rebuild_v2");
     }
 
     #[test]

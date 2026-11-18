@@ -15,8 +15,9 @@ use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 
+// This contract targets the current SDK/server type format; v3.3.5 compatibility is covered separately.
 const SURREALDB_IMAGE: &str =
-    "surrealdb/surrealdb@sha256:58944c284296507fd3cb343e7568a08dd38f397f7e763f9f54a71c5562c5839f";
+    "surrealdb/surrealdb@sha256:408eb8e5c9436670525e2bc2634b1e50ba74ce1b447eaf0094c35f73b67f9cb6";
 const SURREALDB_CONTAINER_PORT: &str = "8000/tcp";
 const CHILD_TIMEOUT: Duration = Duration::from_secs(120);
 const REPORT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -678,8 +679,6 @@ impl DockerContainer {
         let output = Command::new("docker")
             .args([
                 "run",
-                "--platform",
-                "linux/amd64",
                 "--detach",
                 "--rm",
                 "--name",
@@ -695,8 +694,6 @@ impl DockerContainer {
                 "root",
                 "--password",
                 "root",
-                "--allow-experimental",
-                "files",
                 "--log",
                 "error",
                 "memory",

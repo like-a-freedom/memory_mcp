@@ -59,9 +59,10 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 /// The live `memory_mcp` CLI subcommands that must remain stable.
 ///
 /// `init` is the one output-only onboarding exception authorized by ADR-0030.
-/// The `lifecycle-*` entries are internal hidden subcommands consumed by hook
-/// scripts; `lifecycle` is the explicit operator-facing
-/// maintenance command authorized by ADR-0047.
+/// `lifecycle-*` entries are internal hidden subcommands consumed by hook
+/// scripts; `lifecycle` is the explicit operator-facing maintenance command
+/// authorized by ADR-0047. The SurrealDB v4 maintenance command is an explicit
+/// operator-facing storage migration command.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
     "reembed",
@@ -75,6 +76,7 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "lifecycle-capture",
     "lifecycle-recall",
     "init",
+    "surrealdb-v4-maintenance",
 ];
 
 /// Subcommands that are part of the approved surface only when the feature

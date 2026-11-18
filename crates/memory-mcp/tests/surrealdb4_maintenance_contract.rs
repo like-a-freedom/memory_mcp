@@ -221,7 +221,7 @@ fn maintenance_record(namespace: &str, database: &str, attempt_id: &str) -> Valu
         "key": {
             "namespace": namespace,
             "database": database,
-            "revision": "surrealdb_4_index_rebuild_v1"
+            "revision": "surrealdb_4_index_rebuild_v2"
         },
         "role": "primary_memory",
         "provenance": "pre_existing",
@@ -255,7 +255,7 @@ async fn surrealdb_create_only_admits_one_concurrent_durable_claim() {
             barrier.wait().await;
             client
                 .query(
-                    "CREATE ONLY memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1 CONTENT $record;",
+                    "CREATE ONLY memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2 CONTENT $record;",
                     Some(json!({
                                             "record": maintenance_record(
                                                 "maintenance_claim_namespace",
@@ -288,7 +288,7 @@ async fn surrealdb_claim_update_is_fenced_by_the_attempt_id() {
             .expect("in-memory SurrealDB client");
     client
         .query(
-            "CREATE ONLY memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1 CONTENT $record;",
+            "CREATE ONLY memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2 CONTENT $record;",
             Some(json!({
                 "record": maintenance_record(
                     "claim_cas_namespace",
@@ -303,7 +303,7 @@ async fn surrealdb_claim_update_is_fenced_by_the_attempt_id() {
 
     let recovered = client
         .query(
-            "UPDATE memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1 CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
+            "UPDATE memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2 CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
             Some(json!({
                 "record": maintenance_record(
                                     "claim_cas_namespace",
@@ -318,7 +318,7 @@ async fn surrealdb_claim_update_is_fenced_by_the_attempt_id() {
         .expect("replace the claim using its prior attempt id");
     let stale_owner = client
         .query(
-            "UPDATE memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1 CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
+            "UPDATE memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2 CONTENT $record WHERE attempt_id = $expected_attempt_id RETURN AFTER;",
             Some(json!({
                 "record": maintenance_record(
                                     "claim_cas_namespace",
@@ -343,7 +343,7 @@ async fn surrealdb_claim_update_is_fenced_by_the_attempt_id() {
 
     let persisted = client
         .query(
-            "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+            "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2;",
             None,
             "claim_cas_namespace",
         )

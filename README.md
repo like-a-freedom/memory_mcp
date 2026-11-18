@@ -1022,11 +1022,22 @@ Before converting any embedded v3 store:
 3. Allow disk space for the external backup and for the old and converted files
    to coexist. The first conversion can take a long time. Increase the process
    and supervisor restart timeouts so they do not kill and restart it repeatedly.
-4. Set `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true` only in the environment of
-   the first v1.40.0 start that opens the old store. Fresh stores do not need it.
-   If conversion is interrupted, keep the setting enabled for the retry. Leave
-   the application offline until conversion and application/index maintenance
-   complete, then remove the setting.
+4. Keep the application offline and run the pre-start maintenance command
+   before starting the service. For an embedded v3 store, set
+   `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true` on this command so SurrealDB can
+   convert the store and the command can finish schema and index maintenance:
+
+   ```bash
+   # Stdio primary store
+   env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp surrealdb-v4-maintenance --role primary
+
+   # HTTP Registry and configured ready tenant stores
+   env SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true memory_mcp_http surrealdb-v4-maintenance
+   ```
+
+   Fresh stores do not need the conversion flag. If conversion or maintenance is
+   interrupted, keep the flag enabled and rerun the command while the application
+   remains offline. After it succeeds, remove the flag and start the service.
 5. Keep the external backup. Do not delete `_rocksdb_backup/`; it is not a
    substitute for the coordinated backup set.
 

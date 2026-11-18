@@ -1383,7 +1383,7 @@ mod tests {
             .expect("bind tenant client");
         let claim = client
             .query(
-                "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v1;",
+                "SELECT * FROM memory_v4_maintenance_claim:surrealdb_4_index_rebuild_v2;",
                 None,
                 namespace,
             )

@@ -373,10 +373,10 @@ fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Valu
 
 /// Finds an entity by one of its aliases.
 ///
-/// `CONTAINSANY [$alias]` rather than `CONTAINS $alias`: on SurrealDB 3.3 a
-/// `CONTAINS` membership test is never served by an index, while `CONTAINSANY`
-/// over a one-element array is served by the array-element index
-/// `entity_aliases` (`FIELDS aliases.*`). The two are the same membership test.
+/// `CONTAINSANY [$alias]` is index-compatible with the array-element index
+/// `entity_aliases` (`FIELDS aliases.*`). SurrealDB 4 may still choose a table
+/// scan for the production `LIMIT 1` query shape; coverage tests isolate the
+/// membership predicate when asserting index eligibility.
 pub fn build_select_entity_by_alias_query(alias: &str) -> (String, Value) {
     (
         "SELECT entity_id FROM entity WHERE aliases CONTAINSANY [$alias] LIMIT 1".to_string(),
