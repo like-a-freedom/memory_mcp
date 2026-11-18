@@ -11,11 +11,11 @@
 //! actually selects them. An explicitly selected test **fails** when its
 //! environment is missing — it never skips and never passes vacuously.
 //!
-//! They require an isolated remote SurrealDB 3.2.4 and read
+//! They require an isolated SurrealDB 3.3.5 or 4.0.1 server and read
 //! `LOCAL_ADMIN_TEST_CONTROL_URL`, `LOCAL_ADMIN_TEST_CONTROL_USERNAME` and
-//! `LOCAL_ADMIN_TEST_CONTROL_PASSWORD`. Every run uses a fresh random
-//! namespace and database and removes them afterwards, so a production target
-//! cannot be touched by accident.
+//! `LOCAL_ADMIN_TEST_CONTROL_PASSWORD`. The URL must point to loopback. Every
+//! run uses a fresh random namespace and database, so a production target cannot
+//! be touched by accident.
 //!
 //! The `Mem` engine cannot demonstrate replica behaviour: two handles over one
 //! in-process engine share the same lock. These tests therefore use **two
@@ -25,7 +25,10 @@ use std::sync::Arc;
 
 use crate::config::SurrealTargetConfig;
 use crate::service::local_admin::auth::AdminManagementService;
-use crate::service::local_admin::contracts::{LocalAdminError, RequestContext};
+use crate::service::local_admin::contracts::{
+    AdminPrincipal, AttemptDecision, AttemptDomain, AttemptInput, AuthAttemptContext,
+    LocalAdminError, LocalAdminStore, RequestContext, SessionRotate,
+};
 
 use super::SurrealRegistryStore;
 
@@ -34,6 +37,12 @@ use super::SurrealRegistryStore;
 fn remote_target() -> SurrealTargetConfig {
     let url = std::env::var("LOCAL_ADMIN_TEST_CONTROL_URL")
         .expect("LOCAL_ADMIN_TEST_CONTROL_URL must be set for this test");
+    assert!(
+        url.starts_with("ws://127.0.0.1:")
+            || url.starts_with("ws://localhost:")
+            || url.starts_with("ws://[::1]:"),
+        "remote compatibility tests only allow a loopback URL"
+    );
     let username = std::env::var("LOCAL_ADMIN_TEST_CONTROL_USERNAME")
         .expect("LOCAL_ADMIN_TEST_CONTROL_USERNAME must be set for this test");
     let password = std::env::var("LOCAL_ADMIN_TEST_CONTROL_PASSWORD")
@@ -48,20 +57,23 @@ fn remote_target() -> SurrealTargetConfig {
     }
 }
 
+/// Connects and applies the role catalog through the supported maintenance path.
+async fn connect_maintained(target: &SurrealTargetConfig) -> SurrealRegistryStore {
+    SurrealRegistryStore::connect_with_v4_maintenance(
+        target,
+        true,
+        crate::storage::v4_maintenance::RecoveryAuthorization::None,
+    )
+    .await
+    .expect("connect and maintain isolated remote registry")
+}
+
 /// Two independent connections to the same isolated remote registry.
 async fn two_replicas(
     target: &SurrealTargetConfig,
 ) -> (Arc<SurrealRegistryStore>, Arc<SurrealRegistryStore>) {
-    let first = Arc::new(
-        SurrealRegistryStore::connect(target)
-            .await
-            .expect("connect replica one"),
-    );
-    let second = Arc::new(
-        SurrealRegistryStore::connect(target)
-            .await
-            .expect("connect replica two"),
-    );
+    let first = Arc::new(connect_maintained(target).await);
+    let second = Arc::new(connect_maintained(target).await);
     (first, second)
 }
 
@@ -71,13 +83,62 @@ fn request() -> RequestContext {
     }
 }
 
+async fn activated_remote_admin() -> (
+    Arc<SurrealRegistryStore>,
+    Arc<crate::service::local_admin::auth::LocalAdminAuthority>,
+    AdminPrincipal,
+) {
+    let target = remote_target();
+    let store = Arc::new(connect_maintained(&target).await);
+    let authority = crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+        store.clone(),
+        [7u8; 32],
+        [8u8; 32],
+    )
+    .await
+    .expect("join local policy");
+    let management = AdminManagementService::new(authority.clone());
+    let hasher = Arc::new(
+        crate::service::local_admin::password::PasswordHasher::new().expect("supported KDF"),
+    );
+    let auth = crate::service::local_admin::auth::LocalAdminService::new(authority.clone(), hasher);
+    let challenge = management
+        .create_admin("return.contract", &request())
+        .await
+        .expect("create administrator");
+    auth.finish_challenge(
+        &AuthAttemptContext {
+            request: request(),
+            source: std::net::IpAddr::from([127, 0, 0, 1]),
+        },
+        &challenge.code,
+        crate::service::local_admin::contracts::ChallengeKind::Activate,
+        "a sufficiently long passphrase".to_owned(),
+    )
+    .await
+    .expect("activate administrator");
+    let login = auth
+        .login(
+            &AuthAttemptContext {
+                request: request(),
+                source: std::net::IpAddr::from([127, 0, 0, 1]),
+            },
+            "return.contract",
+            "a sufficiently long passphrase".to_owned(),
+        )
+        .await
+        .expect("login");
+
+    (store, authority, login.principal)
+}
+
 /// Two replicas racing to create the same canonical administrator.
 ///
 /// The unique `username` index is the arbiter: exactly one insert commits and
 /// the loser fails with a typed error, never a partial write. Both replicas
 /// then observe the same single row.
 #[tokio::test]
-#[ignore = "requires isolated remote SurrealDB 3.2.4"]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
 async fn local_admin_remote_replica_races() {
     let target = remote_target();
     let (first, second) = two_replicas(&target).await;
@@ -155,7 +216,7 @@ async fn local_admin_remote_replica_races() {
 /// The revocation must be durable and the untouched session must stay
 /// resolvable; neither transaction may raise a statement error.
 #[tokio::test]
-#[ignore = "requires isolated remote SurrealDB 3.2.4"]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
 async fn local_admin_session_revocation_race() {
     let target = remote_target();
     let (first, second) = two_replicas(&target).await;
@@ -268,18 +329,14 @@ async fn local_admin_session_revocation_race() {
 /// sees the spent budget instead of silently resetting it. Plan §5 lists
 /// "restart" alongside the two-handle rate cases.
 #[tokio::test]
-#[ignore = "requires isolated remote SurrealDB 3.2.4"]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
 async fn local_admin_rate_window_survives_a_store_reconnect() {
     use crate::service::local_admin::contracts::{
         AttemptDecision, AttemptDomain, AttemptInput, LocalAdminStore,
     };
 
     let target = remote_target();
-    let before = Arc::new(
-        SurrealRegistryStore::connect(&target)
-            .await
-            .expect("connect before the restart"),
-    );
+    let before = Arc::new(connect_maintained(&target).await);
     let authority = crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
         before.clone(),
         [7u8; 32],
@@ -307,11 +364,7 @@ async fn local_admin_rate_window_survives_a_store_reconnect() {
     // "Restart": the old handle goes away mid-window, a fresh connection
     // opens against the same registry.
     drop(before);
-    let after = Arc::new(
-        SurrealRegistryStore::connect(&target)
-            .await
-            .expect("connect after the restart"),
-    );
+    let after = Arc::new(connect_maintained(&target).await);
     match after.reserve_attempt(attempt()).await.expect("reserve") {
         AttemptDecision::Limited {
             retry_after_seconds,
@@ -330,4 +383,145 @@ fn cookie_verifier(cookie_value: &str) -> [u8; 32] {
         .expect("hex cookie verifier")
         .try_into()
         .expect("32-byte cookie verifier")
+}
+
+async fn count_rows(store: &SurrealRegistryStore, table: &str) -> Vec<serde_json::Value> {
+    store
+        .admin_query(&format!("SELECT * FROM {table};"), None)
+        .await
+        .unwrap_or_else(|error| panic!("read {table}: {error}"))
+}
+
+#[tokio::test]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
+async fn local_admin_remote_resolve_session_returns_and_persists_one_session() {
+    let (store, authority, principal) = activated_remote_admin().await;
+    let verifier = cookie_verifier(&principal.fence.session_id);
+
+    let resolved = store
+        .resolve_session(&verifier, authority.policy())
+        .await
+        .expect("resolve the live session");
+
+    assert_eq!(resolved.fence.admin_id, principal.fence.admin_id);
+    assert_eq!(resolved.username, "return.contract");
+    assert_eq!(resolved.fence.session_id, principal.fence.session_id);
+    let sessions = count_rows(&store, "local_admin_session").await;
+    assert_eq!(
+        sessions.len(),
+        1,
+        "resolution must not create another session"
+    );
+    assert_eq!(sessions[0]["cookie_verifier"], principal.fence.session_id);
+}
+
+#[tokio::test]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
+async fn local_admin_remote_rotate_session_commits_exactly_one_replacement() {
+    let (store, authority, principal) = activated_remote_admin().await;
+    let credential = store
+        .credential("return.contract", authority.policy())
+        .await
+        .expect("read the active credential")
+        .expect("credential exists");
+    let verifier = [9u8; 32];
+    let rotated = store
+        .rotate_session(SessionRotate {
+            fence: principal.fence.clone(),
+            credential,
+            cookie_verifier: verifier,
+            request: request(),
+        })
+        .await
+        .expect("rotate the session");
+
+    let replacement = hex::encode(verifier);
+    assert_eq!(rotated.fence.admin_id, principal.fence.admin_id);
+    assert_eq!(rotated.fence.session_id, replacement);
+    assert_eq!(rotated.username, "return.contract");
+    assert_eq!(rotated.absolute_expiry, principal.absolute_expiry);
+
+    let sessions = count_rows(&store, "local_admin_session").await;
+    assert_eq!(
+        sessions.len(),
+        2,
+        "rotation keeps one revoked and one new row"
+    );
+    assert_eq!(
+        sessions
+            .iter()
+            .filter(|row| row["revoked_at"].is_null())
+            .count(),
+        1,
+        "exactly one session remains active"
+    );
+    assert!(sessions.iter().any(|row| {
+        row["cookie_verifier"] == principal.fence.session_id && !row["revoked_at"].is_null()
+    }));
+    assert!(
+        sessions
+            .iter()
+            .any(|row| { row["cookie_verifier"] == replacement && row["revoked_at"].is_null() })
+    );
+    let audits = store
+        .admin_query(
+            "SELECT * FROM local_admin_audit WHERE action = 'reauth';",
+            None,
+        )
+        .await
+        .expect("read rotation audit rows");
+    assert_eq!(audits.len(), 1, "rotation writes one audit record");
+}
+
+#[tokio::test]
+#[ignore = "requires isolated loopback SurrealDB 3.3.5 or 4.0.1"]
+async fn local_admin_remote_reserve_attempt_keeps_one_saturated_bucket() {
+    let target = remote_target();
+    let store = Arc::new(connect_maintained(&target).await);
+    let authority = crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+        store.clone(),
+        [7u8; 32],
+        [8u8; 32],
+    )
+    .await
+    .expect("join local policy");
+    let attempt = || AttemptInput {
+        domain: AttemptDomain::Challenge,
+        username_bucket: None,
+        source_bucket: 17,
+        policy: authority.policy().clone(),
+        request: request(),
+    };
+
+    for attempt_number in 1..=10 {
+        assert!(
+            matches!(
+                store
+                    .reserve_attempt(attempt())
+                    .await
+                    .expect("reserve attempt"),
+                AttemptDecision::Allowed
+            ),
+            "attempt {attempt_number} is within the challenge budget"
+        );
+    }
+    assert!(matches!(
+        store
+            .reserve_attempt(attempt())
+            .await
+            .expect("reserve saturated attempt"),
+        AttemptDecision::Limited {
+            retry_after_seconds: 1..=900
+        }
+    ));
+
+    let buckets = store
+        .admin_query(
+            "SELECT * FROM local_admin_rate_bucket WHERE action = 'challenge';",
+            None,
+        )
+        .await
+        .expect("read persisted challenge buckets");
+    assert_eq!(buckets.len(), 1, "one source slot has one persisted bucket");
+    assert_eq!(buckets[0]["denied_count"], 11);
 }

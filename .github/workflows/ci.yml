@@ -171,6 +171,53 @@ jobs:
           name: perf-smoke
           path: target/perf/*.json
 
+  surrealdb-remote-compat:
+    name: SurrealDB ${{ matrix.version }} remote compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [3.3.5, 4.0.1]
+    env:
+      MEMORY_SURREALDB_EXPECTED_VERSION: ${{ matrix.version }}
+      SURREALDB_URL: ws://127.0.0.1:8000/rpc
+      SURREALDB_EMBEDDED: 'false'
+      SURREALDB_USERNAME: root
+      SURREALDB_PASSWORD: root
+      LOCAL_ADMIN_TEST_CONTROL_URL: ws://127.0.0.1:8000/rpc
+      LOCAL_ADMIN_TEST_CONTROL_USERNAME: root
+      LOCAL_ADMIN_TEST_CONTROL_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          target: x86_64-unknown-linux-gnu
+          cache-key: quality
+          cache-shared-key: dev
+      - name: Start pinned SurrealDB server
+        run: |
+          docker run --detach \
+            --name surrealdb-${{ matrix.version }} \
+            --publish 127.0.0.1:8000:8000 \
+            surrealdb/surrealdb:v${{ matrix.version }} \
+            start --log warn --user root --pass root --bind 0.0.0.0:8000 memory
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs surrealdb-${{ matrix.version }}
+          exit 1
+      - name: Run remote compatibility and retrieval contracts
+        run: cargo test -p memory_mcp --features streamable-http,test-fixtures --test surrealdb_remote_compat --locked -- --ignored --test-threads=1
+      - name: Run remote local-admin transaction contracts
+        run: cargo test -p memory_mcp --lib --features streamable-http,test-fixtures surreal_store::local_admin_remote --locked -- --ignored --test-threads=1
+      - name: Stop SurrealDB server
+        if: always()
+        run: docker rm --force surrealdb-${{ matrix.version }} || true
+
   native:
     needs: quality
     # The platform matrix starts for pull requests, manual runs and releases.
@@ -595,17 +642,19 @@ jobs:
   passed:
     name: CI passed
     if: always()
-    needs: [quality, native, docker]
+    needs: [quality, surrealdb-remote-compat, native, docker]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every check this event is supposed to run
         env:
           EVENT: ${{ github.event_name }}
           QUALITY: ${{ needs.quality.result }}
+          REMOTE_COMPAT: ${{ needs.surrealdb-remote-compat.result }}
           NATIVE: ${{ needs.native.result }}
           DOCKER: ${{ needs.docker.result }}
         run: |
           test "$QUALITY" = success || exit 1
+          test "$REMOTE_COMPAT" = success || exit 1
           if test "$EVENT" = push; then
             # Build jobs deliberately do not start on push: a skip is the
             # designed outcome there, a failure or cancellation is not.
