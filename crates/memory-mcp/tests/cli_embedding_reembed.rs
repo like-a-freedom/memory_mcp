@@ -46,6 +46,16 @@ async fn seed_stale_fact(data_dir: &Path, dimension: usize) {
     db.apply_migrations(NAMESPACE)
         .await
         .expect("apply fixture migrations");
+    // A real store records its v4 provenance on first start, and startup
+    // refuses an existing database that lacks the record. This fixture seeds
+    // through the client directly, so record the same durable value here.
+    db.query(
+        "CREATE ONLY memory_v4_maintenance_provenance:current CONTENT { provenance: 'fresh_v4' };",
+        None,
+        NAMESPACE,
+    )
+    .await
+    .expect("record v4 provenance for the fixture store");
     let now = chrono::Utc::now();
     DbClient::create(
         &db,
