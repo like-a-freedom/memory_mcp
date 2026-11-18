@@ -11,7 +11,8 @@ backup into a fresh deployment.
 
 3. **Boot** `memory_mcp_http` against the restored pair. The HTTP profile
    requires separate control and tenant bindings; use remote `ws://`/`wss://`
-   targets or the documented non-production `rocksdb://` profile:
+   targets or the documented non-production `surrealkv://` profile. The legacy
+   `rocksdb://` alias is accepted but opens SurrealKV:
    ```bash
    SURREALDB_CONTROL_URL=wss://.../rpc \
    SURREALDB_CONTROL_USERNAME=... \
@@ -57,5 +58,7 @@ After restore and rotation:
 - Confirm OIDC login requires re-linking
 
 This drill applies only when a remote SurrealDB deployment is actually used.
-After restore, run the conformance and isolation commands in the Verification
-section and record the deployment, commit, and key-rotation result manually.
+For the one-time embedded v3-to-v4 conversion and rollback procedure, follow
+[Upgrade to v1.40.0](../../README.md#upgrade-to-v1400). After restore, run the
+conformance and isolation commands in the Verification section and record the
+deployment, commit, and key-rotation result manually.

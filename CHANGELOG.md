@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.40.0] - 2026-11-18
+
+### Changed
+- **Breaking for source integrations:** replace `kv-rocksdb` and `RocksDb` with `kv-surrealkv` and `SurrealKv` when configuring SurrealDB directly.
+- Existing embedded v3 stores require a one-way conversion. Stop all writers, make a cold backup of every distinct local store, and verify a restore with v1.39.0 on a disposable copy. Set `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true` for the first v1.40.0 start, allow a long startup timeout, and keep the flag set if conversion needs a retry. Remove it after conversion and maintenance complete. Never point a v3 binary at converted data.
+- To roll back, stop all v4 processes and restore the complete pre-upgrade backup set into clean paths. Keep the external backup and `_rocksdb_backup/`; the latter is not a substitute. Writes made after the backup will be lost. See the [upgrade guide](README.md#upgrade-to-v1400) and test the restore before upgrading.
+- `surrealkv://` is the preferred local file-backed URL. The existing `rocksdb://` application URL remains accepted as an alias, but now opens SurrealKV.
+- The v1.40.0 SDK works with stable remote SurrealDB 3.x and 4.x; tests cover 3.3.5 and 4.0.1. Remote v3 servers do not need an upgrade. Remote v4 catalog and index maintenance requires `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true`, all datastore-sharing nodes on v4, and a coordinated window with older writers stopped. See the [upgrade guide](README.md#upgrade-to-v1400) for the pre-start commands.
+- Lexical scores and near-tie vector rankings may differ under SurrealDB 4.
+
 ## [1.39.0] - 2026-11-16
 
 ### Added
@@ -76,6 +86,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.40.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.39.0...v1.40.0
 [1.39.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.38.0...v1.39.0
 [1.38.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.2...v1.38.0
 [1.37.2]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.1...v1.37.2

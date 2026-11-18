@@ -8,7 +8,7 @@ Accepted — 2026-08-24.
 
 The optional `watch` CLI mode requires a user to run and supervise a second long-lived process beside each stdio MCP server. That does not fit the product's actual usage: agents invoke the MCP tools or one-shot CLI operations, while users reasonably expect an MCP host to own the lifetime of supporting background work. The existing watcher also ingests only an episode, despite documentation promising `ingest → extract`, and one file error terminates the entire watcher.
 
-Multiple stdio clients normally launch separate Memory MCP processes. Embedded RocksDB cannot be shared concurrently through one data directory, so each such process needs its own `SURREALDB_DATA_DIR`; changing only the database name or Active Namespace does not avoid directory ownership conflicts.
+Multiple stdio clients normally launch separate Memory MCP processes. An embedded SurrealKV store cannot be shared concurrently through one data directory, so each process needs its own `SURREALDB_DATA_DIR`; changing only the database name or Active Namespace does not avoid directory ownership conflicts.
 
 ## Decision
 

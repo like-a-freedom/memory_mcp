@@ -21,6 +21,7 @@ It is designed for workflows where agents need more than short-lived chat contex
   - [Bi-temporal data model](#bi-temporal-data-model)
 - [Quick start](#quick-start)
 - [Remote deployment](#remote-deployment)
+- [Upgrade to v1.40.0](#upgrade-to-v1400)
 - [Configuration](#configuration)
 - [Logging](#logging)
 - [MCP tools](#mcp-tools)
@@ -465,9 +466,10 @@ RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
 
-`mem://` and `rocksdb://` are not remote URL schemes. For an explicit local
-RocksDB location, set `SURREALDB_DATA_DIR`; otherwise the server uses a
-user-owned data directory by default.
+`mem://` and `surrealkv://` are not remote URL schemes. The legacy
+`rocksdb://` alias is also local and now opens SurrealKV. For the default local
+store, set `SURREALDB_DATA_DIR` to choose its directory; otherwise the server
+uses a user-owned data directory.
 
 ### Filesystem ingestion (optional, inside `serve`)
 
@@ -972,10 +974,11 @@ fenced leases; a stable replica ID makes lease ownership observable.
 
 ### Storage backends
 
-`mem://` is test-only. `rocksdb://` works for development, demos, and
-single-process tests. Public production requires remote SurrealDB. The
-embedded profile emits a startup warning and is not HA, not rolling, and
-not horizontally scalable.
+`mem://` is test-only. `surrealkv://` works for development, demos, and
+single-process tests. The legacy `rocksdb://` alias is accepted but also uses
+SurrealKV. Public production requires remote SurrealDB. The embedded profile
+emits a startup warning and is not HA, not rolling, and not horizontally
+scalable.
 
 ### Before opening ingress
 
@@ -984,10 +987,88 @@ Confirm the reverse proxy enforces TLS, host, and origin. Confirm
 [operations runbooks](docs/operations/) (restore drill, credential rotation)
 and the §20.5 release evidence for open signup.
 
+## Upgrade to v1.40.0
+
+Memory MCP 1.40.0 replaces embedded RocksDB (`kv-rocksdb` and `RocksDb`) with
+SurrealKV (`kv-surrealkv` and `SurrealKv`). This breaks source integrations
+that configure SurrealDB directly; replace those feature and type names. The
+application-level `rocksdb://` URL remains accepted as a compatibility alias,
+but it now opens SurrealKV. Use `surrealkv://` in new local URL configuration.
+
+### Embedded stores
+
+First decide which physical stores the running profile uses:
+
+- The stdio server has one primary store. Its directory comes from
+  `SURREALDB_DATA_DIR` or the resolved default. A remote `SURREALDB_URL` does
+  not need local conversion.
+- The HTTP server has a control Registry target and a tenant target, configured
+  by `SURREALDB_CONTROL_URL` and `SURREALDB_TENANT_URL`. For file-backed targets,
+  the path in each URL identifies its local store. Back up every distinct path;
+  if both URLs resolve to the same physical directory, make one copy. Remote
+  targets do not need local conversion. The stdio `SURREALDB_DATA_DIR` does not
+  select either HTTP target.
+
+Before converting any embedded v3 store:
+
+1. Schedule downtime and stop every process that can write to each store,
+   including stdio servers, HTTP servers, filesystem ingestion, admin commands,
+   and other application instances.
+2. While all writers are stopped, make a complete cold copy of every distinct
+   store directory. Preserve the full directory contents and permissions. On a
+   separate disposable path, restore a copy with v1.39.0 and check known records.
+   Rehearse the v1.40.0 conversion on another copy. A checksum alone does not
+   show that a backup can be restored.
+3. Allow disk space for the external backup and for the old and converted files
+   to coexist. The first conversion can take a long time. Increase the process
+   and supervisor restart timeouts so they do not kill and restart it repeatedly.
+4. Set `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true` only in the environment of
+   the first v1.40.0 start that opens the old store. Fresh stores do not need it.
+   If conversion is interrupted, keep the setting enabled for the retry. Leave
+   the application offline until conversion and application/index maintenance
+   complete, then remove the setting.
+5. Keep the external backup. Do not delete `_rocksdb_backup/`; it is not a
+   substitute for the coordinated backup set.
+
+Conversion is one-way for the old v3 SDK. Never point v1.39.0 or another v3
+binary at a converted directory. If you need to roll back, stop every v4 process
+and restore the complete pre-upgrade backup set into clean, separate directories,
+then configure the old binary to use those restored paths. Do not overlay a
+backup onto converted files. Writes made after the backup are absent from the
+restored copy.
+
+### Remote servers and v4 index maintenance
+
+The v1.40.0 SDK remains compatible with stable SurrealDB 3.x and 4.x servers; the
+release was tested against 3.3.5 and 4.0.1. You do not need to upgrade a remote
+server for SDK compatibility. Remote v3 servers do not use the embedded
+conversion setting.
+
+Before v1.40.0 applies its catalog to a remote v4 database, coordinate a
+maintenance window: every node sharing that datastore must run v4, and older
+writers must be stopped. This applies to fresh v4 databases too. The application
+cannot enforce a cluster-wide write pause. Set
+`SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true` separately from the embedded
+conversion flag, then run the role-specific pre-start command:
+
+```bash
+# Stdio primary database
+env SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true memory_mcp surrealdb-v4-maintenance --role primary
+
+# HTTP control Registry and ready tenant databases
+env SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true memory_mcp_http surrealdb-v4-maintenance
+```
+
+Keep the acknowledgement set when starting the v4 application. If maintenance
+reports an ambiguous interruption, keep the application offline and follow its
+recovery instructions. Do not authorize recovery until every earlier submitter
+has stopped and no server-side rebuild can still resume. Remote server upgrades
+remain the remote operator's responsibility.
+
 ## Configuration
 
 Configuration is loaded from environment variables. There is no config file and no
-`.env` is loaded automatically — the process reads the environment it was started
+`.env` is loaded automatically. The process reads the environment it was started
 with, so a variable must be exported into it (or placed in the container's
 `environment:` block, as `docker-compose.yml` does).
 
@@ -1136,12 +1217,14 @@ still marked `No`.
 | `RETRIEVAL_RERANKER_ADMISSION_FLOOR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `RETRIEVAL_RERANKER_MODEL_DIR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `RUST_LOG` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | Storage | No | [Upgrade to v1.40.0](#upgrade-to-v1400) |
 | `SURREALDB_DATA_DIR` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_DB_NAME` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDED` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_EMBEDDING_DIMENSION` | Embeddings | No | [Storage variables and defaults](#storage-variables-and-defaults) |
 | `SURREALDB_MEM_LIMIT` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64); SurrealDB container `mem_limit`, default `512m` |
 | `SURREALDB_NAMESPACE` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | Storage | No | [Upgrade to v1.40.0](#upgrade-to-v1400) |
 
 </details>
 
@@ -1150,9 +1233,10 @@ Variables that are retired, removed, or ignored are collected under
 
 ### Storage variables and defaults
 
-These are read by the stdio/local profile (`memory_mcp serve`). The HTTP profile
-ignores them in favour of the `SURREALDB_CONTROL_*` and `SURREALDB_TENANT_*`
-pair; see [Streamable HTTP environment variables](#streamable-http-environment-variables).
+These are read by the stdio/local profile (`memory_mcp serve`). HTTP uses the
+`SURREALDB_CONTROL_*` and `SURREALDB_TENANT_*` targets instead, except that
+`SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` also enables conversion for embedded HTTP
+targets. See [Streamable HTTP environment variables](#streamable-http-environment-variables).
 
 Some of the variables below are also honoured by an HTTP build, but not all,
 and not by the same code path — check the row before assuming one applies:
@@ -1171,15 +1255,17 @@ and not by the same code path — check the row before assuming one applies:
 | `SURREALDB_NAMESPACE` | string | `main` | No | One namespace; changing it takes effect after restart and never moves data |
 | `SURREALDB_USERNAME` | string | `root` (embedded); explicit value required (remote) | Conditional | Database username. Required in remote mode |
 | `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Conditional | Database password. Required in remote mode |
-| `SURREALDB_URL` | URL | unset (embedded) | Conditional | Remote connection URL using `ws`, `wss`, `http`, or `https`. Required in remote mode |
+| `SURREALDB_URL` | URL | unset (embedded) | Conditional | Remote `ws`, `wss`, `http`, or `https` URL, or local file-backed `surrealkv://` URL. The legacy `rocksdb://` alias also opens SurrealKV |
 | `SURREALDB_EMBEDDED` | boolean | inferred from `SURREALDB_URL` | No | Explicit `true`/`false`; remote URLs select remote mode and all other URLs select embedded mode when unset |
 | `SURREALDB_DATA_DIR` | path | `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Custom embedded data directory; an existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
+| `SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X` | boolean | `false` | No | Allows embedded SurrealDB 4 to convert an existing v3 store. Set during conversion and any retry; fresh stores and remote servers do not need it. See [Upgrade to v1.40.0](#upgrade-to-v1400) |
+| `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | boolean | `false` | Conditional | Explicit acknowledgement for remote v4 catalog and index maintenance. Remote-only; see [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `SURREALDB_EMBEDDING_DIMENSION` | unsigned integer | unset | No | Existing vector dimension override; the provider fallback is `384` for `local-candle` and `1536` for other embedding providers |
 
-The default local path is embedded RocksDB with no external service, credential,
-or model download required to start storage. Remote mode requires a valid URL and
-non-empty explicit username and password. NER defaults to the in-process Anno
-backend; `zero-config` does not mean the binary has no dependencies.
+The default local path uses embedded SurrealKV with no external service,
+credential, or model download required to start storage. Remote mode requires a
+valid URL and non-empty explicit username and password. NER defaults to the
+in-process Anno backend; `zero-config` does not mean the binary has no dependencies.
 
 ### Filesystem ingestion
 
@@ -1283,12 +1369,13 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| `SURREALDB_CONTROL_URL` | URL | Remote `ws`, `wss`, `http`, or `https` connection URL for the control Registry |
+| `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD` | boolean (`false` by default) | Acknowledge remote v4 catalog and index maintenance. Before setting it, ensure all nodes sharing the datastore run v4 and older writers are stopped |
+| `SURREALDB_CONTROL_URL` | URL | Remote `ws`, `wss`, `http`, or `https` URL, or local file-backed `surrealkv://` URL for the control Registry. The legacy `rocksdb://` alias also opens SurrealKV |
 | `SURREALDB_CONTROL_USERNAME` | string | Registry username; non-empty for remote |
 | `SURREALDB_CONTROL_PASSWORD` | string | Registry password; non-empty for remote |
 | `SURREALDB_CONTROL_NAMESPACE` | string | Registry namespace (separate from tenant namespaces) |
 | `SURREALDB_CONTROL_DB` | string | Registry database name |
-| `SURREALDB_TENANT_URL` | URL | Remote URL for the tenant engine that creates and binds immutable tenant namespaces |
+| `SURREALDB_TENANT_URL` | URL | Remote `ws`, `wss`, `http`, or `https` URL, or local file-backed `surrealkv://` URL for the tenant engine. The legacy `rocksdb://` alias also opens SurrealKV |
 | `SURREALDB_TENANT_USERNAME` | string | Tenant engine username |
 | `SURREALDB_TENANT_PASSWORD` | string | Tenant engine password |
 | `SURREALDB_TENANT_NAMESPACE` | string | Tenant engine namespace |
@@ -1484,7 +1571,7 @@ misconfiguration that fails startup rather than being silently ignored.
 
 - `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` are required and must be non-empty in any HTTP build. Missing or wildcard origins are rejected at startup (`ConfigInvalid`), and the server does not fall back to permissive defaults.
 - The control and tenant SurrealDB targets (`SURREALDB_CONTROL_*` vs `SURREALDB_TENANT_*`) must differ in at least one of `url`, `namespace`, or `database`. The server rejects identical bindings at startup to prevent the control Registry from writing into a tenant namespace.
-- `mem://` is rejected at startup in any non-test HTTP build. Production HTTP must use a remote `ws`/`wss`/`http`/`https` SurrealDB target or a documented embedded `rocksdb://` profile.
+- `mem://` is rejected at startup in any non-test HTTP build. Production HTTP must use a remote `ws`/`wss`/`http`/`https` SurrealDB target or a documented embedded `surrealkv://` profile. The legacy `rocksdb://` alias is accepted but opens SurrealKV.
 - `MEMORY_INGESTION_INBOX` is rejected as a fatal startup error if set. Filesystem ingestion is the stdio-only ingestion path; setting it in the HTTP profile means the deployment is misconfigured. (`SURREALDB_FS_WATCH_INBOX`, an older misspelling, is read by no code path and is silently ignored.)
 
 ### Runtime metrics

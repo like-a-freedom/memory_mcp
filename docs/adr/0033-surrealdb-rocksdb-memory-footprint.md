@@ -1,12 +1,16 @@
 # ADR-0033: SurrealDB/RocksDB Memory Footprint
 
 ## Status
-Accepted (investigation — controls EXIST, not enabled by this plan)
+Historical. The RocksDB-specific observations below describe the embedded engine used before v1.40.0; the current embedded engine is SurrealKV.
 
 ## Context
-Embedded SurrealDB (kv-rocksdb) contributes to the process floor and, with
-engine defaults, is the LARGEST hidden memory term after the GLiNER model it
-would leave behind once unload lands.
+
+In the v1.39.0 implementation, embedded SurrealDB used `kv-rocksdb`. That engine
+contributed to the process floor and, with its defaults, was the largest hidden
+memory term after the GLiNER model targeted by the unload work. v1.40.0 switches
+embedded storage to SurrealKV. The tuning variables and measurements below are
+historical RocksDB notes, not configuration advice for SurrealKV. See the
+[upgrade guide](../../README.md#upgrade-to-v1400) for current storage behavior.
 
 Verified against surrealdb-core 3.0.0 sources
 (`~/.cargo/registry/src/*/surrealdb-core-3.0.0/src/kvs/rocksdb/cnf.rs`);
@@ -24,17 +28,18 @@ server); embedded use on a developer laptop gets the same number. It is a
 ceiling, not an allocation — RSS only grows as pages are actually cached —
 but over days of uptime it explains part of the non-GLiNER drift.
 
-## Decision
-Do NOT set these knobs in this plan (out of scope; user workload is dominated
-by GLiNER + malloc arenas). DOCUMENT them here so the idle-RSS investigation
-in Task 11 has a next lever to pull if the post-mimalloc floor proves higher
-than the ~50-300 MB target.
+## Original decision
 
-Follow-up (NOT in this plan): if the post-unload idle floor exceeds ~300 MB,
-set e.g. `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE=268435456` (256 MiB) and re-measure.
-That is a documented user-facing env var of surrealdb 3.0.0, no code change.
+The original investigation did not set these knobs because its workload was
+dominated by GLiNER and malloc arenas. It recorded them as a possible follow-up
+for measuring the idle-RSS floor after model unload and allocator changes.
 
-## Consequences
-+ The full idle-RSS budget is now enumerated; no unexplained term remains.
-- Actual DB floor is workload-dependent; do not claim a hard number until
-  Task 11 measures it.
+Historical follow-up: if the post-unload idle floor exceeded about 300 MB,
+the proposal was to set `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE=268435456` (256 MiB)
+and re-measure. This SurrealDB 3.0.0 setting does not tune the current SurrealKV engine.
+
+## Historical consequences
+
+- The original idle-RSS budget enumerated the RocksDB contribution.
+- The database floor was workload-dependent; no hard number was established by
+  that investigation.

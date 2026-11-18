@@ -89,8 +89,8 @@ smoke checks as well and skip compiling a second test profile.
   inactivity. Rust, lockfile and Cargo config
   changes invalidate Rust caches. Bump `native-v3` if changing native compiler
   policy outside Cargo configuration.
-- The first uncached build is expensive: SurrealDB, RocksDB, ML libraries and
-  release LTO still need compilation. Job timeouts are ceilings, not expected
+- The first uncached build is expensive: SurrealDB, SurrealKV, ML libraries
+  and release LTO still need compilation. Job timeouts are ceilings, not expected
   durations. Do not infer an optimization gain until comparing completed runs.
 
 ## Extended evaluations

@@ -27,7 +27,8 @@ implementation does not match the approved design, the divergence is stated
 rather than smoothed over.
 
 Evidence in this revision was collected against the real binaries and a real
-RocksDB-backed registry. The browser-driven image harness that some of it
+registry. Before v1.40.0, the registry used RocksDB; current local registries
+use SurrealKV. The browser-driven image harness that some of this evidence
 originally came from has been removed: it never ran in CI, so it protected
 nothing from regression. The properties it covered are now asserted by
 `crates/xtask` (the release artifact) and the `ui_assets` integration test (the
@@ -56,7 +57,7 @@ All of the following were executed in this repository and passed:
 | Service security experiments against the **real** store | `... --lib ... service::local_admin` — 31 passed (of which 13 are the plan §5 experiments; see §13.3 for the per-case mapping) |
 | HTTP surface (real router, real pre-auth cookie, CSRF, Origin, session, SQL transactions, migrated in-memory registry) | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` — 44 passed |
 | OIDC regression | `... --test http_control_plane` — 20 passed |
-| CLI contract (clap surface + real subprocess against file-backed RocksDB) | `... --test local_admin_cli` — 11 passed, including the two removals (§5) |
+| CLI contract (clap surface + real subprocess against file-backed SurrealKV; the test uses the legacy `rocksdb://` URL alias) | `... --test local_admin_cli` — 11 passed, including the two removals (§5) |
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
@@ -1592,13 +1593,14 @@ credentials; multi-administrator equality does not remove the need for host and
 database access control. `docs/operations/RESTORE_DRILL.md` covers the generic
 SurrealDB restore procedure.
 
-**Embedded-RocksDB caveat.** The CLI opens `SURREALDB_CONTROL_URL` itself. With
-`rocksdb://<path>` an embedded RocksDB permits one process handle per path, so the
-CLI must run with the HTTP server stopped for that path, or against a remote
-registry URL. `tests/local_admin_cli.rs` proves the CLI works against a
-file-backed `rocksdb://` registry when nothing else holds it (it creates and then
-recovers an administrator across two separate processes). The failure mode of
-running the CLI while the server holds the same path was not exercised.
+**Embedded-store caveat.** The CLI opens `SURREALDB_CONTROL_URL` itself. A local
+SurrealKV store permits one process handle per path, so the CLI must run with the
+HTTP server stopped for that path, or against a remote registry URL. The legacy
+`rocksdb://<path>` alias also opens SurrealKV; `surrealkv://<path>` is preferred.
+`tests/local_admin_cli.rs` proves the CLI works against a file-backed local
+registry when nothing else holds it. It creates and then recovers an
+administrator across two separate processes. The failure mode of running the
+CLI while the server holds the same path was not exercised.
 
 **Migration asset path.** The registry migration SQL is read at runtime from
 `CARGO_MANIFEST_DIR/migrations`, i.e. the absolute build-time path
@@ -1691,7 +1693,7 @@ regardless.
 | Argon2id parameters, per-hash salting, corrupt/foreign PHC rejection, bounded KDF admission | `password.rs` unit tests, including `a_saturated_admission_queue_fails_closed` |
 | Username and password policy | `policy.rs` unit tests |
 | CLI surface, `--username` only, no password/code flags, stable mode label, not a one-shot | `local_admin_cli.rs` parser tests |
-| CLI persists across processes against file-backed RocksDB, no OIDC/model init | `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
+| CLI persists across processes against a file-backed local SurrealKV store, with no OIDC/model init | `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
 | `admin` absent from a `--no-default-features` build | `cargo run -p memory_mcp --no-default-features --locked --bin memory_mcp -- --help` |
 | Local mode starts from environment variables against the real binary | `local_admin_cli.rs`, `http_local_admin.rs` (§2.5) |
 | Provisioning advances a freshly created client to `ready` | Same script §7b — `tenant_status after 1 polls: ready`, plus `op=schema.init` in the instance log (§2.5, §12) |
@@ -1728,7 +1730,7 @@ regardless.
 | Rate-window boundary across replicas and after a restart | ✅ `local_admin_rate_window_survives_a_store_reconnect` spends the whole challenge budget on one connection, drops it mid-window, and shows a fresh connection still sees the spent budget (`Limited`, `retry_after_seconds > 0`); the fixed window and its saturation stay covered by `exp9`/`exp9b` |
 | Client visibility across two administrators | ✅ `http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients` (list, read, suspend, resume) |
 | `surrealdb` SQL fault injection in the local-admin store (nonselected statement error, audit insert error) | ✅ `sql_fault_tests` — a test-only SQL fault hook fails a named local-admin statement; the aborted transaction leaves no session, no success audit row and no half-applied credential change |
-| CLI versus a live holder of the same embedded RocksDB path | ❌ only standalone CLI use is proven; the script stops the server first by design |
+| CLI versus a live holder of the same embedded SurrealKV path | ❌ only standalone CLI use is proven; the script stops the server first by design |
 | Unscheduled rate-bucket cleanup | ✅ scheduled: `local_admin_rate::rate_bucket_cleanup_scheduler_job` is registered by `memory_mcp_http`, at most one bounded pass every 300 s per process |
 | A stale plan is refused at startup rather than adopted | ⚠️ enforced in code only: `ensure_local_plan` runs at startup (`http.rs`) and the store `THROW`s `'plan_limit_mismatch'` when the stored limit set differs (`surreal_store.rs`); no test exercises the refusal |
 

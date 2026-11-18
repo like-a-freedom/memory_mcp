@@ -532,8 +532,9 @@ In order of likelihood:
 
 ## Verified against a running server
 
-Every claim above was checked against `memory_mcp_http` on an embedded
-RocksDB store, serving real requests, rather than reasoned about:
+The v1.39.0 verification checked every claim above against `memory_mcp_http`
+on an embedded RocksDB store serving real requests. v1.40.0 uses SurrealKV for
+new embedded stores; the observations below describe the earlier verification:
 
 - `route="/health/live"`, `route="/health/ready"`, `route="/mcp"` and
   `route="unmatched"` all appear — the last from a request to a path that does

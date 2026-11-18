@@ -157,7 +157,7 @@ See [ADR-0016](docs/adr/0016-agent-memory-lifecycle-integration.md) and the oper
 **Configuration:**
 | Variable | Description |
 |----------|-------------|
-| `SURREALDB_URL` | Connection URL (`mem://`, `rocksdb://path`, or remote `ws://`/`wss://`/`http://`/`https://`) |
+| `SURREALDB_URL` | Connection URL (`mem://`, preferred `surrealkv://path`, legacy `rocksdb://path` alias, or remote `ws://`/`wss://`/`http://`/`https://`) |
 | `SURREALDB_DB_NAME` | Database name |
 | `SURREALDB_NAMESPACE` | One namespace (default: `main`) |
 | `SURREALDB_USERNAME` | Auth username |

@@ -3,8 +3,8 @@
 //! CLI coverage for the administrator-only `admin` command (plan Task 5).
 //!
 //! The parser tests pin the clap surface. The process test spawns the real
-//! `memory_mcp` binary against an isolated, file-backed RocksDB control
-//! registry: it proves `admin create` / `admin recover` persist an
+//! `memory_mcp` binary against an isolated, file-backed control registry opened
+//! through `rocksdb://` (SurrealKV since v1.40.0): it proves `admin create` / `admin recover` persist an
 //! administrator across processes and never require tenant credentials,
 //! model settings or OIDC configuration (those variables are deliberately
 //! absent from the child environment).
