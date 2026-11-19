@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.40.0] - 2026-11-18
+## [1.40.0] - 2026-11-19
 
 ### Changed
 - Source integrations that configure SurrealDB directly must replace the removed `kv-rocksdb` feature and `RocksDb` type with `kv-surrealkv` and `SurrealKv`.
@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file.
 - Lexical scores and near-tie vector rankings may differ under SurrealDB 4.
 
 ### Evaluation
-- The PR and release profiles passed 150/150 and 154/154 cases. The response-size profile passed 61/61, with overall savings of 31.0% for context assembly and 17.9% for explanations.
+- The PR and release profiles passed 150/150 and 154/154 cases. The response-size profile passed 61/61, with overall savings of 31.0% for context assembly and 17.8% for explanations.
 - The v1.39.0 retrieval-quality run was invalid because no embedding provider was configured, so there is no valid before-and-after retrieval comparison.
 
 ## [1.39.0] - 2026-11-16
