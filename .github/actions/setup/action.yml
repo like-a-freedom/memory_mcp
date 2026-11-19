@@ -70,11 +70,14 @@ runs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        # ort-sys 2.0.0-rc.12 copies the ONNX Runtime DLLs into `target`,
-        # `target\examples` and `target\deps` for a host build and panics on a
-        # copy fallback when one of them is missing. A cold Cargo cache has
-        # neither `examples` nor `deps`, which failed the release build.
-        New-Item -ItemType Directory -Force -Path 'target\examples', 'target\deps' | Out-Null
+        # ort-sys 2.0.0-rc.12 copies the ONNX Runtime DLLs next to the build
+        # output (`target\release`) and into its `examples` and `deps`
+        # siblings, and panics on the copy fallback when one is missing. A cold
+        # Cargo cache has no `examples` directory at all.
+        New-Item -ItemType Directory -Force -Path `
+          'target\examples', 'target\deps', `
+          'target\debug\examples', 'target\debug\deps', `
+          'target\release\examples', 'target\release\deps' | Out-Null
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
       with:
         # Use the same rolling channel as `rust-toolchain.toml` and the official
