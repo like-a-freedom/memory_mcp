@@ -158,6 +158,19 @@ jobs:
           echo "checking prometheus without default features"
           cargo check -p memory_mcp --all-targets --no-default-features \
             --features "prometheus,test-fixtures" --locked
+
+  evaluation:
+    needs: release-ref
+    name: Evaluation and perf smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          target: x86_64-unknown-linux-gnu
+          cache-key: quality
+          cache-shared-key: dev
       - name: Cache immutable evaluation models
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -668,18 +681,20 @@ jobs:
   passed:
     name: CI passed
     if: always()
-    needs: [release-ref, quality, surrealdb-remote-compat, native, docker]
+    needs: [release-ref, quality, evaluation, surrealdb-remote-compat, native, docker]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every check this event is supposed to run
         env:
           EVENT: ${{ github.event_name }}
           QUALITY: ${{ needs.quality.result }}
+          EVALUATION: ${{ needs.evaluation.result }}
           REMOTE_COMPAT: ${{ needs.surrealdb-remote-compat.result }}
           NATIVE: ${{ needs.native.result }}
           DOCKER: ${{ needs.docker.result }}
         run: |
           test "$QUALITY" = success || exit 1
+          test "$EVALUATION" = success || exit 1
           test "$REMOTE_COMPAT" = success || exit 1
           if test "$EVENT" = push; then
             # Build jobs deliberately do not start on push: a skip is the
