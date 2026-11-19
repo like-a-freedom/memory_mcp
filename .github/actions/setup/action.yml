@@ -66,6 +66,15 @@ runs:
         # Windows Developer Mode is unavailable; Cargo runs tests from deps.
         $target >> $env:GITHUB_PATH
         (Join-Path $target 'deps') >> $env:GITHUB_PATH
+    - name: Windows ORT link directories
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        # ort-sys 2.0.0-rc.12 copies the ONNX Runtime DLLs into `target`,
+        # `target\examples` and `target\deps` for a host build and panics on a
+        # copy fallback when one of them is missing. A cold Cargo cache has
+        # neither `examples` nor `deps`, which failed the release build.
+        New-Item -ItemType Directory -Force -Path 'target\examples', 'target\deps' | Out-Null
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
       with:
         # Use the same rolling channel as `rust-toolchain.toml` and the official
