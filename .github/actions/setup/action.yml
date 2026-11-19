@@ -71,13 +71,26 @@ runs:
       shell: pwsh
       run: |
         # ort-sys 2.0.0-rc.12 copies the ONNX Runtime DLLs next to the build
-        # output (`target\release`) and into its `examples` and `deps`
-        # siblings, and panics on the copy fallback when one is missing. A cold
-        # Cargo cache has no `examples` directory at all.
-        New-Item -ItemType Directory -Force -Path `
-          'target\examples', 'target\deps', `
-          'target\debug\examples', 'target\debug\deps', `
-          'target\release\examples', 'target\release\deps' | Out-Null
+        # output and into `examples` and `deps` siblings, then panics when a
+        # copy fallback hits a directory that does not exist. Cargo never
+        # creates the `examples` siblings for a plain `cargo build`, so a cold
+        # cache failed both Windows release builds. The set covers host-profile
+        # builds, `--target` builds and the `build` directory the 2.0.0-rc.12
+        # copy resolves to.
+        $bases = @('target', (Join-Path 'target' '${{ inputs.target }}')) | Select-Object -Unique
+        $paths = foreach ($base in $bases) {
+          foreach ($profile in 'debug', 'release') {
+            $root = Join-Path $base $profile
+            $root
+            Join-Path $root 'examples'
+            Join-Path $root 'deps'
+            $build = Join-Path $root 'build'
+            $build
+            Join-Path $build 'examples'
+            Join-Path $build 'deps'
+          }
+        }
+        New-Item -ItemType Directory -Force -Path $paths | Out-Null
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
       with:
         # Use the same rolling channel as `rust-toolchain.toml` and the official
