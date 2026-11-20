@@ -125,7 +125,7 @@ fn structured_summary_section_heading(line: &str) -> Option<StructuredSummarySec
     }
 
     let heading = strip_markdown_inline_formatting(heading);
-    let heading_terms = crate::shared::search::search_query_terms(&heading);
+    let heading_terms = crate::shared::search::content_word_terms(&heading);
     if heading_terms.is_empty() {
         return None;
     }
@@ -333,12 +333,19 @@ pub(super) fn sanitized_content_for_entity_extraction(content: &str) -> String {
         }
 
         let (body, is_list_item) = strip_list_marker(trimmed);
-        // These categorical ticket fields are metadata, not entity mentions.
-        if let Some((field, _)) = body.split_once(':')
+        // A ticket field label alone can also introduce prose.
+        if let Some((field, value)) = body.split_once(':')
             && matches!(
-                crate::shared::search::normalize_text(&strip_markdown_inline_formatting(field))
-                    .as_str(),
-                "substate" | "triage" | "feature flag" | "license kind"
+                (
+                    crate::shared::search::normalize_text(&strip_markdown_inline_formatting(field))
+                        .as_str(),
+                    crate::shared::search::normalize_text(&strip_markdown_inline_formatting(value))
+                        .as_str(),
+                ),
+                ("substate", "analysis")
+                    | ("triage", "pending")
+                    | ("feature flag", "enabled")
+                    | ("license kind", "add-on")
             )
         {
             continue;

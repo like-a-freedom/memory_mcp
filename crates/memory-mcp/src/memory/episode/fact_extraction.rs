@@ -63,7 +63,7 @@ pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact
                 .any(|sentence| {
                     let sentence = sentence.trim();
                     !sentence.ends_with('?')
-                        && crate::shared::search::search_query_terms(sentence).len() >= 3
+                        && crate::shared::search::content_word_terms(sentence).len() >= 3
                 });
         if !has_statement {
             return false;

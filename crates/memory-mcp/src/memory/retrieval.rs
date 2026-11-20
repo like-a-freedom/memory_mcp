@@ -286,7 +286,7 @@ async fn assemble_context_inner(
     if params.resolved_view_mode_opt.as_deref() != Some("facets")
         && params.resolved_view_mode_opt.as_deref() != Some("wake_up")
         && params.resolved_view_mode_opt.as_deref() != Some("map")
-        && params.cleaned_query.is_empty()
+        && request.query.trim().is_empty()
     {
         let appended = append_recent_experience_items(
             &mut results,
@@ -720,7 +720,10 @@ mod tests {
         let service = crate::service::MemoryService::new(
             Arc::new(
                 crate::service::mock_db::MockDbClient::new().expect_query_with(
-                    |sql| sql.contains("FROM episode"),
+                    |sql| {
+                        sql.starts_with("SELECT * FROM episode WHERE")
+                            && sql.contains("string::contains(string::lowercase(content), $query)")
+                    },
                     // The context store runs the episode-content fallback
                     // through the core `query` op, so the assertion the old
                     // fake made inline — that the query carries the user's

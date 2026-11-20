@@ -20,14 +20,18 @@ pub fn preprocess_search_query(raw: &str) -> String {
 }
 
 /// Extract normalized search terms from a natural-language query.
+///
+/// Russian word forms are folded to one stem so that a query written in one
+/// case matches content written in another. The native full-text analyzer
+/// stems too, but admission compares terms inside the application.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
     static RUSSIAN_STEMMER: LazyLock<Stemmer> =
         LazyLock::new(|| Stemmer::create(Algorithm::Russian));
 
-    search_surface_terms(raw)
+    lexical_terms(raw, RussianFunctionWords::Drop)
         .into_iter()
         .map(|term| {
-            if term.chars().all(|c| matches!(c, 'а'..='я' | 'ё')) {
+            if is_cyrillic(&term) {
                 RUSSIAN_STEMMER.stem(&term).into_owned()
             } else {
                 term
@@ -36,9 +40,32 @@ pub fn search_query_terms(raw: &str) -> Vec<String> {
         .collect()
 }
 
-/// Keep Russian word forms for database queries: native FTS stems them itself,
-/// while its substring fallback must use the unstemmed terms.
+/// Word terms that ingestion counts. Every Russian word counts here, because
+/// extraction gates on term counts and retrieval's function-word policy must
+/// not change which notes become facts.
+pub(crate) fn content_word_terms(raw: &str) -> Vec<String> {
+    lexical_terms(raw, RussianFunctionWords::Keep)
+}
+
+/// Keep Russian word forms for database queries: the native full-text analyzer
+/// stems them itself, so send the words as the caller wrote them.
 pub(crate) fn search_surface_terms(raw: &str) -> Vec<String> {
+    lexical_terms(raw, RussianFunctionWords::Drop)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RussianFunctionWords {
+    /// Retrieval evidence ignores Russian function words.
+    Drop,
+    /// Ingestion counts every word, as it did before retrieval narrowed.
+    Keep,
+}
+
+fn is_cyrillic(term: &str) -> bool {
+    !term.is_empty() && term.chars().all(|c| matches!(c, 'а'..='я' | 'ё'))
+}
+
+fn lexical_terms(raw: &str, russian_function_words: RussianFunctionWords) -> Vec<String> {
     static EPISODE_REF: LazyLock<Result<Regex, regex::Error>> =
         LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+"));
     static QUOTED: LazyLock<Result<Regex, regex::Error>> =
@@ -57,7 +84,7 @@ pub(crate) fn search_surface_terms(raw: &str) -> Vec<String> {
         terms.extend(
             token
                 .split(|character: char| !character.is_alphanumeric())
-                .filter_map(normalize_search_term),
+                .filter_map(|term| normalize_search_term(term, russian_function_words)),
         );
         terms.extend(search_reference_terms(token));
     }
@@ -182,16 +209,20 @@ fn looks_like_iso_date(token: &str) -> bool {
     )
 }
 
-fn normalize_search_term(raw: &str) -> Option<String> {
+fn normalize_search_term(
+    raw: &str,
+    russian_function_words: RussianFunctionWords,
+) -> Option<String> {
     let token = raw.trim().to_lowercase();
     if token.len() < 2 {
         return None;
     }
 
-    if matches!(token.as_str(), "or" | "and" | "not")
-        || is_search_stopword(&token)
-        || is_russian_search_stopword(&token)
-    {
+    if matches!(token.as_str(), "or" | "and" | "not") || is_search_stopword(&token) {
+        return None;
+    }
+
+    if russian_function_words == RussianFunctionWords::Drop && is_russian_search_stopword(&token) {
         return None;
     }
 
@@ -224,6 +255,7 @@ fn is_russian_search_stopword(token: &str) -> bool {
             | "бы"
             | "в"
             | "во"
+            | "вот"
             | "где"
             | "да"
             | "для"
@@ -251,6 +283,7 @@ fn is_russian_search_stopword(token: &str) -> bool {
             | "над"
             | "ним"
             | "но"
+            | "ну"
             | "о"
             | "об"
             | "от"
@@ -402,6 +435,19 @@ mod tests {
         assert_eq!(
             search_query_terms("Какой объект и что в NOVA с ним?"),
             vec!["объект", "nova"]
+        );
+    }
+
+    #[test]
+    fn russian_filler_words_are_not_search_evidence() {
+        assert_eq!(search_query_terms("Ну вот объект?"), vec!["объект"]);
+    }
+
+    #[test]
+    fn ingestion_word_terms_keep_every_russian_word() {
+        assert_eq!(
+            content_word_terms("Мы проверили объект и обновили документацию."),
+            vec!["мы", "проверили", "объект", "и", "обновили", "документацию"]
         );
     }
 

@@ -70,7 +70,7 @@ pub fn is_document_action_item(content: &str) -> bool {
 /// it does not match any richer structured-fact heuristic.
 #[must_use]
 pub fn is_summary_like_note_candidate(content: &str) -> bool {
-    let normalized_terms = crate::shared::search::search_query_terms(content);
+    let normalized_terms = crate::shared::search::content_word_terms(content);
     normalized_terms.len() >= 6 && !is_low_value_summary_candidate(content)
 }
 
@@ -115,7 +115,7 @@ pub fn is_low_value_summary_candidate(content: &str) -> bool {
         || trimmed.contains("! ")
         || trimmed.ends_with('?')
         || trimmed.contains("? ");
-    let alpha_terms = crate::shared::search::search_query_terms(trimmed)
+    let alpha_terms = crate::shared::search::content_word_terms(trimmed)
         .into_iter()
         .filter(|term| {
             term.chars()
@@ -206,6 +206,13 @@ mod tests {
     fn is_summary_like_note_candidate_detects_dense_summary_content() {
         assert!(is_summary_like_note_candidate(
             "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped."
+        ));
+    }
+
+    #[test]
+    fn is_summary_like_note_candidate_counts_russian_function_words() {
+        assert!(is_summary_like_note_candidate(
+            "Мы проверили объект и обновили документацию."
         ));
     }
 

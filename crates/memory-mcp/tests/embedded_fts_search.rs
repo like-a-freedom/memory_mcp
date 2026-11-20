@@ -813,6 +813,159 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+/// The episode fallback matches content with a literal substring query, so an
+/// inflected query term only reaches an episode when the term is stemmed before
+/// it is sent to the database.
+#[tokio::test]
+async fn episode_fallback_recalls_inflected_russian_content()
+-> Result<(), Box<dyn std::error::Error>> {
+    use memory_mcp::models::IngestRequest;
+    use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+
+    let service = common::make_service().await;
+    IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_context: None,
+            source_type: "note".to_string(),
+            source_id: "episode-inflected-only".to_string(),
+            content: "Объект 731 готов к проверке.".to_string(),
+            t_ref: Utc::now() - Duration::days(1),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await?;
+
+    let recalled = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "объекта".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await?;
+
+    assert!(
+        recalled
+            .iter()
+            .any(|item| item.source_episode == "episode-inflected-only"
+                || item.content.contains("Объект 731")),
+        "episode fallback should recall an inflected Russian term: {recalled:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn episode_fallback_finds_term_match_when_exact_phrase_has_an_unrelated_hit()
+-> Result<(), Box<dyn std::error::Error>> {
+    use memory_mcp::models::IngestRequest;
+    use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+
+    let service = common::make_service().await;
+    IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_context: None,
+            source_type: "note".to_string(),
+            source_id: "episode-unrelated-direct-hit".to_string(),
+            content: "Remote shell and KESL note: какой объект гейтит TIP?".to_string(),
+            t_ref: Utc::now() - Duration::days(2),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await?;
+    IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_context: None,
+            source_type: "note".to_string(),
+            source_id: "episode-tip-license-gate".to_string(),
+            content: "Объект 464 XDR Optimum — гейт интеграции TIP.".to_string(),
+            t_ref: Utc::now() - Duration::days(1),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await?;
+
+    let recalled = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "какой объект гейтит TIP".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await?;
+
+    assert!(
+        recalled
+            .iter()
+            .any(|item| item.content.contains("Объект 464 XDR Optimum")),
+        "term fallback should find the relevant TIP licensing episode even when exact phrase matching found an unrelated episode: {recalled:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn stopword_only_query_does_not_return_recent_experience_as_browse()
+-> Result<(), Box<dyn std::error::Error>> {
+    let service = common::make_service().await;
+    let experience_id = service
+        .add_fact(
+            "experience",
+            "Remembered note that must not match a filler-only query",
+            "Remembered note that must not match a filler-only query",
+            "episode:filler-query-recent-experience",
+            Utc::now() - Duration::days(1),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::agent_observation("episode:filler-query-recent-experience"),
+        )
+        .await?;
+
+    let recalled = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "Ну вот".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await?;
+
+    assert!(
+        !recalled.iter().any(|item| item.fact_id == experience_id),
+        "a non-empty query stripped to stopwords must not behave like an intentional browse: {recalled:?}"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn mixed_query_recalls_fact_with_inflected_russian_term()
 -> Result<(), Box<dyn std::error::Error>> {

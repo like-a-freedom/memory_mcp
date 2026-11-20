@@ -8,7 +8,7 @@ use crate::error::MemoryError;
 use crate::models::Fact;
 use crate::shared::search::{
     query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
-    search_query_terms, search_surface_terms, unique_query_terms,
+    search_query_terms, unique_query_terms,
 };
 use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap, record_term_set};
 use crate::storage::ContextFactQuery;
@@ -49,14 +49,14 @@ pub(crate) async fn select_fact_records_for_query(
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let initial = rank_lexical_records(initial, &query_terms);
 
-    let Some(query) = params.query_opt else {
+    let Some(_query) = params.query_opt else {
         return Ok(LexicalQueryResult {
             records: initial,
             retrieval_tier: RetrievalTier::Direct,
         });
     };
 
-    let fallback_terms = build_lexical_fallback_queries(&search_surface_terms(query));
+    let fallback_terms = build_lexical_fallback_queries(&query_terms);
 
     let term_groups = service
         .knowledge_store()
@@ -733,15 +733,12 @@ pub(crate) async fn select_episode_records_for_query(
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    if !initial.is_empty() || query_opt.is_none() {
-        return Ok(initial);
-    }
-
     let Some(query) = query_opt else {
         return Ok(initial);
     };
 
-    let fallback_terms = build_lexical_fallback_queries(&search_surface_terms(query));
+    let query_terms = search_query_terms(query);
+    let fallback_terms = build_lexical_fallback_queries(&query_terms);
     if fallback_terms.is_empty() {
         return Ok(initial);
     }
@@ -751,10 +748,11 @@ pub(crate) async fn select_episode_records_for_query(
         .select_episodes_for_terms(cutoff_iso, &fallback_terms, limit)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
+    let mut records = initial;
+    records.extend(term_groups.into_iter().flatten());
 
     let mut seen_episode_ids = HashSet::new();
-    fallback_records.retain(|record| {
+    records.retain(|record| {
         let Some(episode_id) = record
             .get("episode_id")
             .and_then(json_string)
@@ -765,7 +763,7 @@ pub(crate) async fn select_episode_records_for_query(
         seen_episode_ids.insert(episode_id.to_string())
     });
 
-    Ok(fallback_records)
+    Ok(records)
 }
 
 #[cfg(test)]

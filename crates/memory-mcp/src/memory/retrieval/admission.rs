@@ -2960,6 +2960,14 @@ mod tests {
     }
 
     #[test]
+    fn russian_filler_words_do_not_admit_unrelated_fact() {
+        assert_eq!(
+            evaluate("Ну вот объект?", "Ну вот и отпуск.", None),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
     fn zero_grounding_paraphrase_is_admitted_by_semantic_evidence() {
         assert_eq!(
             evaluate(
