@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.41.0] - 2026-11-20
+
+### Fixed
+- Russian-language queries now match more inflected forms, and episode retrieval still runs lexical fallback searches when a literal match exists.
+- Automatic entity extraction ignores categorical ticket metadata fields so values such as `Analysis`, `Pending`, `Enabled`, and `Add-on` are not stored as entities.
+
 ## [1.40.0] - 2026-11-19
 
 ### Changed
@@ -101,6 +107,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preserved bi-temporal validity in lexical fallback and sequence continuity during outbox repair and schema upgrades.
 
+[1.41.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.40.0...v1.41.0
 [1.40.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.39.0...v1.40.0
 [1.39.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.38.0...v1.39.0
 [1.38.0]: https://github.com/like-a-freedom/memory_mcp/compare/v1.37.2...v1.38.0
