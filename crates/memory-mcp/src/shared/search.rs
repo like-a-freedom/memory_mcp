@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
+use rust_stemmers::{Algorithm, Stemmer};
 
 /// Normalize text by lowercasing and collapsing whitespace.
 pub fn normalize_text(value: &str) -> String {
@@ -15,11 +16,29 @@ pub fn normalize_text(value: &str) -> String {
 /// Preprocess a search query by stripping episode references, boolean operators,
 /// quoted phrases, and collapsing whitespace.
 pub fn preprocess_search_query(raw: &str) -> String {
-    search_query_terms(raw).join(" ")
+    search_surface_terms(raw).join(" ")
 }
 
 /// Extract normalized search terms from a natural-language query.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
+    static RUSSIAN_STEMMER: LazyLock<Stemmer> =
+        LazyLock::new(|| Stemmer::create(Algorithm::Russian));
+
+    search_surface_terms(raw)
+        .into_iter()
+        .map(|term| {
+            if term.chars().all(|c| matches!(c, 'а'..='я' | 'ё')) {
+                RUSSIAN_STEMMER.stem(&term).into_owned()
+            } else {
+                term
+            }
+        })
+        .collect()
+}
+
+/// Keep Russian word forms for database queries: native FTS stems them itself,
+/// while its substring fallback must use the unstemmed terms.
+pub(crate) fn search_surface_terms(raw: &str) -> Vec<String> {
     static EPISODE_REF: LazyLock<Result<Regex, regex::Error>> =
         LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+"));
     static QUOTED: LazyLock<Result<Regex, regex::Error>> =
@@ -164,12 +183,15 @@ fn looks_like_iso_date(token: &str) -> bool {
 }
 
 fn normalize_search_term(raw: &str) -> Option<String> {
-    let token = raw.trim().to_ascii_lowercase();
+    let token = raw.trim().to_lowercase();
     if token.len() < 2 {
         return None;
     }
 
-    if matches!(token.as_str(), "or" | "and" | "not") || is_search_stopword(&token) {
+    if matches!(token.as_str(), "or" | "and" | "not")
+        || is_search_stopword(&token)
+        || is_russian_search_stopword(&token)
+    {
         return None;
     }
 
@@ -193,6 +215,56 @@ fn singularize_search_term(token: &str) -> String {
     }
 
     token.to_string()
+}
+
+fn is_russian_search_stopword(token: &str) -> bool {
+    matches!(
+        token,
+        "а" | "без"
+            | "бы"
+            | "в"
+            | "во"
+            | "где"
+            | "да"
+            | "для"
+            | "до"
+            | "за"
+            | "и"
+            | "из"
+            | "или"
+            | "к"
+            | "как"
+            | "какая"
+            | "какие"
+            | "каким"
+            | "каких"
+            | "какого"
+            | "какое"
+            | "какой"
+            | "каком"
+            | "какую"
+            | "ко"
+            | "когда"
+            | "кто"
+            | "ли"
+            | "на"
+            | "над"
+            | "ним"
+            | "но"
+            | "о"
+            | "об"
+            | "от"
+            | "по"
+            | "под"
+            | "при"
+            | "с"
+            | "со"
+            | "у"
+            | "чем"
+            | "что"
+            | "чтобы"
+            | "это"
+    )
 }
 
 fn is_search_stopword(token: &str) -> bool {
@@ -315,6 +387,22 @@ mod tests {
         let result = search_query_terms("atlas analysis status access");
 
         assert_eq!(result, vec!["atlas", "analysis", "status", "access"]);
+    }
+
+    #[test]
+    fn mixed_query_matches_russian_case_forms() {
+        assert_eq!(
+            search_query_terms("ОБЪЕКТ NOVA 731"),
+            search_query_terms("объекта NOVA 731")
+        );
+    }
+
+    #[test]
+    fn russian_function_words_are_not_search_evidence() {
+        assert_eq!(
+            search_query_terms("Какой объект и что в NOVA с ним?"),
+            vec!["объект", "nova"]
+        );
     }
 
     #[test]

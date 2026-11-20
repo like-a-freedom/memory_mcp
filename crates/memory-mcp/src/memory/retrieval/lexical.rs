@@ -8,7 +8,7 @@ use crate::error::MemoryError;
 use crate::models::Fact;
 use crate::shared::search::{
     query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
-    search_query_terms, unique_query_terms,
+    search_query_terms, search_surface_terms, unique_query_terms,
 };
 use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap, record_term_set};
 use crate::storage::ContextFactQuery;
@@ -49,14 +49,14 @@ pub(crate) async fn select_fact_records_for_query(
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let initial = rank_lexical_records(initial, &query_terms);
 
-    let Some(_query) = params.query_opt else {
+    let Some(query) = params.query_opt else {
         return Ok(LexicalQueryResult {
             records: initial,
             retrieval_tier: RetrievalTier::Direct,
         });
     };
 
-    let fallback_terms = build_lexical_fallback_queries(&query_terms);
+    let fallback_terms = build_lexical_fallback_queries(&search_surface_terms(query));
 
     let term_groups = service
         .knowledge_store()
@@ -741,8 +741,7 @@ pub(crate) async fn select_episode_records_for_query(
         return Ok(initial);
     };
 
-    let query_terms = search_query_terms(query);
-    let fallback_terms = build_lexical_fallback_queries(&query_terms);
+    let fallback_terms = build_lexical_fallback_queries(&search_surface_terms(query));
     if fallback_terms.is_empty() {
         return Ok(initial);
     }

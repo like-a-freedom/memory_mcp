@@ -332,12 +332,23 @@ pub(super) fn sanitized_content_for_entity_extraction(content: &str) -> String {
             continue;
         }
 
+        let (body, is_list_item) = strip_list_marker(trimmed);
+        // These categorical ticket fields are metadata, not entity mentions.
+        if let Some((field, _)) = body.split_once(':')
+            && matches!(
+                crate::shared::search::normalize_text(&strip_markdown_inline_formatting(field))
+                    .as_str(),
+                "substate" | "triage" | "feature flag" | "license kind"
+            )
+        {
+            continue;
+        }
+
         if let Some(next_section) = structured_summary_section_heading(trimmed) {
             section = Some(next_section);
             continue;
         }
 
-        let (body, is_list_item) = strip_list_marker(trimmed);
         if let Some((_, remainder)) = split_structured_summary_label(body) {
             sanitized_lines.push(strip_markdown_inline_formatting(remainder));
             continue;
@@ -428,6 +439,43 @@ mod tests {
             candidates[2].content,
             "Capacity Planning: Prepare archive review for next quarter."
         );
+    }
+
+    #[tokio::test]
+    async fn automatic_entities_ignore_structured_ticket_fields() {
+        use crate::knowledge::entity_extraction::{AnnoEntityExtractor, EntityExtractor};
+
+        let ticket = "SubState: Analysis\n\
+                      - Triage: Pending\n\
+                      **Feature flag:** Enabled\n\
+                      1. **License kind**: Add-on\n\
+                      Alice Smith met Bob Jones at OpenAI.\n\
+                      Fact: The preview displays Triage: Pending.";
+        let prose = "Alice Smith met Bob Jones at OpenAI.\n\
+                     The preview displays Triage: Pending.";
+        let facts = structured_summary_fact_candidates(ticket);
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].quote, "The preview displays Triage: Pending.");
+
+        let anno = AnnoEntityExtractor::new().unwrap();
+        let names = |entities: Vec<crate::models::EntityCandidate>| {
+            entities
+                .into_iter()
+                .map(|entity| entity.canonical_name)
+                .collect::<Vec<_>>()
+        };
+        let expected = names(anno.extract_candidates(prose).await.unwrap());
+        assert!(
+            expected
+                .iter()
+                .any(|name| matches!(name.as_str(), "Alice Smith" | "Bob Jones")),
+            "expected Anno to detect a person in the prose: {expected:?}"
+        );
+
+        let sanitized = sanitized_content_for_entity_extraction(ticket);
+        let actual = names(anno.extract_candidates(&sanitized).await.unwrap());
+        assert_eq!(actual, expected, "ticket fields must not generate entities");
+        assert_eq!(sanitized, prose);
     }
 
     #[test]

@@ -812,3 +812,38 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn mixed_query_recalls_fact_with_inflected_russian_term()
+-> Result<(), Box<dyn std::error::Error>> {
+    let service = common::make_service().await;
+    let fact_id = common::seed_fact_at(
+        &service,
+        "org",
+        "Для включения NOVA требуется проверка объекта 731.",
+        Utc::now() - Duration::days(1),
+    )
+    .await;
+
+    let recalled = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "Какой ОБЪЕКТ включает NOVA?".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await?;
+
+    assert_eq!(
+        recalled.first().map(|item| item.fact_id.as_str()),
+        Some(fact_id.as_str())
+    );
+    Ok(())
+}

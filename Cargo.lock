@@ -5061,6 +5061,7 @@ dependencies = [
  "reqwest 0.13.5",
  "rmcp",
  "roxmltree",
+ "rust-stemmers",
  "schemars",
  "serde",
  "serde_json",
