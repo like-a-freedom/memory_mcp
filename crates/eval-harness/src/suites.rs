@@ -22,8 +22,9 @@ pub use external_retrieval::{ExternalRetrievalSuite, WorkerPolicy};
 pub use extraction::ExtractionSuite;
 pub use lifecycle::LifecycleReleaseSuite;
 pub use memory_decisions::{
-    AcceptanceScoreChannel, DeterministicAcceptancePlan, DeterministicAcceptanceReport,
-    ReplayIndex, accept_candidate, compare_replays, load_registered_replay, load_verified_replay,
+    AcceptanceScoreChannel, CrossBuildBinaryPins, DeterministicAcceptancePlan,
+    DeterministicAcceptanceReport, ReplayIndex, accept_candidate, compare_replays,
+    load_registered_replay, load_verified_replay,
 };
 pub use ner_quality::NerQualitySuite;
 pub use poisoning::PoisoningSuite;

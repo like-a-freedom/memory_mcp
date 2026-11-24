@@ -1,8 +1,8 @@
 mod acceptance;
 mod cases;
 pub use acceptance::{
-    AcceptanceScoreChannel, DeterministicAcceptancePlan, DeterministicAcceptanceReport,
-    accept_candidate,
+    AcceptanceScoreChannel, CrossBuildBinaryPins, DeterministicAcceptancePlan,
+    DeterministicAcceptanceReport, accept_candidate,
 };
 mod comparison;
 mod normalization;
