@@ -72,9 +72,12 @@ pub enum RecallReadMode {
 }
 
 /// Executes at most one public read in the trial's own memory session.
+pub(crate) type RecallReplyValidator<'a> = dyn Fn(&Value) -> Result<(), EvalError> + 'a;
+
 pub struct RecallMemorySession<'a, M> {
     memory: &'a mut M,
     mode: Option<RecallReadMode>,
+    validate_reply: Option<&'a RecallReplyValidator<'a>>,
 }
 
 impl<'a, M: MemoryToolSession> RecallMemorySession<'a, M> {
@@ -92,7 +95,16 @@ impl<'a, M: MemoryToolSession> RecallMemorySession<'a, M> {
         Ok(Self {
             memory,
             mode: Some(mode),
+            validate_reply: None,
         })
+    }
+
+    pub(crate) fn with_reply_validator(
+        mut self,
+        validator: Option<&'a RecallReplyValidator<'a>>,
+    ) -> Self {
+        self.validate_reply = validator;
+        self
     }
 }
 
@@ -116,7 +128,11 @@ impl<M: MemoryToolSession> MemoryToolSession for RecallMemorySession<'_, M> {
                 ));
             }
         };
-        self.memory.call_tool(name, arguments)
+        let reply = self.memory.call_tool(name, arguments)?;
+        if let Some(validate) = self.validate_reply {
+            validate(&reply)?;
+        }
+        Ok(reply)
     }
 }
 

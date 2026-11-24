@@ -274,6 +274,10 @@ pub enum Command {
     /// Execute source-authority trials through any loopback OpenAI-compatible API.
     #[command(name = "run-paired-chat-completions")]
     RunPairedChatCompletions {
+        #[arg(long, value_enum)]
+        recall_read_mode: Option<crate::paired_agent::chat_completions_backend::RecallCaptureMode>,
+        #[arg(long, requires = "recall_read_mode")]
+        fixed_read_inputs: Option<PathBuf>,
         #[arg(long)]
         plan: PathBuf,
         #[arg(long)]

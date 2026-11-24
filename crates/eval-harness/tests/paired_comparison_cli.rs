@@ -1314,3 +1314,47 @@ fn fixed_run_start() -> chrono::DateTime<chrono::Utc> {
 fn digest(value: char) -> String {
     std::iter::repeat_n(value, 64).collect()
 }
+
+#[test]
+fn recall_capture_rejects_unregistered_read_mode() {
+    let directory = tempfile::tempdir().unwrap();
+    let output_path = directory.path().join("artifacts");
+    let plan_path = directory.path().join("plan.json");
+    let mut plan: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../evals/paired/source-authority-local-chat-completions-v4-qualification/plan.json"
+    ))
+    .unwrap();
+    plan["stage"] = serde_json::json!("exploratory_comparison");
+    plan["shared_identity"]["tool_call_budget"] = serde_json::json!(1);
+    write_json(&plan_path, &plan);
+    let output = Command::new(env!("CARGO_BIN_EXE_memory-eval"))
+        .env_clear()
+        .args([
+            "run-paired-chat-completions",
+            "--recall-read-mode",
+            "live",
+            "--plan",
+        ])
+        .arg(plan_path)
+        .args([
+            "--tasks",
+            "unopened.json",
+            "--model-endpoint",
+            "http://127.0.0.1:1",
+            "--incumbent-memory-server",
+            "unopened",
+            "--candidate-memory-server",
+            "unopened",
+            "--output-directory",
+        ])
+        .arg(&output_path)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unregistered recall read mode"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!output_path.exists());
+}

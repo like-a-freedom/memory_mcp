@@ -122,6 +122,25 @@ impl ChatCompletionsPairedBackend {
                 "paired plan prompt and runner-policy hashes do not match the registered Chat Completions protocol".into(),
             ));
         }
+        Self::build(
+            plan,
+            incumbent,
+            candidate,
+            sampling,
+            response_format,
+            request_parameters,
+        )
+    }
+
+    fn build(
+        plan: &PairedEvaluationPlan,
+        incumbent: ChatCompletionsArmRuntime,
+        candidate: ChatCompletionsArmRuntime,
+        sampling: ChatCompletionsSampling,
+        response_format: Option<serde_json::Value>,
+        request_parameters: Option<serde_json::Value>,
+    ) -> Result<Self, EvalError> {
+        let shared = &plan.shared_identity;
         let runner_binary = std::env::current_exe().map_err(|_| {
             EvalError::InvalidConfig("could not resolve the active memory-eval executable".into())
         })?;
@@ -305,6 +324,10 @@ impl ChatCompletionsPairedBackend {
         session: &mut StdioSession,
         prompt: &str,
         profile: ChatCompletionsToolProfile,
+        diagnostic: Option<(
+            super::chat_completions::RecallReadMode,
+            Option<&super::chat_completions::RecallReplyValidator<'_>>,
+        )>,
     ) -> Result<AgentObservation, EvalError> {
         let budgets = ChatCompletionBudgets {
             context_tokens: self.shared.context_budget_tokens,
@@ -323,16 +346,322 @@ impl ChatCompletionsPairedBackend {
                 prompts::RECALL_TASK_RULES,
             ),
         };
-        let observation = self.arm(state.arm).agent.run_phase(
-            session,
-            prompt,
-            system_instructions,
-            task_rules,
-            profile,
-            budgets,
-        )?;
+        let agent = &self.arm(state.arm).agent;
+        let observation = if let Some((mode, validate)) = diagnostic {
+            let mut memory = super::chat_completions::RecallMemorySession::new(session, mode)?
+                .with_reply_validator(validate);
+            agent.run_phase(
+                &mut memory,
+                prompt,
+                system_instructions,
+                task_rules,
+                profile,
+                budgets,
+            )
+        } else {
+            agent.run_phase(
+                session,
+                prompt,
+                system_instructions,
+                task_rules,
+                profile,
+                budgets,
+            )
+        }?;
         session.shutdown()?;
         Ok(observation)
+    }
+}
+
+#[derive(Clone, Copy, clap::ValueEnum, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RecallCaptureMode {
+    Live,
+    FixedReply,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixedReadInput {
+    pub key: crate::paired::CaseTrialKey,
+    pub arm: RunArm,
+    pub arguments: serde_json::Value,
+    pub expected_source_events: Vec<String>,
+    pub expected_completeness: Option<super::ReadCompleteness>,
+}
+
+impl FixedReadInput {
+    fn validate_reply(
+        &self,
+        reply: &serde_json::Value,
+        bindings: &BTreeMap<String, String>,
+    ) -> Result<(), EvalError> {
+        let invalid = || {
+            EvalError::InvalidInput("fixed reply differs from registered shape or snapshot".into())
+        };
+        let cutoff = super::tool_results::requested_cutoff(&self.arguments);
+        let evidence =
+            super::tool_results::read_evidence(&reply["result"], None).ok_or_else(invalid)?;
+        let sources = evidence
+            .source_episode_ids
+            .iter()
+            .map(|id| bindings.get(id).map(String::as_str).ok_or_else(invalid))
+            .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+        if !sources
+            .into_iter()
+            .eq(self.expected_source_events.iter().map(String::as_str))
+            || evidence.completeness != self.expected_completeness
+            || cutoff.is_some() && evidence.returned_cutoff_sha256 != cutoff
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+}
+
+pub struct RecallRegistration {
+    mode: RecallCaptureMode,
+    inputs: Vec<FixedReadInput>,
+}
+
+impl RecallRegistration {
+    pub fn new(
+        mode: RecallCaptureMode,
+        inputs: Option<Vec<FixedReadInput>>,
+        plan: &PairedEvaluationPlan,
+    ) -> Result<Self, EvalError> {
+        let invalid = || {
+            EvalError::InvalidConfig("unregistered recall read mode or fixed-read registry".into())
+        };
+        if plan.stage != crate::paired::PairedEvaluationStage::ExploratoryComparison
+            || plan.shared_identity.tool_call_budget != 1
+            || plan.shared_identity.agent_runner != CHAT_COMPLETIONS_AGENT_RUNNER
+            || plan.shared_identity.transport != "stdio"
+            || matches!(mode, RecallCaptureMode::FixedReply) != inputs.is_some()
+        {
+            return Err(invalid());
+        }
+        let mut inputs = inputs.unwrap_or_default();
+        if inputs.len() > plan.expected_trials.len().saturating_mul(2) {
+            return Err(invalid());
+        }
+        let arm_order = |arm| u8::from(arm == RunArm::Candidate);
+        inputs.sort_by(|a, b| {
+            a.key
+                .cmp(&b.key)
+                .then_with(|| arm_order(a.arm).cmp(&arm_order(b.arm)))
+        });
+        for input in &mut inputs {
+            input.expected_source_events.sort();
+        }
+        let fingerprint = sha256(&serde_json::to_vec(&("recall-read/v1", mode, &inputs))?);
+        if fingerprint != plan.shared_identity.reader_config_sha256 {
+            return Err(invalid());
+        }
+        if matches!(mode, RecallCaptureMode::FixedReply)
+            && (inputs.len() != plan.expected_trials.len() * 2
+                || plan.expected_trials.iter().any(|key| {
+                    [RunArm::Incumbent, RunArm::Candidate]
+                        .into_iter()
+                        .any(|arm| {
+                            inputs
+                                .iter()
+                                .filter(|item| &item.key == key && item.arm == arm)
+                                .count()
+                                != 1
+                        })
+                }))
+        {
+            return Err(invalid());
+        }
+        for input in &inputs {
+            let args = &input.arguments;
+            if !args
+                .get("query")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|s| !s.trim().is_empty())
+                || !args
+                    .get("budget")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|n| (1..=32).contains(&n))
+                || serde_json::to_vec(args)?.len() > 4096
+                || input
+                    .expected_source_events
+                    .windows(2)
+                    .any(|pair| pair[0] == pair[1])
+            {
+                return Err(invalid());
+            }
+        }
+        Ok(Self { mode, inputs })
+    }
+}
+
+pub struct ChatCompletionsRecallBackend {
+    runner: ChatCompletionsPairedBackend,
+    registration: RecallRegistration,
+}
+
+impl ChatCompletionsRecallBackend {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        plan: &PairedEvaluationPlan,
+        manifest: &super::PairedTaskManifest,
+        registration: RecallRegistration,
+        incumbent: ChatCompletionsArmRuntime,
+        candidate: ChatCompletionsArmRuntime,
+        sampling: ChatCompletionsSampling,
+        response_format: Option<serde_json::Value>,
+        request_parameters: Option<serde_json::Value>,
+    ) -> Result<Self, EvalError> {
+        manifest.validate(plan)?;
+        for input in &registration.inputs {
+            if !input.expected_source_events.iter().all(|event| {
+                manifest
+                    .tasks
+                    .iter()
+                    .find(|task| task.key == input.key)
+                    .is_some_and(|task| {
+                        task.seed_episodes
+                            .iter()
+                            .any(|seed| &seed.event_id == event)
+                    })
+            }) {
+                return Err(EvalError::InvalidConfig(
+                    "fixed read expects a source outside seeded history".into(),
+                ));
+            }
+        }
+        let runner = ChatCompletionsPairedBackend::build(
+            plan,
+            incumbent,
+            candidate,
+            sampling,
+            response_format,
+            request_parameters,
+        )?;
+        Ok(Self {
+            runner,
+            registration,
+        })
+    }
+
+    fn seed(
+        &self,
+        arm: RunArm,
+        task: &super::PairedTaskInput,
+    ) -> Result<(ChatCompletionsTrialState, SeedMemoryOutput), EvalError> {
+        let runtime = self.runner.arm(arm);
+        let directory = TrialDirectory::create(runtime.temp_root.as_deref())?;
+        let database_path = directory.path.join("database");
+        let boundary = task
+            .knowledge_before_event_id
+            .as_ref()
+            .map(|id| {
+                task.seed_episodes
+                    .iter()
+                    .enumerate()
+                    .find(|(_, seed)| &seed.event_id == id)
+                    .map(|(index, seed)| (index, seed.valid_at))
+                    .ok_or_else(|| {
+                        EvalError::InvalidInput("recall checkpoint event missing".into())
+                    })
+            })
+            .transpose()?;
+        let seeded = crate::memory_fixture::seed_memory(
+            &runtime.memory_server_binary,
+            &database_path,
+            &runtime.claim_rollout_stage,
+            &task.seed_episodes,
+            boundary,
+        )?;
+        let state = ChatCompletionsTrialState {
+            source_root: directory.path.clone(),
+            _trial_directory: directory,
+            database_path,
+            arm,
+            tool_schema_sha256: sha256(&serde_json::to_vec(&seeded.tool_schemas)?),
+            operator_imports: Vec::new(),
+        };
+        Ok((state, seeded))
+    }
+}
+
+impl super::PairedTrialBackend for ChatCompletionsRecallBackend {
+    fn prepare(
+        &mut self,
+        task: &super::PairedTaskInput,
+    ) -> Result<super::PreparedPairedTask, EvalError> {
+        let mut input = task.clone();
+        let expected_known_revision = if task.knowledge_before_event_id.is_some() {
+            let (_, seeded) = self.seed(RunArm::Candidate, task)?;
+            let revision = seeded
+                .known_revision
+                .ok_or_else(|| EvalError::InvalidInput("recall checkpoint unavailable".into()))?;
+            input.prompt = super::resolve_known_revision_prompt(&input.prompt, revision)?;
+            Some(revision)
+        } else {
+            None
+        };
+        Ok(super::PreparedPairedTask {
+            input,
+            expected_known_revision,
+        })
+    }
+
+    fn execute(
+        &mut self,
+        arm: RunArm,
+        task: &super::PreparedPairedTask,
+    ) -> Result<super::PairedTrialExecution, EvalError> {
+        let (state, seeded) = self.seed(arm, &task.input)?;
+        if seeded.known_revision != task.expected_known_revision {
+            return Err(EvalError::InvalidInput(
+                "recall checkpoint differs across seeded trials".into(),
+            ));
+        }
+        let registered = self
+            .registration
+            .inputs
+            .iter()
+            .find(|entry| entry.key == task.input.key && entry.arm == arm);
+        let mode = match (self.registration.mode, registered) {
+            (RecallCaptureMode::Live, None) => super::chat_completions::RecallReadMode::Live,
+            (RecallCaptureMode::FixedReply, Some(entry)) => {
+                super::chat_completions::RecallReadMode::FixedReply(entry.arguments.clone())
+            }
+            _ => {
+                return Err(EvalError::InvalidConfig(
+                    "no registered fixed read for this trial".into(),
+                ));
+            }
+        };
+        let validation = std::cell::Cell::new(false);
+        let validate = |reply: &serde_json::Value| {
+            let Some(entry) = registered else {
+                return Ok(());
+            };
+            let result = entry.validate_reply(reply, &seeded.episode_id_to_event_id);
+            validation.set(result.is_err());
+            result
+        };
+        let mut session = self.runner.open_session(&state)?;
+        let observation = self.runner.run_phase(
+            &state,
+            &mut session,
+            &task.input.prompt,
+            ChatCompletionsToolProfile::RecallOnly,
+            Some((mode, Some(&validate))),
+        )?;
+        if validation.get() {
+            return Err(EvalError::InvalidInput(
+                "fixed reply differs from registered shape or snapshot".into(),
+            ));
+        }
+        Ok(super::PairedTrialExecution {
+            observation,
+            episode_id_to_event_id: seeded.episode_id_to_event_id,
+        })
     }
 }
 
@@ -441,7 +770,7 @@ impl AgentManagedTrialBackend for ChatCompletionsPairedBackend {
             !state.operator_imports.is_empty(),
         );
         let mut session = self.open_session(state)?;
-        self.run_phase(state, &mut session, prompt, profile)
+        self.run_phase(state, &mut session, prompt, profile, None)
     }
 
     fn recall_in_fresh_session(
@@ -455,6 +784,7 @@ impl AgentManagedTrialBackend for ChatCompletionsPairedBackend {
             &mut session,
             prompt,
             ChatCompletionsToolProfile::RecallOnly,
+            None,
         )
     }
 

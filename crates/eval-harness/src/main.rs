@@ -513,6 +513,8 @@ async fn main() -> std::process::ExitCode {
             .await
         }
         Command::RunPairedChatCompletions {
+            recall_read_mode,
+            fixed_read_inputs,
             plan,
             tasks,
             model_endpoint,
@@ -525,6 +527,8 @@ async fn main() -> std::process::ExitCode {
             temp_root,
         } => {
             cmd_run_paired_chat_completions(
+                recall_read_mode,
+                fixed_read_inputs,
                 plan,
                 tasks,
                 model_endpoint,
@@ -1264,6 +1268,10 @@ impl eval_harness::ProgressReporter for StderrProgressReporter {
 
 #[allow(clippy::too_many_arguments)]
 async fn cmd_run_paired_chat_completions(
+    recall_read_mode: Option<
+        eval_harness::paired_agent::chat_completions_backend::RecallCaptureMode,
+    >,
+    fixed_read_inputs: Option<std::path::PathBuf>,
     plan_path: std::path::PathBuf,
     tasks_path: std::path::PathBuf,
     model_endpoint: String,
@@ -1285,23 +1293,25 @@ async fn cmd_run_paired_chat_completions(
             return std::process::ExitCode::from(2);
         }
     };
-    let tasks = match read_json_input::<eval_harness::paired_agent::managed::AgentManagedTaskManifest>(
-        &tasks_path,
-        "agent-managed task manifest",
-    ) {
-        Ok(tasks) => tasks,
+    use eval_harness::paired_agent::chat_completions_backend::{
+        ChatCompletionsPairedBackend, ChatCompletionsRecallBackend, RecallRegistration,
+    };
+    let registration = match recall_read_mode
+        .map(|mode| {
+            let inputs = fixed_read_inputs
+                .as_deref()
+                .map(|path| read_json_input(path, "fixed read inputs"))
+                .transpose()?;
+            RecallRegistration::new(mode, inputs, &plan).map_err(|error| error.to_string())
+        })
+        .transpose()
+    {
+        Ok(registration) => registration,
         Err(error) => {
             eprintln!("error: {error}");
             return std::process::ExitCode::from(2);
         }
     };
-    if let Err(error) = tasks
-        .validate(&plan)
-        .and_then(|()| tasks.validate_for_source_authority_workflow())
-    {
-        eprintln!("error: invalid source-authority plan or task manifest: {error}");
-        return std::process::ExitCode::from(2);
-    }
     let sampling = match load_chat_completions_sampling(sampling_config_path.as_deref()) {
         Ok(sampling) => sampling,
         Err(error) => {
@@ -1358,16 +1368,40 @@ async fn cmd_run_paired_chat_completions(
         };
     let worker_output_directory = output_directory.clone();
     let worker = tokio::task::spawn_blocking(move || {
-        let mut backend =
-            eval_harness::paired_agent::chat_completions_backend::ChatCompletionsPairedBackend::new_with_request_parameters(
+        if let Some(registration) = registration {
+            let tasks = read_json_input(&tasks_path, "recall task manifest")
+                .map_err(eval_harness::EvalError::InvalidInput)?;
+            let mut backend = ChatCompletionsRecallBackend::new(
                 &plan,
                 &tasks,
+                registration,
                 incumbent_runtime,
                 candidate_runtime,
                 sampling,
                 response_format,
                 request_parameters,
             )?;
+            return eval_harness::paired_agent::run_paired_agent_evaluation(
+                &plan,
+                &tasks,
+                &mut backend,
+                &worker_output_directory,
+            );
+        }
+        let tasks: eval_harness::paired_agent::managed::AgentManagedTaskManifest =
+            read_json_input(&tasks_path, "agent-managed task manifest")
+                .map_err(eval_harness::EvalError::InvalidInput)?;
+        tasks.validate(&plan)?;
+        tasks.validate_for_source_authority_workflow()?;
+        let mut backend = ChatCompletionsPairedBackend::new_with_request_parameters(
+            &plan,
+            &tasks,
+            incumbent_runtime,
+            candidate_runtime,
+            sampling,
+            response_format,
+            request_parameters,
+        )?;
         let (incumbent, candidate, _, _) =
             eval_harness::paired_agent::managed::run_agent_managed_paired_evaluation(
                 &plan,
