@@ -1,0 +1,289 @@
+{
+  "platform": "aarch64-apple-darwin",
+  "incumbent_revision": "8d1484400ccbf47e8b68624a51e68f6c1ebc1348",
+  "candidate_revision": "7689e736",
+  "incumbent": {
+    "ordered_facts": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "source_episode": "episode:ff9b2d1e5310cddb515066bd"
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "source_episode": "episode:a929385c1b38bf3c057076ee"
+      }
+    ],
+    "citations": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "sources": [
+          {
+            "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+            "relationship": "direct"
+          },
+          {
+            "episode_id": "episode:a929385c1b38bf3c057076ee",
+            "relationship": "linked",
+            "entity_path": "episode:ff9b2d1e5310cddb515066bd -> entity:7a5f1423b4b5112c5ba6fc04"
+          }
+        ]
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "sources": [
+          {
+            "episode_id": "episode:a929385c1b38bf3c057076ee",
+            "relationship": "direct"
+          },
+          {
+            "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+            "relationship": "linked",
+            "entity_path": "episode:a929385c1b38bf3c057076ee -> entity:7a5f1423b4b5112c5ba6fc04"
+          }
+        ]
+      }
+    ],
+    "formation": [
+      {
+        "source_id": "workout-oct24",
+        "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+        "reconciliation": {
+          "status": "complete",
+          "claims_projected": 1,
+          "active_relations": 0,
+          "reason_codes": []
+        }
+      },
+      {
+        "source_id": "workout-oct29",
+        "episode_id": "episode:a929385c1b38bf3c057076ee",
+        "reconciliation": {
+          "status": "complete",
+          "claims_projected": 1,
+          "active_relations": 1,
+          "reason_codes": [
+            "contradiction"
+          ]
+        }
+      }
+    ]
+  },
+  "candidate_fresh": {
+    "ordered_facts": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "source_episode": "episode:ff9b2d1e5310cddb515066bd"
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "source_episode": "episode:a929385c1b38bf3c057076ee"
+      }
+    ],
+    "citations": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "sources": [
+          {
+            "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+            "relationship": "direct"
+          }
+        ]
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "sources": [
+          {
+            "episode_id": "episode:a929385c1b38bf3c057076ee",
+            "relationship": "direct"
+          }
+        ]
+      }
+    ],
+    "formation": [
+      {
+        "source_id": "workout-oct24",
+        "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+        "reconciliation": {
+          "status": "complete",
+          "claims_projected": 1,
+          "active_relations": 0,
+          "reason_codes": []
+        }
+      },
+      {
+        "source_id": "workout-oct29",
+        "episode_id": "episode:a929385c1b38bf3c057076ee",
+        "reconciliation": {
+          "status": "complete",
+          "claims_projected": 1,
+          "active_relations": 0,
+          "reason_codes": []
+        }
+      }
+    ]
+  },
+  "candidate_restored": {
+    "ordered_facts": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "source_episode": "episode:ff9b2d1e5310cddb515066bd"
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "source_episode": "episode:a929385c1b38bf3c057076ee"
+      }
+    ],
+    "citations": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "sources": [
+          {
+            "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+            "relationship": "direct"
+          },
+          {
+            "episode_id": "episode:a929385c1b38bf3c057076ee",
+            "relationship": "linked",
+            "entity_path": "episode:ff9b2d1e5310cddb515066bd -> entity:7a5f1423b4b5112c5ba6fc04"
+          }
+        ]
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "sources": [
+          {
+            "episode_id": "episode:a929385c1b38bf3c057076ee",
+            "relationship": "direct"
+          },
+          {
+            "episode_id": "episode:ff9b2d1e5310cddb515066bd",
+            "relationship": "linked",
+            "entity_path": "episode:a929385c1b38bf3c057076ee -> entity:7a5f1423b4b5112c5ba6fc04"
+          }
+        ]
+      }
+    ],
+    "reconciliation": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "summary": {
+          "relations": [
+            {
+              "counterpart_source_episode_id": "episode:a929385c1b38bf3c057076ee",
+              "outcome": "contradiction",
+              "role": "conflict"
+            }
+          ]
+        }
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "summary": {
+          "relations": [
+            {
+              "counterpart_source_episode_id": "episode:ff9b2d1e5310cddb515066bd",
+              "outcome": "contradiction",
+              "role": "conflict"
+            }
+          ]
+        }
+      }
+    ],
+    "historical_context": {
+      "snapshot": {
+        "valid_at": "2026-11-01T00:00:01Z",
+        "known_at": "2099-01-01T00:00:00Z",
+        "known_revision": 0
+      },
+      "completeness": "partial",
+      "candidate_scan_truncated": false,
+      "omitted_channels": [
+        "alias expansion",
+        "experience, source episode siblings and source context neighborhoods",
+        "triples, graph edges and community summaries",
+        "semantic ANN and mutable embeddings",
+        "mutable fact access heat",
+        "legacy facts and episodes without committed revision provenance"
+      ]
+    }
+  },
+  "legacy_inventory": {
+    "claims": [
+      {
+        "claim_id": "claim:cc8a4634ce6edf66646f5ade32bf23c9f52f2ad8d20f99309e48b7ab240f973b",
+        "schema_family": "attribute",
+        "slot_fingerprint": "v2:0c0d278f946c58761bb4180c7cd4856e913bd257183e52ec044120044c9476e2",
+        "source_episode_id": "episode:a929385c1b38bf3c057076ee",
+        "source_fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "subject_key": "entity:7a5f1423b4b5112c5ba6fc04",
+        "t_ingested": "2026-11-24T19:40:12.863128Z",
+        "t_invalid_ingested": null
+      },
+      {
+        "claim_id": "claim:dab2d765e51f1b1d71ea5318b06dd97dd0c8e38ccfc22d3e4e149be4203e3901",
+        "schema_family": "attribute",
+        "slot_fingerprint": "v2:0c0d278f946c58761bb4180c7cd4856e913bd257183e52ec044120044c9476e2",
+        "source_episode_id": "episode:ff9b2d1e5310cddb515066bd",
+        "source_fact_id": "fact:3e2bf84899d1482a875972cb",
+        "subject_key": "entity:7a5f1423b4b5112c5ba6fc04",
+        "t_ingested": "2026-11-24T19:40:12.704371Z",
+        "t_invalid_ingested": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:4eb9472eaf04b91b61d7b1ac",
+        "in": "entity:7a5f1423b4b5112c5ba6fc04",
+        "out": "episode:a929385c1b38bf3c057076ee",
+        "t_ingested": "2026-11-24T19:40:12.865524Z"
+      },
+      {
+        "id": "edge:8a547cf489f748de48d6e6fe",
+        "in": "entity:7a5f1423b4b5112c5ba6fc04",
+        "out": "episode:ff9b2d1e5310cddb515066bd",
+        "t_ingested": "2026-11-24T19:40:12.706205Z"
+      },
+      {
+        "id": "edge:ca3af652f6d043baa4c95008",
+        "in": "entity:7a5f1423b4b5112c5ba6fc04",
+        "out": "fact:3e2bf84899d1482a875972cb",
+        "t_ingested": "2026-11-24T19:40:12.706205Z"
+      },
+      {
+        "id": "edge:dc984814cb2ca3b45a3b519e",
+        "in": "entity:7a5f1423b4b5112c5ba6fc04",
+        "out": "fact:7919df3a5941f038b3e2f3ae",
+        "t_ingested": "2026-11-24T19:40:12.865524Z"
+      }
+    ],
+    "facts": [
+      {
+        "fact_id": "fact:3e2bf84899d1482a875972cb",
+        "source_episode": "episode:ff9b2d1e5310cddb515066bd",
+        "t_ingested": "2026-11-24T19:40:12.703327Z",
+        "t_valid": "2026-11-01T00:00:00Z"
+      },
+      {
+        "fact_id": "fact:7919df3a5941f038b3e2f3ae",
+        "source_episode": "episode:a929385c1b38bf3c057076ee",
+        "t_ingested": "2026-11-24T19:40:12.862305Z",
+        "t_valid": "2026-11-01T00:00:00Z"
+      }
+    ],
+    "relations": [
+      {
+        "claim_relation_id": "claim_relation:8e30b59f1693b33882b684ff2f5f843f163f5feb8ebe717bbdb90eba93bb2101",
+        "evaluator_version": "builtin/v1",
+        "left_claim_id": "claim:cc8a4634ce6edf66646f5ade32bf23c9f52f2ad8d20f99309e48b7ab240f973b",
+        "outcome": "contradiction",
+        "right_claim_id": "claim:dab2d765e51f1b1d71ea5318b06dd97dd0c8e38ccfc22d3e4e149be4203e3901",
+        "t_ingested": "2026-11-24T19:40:12.864398Z",
+        "t_invalid_ingested": null
+      }
+    ]
+  },
+  "recovery": {
+    "original_snapshot_unchanged": true,
+    "rollback_matches_incumbent": true
+  }
+}
