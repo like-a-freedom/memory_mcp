@@ -1,6 +1,6 @@
 # LongMemEval-V2 official text-capable evaluation
 
-> **Status as of 2026-11-24.** The native [deterministic memory gate](../../evals/DETERMINISTIC_MEMORY_QUALITY.md) passed on its registered histories. LongMemEval-V2 now has a pinned upstream revision, a frozen seven-case Small web text cohort, and a runner that reports reader and judge failures independently of the native upstream score. Complete scored execution remains the acceptance gate. See the [cohort manifest](../../../evals/longmemeval_v2/small-web-text-cohort.json) and [reproduction steps](../../../evals/longmemeval_v2/README.md#local-scored-small-web-subset).
+> **Status as of 2026-11-24.** The native [deterministic memory gate](../../evals/DETERMINISTIC_MEMORY_QUALITY.md) passed on its registered histories. The pinned Small web text baseline scored all seven adjudicated questions twice on Apple Silicon. Both runs scored 0/7 and returned zero memory tokens to the reader. Six of seven raw context sizes varied across the two reads of the same snapshot. See the [baseline report](../../evals/LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md), [cohort manifest](../../../evals/longmemeval_v2/small-web-text-cohort.json) and [reproduction steps](../../../evals/longmemeval_v2/README.md#local-scored-small-web-subset).
 
 - **Date:** 2026-11-09
 - **Current master reviewed:** 2026-11-20, `1ae1da4a` (v1.41.0)

@@ -13,8 +13,11 @@ cover claims, retrieval and source authority.
 The [typed-conflict agent pilot](../../evals/paired/typed-conflict-agent-pilot-2026-11-24/README.md)
 stopped at its registered ordinary-task gate. The
 [source-authority workflow screen](../../evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/report.md)
-qualified one exact configuration on four synthetic families. Broader agent
-utility and official LongMemEval-V2 scores remain open. See the
+qualified one exact configuration on four synthetic families. The
+[LongMemEval-V2 Small web text baseline](LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
+has complete scoring coverage on seven verified questions and upstream
+accuracy of 0/7. All seven prompts lost the memory context at the token
+cap. Broader agent utility and benchmark coverage remain open. See the
 [follow-up design and tasks](../superpowers/specs/2026-11-24-agent-memory-follow-up-design.md).
 
 ### Keeping evaluation evidence

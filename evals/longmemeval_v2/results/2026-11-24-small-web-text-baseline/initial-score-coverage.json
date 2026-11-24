@@ -1,0 +1,24 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-score-coverage/v1",
+  "selected_case_count": 7,
+  "native_scored_case_count": 7,
+  "covered_case_count": 7,
+  "coverage_adjusted_success_rate": 0.0,
+  "official_metrics_status": "emitted",
+  "official_overall_recomputed_matches": true,
+  "elapsed_seconds": 1724.018,
+  "stage_seconds": {
+    "reader": 38.942,
+    "judge_scoring": 25.319
+  },
+  "cases": {
+    "0c6b0c60": "scored",
+    "6d975a08": "scored",
+    "89a20f48": "scored",
+    "922a0c56": "scored",
+    "d6da3938": "scored",
+    "f43926d9": "scored",
+    "f61a096f": "scored"
+  },
+  "failures": {}
+}

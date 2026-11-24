@@ -185,6 +185,9 @@ sole trajectory in a fresh one-question build preflight with that method.
 
 ## Local scored Small web subset
 
+See the [native baseline report](../../docs/evals/LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
+for both scored passes and their independent coverage receipts.
+
 [The frozen manifest](small-web-text-cohort.json) registers seven questions
 backed by three complete accessibility-tree observations. Each entry gives
 the trajectory, state, line range and span hash. The staging command checks
