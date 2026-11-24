@@ -340,7 +340,9 @@ async fn active_fact_existence_preserves_bitemporal_invalidation_boundaries() {
 #[tokio::test]
 async fn facets_preserve_group_order_while_projecting_episode_inputs() {
     let (service, db) = common::make_service_with_client().await;
-    let base = Utc::now() - Duration::minutes(10);
+    let base = "2026-01-01T00:00:00Z"
+        .parse::<chrono::DateTime<Utc>>()
+        .expect("fixed episode fixture time");
     for (source_id, content, tag, t_ingested) in [
         ("facet-alpha-old", "old alpha content", "alpha", base),
         (
@@ -362,25 +364,23 @@ async fn facets_preserve_group_order_while_projecting_episode_inputs() {
             base + Duration::minutes(4),
         ),
     ] {
-        IngestCapability::ingest_from_service(
-            &service,
-            IngestRequest {
-                source_context: None,
-                source_type: "document".to_string(),
-                source_id: source_id.to_string(),
-                content: content.to_string(),
-                t_ref: t_ingested,
-                t_ingested: Some(t_ingested),
-                policy_tags: if tag.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![tag.to_string()]
-                },
-            },
-            None,
+        let episode_id = format!("episode:{source_id}");
+        db.create(
+            &episode_id,
+            json!({
+                "episode_id": episode_id,
+                "source_type": "document",
+                "source_id": source_id,
+                "content": content,
+                "t_ref": normalize_dt(t_ingested),
+                "t_ingested": normalize_dt(t_ingested),
+                "policy_tags": if tag.is_empty() { Vec::new() } else { vec![tag] },
+            }),
+            "org",
+            &["t_ref", "t_ingested"],
         )
         .await
-        .expect("seed facet episode");
+        .expect("seed committed facet episode");
     }
 
     let rows = EpisodeContextStore::new(db.clone(), "org")
@@ -442,7 +442,7 @@ async fn source_neighborhood_projection_preserves_order_and_content() {
                 source_id: source_id.to_string(),
                 content: content.to_string(),
                 t_ref: base + Duration::seconds(position as i64),
-                t_ingested: Some(base + Duration::seconds(position as i64)),
+                t_ingested: None,
                 policy_tags: vec!["source-visible".to_string()],
             },
             None,
@@ -454,7 +454,7 @@ async fn source_neighborhood_projection_preserves_order_and_content() {
         }
     }
 
-    let cutoff = normalize_dt(base + Duration::minutes(1));
+    let cutoff = normalize_dt(Utc::now() + Duration::seconds(1));
     let rows = EpisodeContextStore::new(db, "org")
         .select_source_neighborhoods_for_episodes(&[middle_episode_id], &cutoff, None, None)
         .await

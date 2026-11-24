@@ -235,16 +235,20 @@ impl KnowledgeStoreClient {
         cutoff: &str,
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
-        let sql = format!(
+        let matching_sources = "SELECT VALUE source_fact_id FROM triple \
+            WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query)";
+        let fact_lookup = format!(
             "SELECT {} FROM fact \
-             WHERE fact_id IN ( \
-               SELECT VALUE source_fact_id FROM triple \
-               WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
-             ) \
-               AND {BI_TEMPORAL_WHERE} \
-             LIMIT $limit",
+             WHERE fact_id IN ({matching_sources}) AND {BI_TEMPORAL_WHERE} LIMIT $limit",
             crate::knowledge::queries::NONSEMANTIC_FACT_PROJECTION,
         );
+        // The conditional and selected branch share one statement read view.
+        // Skip the large fact scan when the triple table has no match.
+        let sql = if limit == 0 {
+            fact_lookup
+        } else {
+            format!("IF array::len(({matching_sources})) = 0 {{ [] }} ELSE {{ {fact_lookup} }}")
+        };
         let vars = json!({
             "query": query_text,
             "cutoff": cutoff,

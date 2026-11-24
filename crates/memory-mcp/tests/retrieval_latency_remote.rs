@@ -23,7 +23,22 @@ const ENV_REPORT: &str = "MEMORY_TRIPLE_TEST_REPORT";
 const IMAGE_ID: &str = "sha256:f40e356e40dd2094e5a743ad8b1353f646cf3a660541e92b9f6cce003d3be2dd";
 const IMAGE_TAG: &str = "surrealdb/surrealdb:v3.3.5";
 const SERVER_VERSION: &str = "3.3.5";
-const SDK_VERSION: &str = "3.3.5";
+fn sdk_version() -> &'static str {
+    include_str!("../../../Cargo.lock")
+        .split("[[package]]")
+        .find_map(|package| {
+            let mut lines = package.trim_start().lines();
+            if lines.next()? != r#"name = "surrealdb""# {
+                return None;
+            }
+            lines
+                .next()?
+                .strip_prefix(r#"version = ""#)?
+                .strip_suffix('"')
+        })
+        .expect("locked SurrealDB SDK version")
+}
+
 const STORAGE_ENGINE: &str = "RocksDB";
 const FACT_COUNT: usize = 2191;
 const EMBEDDING_DIMENSION: usize = 2048;

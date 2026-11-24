@@ -184,6 +184,7 @@ struct GuardComparisonReport {
 pub(super) async fn verify_remote_triple_compatibility(config: &RunConfig) -> Result<(), String> {
     inspect_disposable_container(config)?;
     let session = open_database(config, true).await?;
+    let (store, calls) = make_observed_store(&session, None);
     let result = async {
         for (query, limit, expected) in [
             ("subject-match", 40, &["fact:triple-fixture-0000"][..]),
@@ -194,7 +195,7 @@ pub(super) async fn verify_remote_triple_compatibility(config: &RunConfig) -> Re
             ("triple-fixture-no-match-query", 40, &[][..]),
             ("subject-match", 0, &[][..]),
         ] {
-            measure_query(&session, query, limit, expected).await?;
+            measure_store_query(&store, &calls, query, limit, expected).await?;
         }
         Ok(())
     }
@@ -208,7 +209,8 @@ pub(super) async fn verify_guard_candidate_compatibility(config: &RunConfig) -> 
     let session = open_database(config, true).await?;
     let result = async {
         let candidate_sql = candidate_guarded_triple_sql();
-        let (candidate_store, candidate_calls) = make_override_store(&session, &candidate_sql);
+        let (candidate_store, candidate_calls) =
+            make_observed_store(&session, Some(&candidate_sql));
 
         for (query, expected) in [
             ("triple-fixture-no-match-query", &[][..]),
@@ -259,7 +261,7 @@ pub(super) async fn verify_guard_candidate_compatibility(config: &RunConfig) -> 
 
         let skipped_branch_sql =
             guarded_triple_sql_with_else("THROW 'candidate fact branch entered'");
-        let (skipped_branch_store, _) = make_override_store(&session, &skipped_branch_sql);
+        let (skipped_branch_store, _) = make_observed_store(&session, Some(&skipped_branch_sql));
         let skipped = timeout(
             super::QUERY_TIMEOUT,
             skipped_branch_store.select_facts_by_triple(
@@ -369,8 +371,7 @@ pub(super) async fn compare_guard_candidate(config: &RunConfig) -> Result<(), St
     let docker = inspect_disposable_container(config)?;
     let session = open_database(config, true).await?;
     let result = async {
-        let candidate_sql = candidate_guarded_triple_sql();
-        let (candidate_store, candidate_calls) = make_override_store(&session, &candidate_sql);
+        let (production_store, production_calls) = make_observed_store(&session, None);
         let mut cases = Vec::new();
 
         for (case, query, expected) in [
@@ -389,8 +390,8 @@ pub(super) async fn compare_guard_candidate(config: &RunConfig) -> Result<(), St
                 measure_guard_pair(
                     &session.store,
                     &session.query_calls,
-                    &candidate_store,
-                    &candidate_calls,
+                    &production_store,
+                    &production_calls,
                     query,
                     expected,
                     warmup % 2 == 1,
@@ -405,8 +406,8 @@ pub(super) async fn compare_guard_candidate(config: &RunConfig) -> Result<(), St
                 let (baseline, candidate, order) = measure_guard_pair(
                     &session.store,
                     &session.query_calls,
-                    &candidate_store,
-                    &candidate_calls,
+                    &production_store,
+                    &production_calls,
                     query,
                     expected,
                     pair % 2 == 1,
@@ -447,7 +448,7 @@ pub(super) async fn compare_guard_candidate(config: &RunConfig) -> Result<(), St
         let report = GuardComparisonReport {
             schema: "memory-triple-guard-ab/v1",
             server_version: docker.server_version,
-            sdk_version: super::SDK_VERSION,
+            sdk_version: super::sdk_version(),
             image_id: config.image_id.clone(),
             storage_engine: super::STORAGE_ENGINE,
             host_architecture: docker.host_architecture,
@@ -484,7 +485,7 @@ pub(super) async fn capture_remote_latency(config: &RunConfig) -> Result<(), Str
     let report = LatencyReport {
         schema: "memory-triple-latency/v4",
         server_version: docker.server_version,
-        sdk_version: super::SDK_VERSION,
+        sdk_version: super::sdk_version(),
         image_id: config.image_id.clone(),
         storage_engine: super::STORAGE_ENGINE,
         host_architecture: docker.host_architecture,
@@ -859,12 +860,12 @@ async fn connect_database(
     Ok(Arc::new(client))
 }
 
-fn make_override_store(
+fn make_observed_store(
     session: &DatabaseSession,
-    query: &str,
+    query_override: Option<&str>,
 ) -> (KnowledgeStoreClient, Arc<AtomicUsize>) {
     let db: Arc<dyn DbClient> = session.client.clone();
-    let adapter = oracle::SqlOverrideDbClient::new(db, Some(query));
+    let adapter = oracle::SqlOverrideDbClient::new(db, query_override);
     let query_calls = adapter.query_counter();
     let db: Arc<dyn DbClient> = Arc::new(adapter);
     (

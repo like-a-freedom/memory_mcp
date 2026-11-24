@@ -1,5 +1,40 @@
 # assemble_context latency runbook
 
+## SDK 4.0.1 follow-up on Apple Silicon — 2026-11-24
+
+The disposable local server used the pinned SurrealDB 3.3.5 arm64 image,
+RocksDB and docker-default resources. The descriptive baseline measured
+0.315 ms for an empty table, 210.269 ms for populated no-match, and
+208.897 ms for a positive match at median. The pre-change SQL probe
+qualified for a production-path test.
+
+| Production-path comparison | Order | Unguarded median | Guarded median | B/A |
+|---|---|---:|---:|---:|
+| Populated no-match | AB | 207.694 ms | 0.629 ms | 0.0030 |
+| Populated no-match | BA | 207.060 ms | 0.429 ms | 0.0021 |
+| Positive match | AB | 213.050 ms | 209.820 ms | 0.9848 |
+| Positive match | BA | 208.869 ms | 212.384 ms | 1.0168 |
+
+The final comparison used twenty alternating pairs in each condition.
+Each measured lookup issued one query and returned the expected row
+digest. Positive-case median differences changed sign by order and stayed
+within 1.7%. The incumbent used an explicit frozen SQL override and the
+guard used the real store SQL. A preliminary comparison accidentally
+overrode both arms, so its timings were discarded.
+
+The production guard now short-circuits empty triple results in the same
+statement. The zero-limit path and positive query preserve the existing
+SQL policy. Native validation covered the focused stores, missing tables,
+branch failure propagation, projection, temporal cutoffs, and the real
+remote-compatible disposable fixture. Retrieval quality passed 37/37
+cases and all six gates. The measurements apply to the fixture and mode
+above. The 512 MiB mode remains unavailable.
+
+[Baseline](assemble-context-latency-2026-11-24/unguarded-baseline.json)
+· [SQL probe](assemble-context-latency-2026-11-24/sql-candidate-ab.json)
+· [Production A/B](assemble-context-latency-2026-11-24/production-guard-ab.json)
+· [Retrieval regression](assemble-context-latency-2026-11-24/retrieval-quality.json)
+
 ## Current protocol: descriptive v4 baseline
 
 The user approved replacing the calibration experiment with a descriptive baseline and removing additional work that does not decide whether a guard is useful. Spec B is authoritative. Measure empty-table, populated-no-match, and positive-match at limit 40 on a reused connection: five warmups, twenty timed queries. Keep all raw durations, median/min/max, stable row digests, and one SQL call per measurement. No new-connection timing, calibration, confidence intervals, timer-resolution probe, speedup flag, quiescence gate, or host/Engine monitoring is used.

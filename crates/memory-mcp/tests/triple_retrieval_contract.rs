@@ -85,6 +85,36 @@ async fn compare_with_corrected_unguarded_sql(
 }
 
 #[tokio::test]
+async fn no_match_skips_a_failing_fact_branch_in_one_query() {
+    let (db, _) = fixture().await;
+    let adapter = Arc::new(SqlOverrideDbClient::with_failing_fact_branch(db));
+    let calls = adapter.query_counter();
+    let store = KnowledgeStoreClient::new(adapter, FIXTURE_NAMESPACE);
+
+    let rows = store
+        .select_facts_by_triple("no-matching-triple", FIXED_CUTOFF, 40)
+        .await
+        .expect("no-match should skip the unavailable fact branch");
+
+    assert!(rows.is_empty());
+    assert_eq!(calls.load(Ordering::Relaxed), 1);
+}
+
+#[tokio::test]
+async fn matching_triple_propagates_a_failing_fact_branch() {
+    let (db, _) = fixture().await;
+    let adapter = Arc::new(SqlOverrideDbClient::with_failing_fact_branch(db));
+    let store = KnowledgeStoreClient::new(adapter, FIXTURE_NAMESPACE);
+
+    let error = store
+        .select_facts_by_triple("subject-match", FIXED_CUTOFF, 40)
+        .await
+        .expect_err("a matching triple must enter the fact branch");
+
+    assert!(error.to_string().contains("fixture fact branch entered"));
+}
+
+#[tokio::test]
 async fn seed_triple_fixture_batches_fact_inserts() {
     let database = format!(
         "triple_seed_batch_{}",

@@ -177,6 +177,7 @@ fn canonicalize(value: &Value) -> Value {
 pub struct SqlOverrideDbClient {
     inner: Arc<dyn DbClient>,
     query_override: Option<String>,
+    poison_fact_branch: bool,
     query_calls: Arc<AtomicUsize>,
 }
 
@@ -185,7 +186,16 @@ impl SqlOverrideDbClient {
         Self {
             inner,
             query_override: query_override.map(str::to_owned),
+            poison_fact_branch: false,
             query_calls: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_failing_fact_branch(inner: Arc<dyn DbClient>) -> Self {
+        Self {
+            poison_fact_branch: true,
+            ..Self::new(inner, None)
         }
     }
 
@@ -244,6 +254,16 @@ impl DbClient for SqlOverrideDbClient {
         namespace: &str,
     ) -> Result<Value, MemoryError> {
         self.query_calls.fetch_add(1, Ordering::Relaxed);
+        if self.poison_fact_branch {
+            const FAILURE: &str = "THROW 'fixture fact branch entered'";
+            let guarded = sql
+                .split_once(" ELSE {")
+                .map(|(guard, _)| format!("{guard} ELSE {{ {FAILURE} }}"));
+            return self
+                .inner
+                .query(guarded.as_deref().unwrap_or(FAILURE), vars, namespace)
+                .await;
+        }
         self.inner
             .query(
                 self.query_override.as_deref().unwrap_or(sql),

@@ -6,7 +6,13 @@ Status (November 16, 2026): the user approved a descriptive baseline and a secon
 
 The triple-projection correction and descriptive v4 baseline are complete. The [runbook](../../performance/ASSEMBLE_CONTEXT_LATENCY.md) owns the results and limitations. The measured `docker-default` mode completed. The 512 MiB mode was OOM-killed and remains unavailable. Raw experiment reports were removed during historical merge preparation, leaving narrative summaries and digest identifiers.
 
-The optional production guard was rejected because positive-case nonregression remained inconclusive. Stage instrumentation was also declined because no recurring application-level latency observation justified it. A future guard proposal must first reproduce a material cost on the current SDK/server, prove the positive/negative temporal contract, retain raw paired samples, and satisfy Section C. Stage metrics require a concrete recurring application-level question and the fixed-name/privacy rules of Section D. The historical Rust 1.99.0 / SurrealDB 3.3.5 experiment below does not establish performance for the current 4.0.1 SDK.
+The November 16 guard trial was inconclusive. The November 24 native
+run with SDK 4.0.1 reproduced a 210 ms populated no-match median,
+qualified the guard, and verified the production path against the frozen
+unguarded SQL. The short-circuit is implemented and its scope is limited
+to the validated query and storage path. Stage instrumentation remains
+triggered by an application-level observation under Section D.
+[Raw samples and current results](../../performance/ASSEMBLE_CONTEXT_LATENCY.md#sdk-401-follow-up-on-apple-silicon--2026-11-24)
 
 ## Goal and scope
 

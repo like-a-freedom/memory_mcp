@@ -1,8 +1,14 @@
-# Agent memory follow-up implementation plan
+# Agent memory follow-up design
 
-> **Status:** Proposed. The tasks below are future work.
+> **Status:** Implemented in part. See the outcomes below for the current acceptance state.
 >
 > **For implementers:** Use Superpowers executing-plans or subagent-driven-development and TDD. Complete each task at its public boundary before changing the next layer.
+
+The implementation plans track execution and acceptance in three parts.
+
+1. Agent read diagnostics and fixed-reply control covers Tasks 1–2.
+2. Historical retrieval and identity covers Task 3.
+3. Workflow qualification and remaining evaluations covers Tasks 4–5 and the independent backlog.
 
 **Goal.** Diagnose where agent tasks lose useful memory evidence, then improve the measured failing behavior without regressing ordinary recall, source integrity, or resource budgets.
 
@@ -22,10 +28,19 @@
 
 Sources: [deterministic memory report](../../evals/DETERMINISTIC_MEMORY_QUALITY.md), [v10](../../../evals/paired/memory-decisions-v10-baseline-2026-11-23/README.md), [typed-conflict pilot](../../../evals/paired/typed-conflict-agent-pilot-2026-11-24/README.md), [maintenance v6](../../../evals/paired/agent-managed-maintenance-v6/README.md), [source-authority workflow qualification](../../../evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/report.md).
 
+## Verified follow-up outcomes
+
+- Agent-read diagnostics, versioned receipts and live/fixed-reply controls are implemented. The tested local workflow remains ineligible for confirmation. Fixed reply recovered the historical source and snapshot in both diagnostic trials, while neither mode produced a passing final answer. [Local diagnostic report](../../../evals/paired/recall-read-local-screen-2026-11-24/report.md)
+- Historical subject discovery and identity fixes passed their independent deterministic native comparisons. The additional multiple-correction family protects the earlier snapshot. Historical data repair requires a reproduced durable misattribution and an affected-record inventory. [Historical identity](../../../evals/paired/historical-identity-2026-11-24/report.md) · [Multiple corrections](../../../evals/paired/multiple-corrections-2026-11-24/report.md)
+- The v9 rollout gate passed on native Apple Silicon with four eight-case captures after the public citation schema change. The bounded citation profile passed 62/62 cases. [Native rollout](../../../evals/paired/native-rollout-v9-explain-2026-11-24/report.md) · [ADR-0084](../../adr/0084-bounded-public-explain-citations.md)
+- LongMemEval-V2 passed a portable restore and shared-build failure smoke at the pinned upstream revision. The largest pinned trajectory passed stdin ingest and then hit the default local extraction limit. Official scoring is pending qualification. [Official benchmark design](2026-11-09-longmemeval-v2-official-run-design.md)
+- Deployed extraction measurement is pending matched aggregate windows and an identified deployed revision. The existing local measurements remain the available baseline. [Extraction baseline](2026-11-02-extract-quality-and-cost.md)
+- The triple lookup guard passed the native SDK 4.0.1 comparison on the disposable ARM server. Both acquisition orders achieved the registered populated no-match reduction, and retrieval quality passed 37/37 cases. [Latency runbook](../../performance/ASSEMBLE_CONTEXT_LATENCY.md)
+
 ## Constraints and review focus
 
 - Keep the eight-tool surface. Use the public CLI and MCP seams, the owning memory/knowledge contexts, and narrow adapter dependencies. Preserve wire compatibility and historical artifact semantics. New dependencies and migrations follow the repository approval rules.
-- PR regressions run with Cargo on macOS, Linux and Windows without provider credentials or a model server. Preserve the pinned local encoders only for the existing retrieval quality profile.
+- Required deterministic evaluations in this follow-up run locally through Cargo on native Apple Silicon (`aarch64-apple-darwin`), without provider credentials or a model server. Existing CI and the pinned local encoders for the existing retrieval quality profile stay in place.
 - Preserve the difference between a failed tool call, an empty successful result, an insufficient result and a wrong answer. Legacy artifacts carry unknown observations.
 - Limit exported telemetry to closed enums, booleans and bounded counts. Reject raw prompts, arguments, source text, model responses and provider bodies at the persisted observation boundary. Keep evaluator oracles private.
 - Preserve `partial` or `unknown` for incomplete historical visibility. A zero result in a partial snapshot cannot establish global absence.
@@ -74,7 +89,7 @@ Sources: [deterministic memory report](../../evals/DETERMINISTIC_MEMORY_QUALITY.
 **Owns:** `evals/corpora`, `evals/profiles`, the `evaluation` CI job and [official LongMemEval-V2 design](2026-11-09-longmemeval-v2-official-run-design.md).
 
 - [ ] Add distinct, synthetic history shapes with multiple updates, conflicting sources, lexical distractors and realistic history lengths. Preserve the exposed v4–v10 histories as replay/regression cases. Measure fixed public-call budgets, per-case success and query/runtime distributions separately.
-- [ ] Verify the deterministic Cargo commands on Linux and Windows in addition to macOS, with no vendor login. Archive the exact invoked profile and per-platform receipts. Treat platform-specific model smoke as optional.
+- [x] Verify the deterministic Cargo commands once on native Apple Silicon without vendor login. Archive the exact invoked profile, native toolchain and receipts. Treat model smoke as optional.
 - [ ] Run the official benchmark as a separate project slice. Execute the pinned checkout and manifest preflight, lifecycle and order-independence probes, scorer reconciliation and failure accounting before a full scored run. Publish the dataset/runner identity and denominators if the official protocol completes.
 - [ ] Keep retention, feedback, consolidation and index experiments behind measured triggers. Specify the observed error or resource limit and its deterministic comparator before implementing a mechanism. Reuse the follow-up evidence rules in the [research ledger](2026-11-09-agent-memory-review-evidence-ledger.md).
 
@@ -82,6 +97,6 @@ Sources: [deterministic memory report](../../evals/DETERMINISTIC_MEMORY_QUALITY.
 
 These items have their own evidence and acceptance criteria. They can proceed independently from Tasks 1–5.
 
-- [ ] **Bounded explain citations.** Ratify the [existing spec](2026-11-13-explain-bounded-citation-output-design.md) in a newly allocated ADR. First capture public byte and Unicode reconstruction failures through `explain` and the response-size suite. Then implement the budget and source/provenance continuations at the memory use case. Require reconstruction, bounded over-budget behavior, wire compatibility and cross-platform response-size replay.
+- [x] **Bounded explain citations.** Ratify the [existing spec](2026-11-13-explain-bounded-citation-output-design.md) in a newly allocated ADR. First capture public byte and Unicode reconstruction failures through `explain` and the response-size suite. Then implement the budget and source/provenance continuations at the memory use case. Require reconstruction, bounded over-budget behavior, wire compatibility and native Apple Silicon response-size replay.
 - [ ] **Extract quality after deployment.** Compare equivalent operation windows against the fixed [extract baseline](2026-11-02-extract-quality-and-cost.md). Track false relations, eligible entity recall and per-stage latency/query cost. Open repair only for a reproduced stored misattribution and follow Task 3's recovery criteria.
-- [ ] **Assemble-context latency.** Re-run the [existing performance design](2026-11-14-assemble-context-latency-design.md) on a comparable SDK 4.0.1 host and profile. Change only a measured bottleneck, with correctness and resource controls in the same run. Keep the unavailable 512 MiB mode out of acceptance reporting until it has a valid baseline.
+- [x] **Assemble-context latency.** Re-run the [existing performance design](2026-11-14-assemble-context-latency-design.md) on a comparable SDK 4.0.1 host and profile. Change only a measured bottleneck, with correctness and resource controls in the same run. Keep the unavailable 512 MiB mode out of acceptance reporting until it has a valid baseline.

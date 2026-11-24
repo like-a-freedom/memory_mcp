@@ -1,0 +1,241 @@
+{
+  "schema": "memory-triple-guard-ab/v1",
+  "server_version": "SurrealDB 3.3.5",
+  "sdk_version": "4.0.1",
+  "image_id": "sha256:f40e356e40dd2094e5a743ad8b1353f646cf3a660541e92b9f6cce003d3be2dd",
+  "storage_engine": "RocksDB",
+  "host_architecture": "aarch64",
+  "image_architecture": "arm64",
+  "emulation": false,
+  "resource_mode": "docker-default",
+  "effective_resources": {
+    "memory_limit_bytes": 0,
+    "memory_swap_limit_bytes": 0,
+    "cpu_quota_micros": 0,
+    "cpu_period_micros": 0
+  },
+  "fixture": {
+    "fact_count": 2191,
+    "embedding_dimension": 2048,
+    "triple_count": 5,
+    "cutoff": "2026-11-13T15:52:35.269Z"
+  },
+  "warmup_count": 5,
+  "pair_count": 20,
+  "cases": [
+    {
+      "case": "populated_no_match",
+      "row_count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "pairs": [
+        {
+          "order": "AB",
+          "baseline_ns": 196666125,
+          "candidate_ns": 619209
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 198606917,
+          "candidate_ns": 378250
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 198597625,
+          "candidate_ns": 608292
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 202364875,
+          "candidate_ns": 456541
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 210128375,
+          "candidate_ns": 2083458
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 228304791,
+          "candidate_ns": 1136292
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 338002917,
+          "candidate_ns": 865042
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 357695750,
+          "candidate_ns": 619958
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 256518417,
+          "candidate_ns": 794250
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 229344208,
+          "candidate_ns": 517500
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 256443416,
+          "candidate_ns": 748042
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 205635458,
+          "candidate_ns": 503416
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 255587041,
+          "candidate_ns": 1172708
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 310083875,
+          "candidate_ns": 411917
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 201827625,
+          "candidate_ns": 869375
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 194980667,
+          "candidate_ns": 550750
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 202045209,
+          "candidate_ns": 781750
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 194852250,
+          "candidate_ns": 457750
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 196585042,
+          "candidate_ns": 641292
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 192701833,
+          "candidate_ns": 446459
+        }
+      ]
+    },
+    {
+      "case": "positive_match",
+      "row_count": 1,
+      "sha256": "2ec4b252b2acede70b0bc724abb095b737ebc9b98ae9149c40e1b0be576aad26",
+      "pairs": [
+        {
+          "order": "AB",
+          "baseline_ns": 204350666,
+          "candidate_ns": 203899917
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 205585167,
+          "candidate_ns": 212206084
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 202081625,
+          "candidate_ns": 202881000
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 204140167,
+          "candidate_ns": 199596167
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 204026417,
+          "candidate_ns": 206002709
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 201096041,
+          "candidate_ns": 200526042
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 202742750,
+          "candidate_ns": 196468375
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 207786042,
+          "candidate_ns": 204913834
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 211138292,
+          "candidate_ns": 206714042
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 259730833,
+          "candidate_ns": 244125833
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 197746875,
+          "candidate_ns": 201651750
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 203468917,
+          "candidate_ns": 223200917
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 206921167,
+          "candidate_ns": 223238292
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 209195625,
+          "candidate_ns": 207330334
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 211443292,
+          "candidate_ns": 200647500
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 206669625,
+          "candidate_ns": 201262750
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 214132959,
+          "candidate_ns": 212319250
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 209382250,
+          "candidate_ns": 211059709
+        },
+        {
+          "order": "AB",
+          "baseline_ns": 214290292,
+          "candidate_ns": 222232959
+        },
+        {
+          "order": "BA",
+          "baseline_ns": 235283709,
+          "candidate_ns": 210468250
+        }
+      ]
+    }
+  ]
+}
