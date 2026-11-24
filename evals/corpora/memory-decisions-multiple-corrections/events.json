@@ -1,0 +1,33 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "ledger-original",
+      "source_id": "ledger-original-source",
+      "source_type": "inspection-record",
+      "t_ref": "2026-04-02T00:00:00Z",
+      "content": "subject: Slate Weir\ndimension: length\nvalue: 27 metres for Slate Weir"
+    },
+    {
+      "id": "ledger-revision",
+      "source_id": "ledger-revision-source",
+      "source_type": "inspection-record",
+      "t_ref": "2026-04-02T00:00:00Z",
+      "content": "subject: Slate Weir\ndimension: length\nvalue: 29 metres, correction filed in the inspection ledger for Slate Weir"
+    },
+    {
+      "id": "forum-dispute",
+      "source_id": "forum-dispute-source",
+      "source_type": "forum-report",
+      "t_ref": "2026-04-02T00:00:00Z",
+      "content": "subject: Slate Weir\ndimension: length\nvalue: unverified correction of 31 metres posted on a forum for Slate Weir"
+    },
+    {
+      "id": "neighbor",
+      "source_id": "neighbor-source",
+      "source_type": "inspection-record",
+      "t_ref": "2026-04-02T00:00:00Z",
+      "content": "subject: Slate Weir East\ndimension: length\nvalue: 53 metres for Slate Weir East"
+    }
+  ]
+}

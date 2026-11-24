@@ -1,0 +1,21 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "before-corrections",
+      "family_id": "slate-weir-history",
+      "event_ids": [
+        "ledger-original",
+        "neighbor",
+        "ledger-revision",
+        "forum-dispute"
+      ],
+      "knowledge_before_event_id": "ledger-revision",
+      "query": "What length was recorded for Slate Weir?",
+      "valid_at": "2026-04-02T00:00:00Z",
+      "temporal_diagnostic_as_of": "2026-04-02T00:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "memory-decisions-oracle/v2",
+  "oracles": [
+    {
+      "probe_id": "before-corrections",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "ledger-original"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "ledger-original": "27 metres"
+      },
+      "expected_roles": {
+        "ledger-original": "current"
+      },
+      "forbidden_event_ids": [
+        "neighbor",
+        "ledger-revision",
+        "forum-dispute"
+      ]
+    }
+  ]
+}
