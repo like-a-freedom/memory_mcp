@@ -116,6 +116,8 @@ pub struct PairedTrialExecution {
 #[serde(deny_unknown_fields)]
 pub struct AgentObservation {
     pub trace: Vec<AgentTraceEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_reads: Option<Vec<MemoryReadObservation>>,
     /// Exact final output text for private scoring.
     pub final_answer: Option<String>,
     /// Source episode IDs observed in successful memory reads.
@@ -151,6 +153,24 @@ pub struct AgentObservation {
     pub output_tokens: u64,
     pub wall_time_ms: u64,
     pub status: TrialStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryReadObservation {
+    pub request_sequence: u32,
+    pub response_sequence: Option<u32>,
+    pub outcome: MemoryReadOutcome,
+    pub item_count: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryReadOutcome {
+    Failed,
+    Empty,
+    Nonempty,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -946,6 +966,7 @@ mod tests {
                     ],
                     final_answer: Some(final_answer),
                     memory_source_episode_ids: vec![episode_id.clone()],
+                    memory_reads: None,
                     memory_write_episode_ids: vec![],
                     extract_fact_evidence: vec![],
                     extract_fact_evidence_telemetry_complete: false,
@@ -1625,6 +1646,7 @@ mod tests {
                 .to_string(),
             ),
             memory_source_episode_ids: vec![episode_id.clone()],
+            memory_reads: None,
             memory_write_episode_ids: vec![],
             extract_fact_evidence: vec![],
             extract_fact_evidence_telemetry_complete: false,

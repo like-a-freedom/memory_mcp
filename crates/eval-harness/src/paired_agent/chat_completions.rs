@@ -306,6 +306,7 @@ impl ChatCompletionsAgent {
             trace: Vec::new(),
             final_answer: None,
             memory_source_episode_ids: Vec::new(),
+            memory_reads: Some(Vec::new()),
             memory_write_episode_ids: Vec::new(),
             extract_fact_evidence: Vec::new(),
             extract_fact_evidence_telemetry_complete: matches!(
@@ -625,7 +626,7 @@ impl ChatCompletionsAgent {
                 }
                 Ok(_) | Err(_) => {
                     observation.status = TrialStatus::ToolFailure;
-                    push_event(
+                    let response_sequence = push_event(
                         &mut observation.trace,
                         observation.turns_used,
                         TraceEventKind::ToolError,
@@ -635,6 +636,16 @@ impl ChatCompletionsAgent {
                         None,
                         None,
                     )?;
+                    if tool_name == "assemble_context"
+                        && let Some(reads) = observation.memory_reads.as_mut()
+                    {
+                        reads.push(super::MemoryReadObservation {
+                            request_sequence,
+                            response_sequence: Some(response_sequence),
+                            outcome: super::MemoryReadOutcome::Failed,
+                            item_count: None,
+                        });
+                    }
                     messages.push(json!({
                         "role":"tool",
                         "tool_call_id":call_id,
@@ -656,7 +667,24 @@ impl ChatCompletionsAgent {
             )?;
             match tool_name {
                 "assemble_context" => {
-                    super::tool_results::collect_source_episode_ids(&tool_result, &mut sources)
+                    use super::MemoryReadOutcome;
+                    super::tool_results::collect_source_episode_ids(&tool_result, &mut sources);
+                    let item_count = tool_result
+                        .pointer("/result/structuredContent/result")
+                        .and_then(Value::as_array)
+                        .and_then(|items| u32::try_from(items.len()).ok());
+                    if let Some(reads) = observation.memory_reads.as_mut() {
+                        reads.push(super::MemoryReadObservation {
+                            request_sequence,
+                            response_sequence: Some(response_sequence),
+                            outcome: match item_count {
+                                Some(0) => MemoryReadOutcome::Empty,
+                                Some(_) => MemoryReadOutcome::Nonempty,
+                                None => MemoryReadOutcome::Unknown,
+                            },
+                            item_count,
+                        });
+                    }
                 }
                 "ingest" => {
                     super::tool_results::collect_ingested_episode_id(&tool_result, &mut writes)

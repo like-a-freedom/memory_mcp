@@ -210,6 +210,83 @@ fn model_response(message: Value, prompt_tokens: u64, completion_tokens: u64) ->
     })
 }
 
+fn capture_read_reply(reply: Value) -> Value {
+    struct ReplySession(FakeMemorySession, Option<Value>);
+
+    impl MemoryToolSession for ReplySession {
+        fn tool_schemas(&self) -> &Value {
+            self.0.tool_schemas()
+        }
+
+        fn call_tool(&mut self, _: &str, _: Value) -> Result<Value, EvalError> {
+            Ok(self.1.take().expect("one registered read"))
+        }
+    }
+
+    let server = MockChatServer::with_responses(vec![
+        model_response(
+            json!({
+                "role": "assistant", "content": null, "tool_calls": [{
+                    "id": "read-1", "type": "function",
+                    "function": {"name": "assemble_context",
+                        "arguments": r#"{"query":"Where is Cedar?","budget":1}"#}
+                }]
+            }),
+            40,
+            12,
+        ),
+        model_response(
+            json!({
+                "role": "assistant",
+                "content": r#"{"answer":"unknown","citations":[],"needs_clarification":true}"#
+            }),
+            65,
+            18,
+        ),
+    ]);
+    let agent = ChatCompletionsAgent::new(ChatCompletionsConfig::new(
+        server.endpoint.clone(),
+        "test-model",
+    ))
+    .unwrap();
+    let mut memory = ReplySession(FakeMemorySession::read_only(), Some(reply));
+    let observation = agent
+        .run_phase(
+            &mut memory,
+            "Where is Cedar?",
+            "Use memory.",
+            "Return JSON.",
+            ChatCompletionsToolProfile::RecallOnly,
+            budgets(),
+        )
+        .unwrap();
+    assert_eq!(server.requests().len(), 2);
+    serde_json::to_value(observation).unwrap()
+}
+
+#[test]
+fn read_error_does_not_become_empty_memory() {
+    let captured = capture_read_reply(json!({"result":{"isError":true}}));
+    let read = &captured["memory_reads"][0];
+    assert_eq!(read["outcome"], "failed");
+    assert!(read["item_count"].is_null());
+    let trace = captured["trace"].as_array().unwrap();
+    let request = &trace[read["request_sequence"].as_u64().unwrap() as usize - 1];
+    let response = &trace[read["response_sequence"].as_u64().unwrap() as usize - 1];
+    assert_eq!(request["kind"], "memory_read");
+    assert_eq!(response["kind"], "tool_error");
+    assert_eq!(request["tool_name"], "assemble_context");
+    assert_eq!(response["call_id"], request["call_id"]);
+}
+
+#[test]
+fn empty_read_reports_zero_items() {
+    let captured = capture_read_reply(json!({"result":{"structuredContent":{"result":[]}}}));
+    let read = &captured["memory_reads"][0];
+    assert_eq!(read["outcome"], "empty");
+    assert_eq!(read["item_count"], 0);
+}
+
 #[test]
 fn chat_completions_agent_executes_an_allowed_mcp_tool_and_records_only_receipt_metadata() {
     let final_answer =
