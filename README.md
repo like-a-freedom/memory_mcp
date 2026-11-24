@@ -2591,6 +2591,11 @@ storage, edit files, or change environment variables. `admin` is the other
 command that runs outside a service, and a default build does not have it. See
 [Remote deployment](#remote-deployment).
 
+The local CLI accepts `ingest --content-stdin` for UTF-8 episode bodies
+up to 8 MiB. Pipe the body into the command and supply the same
+`--source-type`, `--source-id` and `--t-ref` metadata as with `--content`.
+Choose one input option per call.
+
 The `ingest` command and all MCP `ingest`/inline `extract` content are literal
 text; a path or URL is never an instruction to read or fetch. Use `import file`
 or `import url` when an operator intentionally wants to import a source. File

@@ -11,8 +11,15 @@ pub struct IngestArgs {
     #[arg(long)]
     pub source_id: String,
     /// Raw content to store as the episode body
+    #[arg(
+        long,
+        required_unless_present = "content_stdin",
+        conflicts_with = "content_stdin"
+    )]
+    pub content: Option<String>,
+    /// Read the episode body as UTF-8 from standard input (up to 8 MiB)
     #[arg(long)]
-    pub content: String,
+    pub content_stdin: bool,
     /// Reference (valid) time in ISO 8601 — e.g. "2026-06-30T10:00:00Z"
     #[arg(long)]
     pub t_ref: String,

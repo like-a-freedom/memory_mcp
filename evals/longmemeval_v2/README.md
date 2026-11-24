@@ -111,14 +111,22 @@ To repeat the optional upstream smoke, point `PYTHONPATH` at the pinned
 upstream checkout and this repository, and set
 `LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY` to the native product binary. Run
 `python -m unittest evals.longmemeval_v2.test_upstream_restore` with the
-upstream test requirements and the local embedding cache available.
+upstream test requirements available.
 
 Streaming the pinned trajectories verified the third file hash and
 resolved the 200 distinct Small trajectory IDs. The current JSON
 serialization reaches 7,600,069 bytes for one trajectory. In total,
 53 trajectories exceed the native Apple Silicon process argument
 budget of 1,048,576 bytes on content alone. A synthetic argument of the
-maximum size was rejected by macOS with `E2BIG`. The current
-`ingest --content` path therefore cannot complete the full Small input set without a transport change. The input
-preflight does not establish product parser or provider capacity.
+maximum size was rejected by macOS with `E2BIG`. The adapter now sends
+the complete UTF-8 body via `ingest --content-stdin` with an 8 MiB limit.
+It requires an explicit dedicated embedded store and disables embeddings
+in an allowlisted subprocess environment. A digest of canonical JSON and
+the undated-trajectory surrogate `2000-01-01T00:00:00Z` form the input
+identity across retries. The longest pinned trajectory (7,600,069 bytes) reached durable ingest on
+native Apple Silicon. The subsequent extract refused the whole input at
+the default Anno limit of 1,048,576 bytes. The adapter keeps this failure
+visible and preserves the product limit. In a synthetic test of the
+actual upstream harness, the same class of failure aborted a shared build
+for two questions before a snapshot, prompt rows or score were emitted.
 [Native aggregate](dataset-small-native-preflight.json)

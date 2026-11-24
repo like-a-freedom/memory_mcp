@@ -1,5 +1,8 @@
 import json
+import os
+import subprocess
 import unittest
+from unittest.mock import patch
 
 from evals.longmemeval_v2.memory_mcp_backend import MemoryMcpBackend
 
@@ -27,6 +30,45 @@ class MemoryMcpBackendTests(unittest.TestCase):
         self.assertEqual(backend.query("What do I prefer?"), [{"type": "text", "value": "tea"}])
         self.assertEqual(calls[1], ("extract", ("--episode-id", "episode:issued")))
         self.assertNotIn("--scope", calls[0][1])
+
+    def test_trajectory_source_identity_survives_restart_and_reordering(self):
+        identities = []
+
+        def runner(command, *args):
+            if command == "ingest":
+                identities.append((
+                    args[args.index("--source-id") + 1], args[args.index("--t-ref") + 1],
+                ))
+                return json.dumps({"result": "episode:issued"})
+            return "{}"
+
+        first = MemoryMcpBackend({}, runner=runner)
+        first.insert({"content": "separate history"})
+        first.insert({"content": "tea", "role": "user"})
+        restarted = MemoryMcpBackend({}, runner=runner)
+        restarted.insert({"role": "user", "content": "tea"})
+
+        self.assertNotEqual(identities[0], identities[1])
+        self.assertEqual(identities[1], identities[2])
+        self.assertEqual(identities[2][1], "2000-01-01T00:00:00Z")
+
+    def test_local_cli_uses_dedicated_store_without_inheriting_provider_or_remote_db(self):
+        parent = {"SURREALDB_URL": "wss://example.invalid", "EMBEDDINGS_PROVIDER": "openai"}
+        replies = [
+            subprocess.CompletedProcess([], 0, b'{"result":"episode:issued"}'),
+            subprocess.CompletedProcess([], 0, b"{}"),
+        ]
+        with patch.dict(os.environ, parent, clear=True), patch("subprocess.run", side_effect=replies) as run:
+            MemoryMcpBackend({"db_path": "/tmp/test-memory-mcp"}).insert({"content": "чай"})
+
+        argv = run.call_args_list[0].args[0]
+        options = run.call_args_list[0].kwargs
+        self.assertIn("--content-stdin", argv)
+        self.assertNotIn("--content", argv)
+        self.assertEqual(json.loads(options["input"]), {"content": "чай"})
+        self.assertEqual(options["env"]["SURREALDB_DATA_DIR"], "/tmp/test-memory-mcp")
+        self.assertNotIn("SURREALDB_URL", options["env"])
+        self.assertNotIn("EMBEDDINGS_PROVIDER", options["env"])
 
     def test_image_queries_are_explicitly_unsupported(self):
         backend = MemoryMcpBackend({}, runner=lambda *_: "{}")

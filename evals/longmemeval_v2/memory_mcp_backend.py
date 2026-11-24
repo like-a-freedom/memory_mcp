@@ -13,8 +13,9 @@ The adapter invokes the existing public ingest/inline extract and
 assemble_context surfaces. It does not seed facts directly.
 """
 
-import json
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -35,6 +36,9 @@ except ModuleNotFoundError as error:  # standalone smoke without upstream checko
 
     def register_memory(cls):  # type: ignore[no-redef]
         return cls
+
+
+UNDATED_TRAJECTORY_REFERENCE = "2000-01-01T00:00:00Z"
 
 
 @register_memory
@@ -64,8 +68,9 @@ class MemoryMcpBackend(Memory):
 
     def _insert(self, trajectory: Any) -> None:
         start = time.monotonic()
-        content = json.dumps(trajectory, ensure_ascii=False)
-        source_id = f"longmemeval_v2_trajectory_{self._insert_count}"
+        content = json.dumps(trajectory, ensure_ascii=False, sort_keys=True)
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        source_id = f"longmemeval_v2_trajectory_{digest}"
 
         # Step 1: ingest the raw trajectory content.
         ingest_output = self._runner(
@@ -73,7 +78,7 @@ class MemoryMcpBackend(Memory):
             "--source-type", "other",
             "--source-id", source_id,
             "--content", content,
-            "--t-ref", _now_iso(),
+            "--t-ref", UNDATED_TRAJECTORY_REFERENCE,
         )
 
         # Step 2: extract facts from the server-issued episode ID.
@@ -166,17 +171,30 @@ class MemoryMcpBackend(Memory):
     def _run_cli(self, subcommand: str, *args: str) -> str:
         with self._store_lock:
             cmd = [self.binary]
-            env = os.environ.copy()
-            if self.db_path:
-                # The CLI exposes embedded storage through the documented
-                # environment contract; `--db` is not a global option.
-                env["SURREALDB_EMBEDDED"] = "true"
-                env["SURREALDB_DATA_DIR"] = self.db_path
-            cmd += [subcommand, *args]
+            if not self.db_path:
+                raise ValueError("memory_mcp requires an explicit dedicated db_path")
+            env = {
+                name: os.environ[name]
+                for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
+                if name in os.environ
+            }
+            env.update({
+                "SURREALDB_EMBEDDED": "true",
+                "SURREALDB_DATA_DIR": self.db_path,
+                "EMBEDDINGS_ENABLED": "false",
+                "RUST_LOG": "error",
+            })
+            argv = list(args)
+            stdin_content = None
+            if subcommand == "ingest":
+                content_index = argv.index("--content")
+                stdin_content = argv[content_index + 1].encode("utf-8")
+                argv[content_index:content_index + 2] = ["--content-stdin"]
+            cmd += [subcommand, *argv]
             result = subprocess.run(
-                cmd, capture_output=True, text=True, check=True, env=env
+                cmd, input=stdin_content, capture_output=True, check=True, env=env
             )
-            return result.stdout
+            return result.stdout.decode("utf-8")
 
 
 def _smoke_test() -> None:
@@ -199,11 +217,6 @@ def _smoke_test() -> None:
     assert "other" in calls[0][1]
     assert calls[1] == ("extract", ("--episode-id", "episode:server-issued"))
     print("LongMemEval-V2 adapter smoke: PASS")
-
-
-def _now_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 if __name__ == "__main__":

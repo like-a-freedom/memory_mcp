@@ -39,7 +39,8 @@ fn ingest_args(content: &str) -> IngestArgs {
     IngestArgs {
         source_type: "note".to_string(),
         source_id: "s-1".to_string(),
-        content: content.to_string(),
+        content: Some(content.to_string()),
+        content_stdin: false,
         t_ref: "2026-01-01T00:00:00Z".to_string(),
         t_ingested: None,
         policy_tags: Vec::new(),
