@@ -1,0 +1,137 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "alder-ordinary-fresh",
+        "case_id": "alder-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "What cabinet stores the Alder calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "record-alder",
+          "source_id": "alder-ordinary-fresh-ledger",
+          "source_type": "document",
+          "content": "The Alder calibration key is stored in Cabinet-28.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "record-alder"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "birch-ordinary-fresh",
+        "case_id": "birch-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "What cabinet stores the Birch calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "record-birch",
+          "source_id": "birch-ordinary-fresh-ledger",
+          "source_type": "document",
+          "content": "The Birch calibration key is stored in Cabinet-43.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "record-birch"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-43"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cedar-ordinary-fresh",
+        "case_id": "cedar-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "What cabinet stores the Cedar calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "record-cedar",
+          "source_id": "cedar-ordinary-fresh-ledger",
+          "source_type": "document",
+          "content": "The Cedar calibration key is stored in Cabinet-16.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "record-cedar"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-16"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "delta-ordinary-fresh",
+        "case_id": "delta-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "What cabinet stores the Delta calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "record-delta",
+          "source_id": "delta-ordinary-fresh-ledger",
+          "source_type": "document",
+          "content": "The Delta calibration key is stored in Cabinet-51.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "record-delta"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-51"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

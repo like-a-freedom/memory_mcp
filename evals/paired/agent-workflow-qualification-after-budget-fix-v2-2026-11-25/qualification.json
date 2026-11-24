@@ -1,0 +1,60 @@
+{
+  "schema_version": "memory-mcp-agent-workflow-qualification/v1",
+  "plan_id": "native-qwen-agent-tool-budget-v2",
+  "plan_sha256": "88b662cd4fbbae426ed59b7114a1f1d356222a8887b01c88425685549caab629",
+  "manifest_sha256": "f53da8d38b04a7e6ddf663166f3bbd090104b6f067f54ef2c0b0d439653d221b",
+  "probes_sha256": "42f37a538f5b4a8fe4af0468202a4eab29f5b48a1297d7d9cad92cc3a6c2b476",
+  "criteria_sha256": "8e9260c34dae4408feb27dc38f123e1b26668db1eed2ab7b023a1892ea13415e",
+  "criteria": {
+    "ordinary_stratum_id": "ordinary",
+    "expected_trial_count": 4,
+    "minimum_task_successes": 3,
+    "minimum_direct_memory_successes": 3,
+    "minimum_probe_successes": 4
+  },
+  "captures": [
+    {
+      "run_id": "82775-1795562124818686000-1",
+      "incumbent_artifact_sha256": "dfb9f5cc1420154bdfa63b582f165610f01859e735fd2b567044b6516060b3b8",
+      "candidate_artifact_sha256": "3abb1b4809d0546d3db80b5b52bc684e90a09f5e4656f34740dd913a0c6efd7c",
+      "candidate_task_successes": 0,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 4,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 4,
+      "candidate_max_turns": 2,
+      "candidate_max_tool_calls": 1,
+      "candidate_max_output_tokens": 142,
+      "candidate_max_wall_time_ms": 10625,
+      "failed_gates": [
+        "ordinary_task_success_floor",
+        "resource_budget_exits"
+      ],
+      "eligible": false
+    },
+    {
+      "run_id": "82825-1795562335105402000-1",
+      "incumbent_artifact_sha256": "8de8c373278b2af2782878bb2a3580821807f4cc6f890cefe39fcaf41abb807b",
+      "candidate_artifact_sha256": "b893ec18c1c905bb2c7ec552871a9fbc6b0bba666a478a593e3b21ebde8be13b",
+      "candidate_task_successes": 0,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 4,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 4,
+      "candidate_max_turns": 2,
+      "candidate_max_tool_calls": 1,
+      "candidate_max_output_tokens": 142,
+      "candidate_max_wall_time_ms": 10382,
+      "failed_gates": [
+        "ordinary_task_success_floor",
+        "resource_budget_exits"
+      ],
+      "eligible": false
+    }
+  ],
+  "eligible": false
+}

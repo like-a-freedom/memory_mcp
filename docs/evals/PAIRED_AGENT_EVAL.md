@@ -58,6 +58,41 @@ without LM Studio or any model server. The test target has no OS-specific
 provider dependency and can be run with Cargo on Windows, Linux, and macOS; the
 local smoke below has only been exercised on this macOS laptop.
 
+## Independent probes and ordinary-workflow qualification
+
+For a provider-neutral ordinary-recall capture, pass
+`run-paired-chat-completions --recall-read-mode live --independent-probes
+<probes.json>`. The runner writes the agent-observed artifacts and a separate
+independent-probe envelope for each arm. Independent probes issue fixed reads
+through the public memory interface and are scored without consulting the
+agent's answer. They must remain a separate metric: a successful probe does
+not count as an agent memory read or a task success. `--independent-probes`
+requires an explicit recall mode and is not accepted for agent-managed tasks.
+
+The offline `qualify-agent-workflow` command applies frozen task-success,
+agent-memory-read, independent-probe, hard-violation and budget gates to two
+paired captures. It consumes the plan, task manifest, probe manifest,
+criteria, and incumbent/candidate independent artifacts for both captures;
+the output report fingerprints these inputs and the artifacts. Exit code `0`
+means the workflow is eligible for a separately frozen confirmation design,
+`1` means valid inputs failed one or more frozen gates, and `2` means invalid
+inputs or an output error. It does not claim a memory treatment effect, replace
+the offline paired-analysis commands, or require an agent harness after
+capture. The first response-format screen remains archived as a historical
+NO-GO in the
+[initial 2026-11-25 qualification](../../evals/paired/agent-workflow-qualification-2026-11-25/README.md).
+
+The later [tool-budget v3 screen](../../evals/paired/agent-workflow-qualification-withdraw-tools-v3-2026-11-25/README.md)
+is ELIGIBLE for a separately frozen study of that exact local configuration:
+both captures passed task, direct-read and independent-probe gates, with no
+hard violations or resource exits. In this runner, once the registered tool
+call budget is consumed, the follow-up request omits `tools`, `tool_choice` and
+`parallel_tool_calls`; `tool_choice: "none"` alone did not stop this local
+provider from returning another call. This screen does not demonstrate a
+memory treatment effect or qualify typed-conflict, agent-managed correction
+or operator-import workflows. Those populations still need separate frozen
+registrations and results.
+
 If a Chat Completions response includes `reasoning_content` alongside a tool
 call, the adapter forwards that optional field in the next assistant-history
 message for providers that require it. It remains transient request context and

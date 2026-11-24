@@ -35,6 +35,240 @@ pub struct IndependentPairedArtifact {
     pub probes_sha256: String,
     pub independent_memory: Vec<IndependentReceipt>,
 }
+
+/// Frozen acceptance floors for an ordinary agent-workflow development screen.
+/// Every ordinary task must have an independent probe, so the probe floor must
+/// equal the registered ordinary denominator.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkflowQualificationCriteria {
+    pub ordinary_stratum_id: String,
+    pub expected_trial_count: u64,
+    pub minimum_task_successes: u64,
+    pub minimum_direct_memory_successes: u64,
+    pub minimum_probe_successes: u64,
+}
+
+/// The incumbent and candidate receipts from one independent execution.
+pub struct AgentWorkflowCapture<'a> {
+    pub incumbent: &'a IndependentPairedArtifact,
+    pub candidate: &'a IndependentPairedArtifact,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkflowCaptureQualification {
+    pub run_id: String,
+    pub incumbent_artifact_sha256: String,
+    pub candidate_artifact_sha256: String,
+    pub candidate_task_successes: u64,
+    pub candidate_task_trials: u64,
+    pub candidate_direct_memory_successes: u64,
+    pub candidate_independent_probe_successes: u64,
+    pub candidate_independent_probe_trials: u64,
+    pub candidate_hard_violations: u64,
+    pub candidate_budget_exit_trials: u64,
+    pub candidate_max_turns: u64,
+    pub candidate_max_tool_calls: u64,
+    pub candidate_max_output_tokens: u64,
+    pub candidate_max_wall_time_ms: u64,
+    pub failed_gates: Vec<String>,
+    pub eligible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkflowQualificationReport {
+    pub schema_version: String,
+    pub plan_id: String,
+    pub plan_sha256: String,
+    pub manifest_sha256: String,
+    pub probes_sha256: String,
+    pub criteria_sha256: String,
+    pub criteria: AgentWorkflowQualificationCriteria,
+    pub captures: Vec<AgentWorkflowCaptureQualification>,
+    pub eligible: bool,
+}
+
+/// Compose ordinary agent-task success, independent fixed-query evidence,
+/// hard violations, and registered resource exits into one qualification gate.
+/// The two captures must be separate executions of the same frozen plan.
+pub fn qualify_agent_workflow(
+    plan: &PairedEvaluationPlan,
+    manifest: &PairedTaskManifest,
+    probes: &[FixedTrialProbe],
+    criteria: &AgentWorkflowQualificationCriteria,
+    captures: &[AgentWorkflowCapture<'_>; 2],
+) -> Result<AgentWorkflowQualificationReport, EvalError> {
+    if plan.stage != crate::paired::PairedEvaluationStage::DevelopmentPilot {
+        return Err(invalid(
+            "agent workflow qualification requires a development-pilot plan",
+        ));
+    }
+    manifest.validate(plan)?;
+    validate_probes(plan, manifest, probes)?;
+
+    let ordinary_trials = plan
+        .expected_trials
+        .iter()
+        .filter(|trial| trial.stratum_id == criteria.ordinary_stratum_id)
+        .count();
+    let ordinary_families = plan
+        .expected_trials
+        .iter()
+        .filter(|trial| trial.stratum_id == criteria.ordinary_stratum_id)
+        .map(|trial| trial.family_id.as_str())
+        .collect::<BTreeSet<_>>();
+    if criteria.ordinary_stratum_id.trim().is_empty()
+        || criteria.expected_trial_count == 0
+        || u64::try_from(ordinary_trials).ok() != Some(criteria.expected_trial_count)
+        || u64::try_from(ordinary_families.len()).ok() != Some(criteria.expected_trial_count)
+        || criteria.minimum_task_successes > criteria.expected_trial_count
+        || criteria.minimum_direct_memory_successes > criteria.expected_trial_count
+        || criteria.minimum_probe_successes != criteria.expected_trial_count
+    {
+        return Err(invalid(
+            "qualification criteria must match the ordinary task and independent-probe denominators",
+        ));
+    }
+
+    let mut run_ids = BTreeSet::new();
+    let mut artifact_hashes = BTreeSet::new();
+    let mut reports = Vec::with_capacity(captures.len());
+    for capture in captures {
+        capture.incumbent.validate(plan, manifest, probes)?;
+        capture.candidate.validate(plan, manifest, probes)?;
+        let incumbent = &capture.incumbent.agent_observed;
+        let candidate = &capture.candidate.agent_observed;
+        let run_id = candidate
+            .run_id
+            .as_ref()
+            .filter(|id| !id.trim().is_empty())
+            .ok_or_else(|| invalid("qualification capture is missing a run id"))?;
+        if incumbent.arm != RunArm::Incumbent
+            || candidate.arm != RunArm::Candidate
+            || incumbent.run_id.as_ref() != Some(run_id)
+            || !run_ids.insert(run_id.clone())
+        {
+            return Err(invalid(
+                "qualification captures must contain paired arms from two distinct executions",
+            ));
+        }
+        let incumbent_bytes = serde_json::to_vec(capture.incumbent)?;
+        let candidate_bytes = serde_json::to_vec(capture.candidate)?;
+        let incumbent_hash = sha256(&incumbent_bytes);
+        let candidate_hash = sha256(&candidate_bytes);
+        if !artifact_hashes.insert(incumbent_hash.clone())
+            || !artifact_hashes.insert(candidate_hash.clone())
+        {
+            return Err(invalid("qualification captures reuse a run artifact"));
+        }
+
+        let ordinary_receipts = candidate
+            .receipts
+            .iter()
+            .filter(|receipt| receipt.key.stratum_id == criteria.ordinary_stratum_id)
+            .collect::<Vec<_>>();
+        let ordinary_probes = capture
+            .candidate
+            .independent_memory
+            .iter()
+            .filter(|receipt| receipt.key.stratum_id == criteria.ordinary_stratum_id)
+            .collect::<Vec<_>>();
+        let task_trials = u64::try_from(ordinary_receipts.len())
+            .map_err(|_| invalid("ordinary task count exceeds u64"))?;
+        let probe_trials = u64::try_from(ordinary_probes.len())
+            .map_err(|_| invalid("ordinary independent-probe count exceeds u64"))?;
+        if task_trials != criteria.expected_trial_count
+            || probe_trials != criteria.expected_trial_count
+        {
+            return Err(invalid(
+                "qualification capture does not cover the ordinary task and probe denominators",
+            ));
+        }
+
+        let task_successes = ordinary_receipts
+            .iter()
+            .filter(|receipt| receipt.task_success())
+            .count() as u64;
+        let direct_memory_successes = ordinary_receipts
+            .iter()
+            .filter(|receipt| receipt.direct_memory_success)
+            .count() as u64;
+        let probe_successes = ordinary_probes
+            .iter()
+            .filter(|receipt| receipt.score.evidence_success)
+            .count() as u64;
+        let hard_violations = ordinary_receipts
+            .iter()
+            .map(|receipt| receipt.hard_violations.len() as u64)
+            .sum();
+        let budget_exit_trials = ordinary_receipts
+            .iter()
+            .filter(|receipt| {
+                matches!(
+                    receipt.status,
+                    crate::paired::TrialStatus::TimedOut
+                        | crate::paired::TrialStatus::BudgetExceeded
+                )
+            })
+            .count() as u64;
+        let max = |select: fn(&crate::paired::TrialReceipt) -> u64| {
+            ordinary_receipts
+                .iter()
+                .map(|receipt| select(receipt))
+                .max()
+                .unwrap_or(0)
+        };
+        let mut failed_gates = Vec::new();
+        if task_successes < criteria.minimum_task_successes {
+            failed_gates.push("ordinary_task_success_floor".into());
+        }
+        if direct_memory_successes < criteria.minimum_direct_memory_successes {
+            failed_gates.push("ordinary_agent_memory_read_floor".into());
+        }
+        if probe_successes < criteria.minimum_probe_successes {
+            failed_gates.push("ordinary_independent_probe_floor".into());
+        }
+        if hard_violations != 0 {
+            failed_gates.push("hard_violations".into());
+        }
+        if budget_exit_trials != 0 {
+            failed_gates.push("resource_budget_exits".into());
+        }
+        reports.push(AgentWorkflowCaptureQualification {
+            run_id: run_id.clone(),
+            incumbent_artifact_sha256: incumbent_hash,
+            candidate_artifact_sha256: candidate_hash,
+            candidate_task_successes: task_successes,
+            candidate_task_trials: task_trials,
+            candidate_direct_memory_successes: direct_memory_successes,
+            candidate_independent_probe_successes: probe_successes,
+            candidate_independent_probe_trials: probe_trials,
+            candidate_hard_violations: hard_violations,
+            candidate_budget_exit_trials: budget_exit_trials,
+            candidate_max_turns: max(|r| u64::from(r.turns_used)),
+            candidate_max_tool_calls: max(|r| u64::from(r.tool_calls)),
+            candidate_max_output_tokens: max(|r| r.output_tokens),
+            candidate_max_wall_time_ms: max(|r| r.wall_time_ms),
+            eligible: failed_gates.is_empty(),
+            failed_gates,
+        });
+    }
+    let eligible = reports.iter().all(|report| report.eligible);
+    Ok(AgentWorkflowQualificationReport {
+        schema_version: "memory-mcp-agent-workflow-qualification/v1".into(),
+        plan_id: plan.plan_id.clone(),
+        plan_sha256: plan.sha256()?,
+        manifest_sha256: sha256(&serde_json::to_vec(manifest)?),
+        probes_sha256: probes_hash(probes)?,
+        criteria_sha256: sha256(&serde_json::to_vec(criteria)?),
+        criteria: criteria.clone(),
+        captures: reports,
+        eligible,
+    })
+}
+
 pub fn run_with_independent_probes<A: PairedTrialBackend, P: IndependentProbeBackend>(
     plan: &PairedEvaluationPlan,
     manifest: &PairedTaskManifest,
@@ -551,6 +785,7 @@ mod tests {
     }
     struct Agent {
         retrieve: bool,
+        answer: &'static str,
     }
     impl PairedTrialBackend for Agent {
         fn execute(
@@ -560,7 +795,7 @@ mod tests {
         ) -> Result<PairedTrialExecution, EvalError> {
             let mut fixed = super::super::tests::FixedBackend {
                 calls: vec![],
-                answer: "North City".into(),
+                answer: self.answer.into(),
             };
             let mut execution = fixed.execute(arm, task)?;
             if !self.retrieve {
@@ -575,6 +810,13 @@ mod tests {
                     e.sequence = (i + 1) as u32;
                 }
                 execution.observation.tool_calls = 0;
+                if let Some(answer) = execution.observation.final_answer.as_deref() {
+                    let mut value: serde_json::Value =
+                        serde_json::from_str(answer).expect("fixture answer is valid JSON");
+                    value["citations"] = serde_json::json!([]);
+                    execution.observation.final_answer =
+                        Some(serde_json::to_string(&value).expect("fixture answer serializes"));
+                }
             }
             Ok(execution)
         }
@@ -634,7 +876,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: false },
+            &mut Agent {
+                retrieve: false,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             a.path(),
         )
@@ -643,7 +888,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: true },
+            &mut Agent {
+                retrieve: true,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             b.path(),
         )
@@ -660,6 +908,201 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_workflow_failure_blocks_confirmation_despite_passing_probes() {
+        let (manifest, plan, probes) = four_ordinary_case_fixture();
+        let first_output = tempfile::tempdir().unwrap();
+        let second_output = tempfile::tempdir().unwrap();
+        let (first_incumbent, first_candidate) = run_with_independent_probes(
+            &plan,
+            &manifest,
+            &probes,
+            &mut Agent {
+                retrieve: false,
+                answer: "Incorrect Depot",
+            },
+            &mut ControlledProbe,
+            first_output.path(),
+        )
+        .expect("first independent capture");
+        let (second_incumbent, second_candidate) = run_with_independent_probes(
+            &plan,
+            &manifest,
+            &probes,
+            &mut Agent {
+                retrieve: false,
+                answer: "Incorrect Depot",
+            },
+            &mut ControlledProbe,
+            second_output.path(),
+        )
+        .expect("second independent capture");
+        let captures = [
+            AgentWorkflowCapture {
+                incumbent: &first_incumbent,
+                candidate: &first_candidate,
+            },
+            AgentWorkflowCapture {
+                incumbent: &second_incumbent,
+                candidate: &second_candidate,
+            },
+        ];
+
+        let report = qualify_agent_workflow(
+            &plan,
+            &manifest,
+            &probes,
+            &AgentWorkflowQualificationCriteria {
+                ordinary_stratum_id: "ordinary".into(),
+                expected_trial_count: 4,
+                minimum_task_successes: 3,
+                minimum_direct_memory_successes: 3,
+                minimum_probe_successes: 4,
+            },
+            &captures,
+        )
+        .expect("valid captures produce a qualification report");
+
+        assert!(!report.eligible);
+        for capture in report.captures {
+            assert_eq!(capture.candidate_task_successes, 0);
+            assert_eq!(capture.candidate_task_trials, 4);
+            assert_eq!(capture.candidate_direct_memory_successes, 0);
+            assert_eq!(capture.candidate_independent_probe_successes, 4);
+            assert_eq!(capture.candidate_independent_probe_trials, 4);
+            assert_eq!(capture.candidate_hard_violations, 0);
+            assert_eq!(capture.candidate_budget_exit_trials, 0);
+            assert!(
+                capture
+                    .failed_gates
+                    .contains(&"ordinary_task_success_floor".to_owned())
+            );
+            assert!(
+                capture
+                    .failed_gates
+                    .contains(&"ordinary_agent_memory_read_floor".to_owned())
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_workflow_qualifies_only_when_both_captures_pass_every_gate() {
+        let (manifest, plan, probes) = four_ordinary_case_fixture();
+        let first_output = tempfile::tempdir().unwrap();
+        let second_output = tempfile::tempdir().unwrap();
+        let (first_incumbent, first_candidate) = run_with_independent_probes(
+            &plan,
+            &manifest,
+            &probes,
+            &mut Agent {
+                retrieve: true,
+                answer: "North City",
+            },
+            &mut ControlledProbe,
+            first_output.path(),
+        )
+        .expect("first independent capture");
+        let (second_incumbent, second_candidate) = run_with_independent_probes(
+            &plan,
+            &manifest,
+            &probes,
+            &mut Agent {
+                retrieve: true,
+                answer: "North City",
+            },
+            &mut ControlledProbe,
+            second_output.path(),
+        )
+        .expect("second independent capture");
+        let captures = [
+            AgentWorkflowCapture {
+                incumbent: &first_incumbent,
+                candidate: &first_candidate,
+            },
+            AgentWorkflowCapture {
+                incumbent: &second_incumbent,
+                candidate: &second_candidate,
+            },
+        ];
+
+        let report = qualify_agent_workflow(
+            &plan,
+            &manifest,
+            &probes,
+            &AgentWorkflowQualificationCriteria {
+                ordinary_stratum_id: "ordinary".into(),
+                expected_trial_count: 4,
+                minimum_task_successes: 3,
+                minimum_direct_memory_successes: 3,
+                minimum_probe_successes: 4,
+            },
+            &captures,
+        )
+        .expect("valid captures produce a qualification report");
+
+        assert!(report.eligible);
+        assert_eq!(report.manifest_sha256.len(), 64);
+        assert_eq!(report.criteria_sha256.len(), 64);
+        for capture in report.captures {
+            assert!(capture.eligible);
+            assert_eq!(capture.candidate_task_successes, 4);
+            assert_eq!(capture.candidate_direct_memory_successes, 4);
+            assert_eq!(capture.candidate_independent_probe_successes, 4);
+            assert_eq!(capture.candidate_hard_violations, 0);
+            assert_eq!(capture.candidate_budget_exit_trials, 0);
+        }
+    }
+
+    fn four_ordinary_case_fixture() -> (
+        PairedTaskManifest,
+        PairedEvaluationPlan,
+        Vec<FixedTrialProbe>,
+    ) {
+        let (mut manifest, mut plan, mut probes) = fixture();
+        for index in 2..4 {
+            let mut task = manifest.tasks[0].clone();
+            let suffix = (b'a' + index as u8) as char;
+            let event_id = format!("event-{suffix}");
+            task.key.family_id = format!("family-{suffix}");
+            task.key.case_id = format!("case-{suffix}");
+            task.key.incumbent_first = index % 2 != 0;
+            task.seed_episodes[0].event_id = event_id.clone();
+            task.seed_episodes[0].source_id = format!("source-{event_id}");
+            task.oracle.sufficient_evidence_alternatives = vec![vec![vec![event_id.clone()]]];
+            manifest.tasks.push(task.clone());
+            probes.push(FixedTrialProbe {
+                key: task.key,
+                input: ProbeInput {
+                    schema_version: "memory-mcp-independent-probe/v1".into(),
+                    query: "fixed question".into(),
+                    principal: "fixture-reader".into(),
+                    valid_at: task.seed_episodes[0].valid_at,
+                    known_revision: 3,
+                    context_budget: 2,
+                    history_sha256: sha256(&serde_json::to_vec(&task.seed_episodes).unwrap()),
+                    claim_rollout_stage: "shadow".into(),
+                },
+                launch_profile: BTreeMap::from([
+                    ("NER_EXTRACTOR".into(), "regex".into()),
+                    ("EMBEDDINGS_ENABLED".into(), "false".into()),
+                    ("MEMORY_CLAIM_ROLLOUT_STAGE".into(), "shadow".into()),
+                ]),
+                oracle: ProbeOracle {
+                    sufficient_evidence_alternatives: vec![vec![vec![event_id]]],
+                    forbidden_event_ids: vec![],
+                    required_claim_annotations: vec![],
+                    required_claim_annotation_alternatives: vec![],
+                },
+            });
+        }
+        plan.expected_trials = manifest.tasks.iter().map(|task| task.key.clone()).collect();
+        plan.planned_independent_families = 4;
+        plan.shared_identity.corpus_sha256 = manifest.corpus_sha256().unwrap();
+        plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
+        plan.validate().unwrap();
+        (manifest, plan, probes)
+    }
+
+    #[test]
     fn paired_independent_probe_uses_each_plan_pinned_rollout_stage() {
         let (manifest, mut plan, probes) = fixture();
         plan.stage = crate::paired::PairedEvaluationStage::ExploratoryComparison;
@@ -672,7 +1115,10 @@ mod tests {
             &plan,
             &manifest,
             &probes,
-            &mut Agent { retrieve: true },
+            &mut Agent {
+                retrieve: true,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             output.path(),
         )
@@ -717,7 +1163,10 @@ mod tests {
                 &p,
                 &m,
                 &probes,
-                &mut Agent { retrieve: false },
+                &mut Agent {
+                    retrieve: false,
+                    answer: "North City",
+                },
                 &mut Changed,
                 out.path()
             )
@@ -736,7 +1185,10 @@ mod tests {
                 &p,
                 &m,
                 &probes,
-                &mut Agent { retrieve: true },
+                &mut Agent {
+                    retrieve: true,
+                    answer: "North City",
+                },
                 &mut ControlledProbe,
                 out.path()
             )
@@ -752,7 +1204,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: false },
+            &mut Agent {
+                retrieve: false,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             out.path(),
         )
@@ -775,7 +1230,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: false },
+            &mut Agent {
+                retrieve: false,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             out.path(),
         )
@@ -795,7 +1253,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: false },
+            &mut Agent {
+                retrieve: false,
+                answer: "North City",
+            },
             &mut ControlledProbe,
             out.path(),
         )
@@ -846,7 +1307,10 @@ mod tests {
             &p,
             &m,
             &probes,
-            &mut Agent { retrieve: false },
+            &mut Agent {
+                retrieve: false,
+                answer: "North City",
+            },
             (binary.clone(), binary),
             &out,
         )

@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {"stratum_id":"ordinary","family_id":"saffron-ordinary-fresh","case_id":"saffron-ordinary-fresh","repetition":1,"incumbent_first":true},
+      "prompt": "Which cabinet contains the Saffron geodesic tile?",
+      "seed_episodes": [{"event_id":"record-saffron","source_id":"saffron-operations-log","source_type":"document","content":"The Saffron geodesic tile is kept in Cabinet-842.","valid_at":"2026-05-01T10:00:00Z"}],
+      "oracle": {"sufficient_evidence_alternatives":[[["record-saffron"]]],"accepted_answers":["Cabinet-842"],"forbidden_event_ids":[],"needs_clarification":false}
+    },
+    {
+      "key": {"stratum_id":"ordinary","family_id":"nacre-ordinary-fresh","case_id":"nacre-ordinary-fresh","repetition":1,"incumbent_first":false},
+      "prompt": "Which drawer contains the Nacre telemetry spindle?",
+      "seed_episodes": [{"event_id":"record-nacre","source_id":"nacre-operations-log","source_type":"document","content":"The Nacre telemetry spindle is kept in Drawer-276.","valid_at":"2026-05-01T10:00:00Z"}],
+      "oracle": {"sufficient_evidence_alternatives":[[["record-nacre"]]],"accepted_answers":["Drawer-276"],"forbidden_event_ids":[],"needs_clarification":false}
+    },
+    {
+      "key": {"stratum_id":"ordinary","family_id":"peregrine-ordinary-fresh","case_id":"peregrine-ordinary-fresh","repetition":1,"incumbent_first":true},
+      "prompt": "Which vault contains the Peregrine checksum seal?",
+      "seed_episodes": [{"event_id":"record-peregrine","source_id":"peregrine-operations-log","source_type":"document","content":"The Peregrine checksum seal is kept in Vault-519.","valid_at":"2026-05-01T10:00:00Z"}],
+      "oracle": {"sufficient_evidence_alternatives":[[["record-peregrine"]]],"accepted_answers":["Vault-519"],"forbidden_event_ids":[],"needs_clarification":false}
+    },
+    {
+      "key": {"stratum_id":"ordinary","family_id":"thistle-ordinary-fresh","case_id":"thistle-ordinary-fresh","repetition":1,"incumbent_first":false},
+      "prompt": "Which locker contains the Thistle ballast key?",
+      "seed_episodes": [{"event_id":"record-thistle","source_id":"thistle-operations-log","source_type":"document","content":"The Thistle ballast key is kept in Locker-683.","valid_at":"2026-05-01T10:00:00Z"}],
+      "oracle": {"sufficient_evidence_alternatives":[[["record-thistle"]]],"accepted_answers":["Locker-683"],"forbidden_event_ids":[],"needs_clarification":false}
+    }
+  ]
+}

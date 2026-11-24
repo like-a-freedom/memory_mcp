@@ -312,6 +312,27 @@ async fn main() -> std::process::ExitCode {
             second_run_directory,
             output,
         } => cmd_summarize_pilot(plan, first_run_directory, second_run_directory, output),
+        Command::QualifyAgentWorkflow {
+            plan,
+            tasks,
+            probes,
+            criteria,
+            first_incumbent,
+            first_candidate,
+            second_incumbent,
+            second_candidate,
+            output,
+        } => cmd_qualify_agent_workflow(
+            plan,
+            tasks,
+            probes,
+            criteria,
+            first_incumbent,
+            first_candidate,
+            second_incumbent,
+            second_candidate,
+            output,
+        ),
         Command::PlanPairedPower {
             pilot_report,
             stratum_id,
@@ -515,6 +536,7 @@ async fn main() -> std::process::ExitCode {
         Command::RunPairedChatCompletions {
             recall_read_mode,
             fixed_read_inputs,
+            independent_probes,
             plan,
             tasks,
             model_endpoint,
@@ -529,6 +551,7 @@ async fn main() -> std::process::ExitCode {
             cmd_run_paired_chat_completions(
                 recall_read_mode,
                 fixed_read_inputs,
+                independent_probes,
                 plan,
                 tasks,
                 model_endpoint,
@@ -1267,11 +1290,96 @@ impl eval_harness::ProgressReporter for StderrProgressReporter {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn cmd_qualify_agent_workflow(
+    plan_path: std::path::PathBuf,
+    tasks_path: std::path::PathBuf,
+    probes_path: std::path::PathBuf,
+    criteria_path: std::path::PathBuf,
+    first_incumbent_path: std::path::PathBuf,
+    first_candidate_path: std::path::PathBuf,
+    second_incumbent_path: std::path::PathBuf,
+    second_candidate_path: std::path::PathBuf,
+    output_path: std::path::PathBuf,
+) -> std::process::ExitCode {
+    use eval_harness::paired_agent::independent::{
+        AgentWorkflowCapture, AgentWorkflowQualificationCriteria, FixedTrialProbe,
+        IndependentPairedArtifact, qualify_agent_workflow,
+    };
+
+    let result = (|| -> Result<bool, String> {
+        let plan = read_json_input(&plan_path, "paired plan")?;
+        let tasks = read_json_input(&tasks_path, "paired tasks")?;
+        let probes: Vec<FixedTrialProbe> = read_json_input(&probes_path, "independent probes")?;
+        let criteria: AgentWorkflowQualificationCriteria =
+            read_json_input(&criteria_path, "workflow qualification criteria")?;
+        let first_incumbent: IndependentPairedArtifact =
+            read_json_input(&first_incumbent_path, "first incumbent capture")?;
+        let first_candidate: IndependentPairedArtifact =
+            read_json_input(&first_candidate_path, "first candidate capture")?;
+        let second_incumbent: IndependentPairedArtifact =
+            read_json_input(&second_incumbent_path, "second incumbent capture")?;
+        let second_candidate: IndependentPairedArtifact =
+            read_json_input(&second_candidate_path, "second candidate capture")?;
+        let captures = [
+            AgentWorkflowCapture {
+                incumbent: &first_incumbent,
+                candidate: &first_candidate,
+            },
+            AgentWorkflowCapture {
+                incumbent: &second_incumbent,
+                candidate: &second_candidate,
+            },
+        ];
+        let report = qualify_agent_workflow(&plan, &tasks, &probes, &criteria, &captures)
+            .map_err(|error| format!("invalid qualification inputs: {error}"))?;
+        let eligible = report.eligible;
+        let bytes = serde_json::to_vec_pretty(&report)
+            .map_err(|error| format!("cannot serialize qualification report: {error}"))?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&output_path)
+            .map_err(|error| {
+                format!(
+                    "cannot create qualification report {}: {error}",
+                    output_path.display()
+                )
+            })?;
+        file.write_all(&bytes)
+            .and_then(|()| file.write_all(b"\n"))
+            .and_then(|()| file.sync_all())
+            .map_err(|error| {
+                format!(
+                    "cannot write qualification report {}: {error}",
+                    output_path.display()
+                )
+            })?;
+        Ok(eligible)
+    })();
+
+    match result {
+        Ok(true) => {
+            eprintln!("agent workflow qualification: ELIGIBLE");
+            std::process::ExitCode::SUCCESS
+        }
+        Ok(false) => {
+            eprintln!("agent workflow qualification: NO-GO");
+            std::process::ExitCode::from(1)
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            std::process::ExitCode::from(2)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn cmd_run_paired_chat_completions(
     recall_read_mode: Option<
         eval_harness::paired_agent::chat_completions_backend::RecallCaptureMode,
     >,
     fixed_read_inputs: Option<std::path::PathBuf>,
+    independent_probes_path: Option<std::path::PathBuf>,
     plan_path: std::path::PathBuf,
     tasks_path: std::path::PathBuf,
     model_endpoint: String,
@@ -1312,6 +1420,26 @@ async fn cmd_run_paired_chat_completions(
             return std::process::ExitCode::from(2);
         }
     };
+    if independent_probes_path.is_some() && registration.is_none() {
+        eprintln!("error: independent probes require a registered recall-read mode");
+        return std::process::ExitCode::from(2);
+    }
+    let independent_probes = match independent_probes_path
+        .as_deref()
+        .map(|path| {
+            read_json_input::<Vec<eval_harness::paired_agent::independent::FixedTrialProbe>>(
+                path,
+                "independent probes",
+            )
+        })
+        .transpose()
+    {
+        Ok(probes) => probes,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return std::process::ExitCode::from(2);
+        }
+    };
     let sampling = match load_chat_completions_sampling(sampling_config_path.as_deref()) {
         Ok(sampling) => sampling,
         Err(error) => {
@@ -1347,6 +1475,10 @@ async fn cmd_run_paired_chat_completions(
         eprintln!("error: cannot create paired output directory: {error}");
         return std::process::ExitCode::from(2);
     }
+    let probe_binaries = (
+        incumbent_memory_server.clone(),
+        candidate_memory_server.clone(),
+    );
     let bearer_token = std::env::var("MEMORY_EVAL_BEARER_TOKEN")
         .ok()
         .filter(|token| !token.is_empty());
@@ -1381,6 +1513,18 @@ async fn cmd_run_paired_chat_completions(
                 response_format,
                 request_parameters,
             )?;
+            if let Some(probes) = independent_probes {
+                let (incumbent, candidate) =
+                    eval_harness::paired_agent::independent::run_with_public_probes(
+                        &plan,
+                        &tasks,
+                        &probes,
+                        &mut backend,
+                        probe_binaries,
+                        &worker_output_directory,
+                    )?;
+                return Ok((incumbent.agent_observed, candidate.agent_observed));
+            }
             return eval_harness::paired_agent::run_paired_agent_evaluation(
                 &plan,
                 &tasks,

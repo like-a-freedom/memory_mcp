@@ -16,9 +16,23 @@ stopped at its registered ordinary-task gate. The
 qualified one exact configuration on four synthetic families. The
 [LongMemEval-V2 Small web text baseline](LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
 has complete scoring coverage on seven verified questions and upstream
-accuracy of 0/7. All seven prompts lost the memory context at the token
-cap. Broader agent utility and benchmark coverage remain open. See the
+accuracy of 0/7 before B5. The repeated seven-case [post-B5 comparison](../../evals/longmemeval_v2/results/2026-11-24-b5-post-fix/REPEATED_COMPARISON.md)
+retained context in 7/7 and scored 1/7 in each run, but only 1/7 cases
+contained the complete reviewed evidence span and measured latency was
+inconclusive. This supports the context-retention fix, not a claim of improved
+grounded answering. See the
 [follow-up design and tasks](../superpowers/specs/2026-11-24-agent-memory-follow-up-design.md).
+
+The initial ordinary local [agent-workflow screen](../../evals/paired/agent-workflow-qualification-2026-11-25/README.md)
+was a NO-GO: independent probes passed 4/4, but the model did not return the
+required final-answer JSON in any agent trial, so it made no memory reads and
+task success was 0/4 in both captures. After adding a tested tool-budget
+control, the fresh [v3 ordinary workflow screen](../../evals/paired/agent-workflow-qualification-withdraw-tools-v3-2026-11-25/README.md)
+passed both captures: task, actual-read and independent-probe scores were each
+4/4 per arm and capture, with zero violations or budget exits. This qualifies
+only that runner/model configuration for a separately frozen study. It is not
+a memory benefit estimate; typed-conflict, agent-managed correction and
+operator-import C1 populations remain unrun.
 
 ### Keeping evaluation evidence
 

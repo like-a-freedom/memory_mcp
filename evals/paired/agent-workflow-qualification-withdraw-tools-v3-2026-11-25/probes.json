@@ -1,0 +1,158 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "saffron-ordinary-fresh",
+      "case_id": "saffron-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which cabinet contains the Saffron geodesic tile?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "0564f8ab6fa2d062b842ed23083f0ae47fe9b838d7902d89ad476c9e9ce6ff63",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-saffron"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "nacre-ordinary-fresh",
+      "case_id": "nacre-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which drawer contains the Nacre telemetry spindle?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "48c2c1a696a11d73b24feb3d0409c5d30ebc3e4cba7141ada0b1fe0abbc1ad10",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-nacre"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "peregrine-ordinary-fresh",
+      "case_id": "peregrine-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which vault contains the Peregrine checksum seal?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "dd09ee25c5105cf0e6d106fe4620fae6fcf9bb8941e6c35ab1174589955b233f",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-peregrine"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "thistle-ordinary-fresh",
+      "case_id": "thistle-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which locker contains the Thistle ballast key?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "a1e590e882270dfad597d58b82d53c6f940517bbf11fe99befb6b2c385694cb5",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-thistle"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]

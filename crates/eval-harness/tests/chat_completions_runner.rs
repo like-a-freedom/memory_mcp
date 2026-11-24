@@ -264,7 +264,10 @@ fn capture_read_reply(reply: Value) -> Value {
             budgets(),
         )
         .unwrap();
-    assert_eq!(server.requests().len(), 2);
+    let requests = server.requests();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0]["tool_choice"], "auto");
+    assert_eq!(requests[1]["tool_choice"], "auto");
     serde_json::to_value(observation).unwrap()
 }
 
@@ -318,6 +321,10 @@ fn fixed_reply_is_delivered_to_the_original_tool_call() {
 
     assert_eq!(product.calls, [("assemble_context".into(), fixed)]);
     let requests = server.requests();
+    assert_eq!(requests[0]["tool_choice"], "auto");
+    assert!(requests[1].get("tool_choice").is_none());
+    assert!(requests[1].get("tools").is_none());
+    assert!(requests[1].get("parallel_tool_calls").is_none());
     let tool = requests[1]["messages"].as_array().unwrap().last().unwrap();
     assert_eq!(tool["tool_call_id"], "read-1");
     assert_eq!(
@@ -326,7 +333,10 @@ fn fixed_reply_is_delivered_to_the_original_tool_call() {
             {"source_episode":"episode:cedar","statement":"Cabinet-28"}
         ]}}})
     );
-    assert_eq!(requests[0]["tools"], requests[1]["tools"]);
+    assert_eq!(
+        requests[0]["tools"][0]["function"]["name"],
+        "assemble_context"
+    );
 }
 
 #[test]

@@ -1,0 +1,60 @@
+{
+  "schema_version": "memory-mcp-agent-workflow-qualification/v1",
+  "plan_id": "native-lfm-ordinary-agent-control-v1",
+  "plan_sha256": "eda7e3108197ac2f4b5e5dd04f566719e3ad4d521b9926646aa5ac15dd19394d",
+  "manifest_sha256": "6c1db6b6d930e27b3f382530214fa76819e313c01d0d7c605b826224c2db3f5a",
+  "probes_sha256": "f95691cfaf235d761ec8cf2b3407a0ff18f7e2a377737b0e8b54a14171d45772",
+  "criteria_sha256": "8e9260c34dae4408feb27dc38f123e1b26668db1eed2ab7b023a1892ea13415e",
+  "criteria": {
+    "ordinary_stratum_id": "ordinary",
+    "expected_trial_count": 4,
+    "minimum_task_successes": 3,
+    "minimum_direct_memory_successes": 3,
+    "minimum_probe_successes": 4
+  },
+  "captures": [
+    {
+      "run_id": "78079-1795558901088047000-1",
+      "incumbent_artifact_sha256": "5f43c7bb97060892fd45f90b3e4f5b991463807d9ad3d2f23492e24404ad19f3",
+      "candidate_artifact_sha256": "c3f806ca35d53d0928d7ffd0cd3adbe39ab65cad648e912c07bd464d1a839870",
+      "candidate_task_successes": 0,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 0,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 0,
+      "candidate_max_turns": 1,
+      "candidate_max_tool_calls": 0,
+      "candidate_max_output_tokens": 57,
+      "candidate_max_wall_time_ms": 394,
+      "failed_gates": [
+        "ordinary_task_success_floor",
+        "ordinary_agent_memory_read_floor"
+      ],
+      "eligible": false
+    },
+    {
+      "run_id": "79231-1795559085955302000-1",
+      "incumbent_artifact_sha256": "6e0c9c21559cff75cd318409b134dd964d00e4685e8e5de16d5bc9f8b7069d4f",
+      "candidate_artifact_sha256": "62e379b95cf8233b7b09178e0cc6333e0af38b397e1b063d6b96698577c07c30",
+      "candidate_task_successes": 0,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 0,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 0,
+      "candidate_max_turns": 1,
+      "candidate_max_tool_calls": 0,
+      "candidate_max_output_tokens": 57,
+      "candidate_max_wall_time_ms": 384,
+      "failed_gates": [
+        "ordinary_task_success_floor",
+        "ordinary_agent_memory_read_floor"
+      ],
+      "eligible": false
+    }
+  ],
+  "eligible": false
+}

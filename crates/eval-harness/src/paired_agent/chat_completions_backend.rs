@@ -433,7 +433,17 @@ impl RecallRegistration {
         let invalid = || {
             EvalError::InvalidConfig("unregistered recall read mode or fixed-read registry".into())
         };
-        if plan.stage != crate::paired::PairedEvaluationStage::ExploratoryComparison
+        let supported_stage = match mode {
+            RecallCaptureMode::Live => matches!(
+                plan.stage,
+                crate::paired::PairedEvaluationStage::DevelopmentPilot
+                    | crate::paired::PairedEvaluationStage::ExploratoryComparison
+            ),
+            RecallCaptureMode::FixedReply => {
+                plan.stage == crate::paired::PairedEvaluationStage::ExploratoryComparison
+            }
+        };
+        if !supported_stage
             || plan.shared_identity.tool_call_budget != 1
             || plan.shared_identity.agent_runner != CHAT_COMPLETIONS_AGENT_RUNNER
             || plan.shared_identity.transport != "stdio"
@@ -855,6 +865,27 @@ mod tests {
         plan.incumbent_product.binary_sha256 = executable_sha256.clone();
         plan.candidate_product.binary_sha256 = executable_sha256;
         (plan, manifest, executable)
+    }
+
+    #[test]
+    fn live_recall_registration_accepts_a_development_pilot_plan() {
+        let mut plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
+            "../../../../evals/paired/recall-read-local-screen-2026-11-24/live-plan.json"
+        ))
+        .expect("local recall plan parses");
+        plan.stage = crate::paired::PairedEvaluationStage::DevelopmentPilot;
+        plan.shared_identity.reader_config_sha256 = sha256(
+            &serde_json::to_vec(&(
+                "recall-read/v1",
+                RecallCaptureMode::Live,
+                &Vec::<FixedReadInput>::new(),
+            ))
+            .expect("serialize live recall registration"),
+        );
+
+        let registration = RecallRegistration::new(RecallCaptureMode::Live, None, &plan);
+
+        assert!(registration.is_ok());
     }
 
     fn runtime(

@@ -1,0 +1,105 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "arclight-ordinary-fresh",
+        "case_id": "arclight-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Which tray contains the Arclight array seal?",
+      "seed_episodes": [
+        {
+          "event_id": "record-arclight",
+          "source_id": "arclight-operations-log",
+          "source_type": "document",
+          "content": "The Arclight array seal is kept in Tray-284.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["record-arclight"]]],
+        "accepted_answers": ["Tray-284"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "bellwether-ordinary-fresh",
+        "case_id": "bellwether-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Which locker contains the Bellwether audit token?",
+      "seed_episodes": [
+        {
+          "event_id": "record-bellwether",
+          "source_id": "bellwether-operations-log",
+          "source_type": "document",
+          "content": "The Bellwether audit token is kept in Locker-617.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["record-bellwether"]]],
+        "accepted_answers": ["Locker-617"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-ordinary-fresh",
+        "case_id": "cobalt-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Which cabinet contains the Cobalt field marker?",
+      "seed_episodes": [
+        {
+          "event_id": "record-cobalt",
+          "source_id": "cobalt-operations-log",
+          "source_type": "document",
+          "content": "The Cobalt field marker is kept in Cabinet-953.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["record-cobalt"]]],
+        "accepted_answers": ["Cabinet-953"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "driftwood-ordinary-fresh",
+        "case_id": "driftwood-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Which case contains the Driftwood calibration pin?",
+      "seed_episodes": [
+        {
+          "event_id": "record-driftwood",
+          "source_id": "driftwood-operations-log",
+          "source_type": "document",
+          "content": "The Driftwood calibration pin is kept in Case-408.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["record-driftwood"]]],
+        "accepted_answers": ["Case-408"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

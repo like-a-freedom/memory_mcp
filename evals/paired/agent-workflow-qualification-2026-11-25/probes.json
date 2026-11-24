@@ -1,0 +1,158 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "alder-ordinary-fresh",
+      "case_id": "alder-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What cabinet stores the Alder calibration key?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "c03788afd66045441d224d65ca57a72e3bf582771c4a8bbb9c7a93ce0f556d0d",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-alder"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "birch-ordinary-fresh",
+      "case_id": "birch-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What cabinet stores the Birch calibration key?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "0997537e4ec1c60264d4d8021b9a132829f458eb7d912aa1dd2a07f7a154abbe",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-birch"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "cedar-ordinary-fresh",
+      "case_id": "cedar-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What cabinet stores the Cedar calibration key?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "4f4f4d14c9c09cf533a8dba1a5ff2d133b36c8ac5850066c038c4d725dd7615f",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-cedar"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "delta-ordinary-fresh",
+      "case_id": "delta-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What cabinet stores the Delta calibration key?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "87f6052a112f91b81f4550be6260e2a9f94d821485d933c4e8004643620f0c5b",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-delta"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]

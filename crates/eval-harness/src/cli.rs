@@ -174,6 +174,27 @@ pub enum Command {
         #[arg(long)]
         output: PathBuf,
     },
+    /// Apply frozen ordinary-workflow, independent-memory, and safety gates to two captures.
+    QualifyAgentWorkflow {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        tasks: PathBuf,
+        #[arg(long)]
+        probes: PathBuf,
+        #[arg(long)]
+        criteria: PathBuf,
+        #[arg(long)]
+        first_incumbent: PathBuf,
+        #[arg(long)]
+        first_candidate: PathBuf,
+        #[arg(long)]
+        second_incumbent: PathBuf,
+        #[arg(long)]
+        second_candidate: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Plan exact paired McNemar sample size from a validated exploratory pilot report.
     PlanPairedPower {
         #[arg(long)]
@@ -278,6 +299,9 @@ pub enum Command {
         recall_read_mode: Option<crate::paired_agent::chat_completions_backend::RecallCaptureMode>,
         #[arg(long, requires = "recall_read_mode")]
         fixed_read_inputs: Option<PathBuf>,
+        /// Add independent fixed-query evidence captures to ordinary recall runs.
+        #[arg(long, requires = "recall_read_mode")]
+        independent_probes: Option<PathBuf>,
         #[arg(long)]
         plan: PathBuf,
         #[arg(long)]
@@ -1037,6 +1061,99 @@ mod tests {
                 request_parameters_config: Some(_),
                 ..
             }
+        ));
+    }
+
+    #[test]
+    fn provider_neutral_chat_completions_runner_accepts_independent_probes_only_for_recall() {
+        let base = [
+            "memory-eval",
+            "run-paired-chat-completions",
+            "--plan",
+            "plan.json",
+            "--tasks",
+            "tasks.json",
+            "--model-endpoint",
+            "http://127.0.0.1:1234/v1",
+            "--incumbent-memory-server",
+            "memory-mcp",
+            "--candidate-memory-server",
+            "memory-mcp",
+            "--output-directory",
+            "runs",
+            "--independent-probes",
+            "probes.json",
+        ];
+        assert!(Cli::try_parse_from(base).is_err());
+
+        let parsed = Cli::try_parse_from([
+            "memory-eval",
+            "run-paired-chat-completions",
+            "--plan",
+            "plan.json",
+            "--tasks",
+            "tasks.json",
+            "--model-endpoint",
+            "http://127.0.0.1:1234/v1",
+            "--incumbent-memory-server",
+            "memory-mcp",
+            "--candidate-memory-server",
+            "memory-mcp",
+            "--output-directory",
+            "runs",
+            "--recall-read-mode",
+            "live",
+            "--independent-probes",
+            "probes.json",
+        ])
+        .expect("provider-neutral recall capture accepts independent probes");
+
+        assert!(matches!(
+            parsed.command,
+            Command::RunPairedChatCompletions {
+                independent_probes: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn agent_workflow_qualification_requires_both_paired_captures_and_all_frozen_inputs() {
+        let missing = Cli::try_parse_from([
+            "memory-eval",
+            "qualify-agent-workflow",
+            "--plan",
+            "plan.json",
+        ]);
+        assert!(missing.is_err());
+
+        let parsed = Cli::try_parse_from([
+            "memory-eval",
+            "qualify-agent-workflow",
+            "--plan",
+            "plan.json",
+            "--tasks",
+            "tasks.json",
+            "--probes",
+            "probes.json",
+            "--criteria",
+            "criteria.json",
+            "--first-incumbent",
+            "first/independent-incumbent.json",
+            "--first-candidate",
+            "first/independent-candidate.json",
+            "--second-incumbent",
+            "second/independent-incumbent.json",
+            "--second-candidate",
+            "second/independent-candidate.json",
+            "--output",
+            "qualification.json",
+        ])
+        .expect("qualification command requires two complete paired captures");
+
+        assert!(matches!(
+            parsed.command,
+            Command::QualifyAgentWorkflow { .. }
         ));
     }
 }

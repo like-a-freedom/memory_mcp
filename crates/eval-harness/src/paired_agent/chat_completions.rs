@@ -457,15 +457,23 @@ impl ChatCompletionsAgent {
                 )?;
                 break;
             }
+            let can_call_tools = observation.tool_calls < budgets.tool_calls;
             let mut request = json!({
                 "model": self.model,
                 "messages": messages,
-                "tools": tools.iter().map(|tool| &tool.definition).collect::<Vec<_>>(),
-                "tool_choice": "auto",
-                "parallel_tool_calls": false,
                 "temperature": self.sampling.temperature,
                 "max_tokens": remaining_output_tokens.min(u64::from(u32::MAX)),
             });
+            if can_call_tools {
+                request["tools"] = json!(
+                    tools
+                        .iter()
+                        .map(|tool| &tool.definition)
+                        .collect::<Vec<_>>()
+                );
+                request["tool_choice"] = json!("auto");
+                request["parallel_tool_calls"] = json!(false);
+            }
             if let Some(response_format) = &self.response_format {
                 request["response_format"] = response_format.clone();
             }

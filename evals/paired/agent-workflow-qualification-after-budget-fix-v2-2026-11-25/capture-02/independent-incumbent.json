@@ -1,0 +1,1023 @@
+{
+  "schema_version": "memory-mcp-independent-paired/v1",
+  "agent_observed": {
+    "schema_version": "memory-mcp-agent-paired/v7",
+    "arm": "incumbent",
+    "run_id": "82825-1795562335105402000-1",
+    "run_started_at": "2026-11-24T23:18:55.105402Z",
+    "run_completed_at": "2026-11-24T23:22:00.064040Z",
+    "identity": {
+      "shared": {
+        "agent_runner": "openai-compatible-chat-completions",
+        "agent_version": "mlx-lm 0.32.2 local server; enable_thinking=false",
+        "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+        "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+        "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+        "transport": "stdio",
+        "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+        "reader_config_sha256": "e182dd29e1cafa0b980121839f482104fabf10da7204c9c80d037afb3c7a095c",
+        "judge_config_sha256": null,
+        "corpus_sha256": "fe153767e682f6a4c77ed2c3e2bff3e93d85ba677ed57896a0e76da60b05c1da",
+        "oracle_sha256": "44fedcb3703d97d2149d585b90cf46480f5bd74e706e6a9ced21043b438a3f98",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+        "provider_fingerprints": {
+          "chat_completions_endpoint_config": "ab2602be035141d9c7a9dd13ff0ba780889dc8c8778424d8e5e0ac87f7e02c7e",
+          "memory_eval_cli": "49c6a1ef3e8607ddce0870456899d15cd382242f1e21e9814a6c9df6c0fbba4a"
+        },
+        "context_budget_tokens": 4096,
+        "tool_call_budget": 1,
+        "turn_budget": 3,
+        "output_token_budget": 384,
+        "wall_time_budget_ms": 25000,
+        "hardware_class": "macos-arm64"
+      },
+      "product": {
+        "revision": "3f1c829939f1759ef1be24eb782ced5f66e3177d",
+        "binary_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      }
+    },
+    "expected_trials": [
+      {
+        "stratum_id": "ordinary",
+        "family_id": "arclight-ordinary-fresh",
+        "case_id": "arclight-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary",
+        "family_id": "bellwether-ordinary-fresh",
+        "case_id": "bellwether-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-ordinary-fresh",
+        "case_id": "cobalt-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary",
+        "family_id": "driftwood-ordinary-fresh",
+        "case_id": "driftwood-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      }
+    ],
+    "receipts": [
+      {
+        "read_capture_status": "observed",
+        "read_diagnostics": [
+          {
+            "request_sequence": 3,
+            "response_sequence": 4,
+            "outcome": "nonempty",
+            "item_count": 1,
+            "source_coverage": true,
+            "completeness": "unknown"
+          }
+        ],
+        "key": {
+          "stratum_id": "ordinary",
+          "family_id": "arclight-ordinary-fresh",
+          "case_id": "arclight-ordinary-fresh",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "budget_exceeded",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "task_oracle_diagnostics": {
+          "final_answer_present": false,
+          "final_answer_schema_valid": false,
+          "accepted_answer": null,
+          "required_evidence_cited": null,
+          "clarification_matches": true
+        },
+        "turns_used": 2,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 2645,
+        "output_tokens": 106,
+        "wall_time_ms": 8141,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1056,
+            "output_tokens": 48
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "75217ba6fc79418098536756d7d0850e7f04fabd9bf840fbb2e1e47d2b54c9da",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "95ae5b14377a011aa65a17557606428f9fb78f0df6096201403591d99934027a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 2,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 2,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1589,
+            "output_tokens": 58
+          },
+          {
+            "sequence": 7,
+            "turn": 2,
+            "kind": "budget_limit_reached",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          }
+        ]
+      },
+      {
+        "read_capture_status": "observed",
+        "read_diagnostics": [
+          {
+            "request_sequence": 3,
+            "response_sequence": 4,
+            "outcome": "nonempty",
+            "item_count": 1,
+            "source_coverage": true,
+            "completeness": "unknown"
+          }
+        ],
+        "key": {
+          "stratum_id": "ordinary",
+          "family_id": "bellwether-ordinary-fresh",
+          "case_id": "bellwether-ordinary-fresh",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "budget_exceeded",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "task_oracle_diagnostics": {
+          "final_answer_present": false,
+          "final_answer_schema_valid": false,
+          "accepted_answer": null,
+          "required_evidence_cited": null,
+          "clarification_matches": true
+        },
+        "turns_used": 2,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 2687,
+        "output_tokens": 142,
+        "wall_time_ms": 9318,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1056,
+            "output_tokens": 66
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "bb3508af1acb212dbd78d23585ecbe07fc228040020c555da105662fc012e72e",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "440c73ee6ae703d952c2b368c581f91b88f1f005df938364c21c3f48076f0dcf",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 2,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 2,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1631,
+            "output_tokens": 76
+          },
+          {
+            "sequence": 7,
+            "turn": 2,
+            "kind": "budget_limit_reached",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          }
+        ]
+      },
+      {
+        "read_capture_status": "observed",
+        "read_diagnostics": [
+          {
+            "request_sequence": 3,
+            "response_sequence": 4,
+            "outcome": "nonempty",
+            "item_count": 1,
+            "source_coverage": true,
+            "completeness": "unknown"
+          }
+        ],
+        "key": {
+          "stratum_id": "ordinary",
+          "family_id": "cobalt-ordinary-fresh",
+          "case_id": "cobalt-ordinary-fresh",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "budget_exceeded",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "task_oracle_diagnostics": {
+          "final_answer_present": false,
+          "final_answer_schema_valid": false,
+          "accepted_answer": null,
+          "required_evidence_cited": null,
+          "clarification_matches": true
+        },
+        "turns_used": 2,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 2644,
+        "output_tokens": 97,
+        "wall_time_ms": 7538,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1055,
+            "output_tokens": 53
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "9f697526761a216826d200c43d782e1f0d5a0dd4da97603385159cd1ea227cf4",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "900bf71ca01c68f526172f78c3e6c0e2a1c8a2832ddb4815e25e9f5a9e32fd6a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 2,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 2,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1589,
+            "output_tokens": 44
+          },
+          {
+            "sequence": 7,
+            "turn": 2,
+            "kind": "budget_limit_reached",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          }
+        ]
+      },
+      {
+        "read_capture_status": "observed",
+        "read_diagnostics": [
+          {
+            "request_sequence": 3,
+            "response_sequence": 4,
+            "outcome": "nonempty",
+            "item_count": 1,
+            "source_coverage": true,
+            "completeness": "unknown"
+          }
+        ],
+        "key": {
+          "stratum_id": "ordinary",
+          "family_id": "driftwood-ordinary-fresh",
+          "case_id": "driftwood-ordinary-fresh",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "budget_exceeded",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "task_oracle_diagnostics": {
+          "final_answer_present": false,
+          "final_answer_schema_valid": false,
+          "accepted_answer": null,
+          "required_evidence_cited": null,
+          "clarification_matches": true
+        },
+        "turns_used": 2,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 2641,
+        "output_tokens": 101,
+        "wall_time_ms": 6662,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1056,
+            "output_tokens": 44
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "347ad7da4f131dc07ef27434daa37f4ef6e2cf1b1d81f097058b3902fa47b744",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "call-1",
+            "tool_name": "assemble_context",
+            "error_class": null,
+            "payload_sha256": "66575af0048c7441cd509dc9c0b7b7601bf97ac69116c3333185b5be3e51b95c",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 2,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 2,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 1585,
+            "output_tokens": 57
+          },
+          {
+            "sequence": 7,
+            "turn": 2,
+            "kind": "budget_limit_reached",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          }
+        ]
+      }
+    ]
+  },
+  "probes_sha256": "42f37a538f5b4a8fe4af0468202a4eab29f5b48a1297d7d9cad92cc3a6c2b476",
+  "independent_memory": [
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "arclight-ordinary-fresh",
+        "case_id": "arclight-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v2",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:91cb8fbe919d0e49052d1cc0": "record-arclight"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "73bb5cad4ae5c09516faba6b3046708b9fa4a79ffbe489b94d9a2cde1fec5304",
+          "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+          "source_event_ids": [
+            "record-arclight"
+          ],
+          "claim_annotations": [
+            {
+              "source_event_id": "record-arclight",
+              "evidence_status": "unknown"
+            }
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 8,
+          "compact": true,
+          "known_revision": 3,
+          "query": "Which tray contains the Arclight array seal?",
+          "valid_at": "2026-05-01T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-24T23:19:02.562384Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"The Arclight array seal is kept in Tray-284.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:91cb8fbe919d0e49052d1cc0\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:91cb8fbe919d0e49052d1cc0\",\"source_id\":\"arclight-operations-log\",\"source_type\":\"document\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:91cb8fbe919d0e49052d1cc0\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-24T23:19:02.562384Z",
+                  "known_revision": 3,
+                  "valid_at": "2026-05-01T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "The Arclight array seal is kept in Tray-284.",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:91cb8fbe919d0e49052d1cc0",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 3,
+                    "reference_time": "2026-05-01T10:00:00Z",
+                    "source_episode": "episode:91cb8fbe919d0e49052d1cc0",
+                    "source_id": "arclight-operations-log",
+                    "source_type": "document",
+                    "valid_at": "2026-05-01T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:91cb8fbe919d0e49052d1cc0"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "73bb5cad4ae5c09516faba6b3046708b9fa4a79ffbe489b94d9a2cde1fec5304",
+        "oracle_sha256": "7ce51ec50d8d9552ee2873f5909b170f780c6f579d83db3d2cd345f869945f89",
+        "observation_sha256": "c53eff98054a480467f09a7041d04e6def5db5d8abd302d857cd7df2cf56885b",
+        "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "bellwether-ordinary-fresh",
+        "case_id": "bellwether-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v2",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:88d09f2d756a9341d4f87f42": "record-bellwether"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "4c3cea9a466db0e3b7bf102bb89756f0ee518e3222d952242d74b4dba78fd4a7",
+          "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+          "source_event_ids": [
+            "record-bellwether"
+          ],
+          "claim_annotations": [
+            {
+              "source_event_id": "record-bellwether",
+              "evidence_status": "unknown"
+            }
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 8,
+          "compact": true,
+          "known_revision": 3,
+          "query": "Which locker contains the Bellwether audit token?",
+          "valid_at": "2026-05-01T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-24T23:20:13.575368Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"The Bellwether audit token is kept in Locker-617.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:88d09f2d756a9341d4f87f42\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:88d09f2d756a9341d4f87f42\",\"source_id\":\"bellwether-operations-log\",\"source_type\":\"document\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:88d09f2d756a9341d4f87f42\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-24T23:20:13.575368Z",
+                  "known_revision": 3,
+                  "valid_at": "2026-05-01T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "The Bellwether audit token is kept in Locker-617.",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:88d09f2d756a9341d4f87f42",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 3,
+                    "reference_time": "2026-05-01T10:00:00Z",
+                    "source_episode": "episode:88d09f2d756a9341d4f87f42",
+                    "source_id": "bellwether-operations-log",
+                    "source_type": "document",
+                    "valid_at": "2026-05-01T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:88d09f2d756a9341d4f87f42"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "4c3cea9a466db0e3b7bf102bb89756f0ee518e3222d952242d74b4dba78fd4a7",
+        "oracle_sha256": "10fdfb87e7debfd2daefc4322d127b7f21459e35683d270b4242781f46525c2e",
+        "observation_sha256": "a924b4f6ea05987607eae9f7f49f946654104c5a22ff3080f48cd98c21f9fb95",
+        "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-ordinary-fresh",
+        "case_id": "cobalt-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v2",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:0ac4e9272af7b63ec0ee8316": "record-cobalt"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "6bc4bdb03079ffd4317675b75595f70b8518a12782d1f660b06dda6e93d41fe4",
+          "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+          "source_event_ids": [
+            "record-cobalt"
+          ],
+          "claim_annotations": [
+            {
+              "source_event_id": "record-cobalt",
+              "evidence_status": "unknown"
+            }
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 8,
+          "compact": true,
+          "known_revision": 3,
+          "query": "Which cabinet contains the Cobalt field marker?",
+          "valid_at": "2026-05-01T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-24T23:20:38.088070Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"The Cobalt field marker is kept in Cabinet-953.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:0ac4e9272af7b63ec0ee8316\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:0ac4e9272af7b63ec0ee8316\",\"source_id\":\"cobalt-operations-log\",\"source_type\":\"document\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:0ac4e9272af7b63ec0ee8316\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-24T23:20:38.088070Z",
+                  "known_revision": 3,
+                  "valid_at": "2026-05-01T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "The Cobalt field marker is kept in Cabinet-953.",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:0ac4e9272af7b63ec0ee8316",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 3,
+                    "reference_time": "2026-05-01T10:00:00Z",
+                    "source_episode": "episode:0ac4e9272af7b63ec0ee8316",
+                    "source_id": "cobalt-operations-log",
+                    "source_type": "document",
+                    "valid_at": "2026-05-01T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:0ac4e9272af7b63ec0ee8316"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "6bc4bdb03079ffd4317675b75595f70b8518a12782d1f660b06dda6e93d41fe4",
+        "oracle_sha256": "9465b5086f8a6c67103e49de818e559e0e963645cedfeef38d8f786d22a450b4",
+        "observation_sha256": "7649d72beb9f32baf1a7e375b898dbbaa16ab939a3736ae5fe6c556820f5ea74",
+        "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "driftwood-ordinary-fresh",
+        "case_id": "driftwood-ordinary-fresh",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v2",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:22c26efd1e439dda8b59055e": "record-driftwood"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "606ceac1d1cae51f7b627bef3fb7978876f3870aba2edb375230139875b5c979",
+          "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+          "source_event_ids": [
+            "record-driftwood"
+          ],
+          "claim_annotations": [
+            {
+              "source_event_id": "record-driftwood",
+              "evidence_status": "unknown"
+            }
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 8,
+          "compact": true,
+          "known_revision": 3,
+          "query": "Which case contains the Driftwood calibration pin?",
+          "valid_at": "2026-05-01T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-24T23:21:45.624988Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"The Driftwood calibration pin is kept in Case-408.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:22c26efd1e439dda8b59055e\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:22c26efd1e439dda8b59055e\",\"source_id\":\"driftwood-operations-log\",\"source_type\":\"document\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:22c26efd1e439dda8b59055e\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-24T23:21:45.624988Z",
+                  "known_revision": 3,
+                  "valid_at": "2026-05-01T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "The Driftwood calibration pin is kept in Case-408.",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:22c26efd1e439dda8b59055e",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 3,
+                    "reference_time": "2026-05-01T10:00:00Z",
+                    "source_episode": "episode:22c26efd1e439dda8b59055e",
+                    "source_id": "driftwood-operations-log",
+                    "source_type": "document",
+                    "valid_at": "2026-05-01T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:22c26efd1e439dda8b59055e"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "606ceac1d1cae51f7b627bef3fb7978876f3870aba2edb375230139875b5c979",
+        "oracle_sha256": "0862a829f587c1ac1593e4c0ded2f9da6ed156484e3bbee7f2fb5310b4ac60db",
+        "observation_sha256": "a7242ce570a6f78b2c17b0d58eadbdf92fe21f5b0e0d148b54ee13b775bf7479",
+        "product_sha256": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea",
+        "evidence_success": true
+      }
+    }
+  ]
+}

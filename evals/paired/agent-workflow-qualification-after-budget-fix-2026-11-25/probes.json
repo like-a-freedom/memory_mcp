@@ -1,0 +1,158 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "arclight-ordinary-fresh",
+      "case_id": "arclight-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which tray contains the Arclight array seal?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "97636320e08460c909dda5565fa11ef5df2d61bf5155418a62332c3a0e430b3d",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-arclight"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "bellwether-ordinary-fresh",
+      "case_id": "bellwether-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which locker contains the Bellwether audit token?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "7ea6b04a15d71e6ad7c5f2464667d8586bfc90d9190d3ffc3b4bd9bf3c2c2457",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-bellwether"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-ordinary-fresh",
+      "case_id": "cobalt-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which cabinet contains the Cobalt field marker?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "d9b53a353f918539431f4f4b3e24b38c7282595b4ea21085bc1b05feeffe3df9",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-cobalt"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "driftwood-ordinary-fresh",
+      "case_id": "driftwood-ordinary-fresh",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which case contains the Driftwood calibration pin?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "99cd9d6959b661fad31c3647f6645e0bd1bd76ce83ad5ab9de77da81b3c0b3b3",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "record-driftwood"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]
