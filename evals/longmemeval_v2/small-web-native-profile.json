@@ -5,7 +5,6 @@
   "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
   "manifest_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
   "adapter_commit": "608afdb8",
-  "binary_sha256": "2b338ba88f846c9638d05e958cf7f8b4acaa87d57da576a8e98d5fe3c73b2860",
   "memory": {
     "formation_method": "ordered-segments-v1",
     "store": "embedded, shared web build then private snapshot copy per query",
@@ -28,7 +27,13 @@
     "max_completion_tokens": 256,
     "memory_context_max_tokens": 4096,
     "scored_pass_wall_limit_seconds": 1200,
-    "external_model_cost": 0
+    "external_model_cost": 0,
+    "upstream_python": {
+      "python": "3.15.2",
+      "torch": "2.15.0",
+      "transformers": "5.24.0",
+      "huggingface_hub": "2.4.0"
+    }
   },
   "processor": {
     "checkpoint": "Qwen/Qwen3.5-9B",
@@ -95,5 +100,14 @@
         false
       ]
     }
+  },
+  "native_binary": {
+    "mode": "cargo build --release -p memory_mcp --bin memory_mcp --locked",
+    "source_commit": "3260f7bb2c934a86a3b7b7b92830d79bac57110b",
+    "sha256": "5db98264e0e71fafb34a541e2a1bc5accb71568ef95f878166d9465db6536922"
+  },
+  "qualification_debug_probe": {
+    "binary_sha256": "2b338ba88f846c9638d05e958cf7f8b4acaa87d57da576a8e98d5fe3c73b2860",
+    "decision": "Use release optimization for the acceptance run. A three-trajectory read took 23.375 seconds with the release binary; building the corresponding first prompt exceeded 224 seconds in the debug probe. This compare was run before any scored cohort output."
   }
 }

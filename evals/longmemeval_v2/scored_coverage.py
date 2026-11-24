@@ -1,6 +1,7 @@
 """Run the pinned upstream scorer with separate, failure-inclusive coverage."""
 
 import argparse
+from collections import defaultdict
 import json
 import math
 import os
@@ -16,7 +17,7 @@ def failure_status(role, error):
 
 
 def run_observed(harness, argv, case_ids, output):
-    failures = {}
+    failures = defaultdict(list)
     reader_cases = {}
     duration = {"reader": 0.0, "judge_scoring": 0.0}
     generate = harness.generate_all_reader_outputs
@@ -32,7 +33,7 @@ def run_observed(harness, argv, case_ids, output):
         try:
             return await reader(client, args, messages)
         except Exception as error:
-            failures[reader_cases[id(messages)]] = failure_status("reader", error)
+            failures[reader_cases[id(messages)]].append(failure_status("reader", error))
             raise
         finally:
             duration["reader"] += time.monotonic() - start
@@ -44,7 +45,7 @@ def run_observed(harness, argv, case_ids, output):
             return score(row, config)
         except Exception as error:
             role = "judge" if judge else "scoring"
-            failures.setdefault(row["question_id"], failure_status(role, error))
+            failures[row["question_id"]].append(failure_status(role, error))
             raise
         finally:
             if judge:
@@ -85,7 +86,10 @@ def write_coverage(case_ids, failures, output, elapsed, duration):
             and math.isclose(overall["overall_full_set"], sum(native.values()) / len(native))
         )
 
-    cases = {case: failures.get(case, "scored" if case in native else "unscored") for case in case_ids}
+    cases = {
+        case: failures[case][0] if case in failures else ("scored" if case in native else "unscored")
+        for case in case_ids
+    }
     covered = [case for case, status in cases.items() if status == "scored"]
     report = {
         "schema": "memory-mcp-longmemeval-v2-score-coverage/v1",
@@ -98,6 +102,7 @@ def write_coverage(case_ids, failures, output, elapsed, duration):
         "elapsed_seconds": round(elapsed, 3),
         "stage_seconds": {stage: round(value, 3) for stage, value in duration.items()},
         "cases": cases,
+        "failures": failures,
     }
     (output / "score-coverage.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if verified is False:

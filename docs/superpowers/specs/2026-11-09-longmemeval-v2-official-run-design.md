@@ -1,6 +1,6 @@
 # LongMemEval-V2 official text-capable evaluation
 
-> **Status as of 2026-11-24.** The native [deterministic memory gate](../../evals/DETERMINISTIC_MEMORY_QUALITY.md) passed on its registered histories. Official LongMemEval-V2 repinning, lifecycle and cohort adjudication, and complete scored execution remain open. No official score is available. See [follow-up tasks](2026-11-24-agent-memory-follow-up-design.md#task-5-broaden-coverage-after-the-native-gates).
+> **Status as of 2026-11-24.** The native [deterministic memory gate](../../evals/DETERMINISTIC_MEMORY_QUALITY.md) passed on its registered histories. LongMemEval-V2 now has a pinned upstream revision, a frozen seven-case Small web text cohort, and a runner that reports reader and judge failures independently of the native upstream score. Complete scored execution remains the acceptance gate. See the [cohort manifest](../../../evals/longmemeval_v2/small-web-text-cohort.json) and [reproduction steps](../../../evals/longmemeval_v2/README.md#local-scored-small-web-subset).
 
 - **Date:** 2026-11-09
 - **Current master reviewed:** 2026-11-20, `1ae1da4a` (v1.41.0)
@@ -9,7 +9,7 @@
 
 ## Priority on v1.41.0
 
-The local adapter and eval package are unchanged since the November 9 specifications. Keep the official run behind the local deterministic paired gate in the investment sequence. Treat adapter registration, persistence and complete coverage as benchmark deliverables. They carry no product uplift. If the benchmark identifies a retrieval failure, develop a distinct case family and reserve a disjoint holdout with reviewed source groups. Compare a product fix against current master using the [deterministic memory-quality gate](2026-11-09-agent-memory-outcome-evaluation-design.md#deterministic-memory-quality-gate). Never use a reader or judge score to populate that gate. Preserve the official runner's own scores and modality denominator.
+Keep the official run behind the local deterministic paired gate in the investment sequence. Treat adapter registration, persistence and complete coverage as benchmark deliverables. They carry no product uplift. If the benchmark identifies a retrieval failure, develop a distinct case family and reserve a disjoint holdout with reviewed source groups. Compare a product fix against current master using the [deterministic memory-quality gate](2026-11-09-agent-memory-outcome-evaluation-design.md#deterministic-memory-quality-gate). Never use a reader or judge score to populate that gate. Preserve the official runner's own scores and modality denominator.
 
 ## Why this is a separate spec
 

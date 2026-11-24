@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -28,7 +29,6 @@ class ScoredCoverageTests(unittest.TestCase):
                 ])
 
             def main():
-                import asyncio
                 asyncio.run(reader_phase())
                 (output / "per_question.jsonl").write_text('{"question_id":"a","score":1}\n')
                 (output / "aggregated_metrics.json").write_text('{"overall":{"overall_full_set":1,"count_all_questions":1}}')
@@ -64,6 +64,35 @@ class ScoredCoverageTests(unittest.TestCase):
             self.assertEqual(report["cases"], {"a": "scored", "b": "judge_error", "c": "unscored"})
             self.assertEqual(report["official_metrics_status"], "unavailable")
 
+    def test_judge_failure_after_reader_fallback_records_both_stages(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            messages = []
+
+            async def reader(client, args, messages):
+                raise ConnectionError()
+
+            async def generate(args, rows):
+                with self.assertRaises(ConnectionError):
+                    await harness.call_reader_model_async(None, args, messages)
+
+            def score(row, config):
+                raise TimeoutError()
+
+            def main():
+                asyncio.run(harness.generate_all_reader_outputs(None, [
+                    {"question_id": "a", "messages": messages},
+                ]))
+                harness.score_prediction({"question_id": "a", "eval_name": "llm"}, {})
+
+            harness = SimpleNamespace(main=main, call_reader_model_async=reader,
+                                      generate_all_reader_outputs=generate,
+                                      score_prediction=score, LLM_EVAL_FUNCTIONS={"llm"})
+            with self.assertRaises(TimeoutError):
+                run_observed(harness, [], ["a"], output)
+            report = json.loads((output / "score-coverage.json").read_text())
+            self.assertEqual(report["cases"], {"a": "reader_error"})
+            self.assertEqual(report["failures"], {"a": ["reader_error", "judge_timeout"]})
 
     def test_remote_reader_or_judge_endpoint_is_refused(self):
         with self.assertRaisesRegex(argparse.ArgumentTypeError, "loopback"):

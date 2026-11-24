@@ -222,7 +222,10 @@ inference use the separately configured models.
 
 The observer leaves upstream reader prompts, scoring, fallback behavior
 and artifacts intact. Its `score-coverage.json` records reader and judge
-errors or timeouts, partial rows and the full selection denominator. If
+errors or timeouts, partial rows and the full selection denominator. The
+`cases` field gives the first failing stage as the case status. The
+`failures` field lists every observed stage failure for each affected case.
+If
 upstream scores a fallback, its row remains in the native count and the
 coverage calculation excludes it. If scoring aborts, the incomplete
 suffix remains unscored. When the aggregate exists the observer verifies
