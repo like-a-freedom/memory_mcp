@@ -1,5 +1,7 @@
 # Token-Efficient MCP Responses — Design Spec
 
+The public `explain` citation behavior below was amended by [ADR-0084](../../adr/0084-bounded-public-explain-citations.md). Compact mode can return a complete quote, source bodies are requested in bounded windows, and provenance contains metadata.
+
 **Status:** Implemented  
 > Validation is recorded in ADR-0022.
 **Date:** 2026-07-30

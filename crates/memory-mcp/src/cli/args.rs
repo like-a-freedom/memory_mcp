@@ -127,12 +127,24 @@ pub struct InvalidateArgs {
     pub t_invalid: String,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default)]
 pub struct ExplainArgs {
     /// JSON array of context items as returned by `assemble-context`
     /// Example: '[{"fact_id":"fact:abc","score":0.85}]'
     #[arg(long)]
     pub context_items: String,
+    /// Select one context item by its zero-based index.
+    #[arg(long)]
+    pub item_offset: Option<usize>,
+    /// Zero-based Unicode scalar offset into the selected source.
+    #[arg(long)]
+    pub source_offset: Option<usize>,
+    /// Maximum Unicode scalars for an explicit source read.
+    #[arg(long)]
+    pub source_limit_scalars: Option<usize>,
+    /// Zero-based provenance continuation offset.
+    #[arg(long)]
+    pub provenance_offset: Option<usize>,
 }
 
 #[derive(Debug, Args)]

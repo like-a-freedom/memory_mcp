@@ -21,6 +21,9 @@ pub struct ToolResponse<T> {
     /// Snapshot and completeness metadata for revision-bounded context reads.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<crate::models::ContextAssemblyMetadata>,
+    /// Reasons that requested results or evidence are incomplete.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub partial_reasons: Vec<&'static str>,
 }
 
 impl<T> ToolResponse<T> {
@@ -33,6 +36,7 @@ impl<T> ToolResponse<T> {
             total_count: None,
             next_offset: None,
             context: None,
+            partial_reasons: Vec::new(),
         }
     }
 
@@ -45,6 +49,7 @@ impl<T> ToolResponse<T> {
             total_count: None,
             next_offset: None,
             context: None,
+            partial_reasons: Vec::new(),
         }
     }
 
@@ -61,6 +66,7 @@ impl<T> ToolResponse<T> {
             total_count: Some(total_count),
             next_offset: None,
             context: None,
+            partial_reasons: Vec::new(),
         }
     }
 
@@ -83,6 +89,7 @@ impl<T> ToolResponse<T> {
             total_count: None,
             next_offset: None,
             context: None,
+            partial_reasons: Vec::new(),
         }
     }
 

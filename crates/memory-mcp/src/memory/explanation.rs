@@ -22,6 +22,144 @@ use crate::storage::{BoundDbClient, DbClient};
 
 use crate::storage::value_helpers::string_from_value;
 
+/// Prepare evidence for the public explanation response. The internal
+/// capability still supports full provenance for direct Rust callers.
+pub(crate) fn public_citation(
+    item: &mut ExplainItem,
+    supplied_content: bool,
+    source_offset: Option<usize>,
+    source_limit: Option<usize>,
+    provenance_offset: Option<usize>,
+) -> Result<(Value, Vec<&'static str>), MemoryError> {
+    if !supplied_content {
+        item.content.clear();
+    }
+    item.all_sources.sort_by(|a, b| {
+        (a.relationship != "direct")
+            .cmp(&(b.relationship != "direct"))
+            .then_with(|| b.episode_t_ref.cmp(&a.episode_t_ref))
+            .then_with(|| a.episode_id.cmp(&b.episode_id))
+            .then_with(|| a.entity_path.cmp(&b.entity_path))
+            .then_with(|| a.relationship.cmp(&b.relationship))
+    });
+    item.all_sources.dedup_by(|a, b| {
+        a.episode_id == b.episode_id
+            && a.relationship == b.relationship
+            && a.entity_path == b.entity_path
+    });
+    let provenance_total = item.all_sources.len();
+    let provenance_start = provenance_offset.unwrap_or_default();
+    if provenance_start > provenance_total {
+        return Err(MemoryError::Validation(
+            "provenance_offset exceeds the source count".into(),
+        ));
+    }
+    let mut reasons = Vec::new();
+    item.all_sources = item
+        .all_sources
+        .drain(..)
+        .skip(provenance_start)
+        .take(20)
+        .collect();
+    for source in &mut item.all_sources {
+        source.episode_content.clear();
+    }
+    let provenance_next = provenance_start + item.all_sources.len();
+    let provenance_next = (provenance_next < provenance_total).then_some(provenance_next);
+    if provenance_next.is_some() {
+        reasons.push("provenance_truncated");
+    }
+    let quote_supplied = !item.quote.is_empty();
+    let source = item.citation_context.take();
+    if source_offset.is_some() && source.is_none() {
+        return Err(MemoryError::Validation(
+            "explicit source read requires an available episode".into(),
+        ));
+    }
+    let mut citation = json!({
+        "citation_context_mode": "none",
+        "citation_context_exact": false,
+        "citation_context_covers_entire_source": false,
+        "quote_supplied": quote_supplied,
+        "quote_returned": quote_supplied,
+        "quote_complete": quote_supplied,
+        "quote_verified": false,
+        "quote_anchored": false,
+        "quote_contained_in_window": false,
+        "content_truncated": false,
+        "provenance_total_count": provenance_total,
+        "provenance_next_offset": provenance_next,
+    });
+    let mut verified = false;
+    if let Some(source) = source {
+        let total = source.chars().count();
+        let anchor = quote_supplied
+            .then(|| source.find(&item.quote))
+            .flatten()
+            .map(|byte| source[..byte].chars().count());
+        verified = anchor.is_some();
+        let start = source_offset.unwrap_or_else(|| anchor.unwrap_or_default().saturating_sub(600));
+        let limit = if source_offset.is_some() {
+            source_limit.unwrap_or(8000)
+        } else {
+            1200
+        };
+        if start > total || (start < total && limit == 0) {
+            return Err(MemoryError::Validation("invalid source range".into()));
+        }
+        let mut window = String::new();
+        let mut remaining_bytes: usize = 20 * 1024;
+        let mut returned = 0;
+        for scalar in source.chars().skip(start).take(limit) {
+            let bytes = match scalar {
+                '"' | '\\' | '\n' | '\r' | '\t' | '\u{8}' | '\u{c}' => 2,
+                scalar if scalar <= '\u{1f}' => 6,
+                scalar => scalar.len_utf8(),
+            };
+            let Some(remaining) = remaining_bytes.checked_sub(bytes) else {
+                break;
+            };
+            remaining_bytes = remaining;
+            returned += 1;
+            window.push(scalar);
+        }
+        let end = start + returned;
+        let explicit = source_offset.is_some();
+        citation["citation_context_mode"] = json!(if explicit {
+            "source_window"
+        } else if verified {
+            "quote_anchored"
+        } else {
+            "source_window"
+        });
+        citation["citation_context_exact"] = json!(true);
+        citation["citation_context_start_offset"] = json!(start);
+        citation["citation_context_scalars_returned"] = json!(returned);
+        citation["citation_context_scalars_total"] = json!(total);
+        citation["citation_context_covers_entire_source"] = json!(start == 0 && end == total);
+        citation["quote_verified"] = json!(verified);
+        citation["quote_anchored"] = json!(verified && !explicit);
+        citation["quote_contained_in_window"] = json!(anchor.is_some_and(|anchor| {
+            anchor >= start && anchor + item.quote.chars().count() <= end
+        }));
+        if explicit {
+            citation["citation_context_next_offset"] = json!((end < total).then_some(end));
+            if end < total {
+                reasons.push("source_window_incomplete");
+            }
+            if returned < limit.min(total - start) {
+                reasons.extend(["citation_window_incomplete", "response_budget_applied"]);
+            }
+        }
+        item.citation_context = Some(window);
+    }
+    if quote_supplied && !verified {
+        reasons.push("quote_unverified");
+    }
+    citation["partial_reasons"] = json!(reasons);
+    Ok((citation, reasons))
+}
+
 /// How an item-level provenance lookup failure is handled.
 ///
 /// A wrong-kind id is a legitimate outcome for `explain`: callers

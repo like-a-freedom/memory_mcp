@@ -1,0 +1,2093 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1795527338",
+  "profile": "response_size",
+  "started_at": "2026-11-24T13:35:38.128901Z",
+  "duration_ms": 12686,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "response-size",
+      "case_id": "explain-unicode-reconstruction"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "first-person-rescue-profile"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "graph-anchor-alice-neighbor"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-001"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-002"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-003"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-004"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-005"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-006"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-007"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-008"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-009"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-010"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-011"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-012"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-013"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-014"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-015"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-016"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-017"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-018"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-019"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-020"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-021"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-022"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-023"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-024"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-025"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-026"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-027"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-028"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-029"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-030"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-031"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-032"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-033"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-034"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-035"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-036"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-037"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-038"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-039"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-040"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-041"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-042"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-043"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-044"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-045"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-046"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-047"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-048"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-049"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-050"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-056"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-057"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-058"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-059"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-060"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-061"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-062"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "ret-063"
+    },
+    {
+      "suite_id": "response-size",
+      "case_id": "timeline-auto-atlas-history"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "explain-unicode-reconstruction"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "explain_reconstruction_max_bytes": 18507.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 176,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "first-person-rescue-profile"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 783.0,
+        "assemble_delta_pct": 35.235732009925556,
+        "assemble_verbose_bytes": 1209.0,
+        "explain_compact_bytes": 877.0,
+        "explain_delta_pct": 3.6263736263736246,
+        "explain_verbose_bytes": 910.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 783,
+          "denominator": 1209
+        }
+      },
+      "failures": [],
+      "duration_ms": 221,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "graph-anchor-alice-neighbor"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 937.0,
+        "assemble_delta_pct": 28.96133434420015,
+        "assemble_verbose_bytes": 1319.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 937,
+          "denominator": 1319
+        }
+      },
+      "failures": [],
+      "duration_ms": 211,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-001"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 774.0,
+        "assemble_delta_pct": 29.954751131221723,
+        "assemble_verbose_bytes": 1105.0,
+        "explain_compact_bytes": 775.0,
+        "explain_delta_pct": 4.084158415841587,
+        "explain_verbose_bytes": 808.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 774,
+          "denominator": 1105
+        }
+      },
+      "failures": [],
+      "duration_ms": 234,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-002"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 715.0,
+        "assemble_delta_pct": 28.855721393034827,
+        "assemble_verbose_bytes": 1005.0,
+        "explain_compact_bytes": 723.0,
+        "explain_delta_pct": 4.36507936507936,
+        "explain_verbose_bytes": 756.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 715,
+          "denominator": 1005
+        }
+      },
+      "failures": [],
+      "duration_ms": 198,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-003"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 736.0,
+        "assemble_delta_pct": 28.195121951219516,
+        "assemble_verbose_bytes": 1025.0,
+        "explain_compact_bytes": 723.0,
+        "explain_delta_pct": 4.36507936507936,
+        "explain_verbose_bytes": 756.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 736,
+          "denominator": 1025
+        }
+      },
+      "failures": [],
+      "duration_ms": 190,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-004"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 809.0,
+        "assemble_delta_pct": 31.556683587140444,
+        "assemble_verbose_bytes": 1182.0,
+        "explain_compact_bytes": 755.0,
+        "explain_delta_pct": 4.187817258883253,
+        "explain_verbose_bytes": 788.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 809,
+          "denominator": 1182
+        }
+      },
+      "failures": [],
+      "duration_ms": 205,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-005"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 762.0,
+        "assemble_delta_pct": 29.76958525345622,
+        "assemble_verbose_bytes": 1085.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 762,
+          "denominator": 1085
+        }
+      },
+      "failures": [],
+      "duration_ms": 177,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-006"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 774.0,
+        "assemble_delta_pct": 29.700272479564028,
+        "assemble_verbose_bytes": 1101.0,
+        "explain_compact_bytes": 765.0,
+        "explain_delta_pct": 4.135338345864659,
+        "explain_verbose_bytes": 798.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 774,
+          "denominator": 1101
+        }
+      },
+      "failures": [],
+      "duration_ms": 199,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-007"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 773.0,
+        "assemble_delta_pct": 29.727272727272723,
+        "assemble_verbose_bytes": 1100.0,
+        "explain_compact_bytes": 765.0,
+        "explain_delta_pct": 4.135338345864659,
+        "explain_verbose_bytes": 798.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 773,
+          "denominator": 1100
+        }
+      },
+      "failures": [],
+      "duration_ms": 191,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-008"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 784.0,
+        "assemble_delta_pct": 29.811996418979415,
+        "assemble_verbose_bytes": 1117.0,
+        "explain_compact_bytes": 769.0,
+        "explain_delta_pct": 4.114713216957611,
+        "explain_verbose_bytes": 802.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 784,
+          "denominator": 1117
+        }
+      },
+      "failures": [],
+      "duration_ms": 181,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-009"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 770.0,
+        "assemble_delta_pct": 29.808568824065627,
+        "assemble_verbose_bytes": 1097.0,
+        "explain_compact_bytes": 775.0,
+        "explain_delta_pct": 4.084158415841587,
+        "explain_verbose_bytes": 808.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 770,
+          "denominator": 1097
+        }
+      },
+      "failures": [],
+      "duration_ms": 208,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-010"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 768.0,
+        "assemble_delta_pct": 29.734675205855442,
+        "assemble_verbose_bytes": 1093.0,
+        "explain_compact_bytes": 763.0,
+        "explain_delta_pct": 4.145728643216085,
+        "explain_verbose_bytes": 796.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 768,
+          "denominator": 1093
+        }
+      },
+      "failures": [],
+      "duration_ms": 174,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-011"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 800.0,
+        "assemble_delta_pct": 29.5774647887324,
+        "assemble_verbose_bytes": 1136.0,
+        "explain_compact_bytes": 775.0,
+        "explain_delta_pct": 4.084158415841587,
+        "explain_verbose_bytes": 808.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 800,
+          "denominator": 1136
+        }
+      },
+      "failures": [],
+      "duration_ms": 212,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-012"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 779.0,
+        "assemble_delta_pct": 29.37443336355394,
+        "assemble_verbose_bytes": 1103.0,
+        "explain_compact_bytes": 759.0,
+        "explain_delta_pct": 4.1666666666666625,
+        "explain_verbose_bytes": 792.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 779,
+          "denominator": 1103
+        }
+      },
+      "failures": [],
+      "duration_ms": 197,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-013"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 765.0,
+        "assemble_delta_pct": 30.2007299270073,
+        "assemble_verbose_bytes": 1096.0,
+        "explain_compact_bytes": 769.0,
+        "explain_delta_pct": 4.114713216957611,
+        "explain_verbose_bytes": 802.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 765,
+          "denominator": 1096
+        }
+      },
+      "failures": [],
+      "duration_ms": 212,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-014"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 766.0,
+        "assemble_delta_pct": 30.109489051094897,
+        "assemble_verbose_bytes": 1096.0,
+        "explain_compact_bytes": 761.0,
+        "explain_delta_pct": 4.156171284634757,
+        "explain_verbose_bytes": 794.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 766,
+          "denominator": 1096
+        }
+      },
+      "failures": [],
+      "duration_ms": 195,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-015"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 778.0,
+        "assemble_delta_pct": 30.349149507609674,
+        "assemble_verbose_bytes": 1117.0,
+        "explain_compact_bytes": 771.0,
+        "explain_delta_pct": 4.104477611940293,
+        "explain_verbose_bytes": 804.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 778,
+          "denominator": 1117
+        }
+      },
+      "failures": [],
+      "duration_ms": 209,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-016"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 777.0,
+        "assemble_delta_pct": 30.25134649910234,
+        "assemble_verbose_bytes": 1114.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 777,
+          "denominator": 1114
+        }
+      },
+      "failures": [],
+      "duration_ms": 214,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-017"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 773.0,
+        "assemble_delta_pct": 30.297565374211,
+        "assemble_verbose_bytes": 1109.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 773,
+          "denominator": 1109
+        }
+      },
+      "failures": [],
+      "duration_ms": 212,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-018"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 783.0,
+        "assemble_delta_pct": 30.400000000000006,
+        "assemble_verbose_bytes": 1125.0,
+        "explain_compact_bytes": 779.0,
+        "explain_delta_pct": 4.064039408866993,
+        "explain_verbose_bytes": 812.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 783,
+          "denominator": 1125
+        }
+      },
+      "failures": [],
+      "duration_ms": 209,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-019"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 782.0,
+        "assemble_delta_pct": 30.303030303030297,
+        "assemble_verbose_bytes": 1122.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 782,
+          "denominator": 1122
+        }
+      },
+      "failures": [],
+      "duration_ms": 227,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-020"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 785.0,
+        "assemble_delta_pct": 30.592396109637487,
+        "assemble_verbose_bytes": 1131.0,
+        "explain_compact_bytes": 781.0,
+        "explain_delta_pct": 4.054054054054057,
+        "explain_verbose_bytes": 814.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 785,
+          "denominator": 1131
+        }
+      },
+      "failures": [],
+      "duration_ms": 206,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-021"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 770.0,
+        "assemble_delta_pct": 30.190389845874886,
+        "assemble_verbose_bytes": 1103.0,
+        "explain_compact_bytes": 775.0,
+        "explain_delta_pct": 4.084158415841587,
+        "explain_verbose_bytes": 808.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 770,
+          "denominator": 1103
+        }
+      },
+      "failures": [],
+      "duration_ms": 228,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-022"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 797.0,
+        "assemble_delta_pct": 30.875975715524717,
+        "assemble_verbose_bytes": 1153.0,
+        "explain_compact_bytes": 729.0,
+        "explain_delta_pct": 4.330708661417326,
+        "explain_verbose_bytes": 762.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 797,
+          "denominator": 1153
+        }
+      },
+      "failures": [],
+      "duration_ms": 183,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-023"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 856.0,
+        "assemble_delta_pct": 27.396098388464797,
+        "assemble_verbose_bytes": 1179.0,
+        "explain_compact_bytes": 737.0,
+        "explain_delta_pct": 4.285714285714281,
+        "explain_verbose_bytes": 770.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 856,
+          "denominator": 1179
+        }
+      },
+      "failures": [],
+      "duration_ms": 211,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-024"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 810.0,
+        "assemble_delta_pct": 31.818181818181824,
+        "assemble_verbose_bytes": 1188.0,
+        "explain_compact_bytes": 737.0,
+        "explain_delta_pct": 4.285714285714281,
+        "explain_verbose_bytes": 770.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 810,
+          "denominator": 1188
+        }
+      },
+      "failures": [],
+      "duration_ms": 196,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-025"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 814.0,
+        "assemble_delta_pct": 31.42375737152485,
+        "assemble_verbose_bytes": 1187.0,
+        "explain_compact_bytes": 733.0,
+        "explain_delta_pct": 4.308093994778073,
+        "explain_verbose_bytes": 766.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 814,
+          "denominator": 1187
+        }
+      },
+      "failures": [],
+      "duration_ms": 192,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-026"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 797.0,
+        "assemble_delta_pct": 31.114952463267066,
+        "assemble_verbose_bytes": 1157.0,
+        "explain_compact_bytes": 715.0,
+        "explain_delta_pct": 4.411764705882348,
+        "explain_verbose_bytes": 748.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 797,
+          "denominator": 1157
+        }
+      },
+      "failures": [],
+      "duration_ms": 197,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-027"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 799.0,
+        "assemble_delta_pct": 31.3573883161512,
+        "assemble_verbose_bytes": 1164.0,
+        "explain_compact_bytes": 725.0,
+        "explain_delta_pct": 4.353562005277045,
+        "explain_verbose_bytes": 758.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 799,
+          "denominator": 1164
+        }
+      },
+      "failures": [],
+      "duration_ms": 196,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-028"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 801.0,
+        "assemble_delta_pct": 31.244635193133053,
+        "assemble_verbose_bytes": 1165.0,
+        "explain_compact_bytes": 729.0,
+        "explain_delta_pct": 4.330708661417326,
+        "explain_verbose_bytes": 762.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 801,
+          "denominator": 1165
+        }
+      },
+      "failures": [],
+      "duration_ms": 196,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-029"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 797.0,
+        "assemble_delta_pct": 31.055363321799312,
+        "assemble_verbose_bytes": 1156.0,
+        "explain_compact_bytes": 729.0,
+        "explain_delta_pct": 4.330708661417326,
+        "explain_verbose_bytes": 762.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 797,
+          "denominator": 1156
+        }
+      },
+      "failures": [],
+      "duration_ms": 194,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-030"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 796.0,
+        "assemble_delta_pct": 31.20138288677614,
+        "assemble_verbose_bytes": 1157.0,
+        "explain_compact_bytes": 723.0,
+        "explain_delta_pct": 4.36507936507936,
+        "explain_verbose_bytes": 756.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 796,
+          "denominator": 1157
+        }
+      },
+      "failures": [],
+      "duration_ms": 205,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-031"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 750.0,
+        "assemble_delta_pct": 29.51127819548872,
+        "assemble_verbose_bytes": 1064.0,
+        "explain_compact_bytes": 755.0,
+        "explain_delta_pct": 4.187817258883253,
+        "explain_verbose_bytes": 788.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 750,
+          "denominator": 1064
+        }
+      },
+      "failures": [],
+      "duration_ms": 185,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-032"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 757.0,
+        "assemble_delta_pct": 29.05342080599812,
+        "assemble_verbose_bytes": 1067.0,
+        "explain_compact_bytes": 749.0,
+        "explain_delta_pct": 4.21994884910486,
+        "explain_verbose_bytes": 782.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 757,
+          "denominator": 1067
+        }
+      },
+      "failures": [],
+      "duration_ms": 191,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-033"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 777.0,
+        "assemble_delta_pct": 29.427792915531338,
+        "assemble_verbose_bytes": 1101.0,
+        "explain_compact_bytes": 759.0,
+        "explain_delta_pct": 4.1666666666666625,
+        "explain_verbose_bytes": 792.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 777,
+          "denominator": 1101
+        }
+      },
+      "failures": [],
+      "duration_ms": 188,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-034"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 781.0,
+        "assemble_delta_pct": 30.14311270125224,
+        "assemble_verbose_bytes": 1118.0,
+        "explain_compact_bytes": 785.0,
+        "explain_delta_pct": 4.0342298288508545,
+        "explain_verbose_bytes": 818.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 781,
+          "denominator": 1118
+        }
+      },
+      "failures": [],
+      "duration_ms": 187,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-035"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 767.0,
+        "assemble_delta_pct": 29.69752520623281,
+        "assemble_verbose_bytes": 1091.0,
+        "explain_compact_bytes": 773.0,
+        "explain_delta_pct": 4.094292803970223,
+        "explain_verbose_bytes": 806.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 767,
+          "denominator": 1091
+        }
+      },
+      "failures": [],
+      "duration_ms": 180,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-036"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 764.0,
+        "assemble_delta_pct": 29.714811407543696,
+        "assemble_verbose_bytes": 1087.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 764,
+          "denominator": 1087
+        }
+      },
+      "failures": [],
+      "duration_ms": 183,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-037"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 751.0,
+        "assemble_delta_pct": 29.150943396226413,
+        "assemble_verbose_bytes": 1060.0,
+        "explain_compact_bytes": 749.0,
+        "explain_delta_pct": 4.21994884910486,
+        "explain_verbose_bytes": 782.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 751,
+          "denominator": 1060
+        }
+      },
+      "failures": [],
+      "duration_ms": 189,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-038"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 752.0,
+        "assemble_delta_pct": 29.45590994371482,
+        "assemble_verbose_bytes": 1066.0,
+        "explain_compact_bytes": 751.0,
+        "explain_delta_pct": 4.2091836734693855,
+        "explain_verbose_bytes": 784.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 752,
+          "denominator": 1066
+        }
+      },
+      "failures": [],
+      "duration_ms": 174,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-039"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 773.0,
+        "assemble_delta_pct": 29.406392694063932,
+        "assemble_verbose_bytes": 1095.0,
+        "explain_compact_bytes": 767.0,
+        "explain_delta_pct": 4.125000000000001,
+        "explain_verbose_bytes": 800.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 773,
+          "denominator": 1095
+        }
+      },
+      "failures": [],
+      "duration_ms": 203,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-040"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 753.0,
+        "assemble_delta_pct": 29.49438202247191,
+        "assemble_verbose_bytes": 1068.0,
+        "explain_compact_bytes": 757.0,
+        "explain_delta_pct": 4.177215189873418,
+        "explain_verbose_bytes": 790.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 753,
+          "denominator": 1068
+        }
+      },
+      "failures": [],
+      "duration_ms": 175,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-041"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 816.0,
+        "assemble_delta_pct": 32.05661948376353,
+        "assemble_verbose_bytes": 1201.0,
+        "explain_compact_bytes": 875.0,
+        "explain_delta_pct": 3.6343612334801767,
+        "explain_verbose_bytes": 908.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 816,
+          "denominator": 1201
+        }
+      },
+      "failures": [],
+      "duration_ms": 209,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-042"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 814.0,
+        "assemble_delta_pct": 32.50414593698176,
+        "assemble_verbose_bytes": 1206.0,
+        "explain_compact_bytes": 891.0,
+        "explain_delta_pct": 3.57142857142857,
+        "explain_verbose_bytes": 924.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 814,
+          "denominator": 1206
+        }
+      },
+      "failures": [],
+      "duration_ms": 181,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-043"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 829.0,
+        "assemble_delta_pct": 31.9376026272578,
+        "assemble_verbose_bytes": 1218.0,
+        "explain_compact_bytes": 873.0,
+        "explain_delta_pct": 3.6423841059602613,
+        "explain_verbose_bytes": 906.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 829,
+          "denominator": 1218
+        }
+      },
+      "failures": [],
+      "duration_ms": 234,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-044"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 825.0,
+        "assemble_delta_pct": 32.87225386493083,
+        "assemble_verbose_bytes": 1229.0,
+        "explain_compact_bytes": 901.0,
+        "explain_delta_pct": 3.5331905781584627,
+        "explain_verbose_bytes": 934.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 825,
+          "denominator": 1229
+        }
+      },
+      "failures": [],
+      "duration_ms": 189,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-045"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 821.0,
+        "assemble_delta_pct": 32.427983539094654,
+        "assemble_verbose_bytes": 1215.0,
+        "explain_compact_bytes": 877.0,
+        "explain_delta_pct": 3.6263736263736246,
+        "explain_verbose_bytes": 910.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 821,
+          "denominator": 1215
+        }
+      },
+      "failures": [],
+      "duration_ms": 184,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-046"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 801.0,
+        "assemble_delta_pct": 32.518955349620896,
+        "assemble_verbose_bytes": 1187.0,
+        "explain_compact_bytes": 879.0,
+        "explain_delta_pct": 3.618421052631582,
+        "explain_verbose_bytes": 912.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 801,
+          "denominator": 1187
+        }
+      },
+      "failures": [],
+      "duration_ms": 179,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-047"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 830.0,
+        "assemble_delta_pct": 32.68450932684509,
+        "assemble_verbose_bytes": 1233.0,
+        "explain_compact_bytes": 899.0,
+        "explain_delta_pct": 3.5407725321888406,
+        "explain_verbose_bytes": 932.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 830,
+          "denominator": 1233
+        }
+      },
+      "failures": [],
+      "duration_ms": 191,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-048"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 809.0,
+        "assemble_delta_pct": 32.6955074875208,
+        "assemble_verbose_bytes": 1202.0,
+        "explain_compact_bytes": 897.0,
+        "explain_delta_pct": 3.548387096774197,
+        "explain_verbose_bytes": 930.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 809,
+          "denominator": 1202
+        }
+      },
+      "failures": [],
+      "duration_ms": 201,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-049"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 816.0,
+        "assemble_delta_pct": 32.05661948376353,
+        "assemble_verbose_bytes": 1201.0,
+        "explain_compact_bytes": 875.0,
+        "explain_delta_pct": 3.6343612334801767,
+        "explain_verbose_bytes": 908.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 816,
+          "denominator": 1201
+        }
+      },
+      "failures": [],
+      "duration_ms": 182,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-050"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 826.0,
+        "assemble_delta_pct": 32.40589198036007,
+        "assemble_verbose_bytes": 1222.0,
+        "explain_compact_bytes": 887.0,
+        "explain_delta_pct": 3.5869565217391264,
+        "explain_verbose_bytes": 920.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 826,
+          "denominator": 1222
+        }
+      },
+      "failures": [],
+      "duration_ms": 186,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-056"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 803.0,
+        "assemble_delta_pct": 31.191088260497,
+        "assemble_verbose_bytes": 1167.0,
+        "explain_compact_bytes": 733.0,
+        "explain_delta_pct": 4.308093994778073,
+        "explain_verbose_bytes": 766.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 803,
+          "denominator": 1167
+        }
+      },
+      "failures": [],
+      "duration_ms": 184,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-057"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 814.0,
+        "assemble_delta_pct": 31.99665831244779,
+        "assemble_verbose_bytes": 1197.0,
+        "explain_compact_bytes": 737.0,
+        "explain_delta_pct": 4.285714285714281,
+        "explain_verbose_bytes": 770.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 814,
+          "denominator": 1197
+        }
+      },
+      "failures": [],
+      "duration_ms": 205,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-058"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 810.0,
+        "assemble_delta_pct": 31.53000845308538,
+        "assemble_verbose_bytes": 1183.0,
+        "explain_compact_bytes": 741.0,
+        "explain_delta_pct": 4.263565891472865,
+        "explain_verbose_bytes": 774.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 810,
+          "denominator": 1183
+        }
+      },
+      "failures": [],
+      "duration_ms": 184,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-059"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 806.0,
+        "assemble_delta_pct": 31.3458262350937,
+        "assemble_verbose_bytes": 1174.0,
+        "explain_compact_bytes": 735.0,
+        "explain_delta_pct": 4.296875,
+        "explain_verbose_bytes": 768.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 806,
+          "denominator": 1174
+        }
+      },
+      "failures": [],
+      "duration_ms": 194,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-060"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 805.0,
+        "assemble_delta_pct": 31.48936170212766,
+        "assemble_verbose_bytes": 1175.0,
+        "explain_compact_bytes": 729.0,
+        "explain_delta_pct": 4.330708661417326,
+        "explain_verbose_bytes": 762.0,
+        "items": 1.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 805,
+          "denominator": 1175
+        }
+      },
+      "failures": [],
+      "duration_ms": 193,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-061"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 3484.0,
+        "assemble_delta_pct": 33.141431587027434,
+        "assemble_verbose_bytes": 5211.0,
+        "explain_compact_bytes": 5598.0,
+        "explain_delta_pct": 0.586041555673944,
+        "explain_verbose_bytes": 5631.0,
+        "items": 4.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 3484,
+          "denominator": 5211
+        }
+      },
+      "failures": [],
+      "duration_ms": 307,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-062"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 3351.0,
+        "assemble_delta_pct": 31.514408338442678,
+        "assemble_verbose_bytes": 4893.0,
+        "explain_compact_bytes": 5389.0,
+        "explain_delta_pct": 0.6086315012910348,
+        "explain_verbose_bytes": 5422.0,
+        "items": 4.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 3351,
+          "denominator": 4893
+        }
+      },
+      "failures": [],
+      "duration_ms": 305,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "ret-063"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 3448.0,
+        "assemble_delta_pct": 32.735076082715565,
+        "assemble_verbose_bytes": 5126.0,
+        "explain_compact_bytes": 5537.0,
+        "explain_delta_pct": 0.5924596050269293,
+        "explain_verbose_bytes": 5570.0,
+        "items": 4.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 3448,
+          "denominator": 5126
+        }
+      },
+      "failures": [],
+      "duration_ms": 381,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "response-size",
+        "case_id": "timeline-auto-atlas-history"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "assemble_compact_bytes": 2136.0,
+        "assemble_delta_pct": 30.87378640776699,
+        "assemble_verbose_bytes": 3090.0,
+        "explain_compact_bytes": 1835.0,
+        "explain_delta_pct": 1.7665952890792314,
+        "explain_verbose_bytes": 1868.0,
+        "items": 3.0
+      },
+      "evidence": {
+        "response_size": {
+          "kind": "ratio",
+          "numerator": 2136,
+          "denominator": 3090
+        }
+      },
+      "failures": [],
+      "duration_ms": 252,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "response-size",
+      "mode": "retrieval_only",
+      "total": 62,
+      "passed": 62,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "assemble_cases": 61.0,
+        "assemble_max_delta_pct": 35.235732009925556,
+        "assemble_mean_delta_pct": 30.745553267516073,
+        "assemble_median_delta_pct": 30.400000000000006,
+        "assemble_min_delta_pct": 27.396098388464797,
+        "assemble_overall_savings_pct": 31.033200148782736,
+        "assemble_p95_delta_pct": 32.735076082715565,
+        "explain_cases": 61.0,
+        "explain_max_delta_pct": 4.411764705882348,
+        "explain_mean_delta_pct": 3.8726869533949984,
+        "explain_median_delta_pct": 4.125000000000001,
+        "explain_min_delta_pct": 0.586041555673944,
+        "explain_overall_savings_pct": 3.1081602717517143,
+        "explain_p95_delta_pct": 4.36507936507936
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "346bacc908736c0ea4d91a43a28e52665b73d6f888c2cde50d86a8b2049a26c0",
+    "git_commit": "3bf2320c1b479562b71a37e59008a3af7c531b7f",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {},
+    "profile_digest": "898bab019257be2a39a69c3f32457390d78e2ba6593291e7b7bb9d9920fd65ac"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

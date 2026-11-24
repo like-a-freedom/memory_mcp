@@ -137,7 +137,8 @@ pub struct ProvenanceEnrichment {
 pub struct ProvenanceSource {
     /// Source episode ID.
     pub episode_id: String,
-    /// Source episode content (excerpt).
+    /// Source content when provided. Public explain provenance is metadata only.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub episode_content: String,
     /// Source episode timestamp.
     pub episode_t_ref: String,

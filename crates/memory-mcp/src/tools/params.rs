@@ -42,6 +42,27 @@ pub struct ExplainParams {
     /// Request compact (token-efficient) response. Defaults to true.
     #[serde(default = "crate::tools::parsers::default_compact")]
     pub compact: bool,
+    /// Zero-based Unicode scalar offset into one selected source.
+    pub source_offset: Option<usize>,
+    /// Maximum scalars for an explicit source read (at most 8000).
+    pub source_limit_scalars: Option<usize>,
+    /// Zero-based offset into one item's ordered provenance.
+    pub provenance_offset: Option<usize>,
+    /// Zero-based offset selecting one submitted context item.
+    pub item_offset: Option<usize>,
+}
+
+impl Default for ExplainParams {
+    fn default() -> Self {
+        Self {
+            context_items: String::new(),
+            compact: crate::tools::parsers::default_compact(),
+            source_offset: None,
+            source_limit_scalars: None,
+            provenance_offset: None,
+            item_offset: None,
+        }
+    }
 }
 
 /// Parameters for the `extract` tool.

@@ -1,5 +1,7 @@
 # ADR-0022: Ship Compact Responses as Default for LLM Consumers
 
+The public `explain` citation behavior below was amended by [ADR-0084](0084-bounded-public-explain-citations.md). Compact mode can return a complete quote, source bodies are requested in bounded windows, and provenance contains metadata.
+
 > **Status:** Accepted (2026-07-30)
 > **Date:** 2026-07-30
 > **Related:** [Design Spec](../superpowers/specs/2026-07-30-token-efficient-responses-design.md) and the validated `response-size` profile (`evals/profiles/response_size.json`)

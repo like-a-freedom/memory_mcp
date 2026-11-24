@@ -1,14 +1,12 @@
 # Bounded `explain` Citation Output — Design
 
-**Status:** Proposed — awaiting approval  
-**Date:** 2026-11-13  
-**Scope:** Bound every successful `explain` response while preserving exact citation evidence and on-demand access to complete source text. This document specifies behavior only; it does not authorize implementation until approved.
+**Status:** Implemented under [ADR-0084](../../adr/0084-bounded-public-explain-citations.md)
+**Date:** 2026-11-13
+**Scope:** Bound every successful public `explain` response while preserving exact citation evidence and on-demand access to complete source text.
 
-## Implementation debt — 2026-11-24
+## Implementation and verification — 2026-11-24
 
-This proposal remains pending. The current adapter has no `explain_budget` module, source/provenance continuation contract or public 32 KiB enforcement proof. Implementation requires the existing `explain` public interface tests to reproduce unbounded output, then capability-owned quote/window/provenance semantics and adapter-owned final-envelope budgeting. Acceptance must cover both modes, escaping-heavy and multi-megabyte inputs, exact quote retention, distinct item/source/provenance offsets, atomic partial metadata and exact Unicode-scalar reconstruction. Extend the response-size evaluator through the real tool envelope and retain the 61 shared cases plus a separately named synthetic reconstruction case.
-
-Ratify the compatibility change in a newly allocated ADR and amend ADR-0022 and the July 30 response specification. ADR-0083 now belongs to [revision-bounded temporal context](../../adr/0083-revision-bounded-temporal-context.md), so the historical ADR number proposed below is superseded. Current implementation must follow the workspace MSRV and repository-required feature/test checks.
+The shared CLI/MCP adapter enforces 32 KiB against the serialized tool envelope. The memory capability owns citation verification and scalar source windows. Public tests cover both output modes, JSON escaping, exact quotes, provenance metadata and reconstruction across source offsets. The native response-size profile passed 62/62 cases, including 61 shared cases and a synthetic Unicode reconstruction. [Native report](../../../evals/response-size/2026-11-24-bounded-explain-native.json)
 
 The native Apple Silicon public MCP preflight stored a 16,219-byte
 synthetic episode containing `Exact small quote. ` followed by 1,800
@@ -26,18 +24,18 @@ Prevent one `explain` call from consuming hundreds of thousands of tokens while 
 
 The design treats response size as a **server policy**, not as a promise about model context windows or token counts.
 
-## Verified current behavior
+## Behavior before ADR-0084
 
-The current implementation has four independent sources of unbounded output:
+The previous implementation had four independent sources of unbounded output:
 
 1. `memory/explanation.rs` copies the full `episode.content` into `citation_context` for every explained item.
 2. When an input item has empty `content`, the same full episode body is copied into `content`.
 3. `all_sources` stores full `episode_content` for the direct episode and every linked episode. Repeated references can repeat the same body.
 4. `compact=true` omits `quote`, but does not bound `content`, `citation_context`, `provenance`, `all_sources`, caller-supplied strings, or JSON escaping overhead.
 
-The current tool adapter returns a `ToolResponse<Value>` envelope, but it has no final response-size guard. The MCP handler only deserializes parameters and delegates; it does not construct the internal `ExplainRequest`.
+The previous tool adapter returned a `ToolResponse<Value>` envelope, without a final response-size guard. The MCP handler only deserializes parameters and delegates; it does not construct the internal `ExplainRequest`.
 
-The current compact decision is ADR-0022. It decided that `compact=true` is the default and that `quote` is omitted because observed quotes duplicated `content`. The July 30 token-efficient-response spec separately preserved full `citation_context` and populated `all_sources.episode_content`. This proposal supersedes the latter policy and amends, but does not replace, ADR-0022's compact default.
+The current compact decision is ADR-0022. It decided that `compact=true` is the default and that `quote` is omitted because observed quotes duplicated `content`. The July 30 token-efficient-response spec separately preserved full `citation_context` and populated `all_sources.episode_content`. ADR-0084 supersedes the latter policy and amends, but does not replace, ADR-0022's compact default.
 
 ## Goals
 

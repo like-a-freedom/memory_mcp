@@ -236,6 +236,7 @@ async fn tools_explain_rejects_bad_json() {
     let params = ExplainParams {
         context_items: "not valid json".to_string(),
         compact: false,
+        ..ExplainParams::default()
     };
 
     let result = memory_mcp::tools::explain(&service, params).await;

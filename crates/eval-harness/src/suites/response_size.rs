@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
-use memory_mcp::service::memory_container_shims::memory_capabilities_explain::ExplainCapability;
+use memory_mcp::tools::{explain, params::ExplainParams};
+
+const MAX_EXPLAIN_BYTES: usize = 32 * 1024;
+const RECONSTRUCTION_CASE: &str = "explain-unicode-reconstruction";
 
 use super::retrieval_cases::{case_as_of, load_cases};
 use crate::domain::*;
@@ -21,10 +24,11 @@ pub struct ResponseSizeSuite {
 impl ResponseSizeSuite {
     pub fn new() -> Result<Self, EvalError> {
         let cases = load_cases()?;
-        let expected_ids = cases
+        let mut expected_ids = cases
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
+        expected_ids.push(EvalCaseId::parse(RECONSTRUCTION_CASE)?);
         Ok(Self {
             expected_ids,
             reducer: ResponseSizeReducer::new("response-size"),
@@ -158,36 +162,32 @@ impl EvalSuite for ResponseSizeSuite {
             let compact_bytes = compact_val.len();
             drop(_guard);
 
-            let explain_input = items
-                .iter()
-                .map(|item| memory_mcp::models::ExplainItem {
-                    fact_id: Some(item.fact_id.clone()),
-                    content: item.content.clone(),
-                    quote: item.quote.clone(),
-                    source_episode: item.source_episode.clone(),
-                    provenance: item.provenance.clone(),
-                    ..Default::default()
-                })
-                .collect();
-            let explain_items = match ExplainCapability::explain_from_service(
-                &service,
-                memory_mcp::models::ExplainRequest {
-                    context_pack: explain_input,
-                    compact: false,
-                },
-                None,
+            let context_items = serde_json::json!(
+                items
+                    .iter()
+                    .map(|item| serde_json::json!({
+                        "fact_id": item.fact_id,
+                        "content": item.content,
+                        "quote": item.quote,
+                        "source_episode": item.source_episode,
+                    }))
+                    .collect::<Vec<_>>()
             )
-            .await
-            {
-                Ok(items) => items,
-                Err(_) => continue,
+            .to_string();
+            let explain_bytes = |compact| {
+                let params = ExplainParams {
+                    context_items: context_items.clone(),
+                    compact,
+                    ..ExplainParams::default()
+                };
+                let service = &service;
+                async move {
+                    let response = explain(service, params).await.ok()?;
+                    Some(serde_json::to_vec(&response).ok()?.len())
+                }
             };
-            let explain_verbose = serde_json::to_string(&explain_items).unwrap_or_default();
-            let explain_verbose_bytes = explain_verbose.len();
-            let _guard = memory_mcp::tools::compact::set_compact(true);
-            let explain_compact = serde_json::to_string(&explain_items).unwrap_or_default();
-            let explain_compact_bytes = explain_compact.len();
-            drop(_guard);
+            let explain_verbose_bytes = explain_bytes(false).await.unwrap_or_default();
+            let explain_compact_bytes = explain_bytes(true).await.unwrap_or_default();
 
             let assemble_delta_pct = if verbose_bytes > 0 {
                 100.0 * (1.0 - compact_bytes as f64 / verbose_bytes as f64)
@@ -235,6 +235,10 @@ impl EvalSuite for ResponseSizeSuite {
                 label_trust: LabelTrust::Official,
                 status: if execution_invalid {
                     CaseStatus::Invalid
+                } else if explain_verbose_bytes > MAX_EXPLAIN_BYTES
+                    || explain_compact_bytes > MAX_EXPLAIN_BYTES
+                {
+                    CaseStatus::QualityFailed
                 } else {
                     CaseStatus::Passed
                 },
@@ -249,7 +253,83 @@ impl EvalSuite for ResponseSizeSuite {
             });
         }
 
+        outcomes.push(reconstruction_outcome().await);
         outcomes
+    }
+}
+
+async fn reconstruction_outcome() -> EvalCaseOutcome {
+    let start = std::time::Instant::now();
+    let memory = test_support::TestMemory::new().await;
+    let source = "é\u{301}🙂\"\\ ".repeat(1900);
+    let episode = test_support::ingest_probe(&memory.service, RECONSTRUCTION_CASE, &source).await;
+    let context_items = serde_json::json!([episode]).to_string();
+    let mut maximum_bytes = 0;
+    let mut reconstructed = String::new();
+    let scalar_count = source.chars().count();
+    let mut offset = 0;
+    let result = loop {
+        let response = match explain(
+            &memory.service,
+            ExplainParams {
+                context_items: context_items.clone(),
+                compact: true,
+                source_offset: Some(offset),
+                ..ExplainParams::default()
+            },
+        )
+        .await
+        {
+            Ok(response) => response,
+            Err(error) => break Err(error.to_string()),
+        };
+        let bytes = match serde_json::to_vec(&response) {
+            Ok(value) => value.len(),
+            Err(error) => break Err(error.to_string()),
+        };
+        maximum_bytes = maximum_bytes.max(bytes);
+        let item = &response.result[0];
+        let Some(window) = item["citation_context"].as_str() else {
+            break Err("explain returned no citation window".into());
+        };
+        if item["citation_context_start_offset"].as_u64() != Some(offset as u64) {
+            break Err("explain returned an unexpected starting offset".into());
+        }
+        reconstructed.push_str(window);
+        match item["citation_context_next_offset"].as_u64() {
+            None => break Ok(reconstructed == source && maximum_bytes <= MAX_EXPLAIN_BYTES),
+            Some(next)
+                if next > offset as u64
+                    && next < scalar_count as u64
+                    && next == offset as u64 + window.chars().count() as u64 =>
+            {
+                offset = next as usize
+            }
+            Some(_) => break Err("explain returned a non-contiguous continuation".into()),
+        }
+    };
+    let status = match &result {
+        Ok(true) => CaseStatus::Passed,
+        Ok(false) => CaseStatus::QualityFailed,
+        Err(_) => CaseStatus::Invalid,
+    };
+    EvalCaseOutcome {
+        case_key: CaseKey::parse("response-size", RECONSTRUCTION_CASE)
+            .expect("valid synthetic case ID"),
+        mode: EvalMode::RetrievalOnly,
+        split: CorpusSplit::Development,
+        label_trust: LabelTrust::Official,
+        status,
+        metrics: [(
+            "explain_reconstruction_max_bytes".into(),
+            maximum_bytes as f64,
+        )]
+        .into(),
+        evidence: Default::default(),
+        invalid_reason: result.err(),
+        failures: vec![],
+        duration_ms: start.elapsed().as_millis() as u64,
+        attempts: 1,
     }
 }
 

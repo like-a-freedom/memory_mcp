@@ -175,6 +175,7 @@ async fn explain_rejects_context_items_that_are_not_json() {
     let service = service().await;
     let args = ExplainArgs {
         context_items: "not json".to_string(),
+        ..ExplainArgs::default()
     };
 
     let observed = commands::run_explain(&service, args).await;
@@ -190,6 +191,7 @@ async fn explain_accepts_a_well_formed_context_pack() {
     let service = service().await;
     let args = ExplainArgs {
         context_items: r#"[{"content":"alpha","source_episode":"episode:abc"}]"#.to_string(),
+        ..ExplainArgs::default()
     };
 
     let observed = commands::run_explain(&service, args).await;
