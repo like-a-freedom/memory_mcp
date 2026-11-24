@@ -468,6 +468,7 @@ fn managed_manifest() -> AgentManagedTaskManifest {
             sufficient_evidence_alternatives: vec![vec![vec![format!("target-{case}")]]],
             forbidden_event_ids: vec![],
             needs_clarification: false,
+            read_expectation: None,
         },
     };
     AgentManagedTaskManifest {

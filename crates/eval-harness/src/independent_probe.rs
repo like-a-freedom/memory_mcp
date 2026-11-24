@@ -553,7 +553,7 @@ fn finish_capture(
     })
 }
 
-fn claim_annotation_from_item(
+pub(crate) fn claim_annotation_from_item(
     item: &serde_json::Value,
     source_event_id: String,
 ) -> Result<Option<ProbeClaimAnnotation>, EvalError> {
@@ -833,7 +833,7 @@ fn validate_annotation_evidence_binding(
     Ok(())
 }
 
-fn claim_annotation_matches(
+pub(crate) fn claim_annotation_matches(
     required: &ProbeClaimAnnotation,
     actual: &ProbeClaimAnnotation,
 ) -> bool {
@@ -848,7 +848,9 @@ fn claim_annotation_matches(
             .all(|relation| actual.relations.contains(relation))
 }
 
-fn validate_claim_annotation(annotation: &ProbeClaimAnnotation) -> Result<(), EvalError> {
+pub(crate) fn validate_claim_annotation(
+    annotation: &ProbeClaimAnnotation,
+) -> Result<(), EvalError> {
     let valid_status = annotation.evidence_status.as_deref().is_none_or(|status| {
         matches!(status, "current" | "historical" | "conflicting" | "unknown")
     });

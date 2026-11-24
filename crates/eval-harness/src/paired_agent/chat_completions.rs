@@ -65,6 +65,61 @@ pub trait MemoryToolSession {
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError>;
 }
 
+/// Selects the public request to execute in a one-read diagnostic phase.
+pub enum RecallReadMode {
+    Live,
+    FixedReply(Value),
+}
+
+/// Executes at most one public read in the trial's own memory session.
+pub struct RecallMemorySession<'a, M> {
+    memory: &'a mut M,
+    mode: Option<RecallReadMode>,
+}
+
+impl<'a, M: MemoryToolSession> RecallMemorySession<'a, M> {
+    pub fn new(memory: &'a mut M, mode: RecallReadMode) -> Result<Self, EvalError> {
+        if let RecallReadMode::FixedReply(arguments) = &mode
+            && !arguments
+                .get("query")
+                .and_then(Value::as_str)
+                .is_some_and(|q| !q.trim().is_empty())
+        {
+            return Err(EvalError::InvalidConfig(
+                "fixed recall requires a public query".into(),
+            ));
+        }
+        Ok(Self {
+            memory,
+            mode: Some(mode),
+        })
+    }
+}
+
+impl<M: MemoryToolSession> MemoryToolSession for RecallMemorySession<'_, M> {
+    fn tool_schemas(&self) -> &Value {
+        self.memory.tool_schemas()
+    }
+
+    fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
+        if name != "assemble_context" {
+            return Err(EvalError::InvalidInput(
+                "recall diagnostic only permits assemble_context".into(),
+            ));
+        }
+        let arguments = match self.mode.take() {
+            Some(RecallReadMode::Live) => arguments,
+            Some(RecallReadMode::FixedReply(registered)) => registered,
+            None => {
+                return Err(EvalError::InvalidInput(
+                    "recall diagnostic permits only one read".into(),
+                ));
+            }
+        };
+        self.memory.call_tool(name, arguments)
+    }
+}
+
 impl MemoryToolSession for crate::suites::memory_decisions::stdio::StdioSession {
     fn tool_schemas(&self) -> &Value {
         crate::suites::memory_decisions::stdio::StdioSession::tool_schemas(self)
@@ -645,6 +700,7 @@ impl ChatCompletionsAgent {
                             response_sequence: Some(response_sequence),
                             outcome: super::MemoryReadOutcome::Failed,
                             item_count: None,
+                            evidence: None,
                         });
                     }
                     messages.push(json!({
@@ -677,6 +733,10 @@ impl ChatCompletionsAgent {
                             response_sequence: Some(response_sequence),
                             outcome,
                             item_count,
+                            evidence: super::tool_results::read_evidence(
+                                &tool_result["result"],
+                                super::tool_results::requested_cutoff(&arguments),
+                            ),
                         });
                     }
                 }

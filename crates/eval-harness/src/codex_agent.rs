@@ -1332,12 +1332,21 @@ fn parse_codex_jsonl_with_terminal_status(
                                             )
                                         })?
                                         .sequence;
-                                    pending_reads.insert(call_id.clone(), memory_reads.len());
+                                    pending_reads.insert(
+                                        call_id.clone(),
+                                        (
+                                            memory_reads.len(),
+                                            crate::paired_agent::tool_results::requested_cutoff(
+                                                arguments,
+                                            ),
+                                        ),
+                                    );
                                     memory_reads.push(MemoryReadObservation {
                                         request_sequence,
                                         response_sequence: None,
                                         outcome: MemoryReadOutcome::Unknown,
                                         item_count: None,
+                                        evidence: None,
                                     });
                                 } else {
                                     read_capture_status = ReadCaptureStatus::Partial;
@@ -1391,7 +1400,7 @@ fn parse_codex_jsonl_with_terminal_status(
                                         None,
                                         None,
                                     )?;
-                                    if let Some(index) = pending_reads.remove(&call_id) {
+                                    if let Some((index, _)) = pending_reads.remove(&call_id) {
                                         let read = &mut memory_reads[index];
                                         read.response_sequence =
                                             trace.last().map(|event| event.sequence);
@@ -1431,13 +1440,20 @@ fn parse_codex_jsonl_with_terminal_status(
                                         Some(serialized_response_bytes(result)?),
                                     );
                                     if tool == "assemble_context" {
-                                        if let Some(index) = pending_reads.remove(&call_id) {
+                                        if let Some((index, requested_cutoff)) =
+                                            pending_reads.remove(&call_id)
+                                        {
                                             let read = &mut memory_reads[index];
                                             read.response_sequence =
                                                 trace.last().map(|event| event.sequence);
                                             (read.outcome, read.item_count) =
                                                 crate::paired_agent::tool_results::read_result(
                                                     result,
+                                                );
+                                            read.evidence =
+                                                crate::paired_agent::tool_results::read_evidence(
+                                                    result,
+                                                    requested_cutoff,
                                                 );
                                         }
                                         collect_source_episode_ids(

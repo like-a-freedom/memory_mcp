@@ -718,22 +718,35 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     let observations_path = directory.path().join("observations.json");
     let expected = trials();
     let manifest: PairedTaskManifest = serde_json::from_value(json!({
-        "schema_version": "memory-mcp-agent-tasks/v1",
+        "schema_version": "memory-mcp-agent-tasks/v2",
         "tasks": expected.iter().map(|key| json!({
             "key": key,
-            "prompt": "Which room is assigned?",
+            "prompt": "Which room is assigned at revision {{KNOWN_REVISION}}?",
+            "knowledge_before_event_id": "boundary",
             "seed_episodes": [{
                 "event_id": "assignment",
                 "source_id": "schedule",
                 "source_type": "document",
                 "content": "The room is Juniper.",
                 "valid_at": fixed_run_start()
+            }, {
+                "event_id":"boundary",
+                "source_id":"schedule",
+                "source_type":"document",
+                "content":"A later schedule was filed.",
+                "valid_at":fixed_run_start()
             }],
             "oracle": {
                 "accepted_answers": ["Juniper"],
                 "forbidden_event_ids": [],
                 "sufficient_evidence_alternatives": [[["assignment"]]],
-                "needs_clarification": false
+                "needs_clarification": false,
+                "read_expectation": {
+                    "valid_at": "2026-05-01T11:00:00+01:00",
+                    "required_claim_annotation_alternatives": [[{
+                        "source_event_id":"assignment","evidence_status":"conflicting"
+                    }]]
+                }
             }
         })).collect::<Vec<_>>()
     }))
@@ -775,7 +788,8 @@ fn scores_external_observations_offline_using_the_private_oracle() {
             "trials": expected.iter().map(|key| json!({
                 "key": key,
                 "arm_order": if incumbent == key.incumbent_first { 1 } else { 2 },
-                "episode_id_to_event_id": {"episode-1": "assignment"},
+                "known_revision_checkpoint": 7,
+                "episode_id_to_event_id": {"episode-1": "assignment", "episode-2": "boundary"},
                 "observation": {
                     "trace": trace,
                     "final_answer": final_answer,
@@ -841,9 +855,12 @@ fn scores_external_observations_offline_using_the_private_oracle() {
             .unwrap()
             .iter()
             .all(|task| {
-                task.get("oracle").is_none() && task["prompt"] == "Which room is assigned?"
+                task.get("oracle").is_none()
+                    && task["prompt"] == "Which room is assigned at revision {{KNOWN_REVISION}}?"
             })
     );
+    assert!(!runner_inputs.to_string().contains("conflicting"));
+    assert!(!runner_inputs.to_string().contains("read_expectation"));
     let score = |folder: &std::path::Path| {
         Command::new(env!("CARGO_BIN_EXE_memory-eval"))
             .env_clear()
@@ -970,6 +987,98 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         artifact["receipts"][0]["read_diagnostics"][0]["item_count"],
         1
     );
+    let mut scored_read = v4.clone();
+    scored_read["incumbent"]["trials"][0]["observation"]["memory_reads"][0]["evidence"] = json!({
+        "source_episode_ids":["episode-1"],
+        "claim_annotations":[],
+        "completeness":"partial",
+        "requested_cutoff_sha256": hex::encode(Sha256::digest(br#"["2026-05-01T10:00:00Z",7]"#)),
+        "returned_cutoff_sha256": hex::encode(Sha256::digest(br#"["2026-05-01T10:00:00Z",8]"#))
+    });
+    let mut adequate =
+        scored_read["incumbent"]["trials"][0]["observation"]["memory_reads"][0].clone();
+    adequate["evidence"]["claim_annotations"] = json!([
+        {"source_event_id":"episode-1", "evidence_status":"conflicting"}
+    ]);
+    adequate["evidence"]["returned_cutoff_sha256"] =
+        adequate["evidence"]["requested_cutoff_sha256"].clone();
+    scored_read["candidate"]["trials"][0]["observation"]["memory_reads"][0] = adequate.clone();
+
+    let no_citations = &mut scored_read["incumbent"]["trials"][1]["observation"];
+    let answer = json!({"answer":"Juniper", "citations":[]}).to_string();
+    no_citations["trace"][3]["payload_sha256"] =
+        json!(hex::encode(Sha256::digest(answer.as_bytes())));
+    no_citations["final_answer"] = json!(answer);
+    no_citations["memory_reads"][0] = adequate;
+
+    let empty = &mut scored_read["candidate"]["trials"][1]["observation"];
+    empty["memory_source_episode_ids"] = json!([]);
+    empty["memory_reads"][0] = json!({
+        "request_sequence":2,"response_sequence":3,"outcome":"empty","item_count":0,
+        "evidence":{"source_episode_ids":[],"claim_annotations":[],"completeness":"partial"}
+    });
+    write_json(&observations_path, &scored_read);
+    let scored_run = directory.path().join("v4-scored-read");
+    let output = score(&scored_run);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let scored: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(scored_run.join("incumbent.json")).unwrap()).unwrap();
+    let read = &scored["receipts"][0]["read_diagnostics"][0];
+    assert_eq!(read["source_coverage"], true);
+    assert_eq!(read["annotation_match"], false);
+    assert_eq!(read["requested_cutoff_match"], true);
+    assert_eq!(read["returned_cutoff_match"], false);
+    assert_eq!(read["cited_returned_source_count"], 1);
+    assert_eq!(scored["receipts"][0]["task_oracle_passed"], true);
+    assert_eq!(read["completeness"], "partial");
+    assert!(read.get("evidence").is_none());
+
+    let candidate: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(scored_run.join("candidate.json")).unwrap()).unwrap();
+    let wrong_answer = &candidate["receipts"][0];
+    let read = &wrong_answer["read_diagnostics"][0];
+    assert_eq!(read["source_coverage"], true);
+    assert_eq!(read["annotation_match"], true);
+    assert_eq!(read["returned_cutoff_match"], true);
+    assert_eq!(read["cited_returned_source_count"], 1);
+    assert_eq!(
+        wrong_answer["task_oracle_diagnostics"]["accepted_answer"],
+        false
+    );
+    assert_eq!(wrong_answer["task_oracle_passed"], false);
+    let uncited = &scored["receipts"][1];
+    assert_eq!(
+        uncited["task_oracle_diagnostics"]["required_evidence_cited"],
+        false
+    );
+    assert_eq!(
+        uncited["read_diagnostics"][0]["cited_returned_source_count"],
+        0
+    );
+    assert_eq!(uncited["task_oracle_passed"], false);
+    let empty = &candidate["receipts"][1]["read_diagnostics"][0];
+    assert_eq!(empty["outcome"], "empty");
+    assert_eq!(empty["completeness"], "partial");
+    assert_eq!(empty["source_coverage"], false);
+    assert!(empty.get("returned_cutoff_match").is_none());
+
+    for arm in ["incumbent", "candidate"] {
+        let published = std::fs::read_to_string(scored_run.join(format!("{arm}.json"))).unwrap();
+        for private in [
+            "episode-1",
+            "assignment",
+            "Juniper",
+            "requested_cutoff_sha256",
+            "conflicting",
+        ] {
+            assert!(!published.contains(private), "receipt leaked {private}");
+        }
+    }
+
     let mut missing = v4.clone();
     missing["incumbent"]["trials"][0]["observation"]["memory_reads"] = json!([]);
     write_json(&observations_path, &missing);

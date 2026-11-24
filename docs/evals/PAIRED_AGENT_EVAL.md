@@ -1384,3 +1384,29 @@ but the existing results do not show useful quality as a workflow evaluator.
 Keep LFM for quick transport/tool smoke; any new agent qualification needs a
 specific technical hypothesis, a fresh disjoint registration, and frozen
 acceptance thresholds. Do not use its speed to replace quality checks.
+
+
+## Per-read diagnostics and archive replay
+
+Task manifests can opt in to read expectations with
+`memory-mcp-agent-tasks/v2`. The private `read_expectation` supplies a valid
+time and alternatives of required claim annotations. Annotation sources must
+refer to events already registered as required evidence. Exported task
+inputs carry the public prompt and seed data. The read expectation contributes
+to the oracle fingerprint and stays in the private manifest.
+
+A v4 external observation may attach private `evidence` to a successful,
+trace-linked read. The scorer checks that there is one source ID per returned
+item and that the annotations refer to sources in that read. For temporal checks,
+hash the compact JSON pair `[utc_rfc3339, known_revision]` with SHA-256. Normalize
+the timestamp to UTC with a `Z` suffix before hashing. An unavailable cutoff
+leaves the corresponding field absent in the receipt. A different observed
+cutoff produces `false` even when source coverage passes.
+
+The v7 receipt contains the read outcome, item count and available diagnostics:
+source coverage, annotation match, cutoff matches, completeness and count of
+distinct cited sources from that reply. A partial empty read describes the
+reply at that snapshot. Legacy observations replay without the new fields.
+Keep observations and task manifests private. Published artifacts contain the
+scoring outcomes and trace hashes. Task acceptance and independent probe
+results retain their existing scoring rules.

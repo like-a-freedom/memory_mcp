@@ -40,7 +40,11 @@ impl MemoryToolSession for FakeMemorySession {
     }
 
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
+        let model_query = arguments["query"] == "model query";
         self.calls.push((name.to_owned(), arguments));
+        if model_query {
+            return Ok(json!({"result":{"structuredContent":{"result":[]}}}));
+        }
         Ok(json!({
             "result": {
                 "structuredContent": {
@@ -265,6 +269,67 @@ fn capture_read_reply(reply: Value) -> Value {
 }
 
 #[test]
+fn fixed_reply_is_delivered_to_the_original_tool_call() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let server = MockChatServer::with_responses(vec![
+        model_response(
+            json!({"role":"assistant","content":null,"tool_calls":[{
+                "id":"read-1","type":"function","function":{"name":"assemble_context",
+                "arguments":r#"{"query":"model query","budget":1}"#}
+            }]}),
+            40,
+            12,
+        ),
+        model_response(
+            json!({"role":"assistant",
+                "content":r#"{"answer":"Cabinet-28","citations":["episode:cedar"]}"#
+            }),
+            65,
+            18,
+        ),
+    ]);
+    let agent = ChatCompletionsAgent::new(ChatCompletionsConfig::new(
+        server.endpoint.clone(),
+        "test-model",
+    ))
+    .unwrap();
+    let mut product = FakeMemorySession::read_only();
+    let fixed = json!({"query":"registered query","budget":1});
+    let mut memory =
+        RecallMemorySession::new(&mut product, RecallReadMode::FixedReply(fixed.clone())).unwrap();
+    assert_eq!(
+        memory.tool_schemas(),
+        FakeMemorySession::read_only().tool_schemas()
+    );
+    agent
+        .run_phase(
+            &mut memory,
+            "Where is Cedar?",
+            "Use memory.",
+            "Return JSON.",
+            ChatCompletionsToolProfile::RecallOnly,
+            ChatCompletionBudgets {
+                tool_calls: 1,
+                ..budgets()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(product.calls, [("assemble_context".into(), fixed)]);
+    let requests = server.requests();
+    let tool = requests[1]["messages"].as_array().unwrap().last().unwrap();
+    assert_eq!(tool["tool_call_id"], "read-1");
+    assert_eq!(
+        serde_json::from_str::<Value>(tool["content"].as_str().unwrap()).unwrap(),
+        json!({"result":{"structuredContent":{"result":[
+            {"source_episode":"episode:cedar","statement":"Cabinet-28"}
+        ]}}})
+    );
+    assert_eq!(requests[0]["tools"], requests[1]["tools"]);
+}
+
+#[test]
 fn read_error_does_not_become_empty_memory() {
     let captured = capture_read_reply(json!({"result":{"isError":true}}));
     let read = &captured["memory_reads"][0];
@@ -287,6 +352,35 @@ fn text_only_loopback_reply_has_unknown_read_outcome() {
     assert_eq!(captured["memory_reads"][0]["outcome"], "unknown");
     assert!(captured["memory_reads"][0]["item_count"].is_null());
     assert!(!captured.to_string().contains("UNRECOGNIZED_REPLY_SENTINEL"));
+}
+
+#[test]
+fn loopback_read_normalizes_only_the_matched_structured_reply() {
+    use sha2::Digest;
+    let captured = capture_read_reply(json!({"result":{"structuredContent":{
+        "result":[{
+            "source_episode":"episode:cedar",
+            "statement":"PRIVATE_STATEMENT_SENTINEL",
+            "evidence_status":"conflicting",
+            "reconciliation":{"relations":[{"outcome":"contradiction","role":"conflict"}]}
+        }],
+        "context":{"completeness":"partial", "snapshot":{
+            "valid_at":"2026-05-01T11:00:00+01:00","known_revision":8
+        }}
+    }}}));
+    let evidence = &captured["memory_reads"][0]["evidence"];
+    let digest = hex::encode(sha2::Sha256::digest(br#"["2026-05-01T10:00:00Z",8]"#));
+    assert_eq!(evidence["returned_cutoff_sha256"], digest);
+    assert_eq!(evidence["completeness"], "partial");
+    assert_eq!(evidence["source_episode_ids"], json!(["episode:cedar"]));
+    assert_eq!(
+        evidence["claim_annotations"],
+        json!([{
+            "source_event_id":"episode:cedar","evidence_status":"conflicting",
+            "relations":[{"outcome":"contradiction","role":"conflict"}]
+        }])
+    );
+    assert!(!captured.to_string().contains("PRIVATE_STATEMENT_SENTINEL"));
 }
 
 #[test]

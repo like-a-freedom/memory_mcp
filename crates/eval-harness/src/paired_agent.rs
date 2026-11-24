@@ -28,6 +28,7 @@ pub(crate) mod prompts;
 pub(crate) mod tool_results;
 
 pub const PAIRED_TASK_MANIFEST_SCHEMA_V1: &str = "memory-mcp-agent-tasks/v1";
+pub const PAIRED_TASK_MANIFEST_SCHEMA_V2: &str = "memory-mcp-agent-tasks/v2";
 pub const PAIRED_KNOWN_REVISION_PLACEHOLDER: &str = "{{KNOWN_REVISION}}";
 const RECEIPT_JOURNAL_SCHEMA_V4: &str = "memory-mcp-agent-trial-receipt/v4";
 
@@ -103,6 +104,16 @@ pub struct HiddenTaskOracle {
     pub accepted_answers: Vec<String>,
     pub forbidden_event_ids: Vec<String>,
     pub needs_clarification: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_expectation: Option<ReadExpectation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReadExpectation {
+    pub valid_at: Option<DateTime<Utc>>,
+    pub required_claim_annotation_alternatives:
+        Vec<Vec<crate::independent_probe::ProbeClaimAnnotation>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -164,6 +175,47 @@ pub struct MemoryReadObservation {
     pub response_sequence: Option<u32>,
     pub outcome: MemoryReadOutcome,
     pub item_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<MemoryReadEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryReadEvidence {
+    pub source_episode_ids: Vec<String>,
+    pub claim_annotations: Vec<crate::independent_probe::ProbeClaimAnnotation>,
+    pub completeness: Option<ReadCompleteness>,
+    pub requested_cutoff_sha256: Option<String>,
+    pub returned_cutoff_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadCompleteness {
+    Complete,
+    Partial,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryReadDiagnostic {
+    pub request_sequence: u32,
+    pub response_sequence: Option<u32>,
+    pub outcome: MemoryReadOutcome,
+    pub item_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_cutoff_match: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub returned_cutoff_match: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_coverage: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotation_match: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completeness: Option<ReadCompleteness>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cited_returned_source_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -305,7 +357,10 @@ pub trait PairedTrialBackend {
 impl PairedTaskManifest {
     pub fn validate(&self, plan: &PairedEvaluationPlan) -> Result<(), EvalError> {
         plan.validate()?;
-        if self.schema_version != PAIRED_TASK_MANIFEST_SCHEMA_V1 {
+        if !matches!(
+            self.schema_version.as_str(),
+            PAIRED_TASK_MANIFEST_SCHEMA_V1 | PAIRED_TASK_MANIFEST_SCHEMA_V2
+        ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired task manifest schema {:?}",
                 self.schema_version
@@ -322,6 +377,13 @@ impl PairedTaskManifest {
             &manifest_keys,
         )?;
         for task in &self.tasks {
+            if task.oracle.read_expectation.is_some()
+                && self.schema_version == PAIRED_TASK_MANIFEST_SCHEMA_V1
+            {
+                return Err(EvalError::InvalidInput(
+                    "read expectations require task manifest v2".into(),
+                ));
+            }
             validate_task(task)?;
         }
         if self.corpus_sha256()? != plan.shared_identity.corpus_sha256 {
@@ -432,6 +494,30 @@ fn validate_task(task: &PairedTaskDefinition) -> Result<(), EvalError> {
                 "paired task {} has an empty or unknown sufficient-evidence group",
                 task.key.case_id
             )));
+        }
+    }
+    if let Some(expectation) = &task.oracle.read_expectation {
+        for alternative in &expectation.required_claim_annotation_alternatives {
+            if alternative.is_empty() {
+                return Err(EvalError::InvalidInput(
+                    "empty read annotation alternative".into(),
+                ));
+            }
+            for annotation in alternative {
+                crate::independent_probe::validate_claim_annotation(annotation)?;
+                if !task
+                    .oracle
+                    .sufficient_evidence_alternatives
+                    .iter()
+                    .flatten()
+                    .flatten()
+                    .any(|id| id == &annotation.source_event_id)
+                {
+                    return Err(EvalError::InvalidInput(
+                        "read annotation source is not registered as required evidence".into(),
+                    ));
+                }
+            }
         }
     }
     if task.oracle.forbidden_event_ids.iter().any(|event_id| {
@@ -598,6 +684,135 @@ fn arm_order_for(arm: RunArm, incumbent_first: bool) -> u8 {
     }
 }
 
+fn evidence_covers(oracle: &HiddenTaskOracle, sources: &BTreeSet<&str>) -> bool {
+    if oracle.sufficient_evidence_alternatives.is_empty() {
+        return sources.is_empty();
+    }
+    oracle
+        .sufficient_evidence_alternatives
+        .iter()
+        .any(|alternative| {
+            !alternative.is_empty()
+                && alternative.iter().all(|group| {
+                    group
+                        .iter()
+                        .any(|event_id| sources.contains(event_id.as_str()))
+                })
+        })
+}
+
+fn score_read(
+    read: &MemoryReadObservation,
+    oracle: &HiddenTaskOracle,
+    checkpoint: Option<i64>,
+    execution: &PairedTrialExecution,
+    citations: Option<&[String]>,
+) -> Result<MemoryReadDiagnostic, EvalError> {
+    let mut diagnostic = MemoryReadDiagnostic {
+        request_sequence: read.request_sequence,
+        response_sequence: read.response_sequence,
+        outcome: read.outcome,
+        item_count: read.item_count,
+        requested_cutoff_match: None,
+        returned_cutoff_match: None,
+        source_coverage: None,
+        annotation_match: None,
+        completeness: None,
+        cited_returned_source_count: None,
+    };
+    let Some(evidence) = &read.evidence else {
+        return Ok(diagnostic);
+    };
+    let invalid = || EvalError::InvalidInput("invalid private read evidence".into());
+    if !matches!(
+        read.outcome,
+        MemoryReadOutcome::Empty | MemoryReadOutcome::Nonempty
+    ) || read
+        .item_count
+        .and_then(|count| usize::try_from(count).ok())
+        != Some(evidence.source_episode_ids.len())
+    {
+        return Err(invalid());
+    }
+    for digest in [
+        &evidence.requested_cutoff_sha256,
+        &evidence.returned_cutoff_sha256,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        crate::paired::validate_sha256("read cutoff", digest)?;
+    }
+    let episode_ids: BTreeSet<_> = evidence
+        .source_episode_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let event_ids = episode_ids
+        .iter()
+        .map(|id| {
+            execution
+                .episode_id_to_event_id
+                .get(*id)
+                .map(String::as_str)
+                .ok_or_else(invalid)
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let mut annotations = evidence.claim_annotations.clone();
+    for annotation in &mut annotations {
+        crate::independent_probe::validate_claim_annotation(annotation)?;
+        if !episode_ids.contains(annotation.source_event_id.as_str()) {
+            return Err(invalid());
+        }
+        annotation.source_event_id = execution
+            .episode_id_to_event_id
+            .get(&annotation.source_event_id)
+            .cloned()
+            .ok_or_else(invalid)?;
+    }
+    diagnostic.source_coverage = Some(evidence_covers(oracle, &event_ids));
+    diagnostic.completeness = Some(evidence.completeness.unwrap_or(ReadCompleteness::Unknown));
+    diagnostic.cited_returned_source_count = citations.map(|citations| {
+        citations
+            .iter()
+            .map(String::as_str)
+            .filter(|id| episode_ids.contains(id))
+            .collect::<BTreeSet<_>>()
+            .len()
+    });
+    if let Some(expectation) = &oracle.read_expectation {
+        if !expectation
+            .required_claim_annotation_alternatives
+            .is_empty()
+        {
+            diagnostic.annotation_match = Some(
+                expectation
+                    .required_claim_annotation_alternatives
+                    .iter()
+                    .any(|alternative| {
+                        alternative.iter().all(|required| {
+                            annotations.iter().any(|actual| {
+                                crate::independent_probe::claim_annotation_matches(required, actual)
+                            })
+                        })
+                    }),
+            );
+        }
+        if let Some(valid_at) = expectation.valid_at {
+            let expected = tool_results::cutoff_digest(valid_at, checkpoint)?;
+            diagnostic.requested_cutoff_match = evidence
+                .requested_cutoff_sha256
+                .as_ref()
+                .map(|digest| digest == &expected);
+            diagnostic.returned_cutoff_match = evidence
+                .returned_cutoff_sha256
+                .as_ref()
+                .map(|digest| digest == &expected);
+        }
+    }
+    Ok(diagnostic)
+}
+
 fn score_trial(
     task: &PairedTaskDefinition,
     arm_order: u8,
@@ -639,21 +854,10 @@ fn score_trial(
     if forbidden {
         violations.insert(HardViolation::ProhibitedEvidence);
     }
-    let evidence_passed = if task.oracle.sufficient_evidence_alternatives.is_empty() {
-        retrieved.is_empty()
-    } else {
-        task.oracle
-            .sufficient_evidence_alternatives
-            .iter()
-            .any(|alternative| {
-                !alternative.is_empty()
-                    && alternative.iter().all(|group| {
-                        group
-                            .iter()
-                            .any(|event_id| retrieved.contains(event_id.as_str()))
-                    })
-            })
-    };
+    let evidence_passed = evidence_covers(
+        &task.oracle,
+        &retrieved.iter().map(String::as_str).collect(),
+    );
     let final_answer = observation
         .final_answer
         .as_deref()
@@ -693,21 +897,7 @@ fn score_trial(
         violations.insert(HardViolation::ProhibitedEvidence);
     }
     let cited_set = cited_events.into_iter().flatten().collect::<BTreeSet<_>>();
-    let cited_evidence_passed = if task.oracle.sufficient_evidence_alternatives.is_empty() {
-        cited_set.is_empty()
-    } else {
-        task.oracle
-            .sufficient_evidence_alternatives
-            .iter()
-            .any(|alternative| {
-                !alternative.is_empty()
-                    && alternative.iter().all(|group| {
-                        group
-                            .iter()
-                            .any(|event_id| cited_set.contains(event_id.as_str()))
-                    })
-            })
-    };
+    let cited_evidence_passed = evidence_covers(&task.oracle, &cited_set);
     if observation.user_clarifications > 1
         || observation
             .trace
@@ -760,8 +950,25 @@ fn score_trial(
         read_capture_status: observation.read_capture_status,
         read_diagnostics: observation
             .memory_reads
-            .clone()
-            .filter(|_| observation.read_capture_status.is_some()),
+            .as_ref()
+            .filter(|_| observation.read_capture_status.is_some())
+            .map(|reads| {
+                reads
+                    .iter()
+                    .map(|read| {
+                        score_read(
+                            read,
+                            &task.oracle,
+                            known_revision_checkpoint,
+                            execution,
+                            final_answer
+                                .as_ref()
+                                .map(|answer| answer.citations.as_slice()),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?,
         key: task.key.clone(),
         arm_order,
         known_revision_checkpoint,
@@ -1139,6 +1346,7 @@ mod tests {
                 accepted_answers: vec!["North City".into()],
                 forbidden_event_ids: Vec::new(),
                 needs_clarification: false,
+                read_expectation: None,
             },
         }
     }

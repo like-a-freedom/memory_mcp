@@ -137,3 +137,61 @@ pub(crate) fn read_result(result: &Value) -> (super::MemoryReadOutcome, Option<u
     };
     (outcome, count)
 }
+
+pub(crate) fn cutoff_digest(
+    valid_at: chrono::DateTime<chrono::Utc>,
+    revision: Option<i64>,
+) -> Result<String, crate::EvalError> {
+    Ok(super::sha256(&serde_json::to_vec(&(
+        valid_at.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
+        revision,
+    ))?))
+}
+
+pub(crate) fn requested_cutoff(arguments: &Value) -> Option<String> {
+    let valid_at = arguments.get("valid_at")?.as_str()?.parse().ok()?;
+    cutoff_digest(
+        valid_at,
+        arguments.get("known_revision").and_then(Value::as_i64),
+    )
+    .ok()
+}
+
+pub(crate) fn read_evidence(
+    result: &Value,
+    requested_cutoff_sha256: Option<String>,
+) -> Option<super::MemoryReadEvidence> {
+    let payload = result.get("structuredContent")?;
+    let items = payload.get("result")?.as_array()?;
+    let mut source_episode_ids = Vec::with_capacity(items.len());
+    let mut claim_annotations = Vec::new();
+    for item in items {
+        let source = item.get("source_episode")?.as_str()?.to_owned();
+        if source.trim().is_empty() {
+            return None;
+        }
+        if let Some(annotation) =
+            crate::independent_probe::claim_annotation_from_item(item, source.clone()).ok()?
+        {
+            claim_annotations.push(annotation);
+        }
+        source_episode_ids.push(source);
+    }
+    Some(super::MemoryReadEvidence {
+        source_episode_ids,
+        claim_annotations,
+        completeness: payload
+            .pointer("/context/completeness")
+            .and_then(|value| serde_json::from_value(value.clone()).ok()),
+        requested_cutoff_sha256,
+        returned_cutoff_sha256: payload
+            .pointer("/context/snapshot")
+            .filter(|snapshot| {
+                snapshot
+                    .get("known_revision")
+                    .and_then(Value::as_i64)
+                    .is_some()
+            })
+            .and_then(requested_cutoff),
+    })
+}

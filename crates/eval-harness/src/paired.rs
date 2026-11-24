@@ -262,7 +262,7 @@ fn validate_run_window(
     Ok(())
 }
 
-fn validate_sha256(label: &str, digest: &str) -> Result<(), EvalError> {
+pub(crate) fn validate_sha256(label: &str, digest: &str) -> Result<(), EvalError> {
     if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(EvalError::InvalidInput(format!(
             "{label} must be a 64-character SHA-256 digest"
@@ -506,7 +506,7 @@ pub struct TrialReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_capture_status: Option<crate::paired_agent::ReadCaptureStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub read_diagnostics: Option<Vec<crate::paired_agent::MemoryReadObservation>>,
+    pub read_diagnostics: Option<Vec<crate::paired_agent::MemoryReadDiagnostic>>,
     pub key: CaseTrialKey,
     /// 1 or 2; the paired comparator requires opposite order in the two arms.
     pub arm_order: u8,
@@ -675,7 +675,21 @@ impl PairedRunArtifact {
                 &receipt.read_diagnostics,
             ) {
                 (PAIRED_ARTIFACT_SCHEMA_V7, Some(status), Some(reads)) => {
-                    crate::paired_agent::validate_read_associations(status, reads, &receipt.trace)?;
+                    let associations = reads
+                        .iter()
+                        .map(|read| crate::paired_agent::MemoryReadObservation {
+                            request_sequence: read.request_sequence,
+                            response_sequence: read.response_sequence,
+                            outcome: read.outcome,
+                            item_count: read.item_count,
+                            evidence: None,
+                        })
+                        .collect::<Vec<_>>();
+                    crate::paired_agent::validate_read_associations(
+                        status,
+                        &associations,
+                        &receipt.trace,
+                    )?;
                 }
                 (PAIRED_ARTIFACT_SCHEMA_V7, None, None)
                     if receipt.status == TrialStatus::Skipped => {}
