@@ -32,3 +32,19 @@ historical contrast justifies a task-focused reproduction with a model that
 can emit the final schema. The transport failure must be resolved before
 using the contradiction case to assess model behavior. This screen provides
 no basis for changing memory retrieval or promoting a product candidate.
+
+## Qwen follow-up before A8
+
+The same historical case and an ordinary positive control were run locally
+with Qwen3.8-27B MLX, 4,096 context tokens, 512 output tokens, one tool call,
+three turns and 90 seconds per trial. Both modes and both arms retrieved the
+ordinary source and exited on the registered budget before a verifiable
+answer. Both historical pairs recorded a model transport failure before
+reading. The completed live run used the preserved incumbent executable
+after the binary fingerprint guard interrupted a run during a separate
+product build.
+
+The Qwen follow-up supplied no historical reply for a presentation
+comparison. The previous LFM screen also had an unresolved output-contract
+failure with adequate fixed historical evidence. Keep A8 at NO-GO and leave
+the public response format unchanged.

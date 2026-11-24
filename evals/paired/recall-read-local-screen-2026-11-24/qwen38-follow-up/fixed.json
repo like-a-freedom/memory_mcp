@@ -1,0 +1,82 @@
+[
+  {
+    "key": {
+      "stratum_id": "recall",
+      "family_id": "alder-ordinary",
+      "case_id": "alder-ordinary",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "incumbent",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Alder calibration key"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": null
+  },
+  {
+    "key": {
+      "stratum_id": "recall",
+      "family_id": "alder-ordinary",
+      "case_id": "alder-ordinary",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "candidate",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Alder calibration key"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": null
+  },
+  {
+    "key": {
+      "stratum_id": "recall",
+      "family_id": "cedar-history",
+      "case_id": "cedar-history",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "incumbent",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "known_revision": 3,
+      "query": "Cedar calibration key",
+      "valid_at": "2026-05-01T10:00:00Z"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": "partial"
+  },
+  {
+    "key": {
+      "stratum_id": "recall",
+      "family_id": "cedar-history",
+      "case_id": "cedar-history",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "candidate",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "known_revision": 3,
+      "query": "Cedar calibration key",
+      "valid_at": "2026-05-01T10:00:00Z"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": "partial"
+  }
+]
