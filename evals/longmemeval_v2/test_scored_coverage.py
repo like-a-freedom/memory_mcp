@@ -1,10 +1,12 @@
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from evals.longmemeval_v2.scored_coverage import loopback_endpoint, run_observed
 
@@ -97,3 +99,14 @@ class ScoredCoverageTests(unittest.TestCase):
     def test_remote_reader_or_judge_endpoint_is_refused(self):
         with self.assertRaisesRegex(argparse.ArgumentTypeError, "loopback"):
             loopback_endpoint("http://192.0.2.1:8000/v1")
+
+    def test_loopback_defaults_do_not_fall_back_to_cloud_credentials(self):
+        with TemporaryDirectory() as directory:
+            def main():
+                self.assertEqual(os.environ["LME_LOCAL_READER_TOKEN"], "EMPTY")
+                self.assertEqual(os.environ["LME_LOCAL_JUDGE_TOKEN"], "EMPTY")
+
+            harness = SimpleNamespace(main=main, call_reader_model_async=None,
+                                      generate_all_reader_outputs=None, score_prediction=None)
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "ambient-cloud-key"}, clear=True):
+                run_observed(harness, [], ["a"], Path(directory))

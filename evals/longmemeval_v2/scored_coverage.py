@@ -52,10 +52,14 @@ def run_observed(harness, argv, case_ids, output):
                 duration["judge_scoring"] += time.monotonic() - start
 
     start = time.monotonic()
+    local_env = {
+        name: os.environ.get(name) or "EMPTY"
+        for name in ("LME_LOCAL_READER_TOKEN", "LME_LOCAL_JUDGE_TOKEN")
+    }
     try:
         with (
             patch("sys.argv", argv),
-            patch.dict(os.environ, {"NO_PROXY": "*", "no_proxy": "*"}),
+            patch.dict(os.environ, {"NO_PROXY": "*", "no_proxy": "*", **local_env}),
             patch.object(harness, "generate_all_reader_outputs", observe_generation),
             patch.object(harness, "call_reader_model_async", observe_reader),
             patch.object(harness, "score_prediction", observe_score),
