@@ -1,16 +1,12 @@
 import json
 import os
 from pathlib import Path
-import subprocess
-import sys
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
 
 
-def build_shared_memory(root, questions, content):
-    from evals.longmemeval_v2.memory_mcp_backend import MemoryMcpBackend
-    from evaluation.harness import main
+def build_shared_memory(root, questions, content, *, haystack=None):
+    from evals.longmemeval_v2.build_preflight import run_shared_build
 
     trajectory_id = "synthetic-trajectory"
     inputs = {
@@ -22,24 +18,19 @@ def build_shared_memory(root, questions, content):
             }
             for question_id, question in questions.items()
         ],
-        "haystack": {question_id: [trajectory_id] for question_id in questions},
-        "trajectories": [{"id": trajectory_id, "content": content}],
-        "memory-config": {
-            "memory_type": MemoryMcpBackend.memory_type,
-            "memory_params": {
-                "binary": os.environ["LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY"],
-                "db_path": str(root / "original"),
-            },
+        "haystack": haystack if haystack is not None else {
+            question_id: [trajectory_id] for question_id in questions
         },
+        "trajectories": [{"id": trajectory_id, "content": content}],
     }
-    argv = ["harness.py", "--domain", "web", "--output-dir", str(root / "build"),
-            "--save-memory", "--skip-evaluation"]
     for name, payload in inputs.items():
-        path = root / f"{name}.json"
-        path.write_text(json.dumps(payload), encoding="utf-8")
-        argv.extend([f"--{name}-path", str(path)])
-    with patch.object(sys, "argv", argv):
-        main()
+        (root / f"{name}.json").write_text(json.dumps(payload), encoding="utf-8")
+    return run_shared_build(
+        domain="web", questions=root / "questions.json",
+        haystack=root / "haystack.json", trajectories=root / "trajectories.json",
+        binary=Path(os.environ["LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY"]),
+        output=root / "build",
+    )
 
 
 @unittest.skipUnless(
@@ -52,8 +43,14 @@ class UpstreamRestoreTests(unittest.TestCase):
 
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            original = root / "original"
-            build_shared_memory(root, {"question-a": "What do I prefer?"}, "I prefer tea")
+            original = root / "build" / "working-store"
+            status = build_shared_memory(root, {"question-a": "What do I prefer?"}, "I prefer tea")
+            self.assertEqual(status, 0)
+            report = json.loads((root / "build" / "build-coverage.json").read_text())
+            self.assertEqual(report["build_status"], "saved")
+            self.assertEqual(report["affected_case_ids"], [])
+            self.assertEqual(report["scored_case_count"], 0)
+            self.assertEqual(report["official_metrics_status"], "unavailable")
             snapshot = root / "build" / "memory_state"
             original.rename(root / "moved")
 
@@ -93,13 +90,27 @@ class UpstreamRestoreTests(unittest.TestCase):
             root = Path(directory)
             questions = {"question-a": "What do I prefer?", "question-b": "Which drink?"}
 
-            with self.assertRaises(subprocess.CalledProcessError) as caught:
-                build_shared_memory(root, questions, "x" * 1_048_577)
+            status = build_shared_memory(root, questions, "x" * 1_048_577)
 
-            self.assertEqual(caught.exception.cmd[1], "extract")
-            self.assertIn(b"entity extraction input too large", caught.exception.stderr)
+            self.assertEqual(status, 1)
             output = root / "build"
+            report = json.loads((output / "build-coverage.json").read_text())
+            self.assertEqual(report["failed_step"], "extract")
+            self.assertEqual(report["affected_case_ids"], ["question-a", "question-b"])
+            self.assertEqual(report["scored_case_count"], 0)
+            self.assertEqual(report["official_metrics_status"], "unavailable")
             self.assertFalse((output / "memory_state" / "store").exists())
             self.assertFalse((output / "prompt_rows.jsonl").exists())
             self.assertFalse((output / "per_question.jsonl").exists())
             self.assertFalse((output / "aggregated_metrics.json").exists())
+
+
+    def test_rejects_different_haystack_order_before_creating_output(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "shared nonempty ordered haystack"):
+                build_shared_memory(
+                    root, {"a": "What?", "b": "Which?"}, "I prefer tea",
+                    haystack={"a": ["first", "second"], "b": ["second", "first"]},
+                )
+            self.assertFalse((root / "build").exists())

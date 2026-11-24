@@ -30,10 +30,11 @@ measured 53 of 200 unique trajectories above the Apple Silicon argument
 budget. The largest serialized input is 7,600,069 bytes. Bounded stdin
 replaces argv for this adapter. The real longest trajectory reached durable
 ingest. Default Anno extraction refused it at its 1 MiB whole-input limit.
-The pinned harness aborts both questions sharing a failed synthetic build
-before emitting prompt rows or an official score. Extraction policy,
-framework-level failure accounting and full selected-cohort coverage
-remain separate qualification tasks.
+The [build preflight](../../../evals/longmemeval_v2/README.md#small-dataset-preflight)
+records both questions affected by a failed synthetic shared build. The
+pinned harness aborts before emitting prompt rows or an official score.
+Extraction policy, failure accounting for scored runs and full selected-cohort
+coverage remain qualification tasks.
 
 ## Approaches and decision
 

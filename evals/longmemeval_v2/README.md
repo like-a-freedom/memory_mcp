@@ -129,6 +129,23 @@ upstream checkout and this repository, and set
 `python -m unittest evals.longmemeval_v2.test_upstream_restore` with the
 upstream test requirements available.
 
+For a build-only run with a shared ordered haystack, use the same pinned
+checkout and a fresh output directory:
+
+```bash
+python -m evals.longmemeval_v2.build_preflight --domain web \
+  --questions /path/to/questions.json --haystack /path/to/haystack.json \
+  --trajectories /path/to/trajectories.json --binary target/debug/memory_mcp \
+  --output /path/to/new-output
+```
+
+The runner writes `build-coverage.json` with all selected question IDs.
+A failed product ingest or extract returns exit code 1 and attributes the
+aborted build to every dependent question. A successful snapshot returns 0.
+Both outcomes report zero scored cases and unavailable official metrics.
+Invalid inputs and other execution errors surface directly. The preflight
+uses no scorer, credentials, or retry.
+
 Streaming the pinned trajectories verified the third file hash and
 resolved the 200 distinct Small trajectory IDs. The current JSON
 serialization reaches 7,600,069 bytes for one trajectory. In total,
