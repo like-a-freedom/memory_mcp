@@ -14,6 +14,7 @@ assemble_context surfaces. It does not seed facts directly.
 """
 
 import argparse
+from bisect import bisect_right
 from contextlib import nullcontext
 import hashlib
 import json
@@ -39,6 +40,54 @@ except ModuleNotFoundError as error:  # standalone smoke without upstream checko
         return cls
 
 
+ORDERED_SEGMENTS = "ordered-segments-v1"
+WHOLE_TRAJECTORY = "whole-trajectory-v1"
+FORMATION_METHODS = (WHOLE_TRAJECTORY, ORDERED_SEGMENTS)
+ANNO_INPUT_LIMIT = 1_048_576
+
+
+def serialize_trajectory(trajectory: Any) -> tuple[bytes, list[int]]:
+    encoder = json.JSONEncoder(ensure_ascii=False, sort_keys=True)
+    if not isinstance(trajectory, dict) or not isinstance(trajectory.get("states"), list):
+        return encoder.encode(trajectory).encode("utf-8"), []
+
+    content = bytearray(b"{")
+    boundaries = []
+    for index, key in enumerate(sorted(trajectory)):
+        if index:
+            content.extend(b", ")
+        content.extend(encoder.encode(key).encode("utf-8"))
+        content.extend(b": ")
+        if key != "states":
+            content.extend(encoder.encode(trajectory[key]).encode("utf-8"))
+            continue
+        content.extend(b"[")
+        for state_index, state in enumerate(trajectory[key]):
+            if state_index:
+                content.extend(b", ")
+                boundaries.append(len(content))
+            content.extend(encoder.encode(state).encode("utf-8"))
+        content.extend(b"]")
+    content.extend(b"}")
+    return bytes(content), boundaries
+
+
+def ordered_segments(content: bytes, boundaries: list[int]):
+    start = 0
+    while start < len(content):
+        end = min(start + ANNO_INPUT_LIMIT, len(content))
+        if end < len(content):
+            boundary_index = bisect_right(boundaries, end) - 1
+            if boundary_index >= 0 and boundaries[boundary_index] > start:
+                end = boundaries[boundary_index]
+            else:
+                # An oversized state may span multiple episodes. Keep UTF-8 intact.
+                while content[end] & 0b11000000 == 0b10000000:
+                    end -= 1
+        yield content[start:end].decode("utf-8")
+        start = end
+
+
 UNDATED_TRAJECTORY_REFERENCE = "2000-01-01T00:00:00Z"
 
 
@@ -54,6 +103,9 @@ class MemoryMcpBackend(Memory):
         binary = memory_params.get("binary", binary)
         self.db_path = memory_params.get("db_path")
         self.binary = binary
+        self.formation_method = memory_params.get("formation_method", WHOLE_TRAJECTORY)
+        if self.formation_method not in FORMATION_METHODS:
+            raise ValueError("unknown LongMemEval-V2 formation method")
         self._store_lock = RLock()
         self._restored_store: Optional[TemporaryDirectory] = None
         self._runner = runner or self._run_cli
@@ -69,10 +121,19 @@ class MemoryMcpBackend(Memory):
 
     def _insert(self, trajectory: Any) -> None:
         start = time.monotonic()
-        content = json.dumps(trajectory, ensure_ascii=False, sort_keys=True)
-        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        encoded, boundaries = serialize_trajectory(trajectory)
+        digest = hashlib.sha256(encoded).hexdigest()
         source_id = f"longmemeval_v2_trajectory_{digest}"
+        if self.formation_method == ORDERED_SEGMENTS:
+            for index, segment in enumerate(ordered_segments(encoded, boundaries)):
+                self._form_episode(f"{source_id}_{ORDERED_SEGMENTS}_{index:08d}", segment)
+        else:
+            self._form_episode(source_id, encoded.decode("utf-8"))
 
+        self._insert_count += 1
+        self._insert_time_secs += time.monotonic() - start
+
+    def _form_episode(self, source_id: str, content: str) -> None:
         # Step 1: ingest the raw trajectory content.
         ingest_output = self._runner(
             "ingest",
@@ -96,9 +157,6 @@ class MemoryMcpBackend(Memory):
             "extract",
             "--episode-id", episode_id,
         )
-
-        self._insert_count += 1
-        self._insert_time_secs += time.monotonic() - start
 
     def query(self, query: str, query_image: Optional[Any] = None) -> list[dict[str, str]]:
         """Query memory for relevant context."""

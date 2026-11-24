@@ -6,10 +6,12 @@ from pathlib import Path
 from subprocess import CalledProcessError
 import sys
 
+from .memory_mcp_backend import FORMATION_METHODS, WHOLE_TRAJECTORY, MemoryMcpBackend
+
 
 def run_shared_build(
     *, domain: str, questions: Path, haystack: Path, trajectories: Path,
-    binary: Path, output: Path,
+    binary: Path, output: Path, formation_method: str = WHOLE_TRAJECTORY,
 ) -> int:
     from evaluation.harness import (
         all_haystacks_shared,
@@ -19,7 +21,8 @@ def run_shared_build(
         validate_question_and_haystack_ids,
     )
 
-    from .memory_mcp_backend import MemoryMcpBackend
+    if formation_method not in FORMATION_METHODS:
+        raise ValueError("unknown LongMemEval-V2 formation method")
 
     ids = [item.get("id") for item in load_questions(str(questions))]
     if not ids or any(not isinstance(case, str) or not case for case in ids):
@@ -37,7 +40,10 @@ def run_shared_build(
     config = output / "memory-config.json"
     config.write_text(json.dumps({
         "memory_type": MemoryMcpBackend.memory_type,
-        "memory_params": {"binary": executable, "db_path": str(output / "working-store")},
+        "memory_params": {
+            "binary": executable, "db_path": str(output / "working-store"),
+            "formation_method": formation_method,
+        },
     }), encoding="utf-8")
     argv = [
         "harness.py", "--domain", domain, "--output-dir", str(output),
@@ -62,6 +68,7 @@ def run_shared_build(
 
     report = {
         "schema": "memory-mcp-longmemeval-v2-build-preflight/v1",
+        "formation_method": formation_method,
         "selected_case_ids": ids,
         "selected_case_count": len(ids),
         "affected_case_ids": ids if failed_step else [],
@@ -80,6 +87,7 @@ def run_shared_build(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--domain", required=True)
+    parser.add_argument("--formation-method", choices=FORMATION_METHODS, default=WHOLE_TRAJECTORY)
     for name in ("questions", "haystack", "trajectories", "binary", "output"):
         parser.add_argument(f"--{name}", required=True, type=Path)
     raise SystemExit(run_shared_build(**vars(parser.parse_args())))

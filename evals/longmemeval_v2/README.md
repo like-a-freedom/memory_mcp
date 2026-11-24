@@ -146,6 +146,17 @@ Both outcomes report zero scored cases and unavailable official metrics.
 Invalid inputs and other execution errors surface directly. The preflight
 uses no scorer, credentials, or retry.
 
+Pass `--formation-method ordered-segments-v1` to exercise bounded
+memory formation. This method uses public ingest and extract for each
+segment in order. It prefers boundaries between states and splits an
+oversized state at a UTF-8 scalar boundary. Concatenating the segment
+bodies reproduces the canonical trajectory byte for byte. The source ID
+includes the whole trajectory digest, method version and segment ordinal.
+The method forms multiple episodes when required, so cross-segment
+extraction and answer quality must be evaluated for this method separately.
+The default `whole-trajectory-v1` remains available for comparison. Build
+receipts and saved configuration record the selected method.
+
 Streaming the pinned trajectories verified the third file hash and
 resolved the 200 distinct Small trajectory IDs. The current JSON
 serialization reaches 7,600,069 bytes for one trajectory. In total,

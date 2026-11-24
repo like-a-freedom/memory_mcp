@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 
-def build_shared_memory(root, questions, content, *, haystack=None):
+def build_shared_memory(root, questions, content, *, haystack=None, formation_method="whole-trajectory-v1"):
     from evals.longmemeval_v2.build_preflight import run_shared_build
 
     trajectory_id = "synthetic-trajectory"
@@ -29,7 +29,7 @@ def build_shared_memory(root, questions, content, *, haystack=None):
         domain="web", questions=root / "questions.json",
         haystack=root / "haystack.json", trajectories=root / "trajectories.json",
         binary=Path(os.environ["LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY"]),
-        output=root / "build",
+        output=root / "build", formation_method=formation_method,
     )
 
 
@@ -114,3 +114,24 @@ class UpstreamRestoreTests(unittest.TestCase):
                     haystack={"a": ["first", "second"], "b": ["second", "first"]},
                 )
             self.assertFalse((root / "build").exists())
+
+
+    def test_segmented_method_recovers_evidence_after_the_anno_limit(self):
+        from memory_modules.memory import load_memory
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            status = build_shared_memory(
+                root, {"a": "What do I prefer?"}, "\n" * 524_288 + "I prefer tea.",
+                formation_method="ordered-segments-v1",
+            )
+            self.assertEqual(status, 0)
+            output = root / "build"
+            report = json.loads((output / "build-coverage.json").read_text())
+            self.assertEqual(report["formation_method"], "ordered-segments-v1")
+            self.assertEqual(report["build_status"], "saved")
+            restored = load_memory(output / "memory_state")
+            self.addCleanup(restored._restored_store.cleanup)
+            self.assertTrue(any(
+                "tea" in item["value"].lower() for item in restored.query("What do I prefer?")
+            ))

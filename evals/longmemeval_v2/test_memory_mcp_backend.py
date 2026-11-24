@@ -54,6 +54,77 @@ class MemoryMcpBackendTests(unittest.TestCase):
         self.assertEqual(identities[1], identities[2])
         self.assertEqual(identities[2][1], "2000-01-01T00:00:00Z")
 
+    def test_segmented_method_preserves_complete_ordered_trajectory_under_anno_limit(self):
+        bodies = []
+        identities = []
+
+        def runner(command, *args):
+            if command == "ingest":
+                bodies.append(args[args.index("--content") + 1])
+                identities.append(args[args.index("--source-id") + 1])
+                return '{"result":"episode:issued"}'
+            return "{}"
+
+        trajectory = {"id": "demo", "states": [
+            {"state_index": 0, "text": "я" * 550_000},
+            {"state_index": 1, "text": "the last state"},
+        ]}
+        backend = MemoryMcpBackend({"formation_method": "ordered-segments-v1"}, runner=runner)
+        backend.insert(trajectory)
+
+        self.assertGreater(len(bodies), 1)
+        self.assertTrue(all(len(body.encode("utf-8")) <= 1_048_576 for body in bodies))
+        self.assertEqual(json.loads("".join(bodies)), trajectory)
+        self.assertEqual(len(set(identities)), len(bodies))
+        self.assertEqual(backend.stats["insert_count"], 1)
+
+    def test_segmented_method_keeps_adjacent_states_intact_when_each_fits(self):
+        bodies = []
+
+        def runner(command, *args):
+            if command == "ingest":
+                bodies.append(args[args.index("--content") + 1])
+                return '{"result":"episode:issued"}'
+            return "{}"
+
+        trajectory = {"states": [
+            {"state_index": 0, "text": "a" * 600_000},
+            {"state_index": 1, "text": "b" * 600_000},
+        ]}
+        MemoryMcpBackend({"formation_method": "ordered-segments-v1"}, runner=runner).insert(trajectory)
+
+        self.assertEqual(len(bodies), 2)
+        self.assertEqual(bodies[0].find('"state_index": 1'), -1)
+        self.assertTrue(bodies[1].startswith('{"state_index": 1, '))
+        self.assertEqual(json.loads("".join(bodies)), trajectory)
+
+    def test_segmented_retry_reuses_source_ids_after_a_failed_extract(self):
+        attempts = []
+        fail = True
+
+        def runner(command, *args):
+            if command == "ingest":
+                source_id = args[args.index("--source-id") + 1]
+                attempts.append(source_id)
+                return json.dumps({"result": source_id})
+            if fail and len(attempts) == 2:
+                raise RuntimeError("extract interrupted")
+            return "{}"
+
+        params = {"formation_method": "ordered-segments-v1"}
+        trajectory = {"states": [{"text": "x" * 600_000}, {"text": "y" * 600_000}]}
+        first = MemoryMcpBackend(params, runner=runner)
+        with self.assertRaisesRegex(RuntimeError, "extract interrupted"):
+            first.insert(trajectory)
+        self.assertEqual(first.stats["insert_count"], 0)
+
+        fail = False
+        restarted = MemoryMcpBackend(params, runner=runner)
+        restarted.insert(trajectory)
+        self.assertEqual(len(attempts), 4)
+        self.assertEqual(attempts[:2], attempts[2:])
+        self.assertEqual(restarted.stats["insert_count"], 1)
+
     def test_local_cli_uses_dedicated_store_without_inheriting_provider_or_remote_db(self):
         parent = {"SURREALDB_URL": "wss://example.invalid", "EMBEDDINGS_PROVIDER": "openai"}
         replies = [

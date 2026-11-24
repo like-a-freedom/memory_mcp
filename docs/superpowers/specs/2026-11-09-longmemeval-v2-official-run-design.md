@@ -36,6 +36,14 @@ pinned harness aborts before emitting prompt rows or an official score.
 Extraction policy, failure accounting for scored runs and full selected-cohort
 coverage remain qualification tasks.
 
+The adapter offers an explicit `ordered-segments-v1` formation method.
+It bounds each episode to 1 MiB, preserves ordered canonical bytes, and
+assigns provenance by trajectory digest and segment ordinal. Each segment
+runs through the public ingest and extract path. This changes the unit of
+extraction when a trajectory spans multiple episodes. Freeze the formation
+method in the run profile and qualify retrieval and reader outcomes with
+that method before publishing a baseline.
+
 ## Approaches and decision
 
 | Approach | Trade-off | Decision |
