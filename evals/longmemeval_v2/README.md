@@ -173,4 +173,12 @@ the default Anno limit of 1,048,576 bytes. The adapter keeps this failure
 visible and preserves the product limit. In a synthetic test of the
 actual upstream harness, the same class of failure aborted a shared build
 for two questions before a snapshot, prompt rows or score were emitted.
+The pinned upstream build-only runner saved the real largest trajectory
+with `ordered-segments-v1` on Apple Silicon. Eight segments reproduced
+all 7,600,069 canonical bytes, with a maximum segment of 1,039,593 bytes.
+The isolated debug-binary run took 198.4 seconds end to end, including
+upstream startup and snapshot creation. It scored zero questions.
+To reproduce, verify the three dataset hashes, select the largest
+canonical serialization among the Small haystack IDs, and pass it as the
+sole trajectory in a fresh one-question build preflight with that method.
 [Native aggregate](dataset-small-native-preflight.json)

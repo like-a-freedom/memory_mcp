@@ -3,5 +3,19 @@
   "unique_small_trajectories": 200,
   "max_adapter_content_bytes": 7600069,
   "host_arg_max_bytes": 1048576,
-  "content_alone_exceeds_host_arg_max": 53
+  "content_alone_exceeds_host_arg_max": 53,
+  "largest_trajectory_segmented_build": {
+    "upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+    "adapter_commit": "2f9c685e",
+    "binary_sha256": "2b338ba88f846c9638d05e958cf7f8b4acaa87d57da576a8e98d5fe3c73b2860",
+    "host": "Darwin arm64",
+    "formation_method": "ordered-segments-v1",
+    "segment_count": 8,
+    "max_segment_bytes": 1039593,
+    "exact_byte_reconstruction": true,
+    "build_status": "saved",
+    "wall_seconds": 198.4,
+    "scored_case_count": 0,
+    "official_metrics_status": "unavailable"
+  }
 }
