@@ -155,9 +155,11 @@ struct RetrievalPort<'a> {
 impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
     async fn retrieve(
         &self,
-        _command: &crate::memory::api::RecallCommand,
+        command: &crate::memory::api::RecallCommand,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-        assemble_context_inner(self.ctx, self.request.clone()).await
+        let mut items = assemble_context_inner(self.ctx, self.request.clone()).await?;
+        budget::bound_context_evidence(&mut items, &command.query);
+        Ok(items)
     }
 }
 
@@ -172,7 +174,10 @@ impl crate::memory::api::TemporalContextRetrievalPort for TemporalRetrievalPort<
         request: &AssembleContextRequest,
         temporal: crate::models::TemporalContextQuery,
     ) -> Result<crate::models::ContextAssemblyResult, crate::error::MemoryError> {
-        pipeline::assemble_revision_bounded_context(self.ctx, request, temporal).await
+        let mut result =
+            pipeline::assemble_revision_bounded_context(self.ctx, request, temporal).await?;
+        budget::bound_context_evidence(&mut result.items, &request.query);
+        Ok(result)
     }
 }
 

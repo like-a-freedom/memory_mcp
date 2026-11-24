@@ -1,0 +1,38 @@
+{
+  "case": "f43926d9",
+  "baseline_original": 720346,
+  "baseline_survives": 0,
+  "candidate": [
+    {
+      "original": 3598,
+      "survives": 3598,
+      "item_bytes": [
+        2048,
+        2048,
+        2048,
+        2048,
+        2048
+      ],
+      "sha256": "8134c919af6c0e602bb5e47727690ffc3658b7cf5e780d634283fa1a7b58191a",
+      "selected_items": 5
+    },
+    {
+      "original": 3598,
+      "survives": 3598,
+      "item_bytes": [
+        2048,
+        2048,
+        2048,
+        2048,
+        2048
+      ],
+      "sha256": "8134c919af6c0e602bb5e47727690ffc3658b7cf5e780d634283fa1a7b58191a",
+      "selected_items": 5
+    }
+  ],
+  "equal": true,
+  "host": "Darwin arm64",
+  "candidate_binary_sha256": "9c9b24b757a948eae3299313dd1a0a14c6cd4ddd62f033580bc27a7edf06213d",
+  "upstream_context_cap_tokens": 4096,
+  "scope": "context-only"
+}

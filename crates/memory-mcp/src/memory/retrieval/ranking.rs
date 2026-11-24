@@ -1,7 +1,7 @@
 //! Ranking and MMR-based selection of context facts.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap, HashSet, hash_map::Entry};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, hash_map::Entry};
 
 use chrono::{DateTime, Utc};
 
@@ -202,7 +202,7 @@ pub(crate) fn build_ranked_context_facts(
         cutoff,
     } = request;
 
-    let mut ranked_by_fact_id = HashMap::<String, RankedContextFact>::new();
+    let mut ranked_by_fact_id = BTreeMap::<String, RankedContextFact>::new();
     let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, fact);
     let grounding = |fact: &Fact| query_grounding_score(query_opt, fact);
     let lexical_query_terms = query_opt.map(search_query_terms).unwrap_or_default();
@@ -454,7 +454,10 @@ pub(crate) fn build_ranked_context_facts(
         }
     }
 
-    ranked_by_content.into_values().collect()
+    // Admission preserves this order and caps the pool before final reranking.
+    let mut ranked: Vec<_> = ranked_by_content.into_values().collect();
+    ranked.sort_by(|left, right| compare_ranked_context_facts_with_focus(left, right, None));
+    ranked
 }
 
 fn lexical_fusion_score(rank: usize, fact: &Fact, query_terms: &[String]) -> f64 {
@@ -775,8 +778,7 @@ fn compare_ranked_context_facts_with_focus(
 
 /// No-focus comparator for deterministic ranking assertions in tests.
 ///
-/// Production ordering always goes through
-/// [`compare_ranked_context_facts_with_focus`] (with a temporal focus window).
+/// Production uses [`compare_ranked_context_facts_with_focus`] directly.
 /// This variant exists so tests can assert a stable, focus-free ordering
 /// without constructing a `TemporalWindow`.
 #[cfg(test)]
@@ -2028,6 +2030,39 @@ mod tests {
         assert_eq!(ranked.len(), 1);
         assert_eq!(ranked[0].retrieval_tier, RetrievalTier::TemporalExpanded);
         assert!(ranked[0].rationale.contains("tier=temporal"));
+    }
+
+    #[test]
+    fn fused_candidates_keep_lexical_rank_before_the_candidate_cap() {
+        let cutoff = fixed_temporal_cutoff();
+        let expected: Vec<_> = (0..32).map(|index| format!("fact:{index:02}")).collect();
+        let lexical_facts = expected
+            .iter()
+            .map(|id| {
+                let mut fact = create_test_fact(id, cutoff);
+                fact.content = format!("Distinct {id}");
+                (fact, RetrievalTier::Direct)
+            })
+            .collect();
+
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts,
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: None,
+                semantic_available: false,
+                cutoff,
+            },
+            |_, _| 1.0,
+        );
+
+        let actual: Vec<_> = ranked
+            .into_iter()
+            .map(|candidate| candidate.fact.fact_id)
+            .collect();
+        assert_eq!(actual, expected);
     }
 
     #[test]

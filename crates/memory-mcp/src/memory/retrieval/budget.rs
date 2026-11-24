@@ -1,5 +1,6 @@
 use crate::models::AssembledContextItem;
 use std::collections::HashSet;
+use std::ops::Range;
 
 use super::admission::{build_query_evidence, episode_candidate_is_admitted_at_reference_time};
 use super::filtering;
@@ -10,6 +11,92 @@ use super::types::{RankedContextFact, RetrievalTier};
 use crate::error::MemoryError;
 use crate::memory::retrieval::RetrievalContext;
 use crate::shared::search_lexical::matched_query_terms_for_text;
+
+// Leave space for the source metadata and delimiters in downstream context windows.
+const MAX_EVIDENCE_EXCERPT_BYTES: usize = 2048;
+
+pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query: &str) {
+    let query_terms = crate::shared::search::search_query_terms(query);
+    for item in items {
+        if item.content.len().max(item.quote.len()) <= MAX_EVIDENCE_EXCERPT_BYTES {
+            continue;
+        }
+        if !item.provenance.is_object() {
+            item.provenance = serde_json::json!({});
+        }
+
+        let same_text = item.content == item.quote;
+        let episode_fallback = item.provenance["episode_fallback"] == true && same_text;
+        if let Some(range) = evidence_excerpt_range(&item.content, &query_terms) {
+            if episode_fallback {
+                item.provenance["episode_excerpt"] = serde_json::json!({
+                    "start_byte": range.start,
+                    "end_byte": range.end,
+                    "source_bytes": item.content.len(),
+                });
+                item.quote = item.content[range.clone()].to_owned();
+            } else {
+                item.provenance["content_excerpt"] = excerpt_metadata(&range, item.content.len());
+                if same_text {
+                    item.provenance["quote_excerpt"] = item.provenance["content_excerpt"].clone();
+                    item.quote = item.content[range.clone()].to_owned();
+                }
+            }
+            item.content = item.content[range].to_owned();
+        }
+        if let Some(range) = evidence_excerpt_range(&item.quote, &query_terms) {
+            item.provenance["quote_excerpt"] = excerpt_metadata(&range, item.quote.len());
+            item.quote = item.quote[range].to_owned();
+        }
+    }
+}
+
+fn excerpt_metadata(range: &Range<usize>, bytes: usize) -> serde_json::Value {
+    serde_json::json!({
+        "start_byte": range.start,
+        "end_byte": range.end,
+        "original_bytes": bytes,
+    })
+}
+
+fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<usize>> {
+    if text.len() <= MAX_EVIDENCE_EXCERPT_BYTES {
+        return None;
+    }
+    if query_terms.is_empty() {
+        return Some(0..text.floor_char_boundary(MAX_EVIDENCE_EXCERPT_BYTES));
+    }
+
+    let last_start = text.len() - MAX_EVIDENCE_EXCERPT_BYTES;
+    let margin = MAX_EVIDENCE_EXCERPT_BYTES / 4;
+    let mut best_score = None;
+    let mut best_range = 0..0;
+    // Overlap adjacent windows so short evidence can survive a window boundary.
+    for offset in (0..last_start)
+        .step_by(MAX_EVIDENCE_EXCERPT_BYTES / 2)
+        .chain(std::iter::once(last_start))
+    {
+        let start = text.ceil_char_boundary(offset);
+        let end = text.floor_char_boundary(offset + MAX_EVIDENCE_EXCERPT_BYTES);
+        let overlap = super::lexical::lexical_query_score_for_text(&text[start..end], query_terms);
+        if best_score.is_some_and(|(best_overlap, _)| overlap < best_overlap) {
+            continue;
+        }
+        // Prefer room around a match for the words carrying its answer.
+        let inner_start = text.ceil_char_boundary(offset + margin);
+        let inner_end = text.floor_char_boundary(offset + 3 * margin);
+        let interior_overlap = super::lexical::lexical_query_score_for_text(
+            &text[inner_start..inner_end],
+            query_terms,
+        );
+        let score = (overlap, interior_overlap);
+        if best_score.is_none_or(|best| score > best) {
+            best_score = Some(score);
+            best_range = start..end;
+        }
+    }
+    Some(best_range)
+}
 
 pub(super) fn should_prefer_episode_content(
     selected_facts: &[RankedContextFact],
