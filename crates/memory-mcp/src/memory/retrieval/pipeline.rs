@@ -107,27 +107,64 @@ pub(super) async fn assemble_revision_bounded_context(
         records.extend(scanned);
         scan_truncated |= truncated;
     }
-    let ranked_records = super::lexical::rank_lexical_records(records, &query_terms);
     let access = request.access.clone().unwrap_or_default();
-    let mut facts = super::filtering::filter_facts_by_constraints(
-        ranked_records,
-        &access,
-        &normalized_fact_types,
-    );
-    let mut seen_fact_ids = HashSet::new();
-    facts.retain(|fact| {
-        seen_fact_ids.insert(fact.fact_id.clone())
-            && super::admission::candidate_matches_explicit_query_subject(
-                &request.query,
-                &fact.content,
-            )
-            && request
-                .window_start
-                .is_none_or(|start| fact.t_valid >= start)
-            && request.window_end.is_none_or(|end| fact.t_valid <= end)
-            && (query_terms.is_empty()
-                || super::lexical::lexical_query_overlap_for_fact(fact, &query_terms) > 0)
-    });
+    let admit = |records| {
+        let ranked = super::lexical::rank_lexical_records(records, &query_terms);
+        let mut facts =
+            super::filtering::filter_facts_by_constraints(ranked, &access, &normalized_fact_types);
+        let mut seen_fact_ids = HashSet::new();
+        facts.retain(|fact| {
+            seen_fact_ids.insert(fact.fact_id.clone())
+                && super::admission::candidate_matches_explicit_query_subject(
+                    &request.query,
+                    &fact.content,
+                )
+                && request
+                    .window_start
+                    .is_none_or(|start| fact.t_valid >= start)
+                && request.window_end.is_none_or(|end| fact.t_valid <= end)
+                && (query_terms.is_empty()
+                    || super::lexical::lexical_query_overlap_for_fact(fact, &query_terms) > 0)
+        });
+        facts
+    };
+    let mut facts = admit(records);
+    if facts.is_empty()
+        && scan_truncated
+        && let Some(subject) = super::admission::explicit_query_subject(&request.query)
+    {
+        let subject_query = crate::shared::search::preprocess_search_query(&subject);
+        let subject_terms = crate::shared::search::search_query_terms(&subject);
+        let topic_terms = query_terms
+            .iter()
+            .filter(|term| !subject_terms.contains(term))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !subject_query.is_empty()
+            && query_opt != Some(subject_query.as_str())
+            && !topic_terms.is_empty()
+        {
+            let (subject_records, truncated) = service
+                .knowledge_store()
+                .select_facts_at_revision(
+                    valid_at,
+                    known_revision,
+                    Some(&subject_query),
+                    &normalized_fact_types,
+                    super::lexical::lexical_candidate_limit(budget),
+                )
+                .await?;
+            scan_truncated |= truncated;
+            facts = admit(subject_records);
+            facts.retain(|fact| {
+                super::lexical::lexical_query_overlap_for_fact(fact, &topic_terms) > 0
+                    && crate::knowledge::claims_policy::structural::explicit_schema_fields(
+                        &fact.content,
+                    )
+                    .contains_key("subject")
+            });
+        }
+    }
     facts.truncate(budget as usize);
 
     let valid_at_iso = crate::shared::temporal::normalize_dt(valid_at);

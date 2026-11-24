@@ -333,9 +333,8 @@ fn inferred_subject_terms(query: &str) -> Vec<String> {
     )
 }
 
-/// A lexical match on a predicate alone cannot establish a named subject.
-/// Queries without an inferred explicit subject retain their lexical policy.
-pub(super) fn candidate_matches_explicit_query_subject(query: &str, content: &str) -> bool {
+/// A single explicit subject, using the same admission rule as historical reads.
+pub(super) fn explicit_query_subject(query: &str) -> Option<String> {
     let inferred = inferred_subject_terms(query);
     let tokens = query
         .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
@@ -366,11 +365,16 @@ pub(super) fn candidate_matches_explicit_query_subject(query: &str, content: &st
     if !span.is_empty() {
         spans.push(span);
     }
-    // Multiple names need entity-aware query semantics; never concatenate them.
-    if spans.len() != 1 {
+    // Multiple names need entity-aware query semantics.
+    (spans.len() == 1).then(|| spans[0].join(" "))
+}
+
+/// A lexical match on a predicate alone cannot establish a named subject.
+pub(super) fn candidate_matches_explicit_query_subject(query: &str, content: &str) -> bool {
+    let Some(subject) = explicit_query_subject(query) else {
         return true;
-    }
-    let subject = crate::knowledge::entity_resolution::normalize_entity_name(&spans[0].join(" "));
+    };
+    let subject = crate::knowledge::entity_resolution::normalize_entity_name(&subject);
     let fields = crate::knowledge::claims_policy::structural::explicit_schema_fields(content);
     if let Some(declared) = fields.get("subject") {
         return crate::knowledge::entity_resolution::normalize_entity_name(declared) == subject;

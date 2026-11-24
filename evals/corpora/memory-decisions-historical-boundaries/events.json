@@ -1,0 +1,1769 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "old-record",
+      "source_id": "old-record-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Copper Warehouse\ndimension: capacity\nvalue: 42 crates for Copper Warehouse",
+      "t_ref": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": "depot-000",
+      "source_id": "depot-000-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 000\ndimension: capacity\nvalue: 400 crates for Depot 000",
+      "t_ref": "2026-03-01T23:59:59Z"
+    },
+    {
+      "id": "depot-001",
+      "source_id": "depot-001-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 001\ndimension: capacity\nvalue: 401 crates for Depot 001",
+      "t_ref": "2026-03-01T23:59:58Z"
+    },
+    {
+      "id": "depot-002",
+      "source_id": "depot-002-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 002\ndimension: capacity\nvalue: 402 crates for Depot 002",
+      "t_ref": "2026-03-01T23:59:57Z"
+    },
+    {
+      "id": "depot-003",
+      "source_id": "depot-003-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 003\ndimension: capacity\nvalue: 403 crates for Depot 003",
+      "t_ref": "2026-03-01T23:59:56Z"
+    },
+    {
+      "id": "depot-004",
+      "source_id": "depot-004-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 004\ndimension: capacity\nvalue: 404 crates for Depot 004",
+      "t_ref": "2026-03-01T23:59:55Z"
+    },
+    {
+      "id": "depot-005",
+      "source_id": "depot-005-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 005\ndimension: capacity\nvalue: 405 crates for Depot 005",
+      "t_ref": "2026-03-01T23:59:54Z"
+    },
+    {
+      "id": "depot-006",
+      "source_id": "depot-006-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 006\ndimension: capacity\nvalue: 406 crates for Depot 006",
+      "t_ref": "2026-03-01T23:59:53Z"
+    },
+    {
+      "id": "depot-007",
+      "source_id": "depot-007-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 007\ndimension: capacity\nvalue: 407 crates for Depot 007",
+      "t_ref": "2026-03-01T23:59:52Z"
+    },
+    {
+      "id": "depot-008",
+      "source_id": "depot-008-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 008\ndimension: capacity\nvalue: 408 crates for Depot 008",
+      "t_ref": "2026-03-01T23:59:51Z"
+    },
+    {
+      "id": "depot-009",
+      "source_id": "depot-009-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 009\ndimension: capacity\nvalue: 409 crates for Depot 009",
+      "t_ref": "2026-03-01T23:59:50Z"
+    },
+    {
+      "id": "depot-010",
+      "source_id": "depot-010-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 010\ndimension: capacity\nvalue: 410 crates for Depot 010",
+      "t_ref": "2026-03-01T23:59:49Z"
+    },
+    {
+      "id": "depot-011",
+      "source_id": "depot-011-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 011\ndimension: capacity\nvalue: 411 crates for Depot 011",
+      "t_ref": "2026-03-01T23:59:48Z"
+    },
+    {
+      "id": "depot-012",
+      "source_id": "depot-012-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 012\ndimension: capacity\nvalue: 412 crates for Depot 012",
+      "t_ref": "2026-03-01T23:59:47Z"
+    },
+    {
+      "id": "depot-013",
+      "source_id": "depot-013-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 013\ndimension: capacity\nvalue: 413 crates for Depot 013",
+      "t_ref": "2026-03-01T23:59:46Z"
+    },
+    {
+      "id": "depot-014",
+      "source_id": "depot-014-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 014\ndimension: capacity\nvalue: 414 crates for Depot 014",
+      "t_ref": "2026-03-01T23:59:45Z"
+    },
+    {
+      "id": "depot-015",
+      "source_id": "depot-015-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 015\ndimension: capacity\nvalue: 415 crates for Depot 015",
+      "t_ref": "2026-03-01T23:59:44Z"
+    },
+    {
+      "id": "depot-016",
+      "source_id": "depot-016-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 016\ndimension: capacity\nvalue: 416 crates for Depot 016",
+      "t_ref": "2026-03-01T23:59:43Z"
+    },
+    {
+      "id": "depot-017",
+      "source_id": "depot-017-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 017\ndimension: capacity\nvalue: 417 crates for Depot 017",
+      "t_ref": "2026-03-01T23:59:42Z"
+    },
+    {
+      "id": "depot-018",
+      "source_id": "depot-018-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 018\ndimension: capacity\nvalue: 418 crates for Depot 018",
+      "t_ref": "2026-03-01T23:59:41Z"
+    },
+    {
+      "id": "depot-019",
+      "source_id": "depot-019-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 019\ndimension: capacity\nvalue: 419 crates for Depot 019",
+      "t_ref": "2026-03-01T23:59:40Z"
+    },
+    {
+      "id": "depot-020",
+      "source_id": "depot-020-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 020\ndimension: capacity\nvalue: 420 crates for Depot 020",
+      "t_ref": "2026-03-01T23:59:39Z"
+    },
+    {
+      "id": "depot-021",
+      "source_id": "depot-021-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 021\ndimension: capacity\nvalue: 421 crates for Depot 021",
+      "t_ref": "2026-03-01T23:59:38Z"
+    },
+    {
+      "id": "depot-022",
+      "source_id": "depot-022-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 022\ndimension: capacity\nvalue: 422 crates for Depot 022",
+      "t_ref": "2026-03-01T23:59:37Z"
+    },
+    {
+      "id": "depot-023",
+      "source_id": "depot-023-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 023\ndimension: capacity\nvalue: 423 crates for Depot 023",
+      "t_ref": "2026-03-01T23:59:36Z"
+    },
+    {
+      "id": "depot-024",
+      "source_id": "depot-024-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 024\ndimension: capacity\nvalue: 424 crates for Depot 024",
+      "t_ref": "2026-03-01T23:59:35Z"
+    },
+    {
+      "id": "depot-025",
+      "source_id": "depot-025-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 025\ndimension: capacity\nvalue: 425 crates for Depot 025",
+      "t_ref": "2026-03-01T23:59:34Z"
+    },
+    {
+      "id": "depot-026",
+      "source_id": "depot-026-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 026\ndimension: capacity\nvalue: 426 crates for Depot 026",
+      "t_ref": "2026-03-01T23:59:33Z"
+    },
+    {
+      "id": "depot-027",
+      "source_id": "depot-027-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 027\ndimension: capacity\nvalue: 427 crates for Depot 027",
+      "t_ref": "2026-03-01T23:59:32Z"
+    },
+    {
+      "id": "depot-028",
+      "source_id": "depot-028-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 028\ndimension: capacity\nvalue: 428 crates for Depot 028",
+      "t_ref": "2026-03-01T23:59:31Z"
+    },
+    {
+      "id": "depot-029",
+      "source_id": "depot-029-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 029\ndimension: capacity\nvalue: 429 crates for Depot 029",
+      "t_ref": "2026-03-01T23:59:30Z"
+    },
+    {
+      "id": "depot-030",
+      "source_id": "depot-030-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 030\ndimension: capacity\nvalue: 430 crates for Depot 030",
+      "t_ref": "2026-03-01T23:59:29Z"
+    },
+    {
+      "id": "depot-031",
+      "source_id": "depot-031-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 031\ndimension: capacity\nvalue: 431 crates for Depot 031",
+      "t_ref": "2026-03-01T23:59:28Z"
+    },
+    {
+      "id": "depot-032",
+      "source_id": "depot-032-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 032\ndimension: capacity\nvalue: 432 crates for Depot 032",
+      "t_ref": "2026-03-01T23:59:27Z"
+    },
+    {
+      "id": "depot-033",
+      "source_id": "depot-033-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 033\ndimension: capacity\nvalue: 433 crates for Depot 033",
+      "t_ref": "2026-03-01T23:59:26Z"
+    },
+    {
+      "id": "depot-034",
+      "source_id": "depot-034-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 034\ndimension: capacity\nvalue: 434 crates for Depot 034",
+      "t_ref": "2026-03-01T23:59:25Z"
+    },
+    {
+      "id": "depot-035",
+      "source_id": "depot-035-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 035\ndimension: capacity\nvalue: 435 crates for Depot 035",
+      "t_ref": "2026-03-01T23:59:24Z"
+    },
+    {
+      "id": "depot-036",
+      "source_id": "depot-036-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 036\ndimension: capacity\nvalue: 436 crates for Depot 036",
+      "t_ref": "2026-03-01T23:59:23Z"
+    },
+    {
+      "id": "depot-037",
+      "source_id": "depot-037-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 037\ndimension: capacity\nvalue: 437 crates for Depot 037",
+      "t_ref": "2026-03-01T23:59:22Z"
+    },
+    {
+      "id": "depot-038",
+      "source_id": "depot-038-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 038\ndimension: capacity\nvalue: 438 crates for Depot 038",
+      "t_ref": "2026-03-01T23:59:21Z"
+    },
+    {
+      "id": "depot-039",
+      "source_id": "depot-039-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 039\ndimension: capacity\nvalue: 439 crates for Depot 039",
+      "t_ref": "2026-03-01T23:59:20Z"
+    },
+    {
+      "id": "depot-040",
+      "source_id": "depot-040-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 040\ndimension: capacity\nvalue: 440 crates for Depot 040",
+      "t_ref": "2026-03-01T23:59:19Z"
+    },
+    {
+      "id": "depot-041",
+      "source_id": "depot-041-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 041\ndimension: capacity\nvalue: 441 crates for Depot 041",
+      "t_ref": "2026-03-01T23:59:18Z"
+    },
+    {
+      "id": "depot-042",
+      "source_id": "depot-042-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 042\ndimension: capacity\nvalue: 442 crates for Depot 042",
+      "t_ref": "2026-03-01T23:59:17Z"
+    },
+    {
+      "id": "depot-043",
+      "source_id": "depot-043-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 043\ndimension: capacity\nvalue: 443 crates for Depot 043",
+      "t_ref": "2026-03-01T23:59:16Z"
+    },
+    {
+      "id": "depot-044",
+      "source_id": "depot-044-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 044\ndimension: capacity\nvalue: 444 crates for Depot 044",
+      "t_ref": "2026-03-01T23:59:15Z"
+    },
+    {
+      "id": "depot-045",
+      "source_id": "depot-045-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 045\ndimension: capacity\nvalue: 445 crates for Depot 045",
+      "t_ref": "2026-03-01T23:59:14Z"
+    },
+    {
+      "id": "depot-046",
+      "source_id": "depot-046-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 046\ndimension: capacity\nvalue: 446 crates for Depot 046",
+      "t_ref": "2026-03-01T23:59:13Z"
+    },
+    {
+      "id": "depot-047",
+      "source_id": "depot-047-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 047\ndimension: capacity\nvalue: 447 crates for Depot 047",
+      "t_ref": "2026-03-01T23:59:12Z"
+    },
+    {
+      "id": "depot-048",
+      "source_id": "depot-048-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 048\ndimension: capacity\nvalue: 448 crates for Depot 048",
+      "t_ref": "2026-03-01T23:59:11Z"
+    },
+    {
+      "id": "depot-049",
+      "source_id": "depot-049-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 049\ndimension: capacity\nvalue: 449 crates for Depot 049",
+      "t_ref": "2026-03-01T23:59:10Z"
+    },
+    {
+      "id": "depot-050",
+      "source_id": "depot-050-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 050\ndimension: capacity\nvalue: 450 crates for Depot 050",
+      "t_ref": "2026-03-01T23:59:09Z"
+    },
+    {
+      "id": "depot-051",
+      "source_id": "depot-051-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 051\ndimension: capacity\nvalue: 451 crates for Depot 051",
+      "t_ref": "2026-03-01T23:59:08Z"
+    },
+    {
+      "id": "depot-052",
+      "source_id": "depot-052-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 052\ndimension: capacity\nvalue: 452 crates for Depot 052",
+      "t_ref": "2026-03-01T23:59:07Z"
+    },
+    {
+      "id": "depot-053",
+      "source_id": "depot-053-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 053\ndimension: capacity\nvalue: 453 crates for Depot 053",
+      "t_ref": "2026-03-01T23:59:06Z"
+    },
+    {
+      "id": "depot-054",
+      "source_id": "depot-054-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 054\ndimension: capacity\nvalue: 454 crates for Depot 054",
+      "t_ref": "2026-03-01T23:59:05Z"
+    },
+    {
+      "id": "depot-055",
+      "source_id": "depot-055-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 055\ndimension: capacity\nvalue: 455 crates for Depot 055",
+      "t_ref": "2026-03-01T23:59:04Z"
+    },
+    {
+      "id": "depot-056",
+      "source_id": "depot-056-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 056\ndimension: capacity\nvalue: 456 crates for Depot 056",
+      "t_ref": "2026-03-01T23:59:03Z"
+    },
+    {
+      "id": "depot-057",
+      "source_id": "depot-057-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 057\ndimension: capacity\nvalue: 457 crates for Depot 057",
+      "t_ref": "2026-03-01T23:59:02Z"
+    },
+    {
+      "id": "depot-058",
+      "source_id": "depot-058-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 058\ndimension: capacity\nvalue: 458 crates for Depot 058",
+      "t_ref": "2026-03-01T23:59:01Z"
+    },
+    {
+      "id": "depot-059",
+      "source_id": "depot-059-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 059\ndimension: capacity\nvalue: 459 crates for Depot 059",
+      "t_ref": "2026-03-01T23:59:00Z"
+    },
+    {
+      "id": "depot-060",
+      "source_id": "depot-060-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 060\ndimension: capacity\nvalue: 460 crates for Depot 060",
+      "t_ref": "2026-03-01T23:58:59Z"
+    },
+    {
+      "id": "depot-061",
+      "source_id": "depot-061-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 061\ndimension: capacity\nvalue: 461 crates for Depot 061",
+      "t_ref": "2026-03-01T23:58:58Z"
+    },
+    {
+      "id": "depot-062",
+      "source_id": "depot-062-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 062\ndimension: capacity\nvalue: 462 crates for Depot 062",
+      "t_ref": "2026-03-01T23:58:57Z"
+    },
+    {
+      "id": "depot-063",
+      "source_id": "depot-063-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 063\ndimension: capacity\nvalue: 463 crates for Depot 063",
+      "t_ref": "2026-03-01T23:58:56Z"
+    },
+    {
+      "id": "depot-064",
+      "source_id": "depot-064-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 064\ndimension: capacity\nvalue: 464 crates for Depot 064",
+      "t_ref": "2026-03-01T23:58:55Z"
+    },
+    {
+      "id": "depot-065",
+      "source_id": "depot-065-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 065\ndimension: capacity\nvalue: 465 crates for Depot 065",
+      "t_ref": "2026-03-01T23:58:54Z"
+    },
+    {
+      "id": "depot-066",
+      "source_id": "depot-066-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 066\ndimension: capacity\nvalue: 466 crates for Depot 066",
+      "t_ref": "2026-03-01T23:58:53Z"
+    },
+    {
+      "id": "depot-067",
+      "source_id": "depot-067-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 067\ndimension: capacity\nvalue: 467 crates for Depot 067",
+      "t_ref": "2026-03-01T23:58:52Z"
+    },
+    {
+      "id": "depot-068",
+      "source_id": "depot-068-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 068\ndimension: capacity\nvalue: 468 crates for Depot 068",
+      "t_ref": "2026-03-01T23:58:51Z"
+    },
+    {
+      "id": "depot-069",
+      "source_id": "depot-069-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 069\ndimension: capacity\nvalue: 469 crates for Depot 069",
+      "t_ref": "2026-03-01T23:58:50Z"
+    },
+    {
+      "id": "depot-070",
+      "source_id": "depot-070-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 070\ndimension: capacity\nvalue: 470 crates for Depot 070",
+      "t_ref": "2026-03-01T23:58:49Z"
+    },
+    {
+      "id": "depot-071",
+      "source_id": "depot-071-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 071\ndimension: capacity\nvalue: 471 crates for Depot 071",
+      "t_ref": "2026-03-01T23:58:48Z"
+    },
+    {
+      "id": "depot-072",
+      "source_id": "depot-072-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 072\ndimension: capacity\nvalue: 472 crates for Depot 072",
+      "t_ref": "2026-03-01T23:58:47Z"
+    },
+    {
+      "id": "depot-073",
+      "source_id": "depot-073-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 073\ndimension: capacity\nvalue: 473 crates for Depot 073",
+      "t_ref": "2026-03-01T23:58:46Z"
+    },
+    {
+      "id": "depot-074",
+      "source_id": "depot-074-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 074\ndimension: capacity\nvalue: 474 crates for Depot 074",
+      "t_ref": "2026-03-01T23:58:45Z"
+    },
+    {
+      "id": "depot-075",
+      "source_id": "depot-075-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 075\ndimension: capacity\nvalue: 475 crates for Depot 075",
+      "t_ref": "2026-03-01T23:58:44Z"
+    },
+    {
+      "id": "depot-076",
+      "source_id": "depot-076-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 076\ndimension: capacity\nvalue: 476 crates for Depot 076",
+      "t_ref": "2026-03-01T23:58:43Z"
+    },
+    {
+      "id": "depot-077",
+      "source_id": "depot-077-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 077\ndimension: capacity\nvalue: 477 crates for Depot 077",
+      "t_ref": "2026-03-01T23:58:42Z"
+    },
+    {
+      "id": "depot-078",
+      "source_id": "depot-078-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 078\ndimension: capacity\nvalue: 478 crates for Depot 078",
+      "t_ref": "2026-03-01T23:58:41Z"
+    },
+    {
+      "id": "depot-079",
+      "source_id": "depot-079-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 079\ndimension: capacity\nvalue: 479 crates for Depot 079",
+      "t_ref": "2026-03-01T23:58:40Z"
+    },
+    {
+      "id": "depot-080",
+      "source_id": "depot-080-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 080\ndimension: capacity\nvalue: 480 crates for Depot 080",
+      "t_ref": "2026-03-01T23:58:39Z"
+    },
+    {
+      "id": "depot-081",
+      "source_id": "depot-081-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 081\ndimension: capacity\nvalue: 481 crates for Depot 081",
+      "t_ref": "2026-03-01T23:58:38Z"
+    },
+    {
+      "id": "depot-082",
+      "source_id": "depot-082-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 082\ndimension: capacity\nvalue: 482 crates for Depot 082",
+      "t_ref": "2026-03-01T23:58:37Z"
+    },
+    {
+      "id": "depot-083",
+      "source_id": "depot-083-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 083\ndimension: capacity\nvalue: 483 crates for Depot 083",
+      "t_ref": "2026-03-01T23:58:36Z"
+    },
+    {
+      "id": "depot-084",
+      "source_id": "depot-084-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 084\ndimension: capacity\nvalue: 484 crates for Depot 084",
+      "t_ref": "2026-03-01T23:58:35Z"
+    },
+    {
+      "id": "depot-085",
+      "source_id": "depot-085-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 085\ndimension: capacity\nvalue: 485 crates for Depot 085",
+      "t_ref": "2026-03-01T23:58:34Z"
+    },
+    {
+      "id": "depot-086",
+      "source_id": "depot-086-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 086\ndimension: capacity\nvalue: 486 crates for Depot 086",
+      "t_ref": "2026-03-01T23:58:33Z"
+    },
+    {
+      "id": "depot-087",
+      "source_id": "depot-087-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 087\ndimension: capacity\nvalue: 487 crates for Depot 087",
+      "t_ref": "2026-03-01T23:58:32Z"
+    },
+    {
+      "id": "depot-088",
+      "source_id": "depot-088-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 088\ndimension: capacity\nvalue: 488 crates for Depot 088",
+      "t_ref": "2026-03-01T23:58:31Z"
+    },
+    {
+      "id": "depot-089",
+      "source_id": "depot-089-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 089\ndimension: capacity\nvalue: 489 crates for Depot 089",
+      "t_ref": "2026-03-01T23:58:30Z"
+    },
+    {
+      "id": "depot-090",
+      "source_id": "depot-090-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 090\ndimension: capacity\nvalue: 490 crates for Depot 090",
+      "t_ref": "2026-03-01T23:58:29Z"
+    },
+    {
+      "id": "depot-091",
+      "source_id": "depot-091-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 091\ndimension: capacity\nvalue: 491 crates for Depot 091",
+      "t_ref": "2026-03-01T23:58:28Z"
+    },
+    {
+      "id": "depot-092",
+      "source_id": "depot-092-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 092\ndimension: capacity\nvalue: 492 crates for Depot 092",
+      "t_ref": "2026-03-01T23:58:27Z"
+    },
+    {
+      "id": "depot-093",
+      "source_id": "depot-093-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 093\ndimension: capacity\nvalue: 493 crates for Depot 093",
+      "t_ref": "2026-03-01T23:58:26Z"
+    },
+    {
+      "id": "depot-094",
+      "source_id": "depot-094-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 094\ndimension: capacity\nvalue: 494 crates for Depot 094",
+      "t_ref": "2026-03-01T23:58:25Z"
+    },
+    {
+      "id": "depot-095",
+      "source_id": "depot-095-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 095\ndimension: capacity\nvalue: 495 crates for Depot 095",
+      "t_ref": "2026-03-01T23:58:24Z"
+    },
+    {
+      "id": "depot-096",
+      "source_id": "depot-096-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 096\ndimension: capacity\nvalue: 496 crates for Depot 096",
+      "t_ref": "2026-03-01T23:58:23Z"
+    },
+    {
+      "id": "depot-097",
+      "source_id": "depot-097-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 097\ndimension: capacity\nvalue: 497 crates for Depot 097",
+      "t_ref": "2026-03-01T23:58:22Z"
+    },
+    {
+      "id": "depot-098",
+      "source_id": "depot-098-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 098\ndimension: capacity\nvalue: 498 crates for Depot 098",
+      "t_ref": "2026-03-01T23:58:21Z"
+    },
+    {
+      "id": "depot-099",
+      "source_id": "depot-099-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 099\ndimension: capacity\nvalue: 499 crates for Depot 099",
+      "t_ref": "2026-03-01T23:58:20Z"
+    },
+    {
+      "id": "depot-100",
+      "source_id": "depot-100-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 100\ndimension: capacity\nvalue: 500 crates for Depot 100",
+      "t_ref": "2026-03-01T23:58:19Z"
+    },
+    {
+      "id": "depot-101",
+      "source_id": "depot-101-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 101\ndimension: capacity\nvalue: 501 crates for Depot 101",
+      "t_ref": "2026-03-01T23:58:18Z"
+    },
+    {
+      "id": "depot-102",
+      "source_id": "depot-102-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 102\ndimension: capacity\nvalue: 502 crates for Depot 102",
+      "t_ref": "2026-03-01T23:58:17Z"
+    },
+    {
+      "id": "depot-103",
+      "source_id": "depot-103-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 103\ndimension: capacity\nvalue: 503 crates for Depot 103",
+      "t_ref": "2026-03-01T23:58:16Z"
+    },
+    {
+      "id": "depot-104",
+      "source_id": "depot-104-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 104\ndimension: capacity\nvalue: 504 crates for Depot 104",
+      "t_ref": "2026-03-01T23:58:15Z"
+    },
+    {
+      "id": "depot-105",
+      "source_id": "depot-105-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 105\ndimension: capacity\nvalue: 505 crates for Depot 105",
+      "t_ref": "2026-03-01T23:58:14Z"
+    },
+    {
+      "id": "depot-106",
+      "source_id": "depot-106-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 106\ndimension: capacity\nvalue: 506 crates for Depot 106",
+      "t_ref": "2026-03-01T23:58:13Z"
+    },
+    {
+      "id": "depot-107",
+      "source_id": "depot-107-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 107\ndimension: capacity\nvalue: 507 crates for Depot 107",
+      "t_ref": "2026-03-01T23:58:12Z"
+    },
+    {
+      "id": "depot-108",
+      "source_id": "depot-108-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 108\ndimension: capacity\nvalue: 508 crates for Depot 108",
+      "t_ref": "2026-03-01T23:58:11Z"
+    },
+    {
+      "id": "depot-109",
+      "source_id": "depot-109-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 109\ndimension: capacity\nvalue: 509 crates for Depot 109",
+      "t_ref": "2026-03-01T23:58:10Z"
+    },
+    {
+      "id": "depot-110",
+      "source_id": "depot-110-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 110\ndimension: capacity\nvalue: 510 crates for Depot 110",
+      "t_ref": "2026-03-01T23:58:09Z"
+    },
+    {
+      "id": "depot-111",
+      "source_id": "depot-111-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 111\ndimension: capacity\nvalue: 511 crates for Depot 111",
+      "t_ref": "2026-03-01T23:58:08Z"
+    },
+    {
+      "id": "depot-112",
+      "source_id": "depot-112-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 112\ndimension: capacity\nvalue: 512 crates for Depot 112",
+      "t_ref": "2026-03-01T23:58:07Z"
+    },
+    {
+      "id": "depot-113",
+      "source_id": "depot-113-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 113\ndimension: capacity\nvalue: 513 crates for Depot 113",
+      "t_ref": "2026-03-01T23:58:06Z"
+    },
+    {
+      "id": "depot-114",
+      "source_id": "depot-114-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 114\ndimension: capacity\nvalue: 514 crates for Depot 114",
+      "t_ref": "2026-03-01T23:58:05Z"
+    },
+    {
+      "id": "depot-115",
+      "source_id": "depot-115-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 115\ndimension: capacity\nvalue: 515 crates for Depot 115",
+      "t_ref": "2026-03-01T23:58:04Z"
+    },
+    {
+      "id": "depot-116",
+      "source_id": "depot-116-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 116\ndimension: capacity\nvalue: 516 crates for Depot 116",
+      "t_ref": "2026-03-01T23:58:03Z"
+    },
+    {
+      "id": "depot-117",
+      "source_id": "depot-117-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 117\ndimension: capacity\nvalue: 517 crates for Depot 117",
+      "t_ref": "2026-03-01T23:58:02Z"
+    },
+    {
+      "id": "depot-118",
+      "source_id": "depot-118-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 118\ndimension: capacity\nvalue: 518 crates for Depot 118",
+      "t_ref": "2026-03-01T23:58:01Z"
+    },
+    {
+      "id": "depot-119",
+      "source_id": "depot-119-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 119\ndimension: capacity\nvalue: 519 crates for Depot 119",
+      "t_ref": "2026-03-01T23:58:00Z"
+    },
+    {
+      "id": "depot-120",
+      "source_id": "depot-120-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 120\ndimension: capacity\nvalue: 520 crates for Depot 120",
+      "t_ref": "2026-03-01T23:57:59Z"
+    },
+    {
+      "id": "depot-121",
+      "source_id": "depot-121-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 121\ndimension: capacity\nvalue: 521 crates for Depot 121",
+      "t_ref": "2026-03-01T23:57:58Z"
+    },
+    {
+      "id": "depot-122",
+      "source_id": "depot-122-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 122\ndimension: capacity\nvalue: 522 crates for Depot 122",
+      "t_ref": "2026-03-01T23:57:57Z"
+    },
+    {
+      "id": "depot-123",
+      "source_id": "depot-123-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 123\ndimension: capacity\nvalue: 523 crates for Depot 123",
+      "t_ref": "2026-03-01T23:57:56Z"
+    },
+    {
+      "id": "depot-124",
+      "source_id": "depot-124-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 124\ndimension: capacity\nvalue: 524 crates for Depot 124",
+      "t_ref": "2026-03-01T23:57:55Z"
+    },
+    {
+      "id": "depot-125",
+      "source_id": "depot-125-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 125\ndimension: capacity\nvalue: 525 crates for Depot 125",
+      "t_ref": "2026-03-01T23:57:54Z"
+    },
+    {
+      "id": "depot-126",
+      "source_id": "depot-126-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 126\ndimension: capacity\nvalue: 526 crates for Depot 126",
+      "t_ref": "2026-03-01T23:57:53Z"
+    },
+    {
+      "id": "depot-127",
+      "source_id": "depot-127-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 127\ndimension: capacity\nvalue: 527 crates for Depot 127",
+      "t_ref": "2026-03-01T23:57:52Z"
+    },
+    {
+      "id": "depot-128",
+      "source_id": "depot-128-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 128\ndimension: capacity\nvalue: 528 crates for Depot 128",
+      "t_ref": "2026-03-01T23:57:51Z"
+    },
+    {
+      "id": "depot-129",
+      "source_id": "depot-129-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 129\ndimension: capacity\nvalue: 529 crates for Depot 129",
+      "t_ref": "2026-03-01T23:57:50Z"
+    },
+    {
+      "id": "depot-130",
+      "source_id": "depot-130-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 130\ndimension: capacity\nvalue: 530 crates for Depot 130",
+      "t_ref": "2026-03-01T23:57:49Z"
+    },
+    {
+      "id": "depot-131",
+      "source_id": "depot-131-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 131\ndimension: capacity\nvalue: 531 crates for Depot 131",
+      "t_ref": "2026-03-01T23:57:48Z"
+    },
+    {
+      "id": "depot-132",
+      "source_id": "depot-132-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 132\ndimension: capacity\nvalue: 532 crates for Depot 132",
+      "t_ref": "2026-03-01T23:57:47Z"
+    },
+    {
+      "id": "depot-133",
+      "source_id": "depot-133-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 133\ndimension: capacity\nvalue: 533 crates for Depot 133",
+      "t_ref": "2026-03-01T23:57:46Z"
+    },
+    {
+      "id": "depot-134",
+      "source_id": "depot-134-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 134\ndimension: capacity\nvalue: 534 crates for Depot 134",
+      "t_ref": "2026-03-01T23:57:45Z"
+    },
+    {
+      "id": "depot-135",
+      "source_id": "depot-135-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 135\ndimension: capacity\nvalue: 535 crates for Depot 135",
+      "t_ref": "2026-03-01T23:57:44Z"
+    },
+    {
+      "id": "depot-136",
+      "source_id": "depot-136-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 136\ndimension: capacity\nvalue: 536 crates for Depot 136",
+      "t_ref": "2026-03-01T23:57:43Z"
+    },
+    {
+      "id": "depot-137",
+      "source_id": "depot-137-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 137\ndimension: capacity\nvalue: 537 crates for Depot 137",
+      "t_ref": "2026-03-01T23:57:42Z"
+    },
+    {
+      "id": "depot-138",
+      "source_id": "depot-138-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 138\ndimension: capacity\nvalue: 538 crates for Depot 138",
+      "t_ref": "2026-03-01T23:57:41Z"
+    },
+    {
+      "id": "depot-139",
+      "source_id": "depot-139-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 139\ndimension: capacity\nvalue: 539 crates for Depot 139",
+      "t_ref": "2026-03-01T23:57:40Z"
+    },
+    {
+      "id": "depot-140",
+      "source_id": "depot-140-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 140\ndimension: capacity\nvalue: 540 crates for Depot 140",
+      "t_ref": "2026-03-01T23:57:39Z"
+    },
+    {
+      "id": "depot-141",
+      "source_id": "depot-141-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 141\ndimension: capacity\nvalue: 541 crates for Depot 141",
+      "t_ref": "2026-03-01T23:57:38Z"
+    },
+    {
+      "id": "depot-142",
+      "source_id": "depot-142-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 142\ndimension: capacity\nvalue: 542 crates for Depot 142",
+      "t_ref": "2026-03-01T23:57:37Z"
+    },
+    {
+      "id": "depot-143",
+      "source_id": "depot-143-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 143\ndimension: capacity\nvalue: 543 crates for Depot 143",
+      "t_ref": "2026-03-01T23:57:36Z"
+    },
+    {
+      "id": "depot-144",
+      "source_id": "depot-144-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 144\ndimension: capacity\nvalue: 544 crates for Depot 144",
+      "t_ref": "2026-03-01T23:57:35Z"
+    },
+    {
+      "id": "depot-145",
+      "source_id": "depot-145-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 145\ndimension: capacity\nvalue: 545 crates for Depot 145",
+      "t_ref": "2026-03-01T23:57:34Z"
+    },
+    {
+      "id": "depot-146",
+      "source_id": "depot-146-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 146\ndimension: capacity\nvalue: 546 crates for Depot 146",
+      "t_ref": "2026-03-01T23:57:33Z"
+    },
+    {
+      "id": "depot-147",
+      "source_id": "depot-147-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 147\ndimension: capacity\nvalue: 547 crates for Depot 147",
+      "t_ref": "2026-03-01T23:57:32Z"
+    },
+    {
+      "id": "depot-148",
+      "source_id": "depot-148-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 148\ndimension: capacity\nvalue: 548 crates for Depot 148",
+      "t_ref": "2026-03-01T23:57:31Z"
+    },
+    {
+      "id": "depot-149",
+      "source_id": "depot-149-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 149\ndimension: capacity\nvalue: 549 crates for Depot 149",
+      "t_ref": "2026-03-01T23:57:30Z"
+    },
+    {
+      "id": "depot-150",
+      "source_id": "depot-150-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 150\ndimension: capacity\nvalue: 550 crates for Depot 150",
+      "t_ref": "2026-03-01T23:57:29Z"
+    },
+    {
+      "id": "depot-151",
+      "source_id": "depot-151-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 151\ndimension: capacity\nvalue: 551 crates for Depot 151",
+      "t_ref": "2026-03-01T23:57:28Z"
+    },
+    {
+      "id": "depot-152",
+      "source_id": "depot-152-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 152\ndimension: capacity\nvalue: 552 crates for Depot 152",
+      "t_ref": "2026-03-01T23:57:27Z"
+    },
+    {
+      "id": "depot-153",
+      "source_id": "depot-153-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 153\ndimension: capacity\nvalue: 553 crates for Depot 153",
+      "t_ref": "2026-03-01T23:57:26Z"
+    },
+    {
+      "id": "depot-154",
+      "source_id": "depot-154-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 154\ndimension: capacity\nvalue: 554 crates for Depot 154",
+      "t_ref": "2026-03-01T23:57:25Z"
+    },
+    {
+      "id": "depot-155",
+      "source_id": "depot-155-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 155\ndimension: capacity\nvalue: 555 crates for Depot 155",
+      "t_ref": "2026-03-01T23:57:24Z"
+    },
+    {
+      "id": "depot-156",
+      "source_id": "depot-156-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 156\ndimension: capacity\nvalue: 556 crates for Depot 156",
+      "t_ref": "2026-03-01T23:57:23Z"
+    },
+    {
+      "id": "depot-157",
+      "source_id": "depot-157-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 157\ndimension: capacity\nvalue: 557 crates for Depot 157",
+      "t_ref": "2026-03-01T23:57:22Z"
+    },
+    {
+      "id": "depot-158",
+      "source_id": "depot-158-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 158\ndimension: capacity\nvalue: 558 crates for Depot 158",
+      "t_ref": "2026-03-01T23:57:21Z"
+    },
+    {
+      "id": "depot-159",
+      "source_id": "depot-159-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 159\ndimension: capacity\nvalue: 559 crates for Depot 159",
+      "t_ref": "2026-03-01T23:57:20Z"
+    },
+    {
+      "id": "depot-160",
+      "source_id": "depot-160-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 160\ndimension: capacity\nvalue: 560 crates for Depot 160",
+      "t_ref": "2026-03-01T23:57:19Z"
+    },
+    {
+      "id": "depot-161",
+      "source_id": "depot-161-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 161\ndimension: capacity\nvalue: 561 crates for Depot 161",
+      "t_ref": "2026-03-01T23:57:18Z"
+    },
+    {
+      "id": "depot-162",
+      "source_id": "depot-162-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 162\ndimension: capacity\nvalue: 562 crates for Depot 162",
+      "t_ref": "2026-03-01T23:57:17Z"
+    },
+    {
+      "id": "depot-163",
+      "source_id": "depot-163-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 163\ndimension: capacity\nvalue: 563 crates for Depot 163",
+      "t_ref": "2026-03-01T23:57:16Z"
+    },
+    {
+      "id": "depot-164",
+      "source_id": "depot-164-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 164\ndimension: capacity\nvalue: 564 crates for Depot 164",
+      "t_ref": "2026-03-01T23:57:15Z"
+    },
+    {
+      "id": "depot-165",
+      "source_id": "depot-165-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 165\ndimension: capacity\nvalue: 565 crates for Depot 165",
+      "t_ref": "2026-03-01T23:57:14Z"
+    },
+    {
+      "id": "depot-166",
+      "source_id": "depot-166-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 166\ndimension: capacity\nvalue: 566 crates for Depot 166",
+      "t_ref": "2026-03-01T23:57:13Z"
+    },
+    {
+      "id": "depot-167",
+      "source_id": "depot-167-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 167\ndimension: capacity\nvalue: 567 crates for Depot 167",
+      "t_ref": "2026-03-01T23:57:12Z"
+    },
+    {
+      "id": "depot-168",
+      "source_id": "depot-168-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 168\ndimension: capacity\nvalue: 568 crates for Depot 168",
+      "t_ref": "2026-03-01T23:57:11Z"
+    },
+    {
+      "id": "depot-169",
+      "source_id": "depot-169-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 169\ndimension: capacity\nvalue: 569 crates for Depot 169",
+      "t_ref": "2026-03-01T23:57:10Z"
+    },
+    {
+      "id": "depot-170",
+      "source_id": "depot-170-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 170\ndimension: capacity\nvalue: 570 crates for Depot 170",
+      "t_ref": "2026-03-01T23:57:09Z"
+    },
+    {
+      "id": "depot-171",
+      "source_id": "depot-171-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 171\ndimension: capacity\nvalue: 571 crates for Depot 171",
+      "t_ref": "2026-03-01T23:57:08Z"
+    },
+    {
+      "id": "depot-172",
+      "source_id": "depot-172-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 172\ndimension: capacity\nvalue: 572 crates for Depot 172",
+      "t_ref": "2026-03-01T23:57:07Z"
+    },
+    {
+      "id": "depot-173",
+      "source_id": "depot-173-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 173\ndimension: capacity\nvalue: 573 crates for Depot 173",
+      "t_ref": "2026-03-01T23:57:06Z"
+    },
+    {
+      "id": "depot-174",
+      "source_id": "depot-174-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 174\ndimension: capacity\nvalue: 574 crates for Depot 174",
+      "t_ref": "2026-03-01T23:57:05Z"
+    },
+    {
+      "id": "depot-175",
+      "source_id": "depot-175-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 175\ndimension: capacity\nvalue: 575 crates for Depot 175",
+      "t_ref": "2026-03-01T23:57:04Z"
+    },
+    {
+      "id": "depot-176",
+      "source_id": "depot-176-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 176\ndimension: capacity\nvalue: 576 crates for Depot 176",
+      "t_ref": "2026-03-01T23:57:03Z"
+    },
+    {
+      "id": "depot-177",
+      "source_id": "depot-177-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 177\ndimension: capacity\nvalue: 577 crates for Depot 177",
+      "t_ref": "2026-03-01T23:57:02Z"
+    },
+    {
+      "id": "depot-178",
+      "source_id": "depot-178-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 178\ndimension: capacity\nvalue: 578 crates for Depot 178",
+      "t_ref": "2026-03-01T23:57:01Z"
+    },
+    {
+      "id": "depot-179",
+      "source_id": "depot-179-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 179\ndimension: capacity\nvalue: 579 crates for Depot 179",
+      "t_ref": "2026-03-01T23:57:00Z"
+    },
+    {
+      "id": "depot-180",
+      "source_id": "depot-180-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 180\ndimension: capacity\nvalue: 580 crates for Depot 180",
+      "t_ref": "2026-03-01T23:56:59Z"
+    },
+    {
+      "id": "depot-181",
+      "source_id": "depot-181-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 181\ndimension: capacity\nvalue: 581 crates for Depot 181",
+      "t_ref": "2026-03-01T23:56:58Z"
+    },
+    {
+      "id": "depot-182",
+      "source_id": "depot-182-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 182\ndimension: capacity\nvalue: 582 crates for Depot 182",
+      "t_ref": "2026-03-01T23:56:57Z"
+    },
+    {
+      "id": "depot-183",
+      "source_id": "depot-183-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 183\ndimension: capacity\nvalue: 583 crates for Depot 183",
+      "t_ref": "2026-03-01T23:56:56Z"
+    },
+    {
+      "id": "depot-184",
+      "source_id": "depot-184-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 184\ndimension: capacity\nvalue: 584 crates for Depot 184",
+      "t_ref": "2026-03-01T23:56:55Z"
+    },
+    {
+      "id": "depot-185",
+      "source_id": "depot-185-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 185\ndimension: capacity\nvalue: 585 crates for Depot 185",
+      "t_ref": "2026-03-01T23:56:54Z"
+    },
+    {
+      "id": "depot-186",
+      "source_id": "depot-186-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 186\ndimension: capacity\nvalue: 586 crates for Depot 186",
+      "t_ref": "2026-03-01T23:56:53Z"
+    },
+    {
+      "id": "depot-187",
+      "source_id": "depot-187-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 187\ndimension: capacity\nvalue: 587 crates for Depot 187",
+      "t_ref": "2026-03-01T23:56:52Z"
+    },
+    {
+      "id": "depot-188",
+      "source_id": "depot-188-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 188\ndimension: capacity\nvalue: 588 crates for Depot 188",
+      "t_ref": "2026-03-01T23:56:51Z"
+    },
+    {
+      "id": "depot-189",
+      "source_id": "depot-189-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 189\ndimension: capacity\nvalue: 589 crates for Depot 189",
+      "t_ref": "2026-03-01T23:56:50Z"
+    },
+    {
+      "id": "depot-190",
+      "source_id": "depot-190-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 190\ndimension: capacity\nvalue: 590 crates for Depot 190",
+      "t_ref": "2026-03-01T23:56:49Z"
+    },
+    {
+      "id": "depot-191",
+      "source_id": "depot-191-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 191\ndimension: capacity\nvalue: 591 crates for Depot 191",
+      "t_ref": "2026-03-01T23:56:48Z"
+    },
+    {
+      "id": "depot-192",
+      "source_id": "depot-192-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 192\ndimension: capacity\nvalue: 592 crates for Depot 192",
+      "t_ref": "2026-03-01T23:56:47Z"
+    },
+    {
+      "id": "depot-193",
+      "source_id": "depot-193-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 193\ndimension: capacity\nvalue: 593 crates for Depot 193",
+      "t_ref": "2026-03-01T23:56:46Z"
+    },
+    {
+      "id": "depot-194",
+      "source_id": "depot-194-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 194\ndimension: capacity\nvalue: 594 crates for Depot 194",
+      "t_ref": "2026-03-01T23:56:45Z"
+    },
+    {
+      "id": "depot-195",
+      "source_id": "depot-195-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 195\ndimension: capacity\nvalue: 595 crates for Depot 195",
+      "t_ref": "2026-03-01T23:56:44Z"
+    },
+    {
+      "id": "depot-196",
+      "source_id": "depot-196-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 196\ndimension: capacity\nvalue: 596 crates for Depot 196",
+      "t_ref": "2026-03-01T23:56:43Z"
+    },
+    {
+      "id": "depot-197",
+      "source_id": "depot-197-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 197\ndimension: capacity\nvalue: 597 crates for Depot 197",
+      "t_ref": "2026-03-01T23:56:42Z"
+    },
+    {
+      "id": "depot-198",
+      "source_id": "depot-198-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 198\ndimension: capacity\nvalue: 598 crates for Depot 198",
+      "t_ref": "2026-03-01T23:56:41Z"
+    },
+    {
+      "id": "depot-199",
+      "source_id": "depot-199-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 199\ndimension: capacity\nvalue: 599 crates for Depot 199",
+      "t_ref": "2026-03-01T23:56:40Z"
+    },
+    {
+      "id": "depot-200",
+      "source_id": "depot-200-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 200\ndimension: capacity\nvalue: 600 crates for Depot 200",
+      "t_ref": "2026-03-01T23:56:39Z"
+    },
+    {
+      "id": "depot-201",
+      "source_id": "depot-201-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 201\ndimension: capacity\nvalue: 601 crates for Depot 201",
+      "t_ref": "2026-03-01T23:56:38Z"
+    },
+    {
+      "id": "depot-202",
+      "source_id": "depot-202-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 202\ndimension: capacity\nvalue: 602 crates for Depot 202",
+      "t_ref": "2026-03-01T23:56:37Z"
+    },
+    {
+      "id": "depot-203",
+      "source_id": "depot-203-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 203\ndimension: capacity\nvalue: 603 crates for Depot 203",
+      "t_ref": "2026-03-01T23:56:36Z"
+    },
+    {
+      "id": "depot-204",
+      "source_id": "depot-204-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 204\ndimension: capacity\nvalue: 604 crates for Depot 204",
+      "t_ref": "2026-03-01T23:56:35Z"
+    },
+    {
+      "id": "depot-205",
+      "source_id": "depot-205-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 205\ndimension: capacity\nvalue: 605 crates for Depot 205",
+      "t_ref": "2026-03-01T23:56:34Z"
+    },
+    {
+      "id": "depot-206",
+      "source_id": "depot-206-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 206\ndimension: capacity\nvalue: 606 crates for Depot 206",
+      "t_ref": "2026-03-01T23:56:33Z"
+    },
+    {
+      "id": "depot-207",
+      "source_id": "depot-207-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 207\ndimension: capacity\nvalue: 607 crates for Depot 207",
+      "t_ref": "2026-03-01T23:56:32Z"
+    },
+    {
+      "id": "depot-208",
+      "source_id": "depot-208-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 208\ndimension: capacity\nvalue: 608 crates for Depot 208",
+      "t_ref": "2026-03-01T23:56:31Z"
+    },
+    {
+      "id": "depot-209",
+      "source_id": "depot-209-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 209\ndimension: capacity\nvalue: 609 crates for Depot 209",
+      "t_ref": "2026-03-01T23:56:30Z"
+    },
+    {
+      "id": "depot-210",
+      "source_id": "depot-210-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 210\ndimension: capacity\nvalue: 610 crates for Depot 210",
+      "t_ref": "2026-03-01T23:56:29Z"
+    },
+    {
+      "id": "depot-211",
+      "source_id": "depot-211-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 211\ndimension: capacity\nvalue: 611 crates for Depot 211",
+      "t_ref": "2026-03-01T23:56:28Z"
+    },
+    {
+      "id": "depot-212",
+      "source_id": "depot-212-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 212\ndimension: capacity\nvalue: 612 crates for Depot 212",
+      "t_ref": "2026-03-01T23:56:27Z"
+    },
+    {
+      "id": "depot-213",
+      "source_id": "depot-213-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 213\ndimension: capacity\nvalue: 613 crates for Depot 213",
+      "t_ref": "2026-03-01T23:56:26Z"
+    },
+    {
+      "id": "depot-214",
+      "source_id": "depot-214-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 214\ndimension: capacity\nvalue: 614 crates for Depot 214",
+      "t_ref": "2026-03-01T23:56:25Z"
+    },
+    {
+      "id": "depot-215",
+      "source_id": "depot-215-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 215\ndimension: capacity\nvalue: 615 crates for Depot 215",
+      "t_ref": "2026-03-01T23:56:24Z"
+    },
+    {
+      "id": "depot-216",
+      "source_id": "depot-216-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 216\ndimension: capacity\nvalue: 616 crates for Depot 216",
+      "t_ref": "2026-03-01T23:56:23Z"
+    },
+    {
+      "id": "depot-217",
+      "source_id": "depot-217-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 217\ndimension: capacity\nvalue: 617 crates for Depot 217",
+      "t_ref": "2026-03-01T23:56:22Z"
+    },
+    {
+      "id": "depot-218",
+      "source_id": "depot-218-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 218\ndimension: capacity\nvalue: 618 crates for Depot 218",
+      "t_ref": "2026-03-01T23:56:21Z"
+    },
+    {
+      "id": "depot-219",
+      "source_id": "depot-219-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 219\ndimension: capacity\nvalue: 619 crates for Depot 219",
+      "t_ref": "2026-03-01T23:56:20Z"
+    },
+    {
+      "id": "depot-220",
+      "source_id": "depot-220-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 220\ndimension: capacity\nvalue: 620 crates for Depot 220",
+      "t_ref": "2026-03-01T23:56:19Z"
+    },
+    {
+      "id": "depot-221",
+      "source_id": "depot-221-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 221\ndimension: capacity\nvalue: 621 crates for Depot 221",
+      "t_ref": "2026-03-01T23:56:18Z"
+    },
+    {
+      "id": "depot-222",
+      "source_id": "depot-222-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 222\ndimension: capacity\nvalue: 622 crates for Depot 222",
+      "t_ref": "2026-03-01T23:56:17Z"
+    },
+    {
+      "id": "depot-223",
+      "source_id": "depot-223-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 223\ndimension: capacity\nvalue: 623 crates for Depot 223",
+      "t_ref": "2026-03-01T23:56:16Z"
+    },
+    {
+      "id": "depot-224",
+      "source_id": "depot-224-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 224\ndimension: capacity\nvalue: 624 crates for Depot 224",
+      "t_ref": "2026-03-01T23:56:15Z"
+    },
+    {
+      "id": "depot-225",
+      "source_id": "depot-225-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 225\ndimension: capacity\nvalue: 625 crates for Depot 225",
+      "t_ref": "2026-03-01T23:56:14Z"
+    },
+    {
+      "id": "depot-226",
+      "source_id": "depot-226-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 226\ndimension: capacity\nvalue: 626 crates for Depot 226",
+      "t_ref": "2026-03-01T23:56:13Z"
+    },
+    {
+      "id": "depot-227",
+      "source_id": "depot-227-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 227\ndimension: capacity\nvalue: 627 crates for Depot 227",
+      "t_ref": "2026-03-01T23:56:12Z"
+    },
+    {
+      "id": "depot-228",
+      "source_id": "depot-228-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 228\ndimension: capacity\nvalue: 628 crates for Depot 228",
+      "t_ref": "2026-03-01T23:56:11Z"
+    },
+    {
+      "id": "depot-229",
+      "source_id": "depot-229-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 229\ndimension: capacity\nvalue: 629 crates for Depot 229",
+      "t_ref": "2026-03-01T23:56:10Z"
+    },
+    {
+      "id": "depot-230",
+      "source_id": "depot-230-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 230\ndimension: capacity\nvalue: 630 crates for Depot 230",
+      "t_ref": "2026-03-01T23:56:09Z"
+    },
+    {
+      "id": "depot-231",
+      "source_id": "depot-231-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 231\ndimension: capacity\nvalue: 631 crates for Depot 231",
+      "t_ref": "2026-03-01T23:56:08Z"
+    },
+    {
+      "id": "depot-232",
+      "source_id": "depot-232-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 232\ndimension: capacity\nvalue: 632 crates for Depot 232",
+      "t_ref": "2026-03-01T23:56:07Z"
+    },
+    {
+      "id": "depot-233",
+      "source_id": "depot-233-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 233\ndimension: capacity\nvalue: 633 crates for Depot 233",
+      "t_ref": "2026-03-01T23:56:06Z"
+    },
+    {
+      "id": "depot-234",
+      "source_id": "depot-234-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 234\ndimension: capacity\nvalue: 634 crates for Depot 234",
+      "t_ref": "2026-03-01T23:56:05Z"
+    },
+    {
+      "id": "depot-235",
+      "source_id": "depot-235-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 235\ndimension: capacity\nvalue: 635 crates for Depot 235",
+      "t_ref": "2026-03-01T23:56:04Z"
+    },
+    {
+      "id": "depot-236",
+      "source_id": "depot-236-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 236\ndimension: capacity\nvalue: 636 crates for Depot 236",
+      "t_ref": "2026-03-01T23:56:03Z"
+    },
+    {
+      "id": "depot-237",
+      "source_id": "depot-237-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 237\ndimension: capacity\nvalue: 637 crates for Depot 237",
+      "t_ref": "2026-03-01T23:56:02Z"
+    },
+    {
+      "id": "depot-238",
+      "source_id": "depot-238-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 238\ndimension: capacity\nvalue: 638 crates for Depot 238",
+      "t_ref": "2026-03-01T23:56:01Z"
+    },
+    {
+      "id": "depot-239",
+      "source_id": "depot-239-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 239\ndimension: capacity\nvalue: 639 crates for Depot 239",
+      "t_ref": "2026-03-01T23:56:00Z"
+    },
+    {
+      "id": "depot-240",
+      "source_id": "depot-240-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 240\ndimension: capacity\nvalue: 640 crates for Depot 240",
+      "t_ref": "2026-03-01T23:55:59Z"
+    },
+    {
+      "id": "depot-241",
+      "source_id": "depot-241-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 241\ndimension: capacity\nvalue: 641 crates for Depot 241",
+      "t_ref": "2026-03-01T23:55:58Z"
+    },
+    {
+      "id": "depot-242",
+      "source_id": "depot-242-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 242\ndimension: capacity\nvalue: 642 crates for Depot 242",
+      "t_ref": "2026-03-01T23:55:57Z"
+    },
+    {
+      "id": "depot-243",
+      "source_id": "depot-243-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 243\ndimension: capacity\nvalue: 643 crates for Depot 243",
+      "t_ref": "2026-03-01T23:55:56Z"
+    },
+    {
+      "id": "depot-244",
+      "source_id": "depot-244-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 244\ndimension: capacity\nvalue: 644 crates for Depot 244",
+      "t_ref": "2026-03-01T23:55:55Z"
+    },
+    {
+      "id": "depot-245",
+      "source_id": "depot-245-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 245\ndimension: capacity\nvalue: 645 crates for Depot 245",
+      "t_ref": "2026-03-01T23:55:54Z"
+    },
+    {
+      "id": "depot-246",
+      "source_id": "depot-246-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 246\ndimension: capacity\nvalue: 646 crates for Depot 246",
+      "t_ref": "2026-03-01T23:55:53Z"
+    },
+    {
+      "id": "depot-247",
+      "source_id": "depot-247-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 247\ndimension: capacity\nvalue: 647 crates for Depot 247",
+      "t_ref": "2026-03-01T23:55:52Z"
+    },
+    {
+      "id": "depot-248",
+      "source_id": "depot-248-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 248\ndimension: capacity\nvalue: 648 crates for Depot 248",
+      "t_ref": "2026-03-01T23:55:51Z"
+    },
+    {
+      "id": "depot-249",
+      "source_id": "depot-249-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Depot 249\ndimension: capacity\nvalue: 649 crates for Depot 249",
+      "t_ref": "2026-03-01T23:55:50Z"
+    },
+    {
+      "id": "ordinary-record",
+      "source_id": "ordinary-record-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Ash Warehouse\ndimension: capacity\nvalue: 64 crates for Ash Warehouse",
+      "t_ref": "2026-03-01T00:00:00Z"
+    }
+  ]
+}

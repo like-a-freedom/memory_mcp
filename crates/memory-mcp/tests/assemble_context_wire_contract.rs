@@ -485,3 +485,75 @@ async fn latest_revision(database: &impl memory_mcp::storage::DbClient) -> i64 {
         .and_then(|row| row["latest_revision"].as_i64())
         .expect("revision clock row")
 }
+
+#[tokio::test]
+async fn historical_large_history_replay_excludes_a_late_backdated_correction() {
+    use chrono::{TimeDelta, TimeZone};
+
+    let memory = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(memory.service).unwrap();
+    let valid_at = Utc.with_ymd_and_hms(2026, 3, 2, 0, 0, 0).unwrap();
+    let original = common::ingest_episode(
+        &service,
+        "warehouse-ledger",
+        "subject: Copper Warehouse\ndimension: capacity\nvalue: 42 crates for Copper Warehouse",
+    )
+    .await;
+    for index in 0..250 {
+        common::seed_fact_at(
+            &service,
+            "wire-contract",
+            &format!("subject: Depot {index:03}\ndimension: capacity\nvalue: 16 crates"),
+            valid_at - TimeDelta::seconds(index + 1),
+        )
+        .await;
+    }
+
+    let request = |revision| {
+        let mut request = params("What capacity was recorded for Copper Warehouse?", true);
+        request.valid_at = Some(valid_at.to_rfc3339());
+        request.known_revision = revision;
+        request
+    };
+    let checkpoint = assemble_context(&service, request(None))
+        .await
+        .unwrap()
+        .context
+        .expect("revision-bounded metadata")
+        .snapshot
+        .known_revision;
+    let original_read = assemble_context(&service, request(Some(checkpoint)))
+        .await
+        .unwrap();
+    let original_metadata = original_read.context.expect("revision-bounded metadata");
+    assert!(original_metadata.candidate_scan_truncated);
+    assert_eq!(
+        original_metadata.completeness,
+        memory_mcp::models::ContextCompleteness::Partial,
+    );
+    assert_eq!(original_read.result[0]["source_episode"], original);
+    let revision = original_metadata.snapshot.known_revision;
+
+    let correction = common::ingest_episode(
+        &service,
+        "warehouse-correction",
+        "subject: Copper Warehouse\ndimension: capacity\nvalue: 48 crates, correction reported for Copper Warehouse",
+    )
+    .await;
+
+    let replay = assemble_context(&service, request(Some(revision)))
+        .await
+        .unwrap();
+    assert_eq!(replay.result, original_read.result);
+    assert_eq!(replay.context.as_ref(), Some(&original_metadata));
+
+    let latest = assemble_context(&service, request(None)).await.unwrap();
+    assert!(
+        latest
+            .result
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["source_episode"] == correction)
+    );
+}

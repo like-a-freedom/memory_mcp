@@ -267,3 +267,122 @@ async fn historical_ranking_does_not_use_future_fts_statistics() {
         "future corpus statistics cannot reorder a fixed revision"
     );
 }
+
+#[tokio::test]
+async fn historical_249_facts_fit_candidate_scan() {
+    assert_historical_scan_boundary(249, 249, false).await;
+}
+
+async fn assert_historical_scan_boundary(seed_count: u32, expected_count: usize, truncated: bool) {
+    use std::collections::BTreeSet;
+
+    use chrono::TimeDelta;
+    use memory_mcp::models::ContextCompleteness;
+
+    let memory = common::TestMemory::new(false).await;
+    let valid_at = Utc.with_ymd_and_hms(2026, 3, 2, 0, 0, 0).unwrap();
+    for index in 0..seed_count {
+        common::seed_fact_at(
+            &memory.service,
+            "main",
+            &format!("Independent inventory note {index:03}"),
+            valid_at - TimeDelta::seconds(i64::from(index) + 1),
+        )
+        .await;
+    }
+    let result = AssembleContextCapability::assemble_context_temporal_from_service(
+        &memory.service,
+        AssembleContextRequest {
+            budget: 250,
+            ..request("")
+        },
+        TemporalContextQuery {
+            valid_at: Some(valid_at),
+            known_at: None,
+            known_revision: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let metadata = result.metadata.expect("revision-bounded context metadata");
+    assert_eq!(result.items.len(), expected_count);
+    let distinct: BTreeSet<_> = result.items.iter().map(|item| &item.fact_id).collect();
+    assert_eq!(distinct.len(), expected_count);
+    assert_eq!(metadata.candidate_scan_truncated, truncated);
+    assert_eq!(metadata.completeness, ContextCompleteness::Partial);
+}
+
+#[tokio::test]
+async fn historical_250_facts_fit_candidate_scan() {
+    assert_historical_scan_boundary(250, 250, false).await;
+}
+
+#[tokio::test]
+async fn historical_251_facts_report_truncated_scan() {
+    assert_historical_scan_boundary(251, 250, true).await;
+}
+
+#[tokio::test]
+async fn historical_old_declared_subject_survives_distractor_history() {
+    use chrono::TimeDelta;
+    use memory_mcp::models::ContextCompleteness;
+
+    let memory = common::TestMemory::new(false).await;
+    let valid_at = Utc.with_ymd_and_hms(2026, 3, 2, 0, 0, 0).unwrap();
+    let content =
+        "subject: Copper Warehouse\ndimension: capacity\nvalue: 42 crates for Copper Warehouse";
+    let target = common::seed_fact_at(
+        &memory.service,
+        "main",
+        content,
+        valid_at - TimeDelta::days(1),
+    )
+    .await;
+    for index in 0..250 {
+        common::seed_fact_at(
+            &memory.service,
+            "main",
+            &format!("subject: Depot {index:03}\ndimension: capacity\nvalue: 16 crates"),
+            valid_at - TimeDelta::seconds(index + 1),
+        )
+        .await;
+    }
+    let cutoff = TemporalContextQuery {
+        valid_at: Some(valid_at),
+        known_at: None,
+        known_revision: None,
+    };
+    let exact = AssembleContextCapability::assemble_context_temporal_from_service(
+        &memory.service,
+        request("Copper Warehouse"),
+        cutoff,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        exact.items[0].fact_id, target,
+        "exact-query visibility control"
+    );
+
+    let observed = AssembleContextCapability::assemble_context_temporal_from_service(
+        &memory.service,
+        request("What capacity was recorded for Copper Warehouse?"),
+        cutoff,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        observed
+            .items
+            .iter()
+            .map(|item| item.fact_id.as_str())
+            .collect::<Vec<_>>(),
+        [target.as_str()],
+    );
+    let metadata = observed
+        .metadata
+        .expect("revision-bounded context metadata");
+    assert_eq!(metadata.completeness, ContextCompleteness::Partial);
+    assert!(metadata.candidate_scan_truncated);
+}
