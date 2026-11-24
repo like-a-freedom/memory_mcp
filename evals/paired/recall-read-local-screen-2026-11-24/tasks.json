@@ -1,0 +1,138 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "recall",
+        "family_id": "alder-ordinary",
+        "case_id": "alder-ordinary",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "What cabinet stores the Alder calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "ledger",
+          "source_id": "alder-ordinary-ledger",
+          "source_type": "document",
+          "content": "The Alder calibration key is stored in Cabinet-28.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": null,
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "recall",
+        "family_id": "birch-conflict",
+        "case_id": "birch-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Which cabinet does the Birch signed ledger assign to the calibration key?",
+      "seed_episodes": [
+        {
+          "event_id": "ledger",
+          "source_id": "birch-conflict-ledger",
+          "source_type": "document",
+          "content": "The Birch calibration key is stored in Cabinet-43.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        {
+          "event_id": "note",
+          "source_id": "birch-conflict-note",
+          "source_type": "document",
+          "content": "The Birch calibration key is stored in Cabinet-72.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-43"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": null,
+          "required_claim_annotation_alternatives": [
+            [
+              {
+                "source_event_id": "ledger",
+                "evidence_status": "conflicting"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "recall",
+        "family_id": "cedar-history",
+        "case_id": "cedar-history",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "At revision {{KNOWN_REVISION}} and valid time 2026-05-01T10:00:00Z, where was the Cedar calibration key stored?",
+      "knowledge_before_event_id": "correction",
+      "seed_episodes": [
+        {
+          "event_id": "ledger",
+          "source_id": "cedar-history-ledger",
+          "source_type": "document",
+          "content": "The Cedar calibration key is stored in Cabinet-16.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        {
+          "event_id": "correction",
+          "source_id": "cedar-history-correction",
+          "source_type": "document",
+          "content": "The Cedar calibration key is stored in Cabinet-51.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-16"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-05-01T10:00:00Z",
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    }
+  ]
+}

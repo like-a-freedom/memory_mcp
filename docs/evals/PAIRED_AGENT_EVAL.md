@@ -1410,3 +1410,30 @@ reply at that snapshot. Legacy observations replay without the new fields.
 Keep observations and task manifests private. Published artifacts contain the
 scoring outcomes and trace hashes. Task acceptance and independent probe
 results retain their existing scoring rules.
+
+
+### Registered recall controls
+
+Pass `--recall-read-mode live` or `--recall-read-mode fixed-reply` to
+`run-paired-chat-completions` with an exploratory plan, a recall task manifest
+and a tool-call budget of one. Fixed mode also requires `--fixed-read-inputs`.
+Each registration pins a trial key, arm, public `assemble_context` arguments,
+expected returned source-event set and optional completeness. Both modes use
+the trial's seeded database and the public tool schema. The model's attempted
+request remains in the trace as a digest. In fixed mode the executed request
+comes from the registration, and the validated MCP result is delivered under
+the model's original call ID.
+
+Set `reader_config_sha256` to the SHA-256 of compact JSON
+`["recall-read/v1",mode,entries]`. Order entries by trial key, then incumbent
+before candidate, and sort each entry's expected event IDs. Serialize each
+entry as `key, arm, arguments, expected_source_events, expected_completeness`
+in that order, with the key fields in the same order as `expected_trials`
+and argument object keys sorted. Use JSON `null` for unknown completeness and
+an empty entry list for live mode. Keep these runs outside promotion comparisons.
+
+The [November 24 local diagnostic screen](../../evals/paired/recall-read-local-screen-2026-11-24/report.md)
+recovered the registered source and snapshot with fixed reply in both
+historical trials. Neither mode produced a passing final answer. The
+ordinary and contradiction cases did not reach a memory read. The earlier
+qualification decision remains NO-GO.
