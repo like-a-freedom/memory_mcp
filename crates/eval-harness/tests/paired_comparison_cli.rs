@@ -990,6 +990,49 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     );
     assert_eq!(unavailable["receipts"][0]["read_diagnostics"], json!([]));
 
+    let mut retried = v4.clone();
+    let retry = &mut retried["incumbent"]["trials"][0]["observation"];
+    let trace = retry["trace"].as_array_mut().unwrap();
+    let mut request = trace[1].clone();
+    let mut response = trace[2].clone();
+    request["call_id"] = json!("retry");
+    response["call_id"] = json!("retry");
+    trace[2]["kind"] = json!("tool_error");
+    trace[2]["error_class"] = json!("unknown");
+    trace.splice(3..3, [request, response]);
+    for (index, event) in trace.iter_mut().enumerate() {
+        event["sequence"] = json!(index + 1);
+    }
+    retry["tool_calls"] = json!(2);
+    retry["memory_reads"] = json!([
+        {"request_sequence":2,"response_sequence":3,"outcome":"failed","item_count":null},
+        {"request_sequence":4,"response_sequence":5,"outcome":"nonempty","item_count":1}
+    ]);
+    write_json(&observations_path, &retried);
+    let retry_run = directory.path().join("v4-retry");
+    let output = score(&retry_run);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let retry_artifact: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(retry_run.join("incumbent.json")).unwrap()).unwrap();
+    let receipt = &retry_artifact["receipts"][0];
+    assert_eq!(receipt["task_oracle_passed"], true);
+    assert_eq!(receipt["read_diagnostics"][0]["outcome"], "failed");
+    assert_eq!(receipt["read_diagnostics"][1]["outcome"], "nonempty");
+
+    let reads = &mut retried["incumbent"]["trials"][0]["observation"]["memory_reads"];
+    reads[0]["response_sequence"] = json!(5);
+    reads[1]["response_sequence"] = json!(3);
+    write_json(&observations_path, &retried);
+    let swapped_run = directory.path().join("v4-swapped");
+    let output = score(&swapped_run);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("read/reply association"));
+    assert!(!swapped_run.exists());
+
     v4["incumbent"]["trials"][0]["observation"]["trace"][2]["call_id"] = json!("different-read");
     write_json(&observations_path, &v4);
     let mismatch = directory.path().join("v4-mismatch");
