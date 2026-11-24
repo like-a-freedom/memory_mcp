@@ -1,0 +1,99 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-native-profile/v1",
+  "host": "Darwin arm64",
+  "upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+  "manifest_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+  "adapter_commit": "608afdb8",
+  "binary_sha256": "2b338ba88f846c9638d05e958cf7f8b4acaa87d57da576a8e98d5fe3c73b2860",
+  "memory": {
+    "formation_method": "ordered-segments-v1",
+    "store": "embedded, shared web build then private snapshot copy per query",
+    "ner": "default Anno rules, 1048576 byte extraction limit",
+    "embeddings": "disabled",
+    "valid_time": "fixed surrogate 2000-01-01 UTC",
+    "transaction_time": "product wall clock during build; reuse the snapshot for scoring and replay"
+  },
+  "runtime": {
+    "provider": "independent loopback OpenAI-compatible endpoints",
+    "local_runtime": {
+      "mlx_lm": "0.32.2",
+      "mlx": "0.32.4"
+    },
+    "reader_temperature": 0,
+    "judge_server_default_temperature": 0,
+    "request_timeout_seconds": 30,
+    "upstream_sdk_max_retries": 10,
+    "reader_concurrency": 1,
+    "max_completion_tokens": 256,
+    "memory_context_max_tokens": 4096,
+    "scored_pass_wall_limit_seconds": 1200,
+    "external_model_cost": 0
+  },
+  "processor": {
+    "checkpoint": "Qwen/Qwen3.5-9B",
+    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "files": {
+      "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+      "config.json": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+      "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+      "preprocessor_config.json": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+      "video_preprocessor_config.json": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+      "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+    }
+  },
+  "models": {
+    "reader": {
+      "checkpoint": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "files": {
+        "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+        "config.json": "14b65a0ee06517060a6bbd979bb1a8ff54e7b304b1a1f01d54344b88b8285e85",
+        "generation_config.json": "e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e",
+        "model-00001-of-00003.safetensors": "471a9a81b54dddbfef43e8a71960ca24ad3c727891c6b0750a9db9a214aab504",
+        "model-00002-of-00003.safetensors": "e7474b8f968f4078dfd4889925961c5b0da9939219b614dba08eb63c46590de7",
+        "model-00003-of-00003.safetensors": "1038989bed1346ecdb541a45c078df2aae99a9509f35bfd51e7a04802a5d8402",
+        "model.safetensors.index.json": "13b840162b4cb35c66fef7df072f7dbb4717908204364f5e5d9f9655a2758fa8",
+        "preprocessor_config.json": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+        "processor_config.json": "45fc17c8dd2474af6b493b52483c26c0584b0082d368c480f9fa611e73070040",
+        "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+        "tokenizer_config.json": "47a7a8371379b07650b22f3c8a78c32fed85c4e35ea88e3da0c4b7a7611e8082",
+        "video_preprocessor_config.json": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+        "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+      }
+    },
+    "judge": {
+      "checkpoint": "ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+      "files": {
+        "chat_template.jinja": "182e77dd83bd8e9ca818b240b82e28f243762cd5dda32e6eef327df7b1cd107e",
+        "config.json": "fc27b922c3506e955271c68120be9079ad8bba7266c8086c02dfbb8c98723bd5",
+        "generation_config.json": "e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e",
+        "model-00001-of-00004.safetensors": "f0b2b03fb3eecf84096ee5abb213c99e9c3725f9947004a01999dc5cc55ebdd9",
+        "model-00002-of-00004.safetensors": "971b1935112c4221616ddab04ead15d50b3c489754e619d74304dc4f64d034dc",
+        "model-00003-of-00004.safetensors": "041377369466c48cb486ce2911c3cce638b8702080bb39113a7cf190632f5529",
+        "model-00004-of-00004.safetensors": "d1088c7f6e9d705a253d3049bf7308704ccf1f4099cf40678ff077da88f0184b",
+        "model.safetensors.index.json": "c118f13c0dcb729e4ca2e3d653ab193067551eb1a6410badb5192eb426104f36",
+        "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+        "tokenizer_config.json": "386ba246ba3dfa4d3a21d8bc8712eba38de558e5ac94c2c90436d8f94d519d5e"
+      }
+    }
+  },
+  "judge_calibration": {
+    "rule": "accept the reference and reject a deliberately false premise-following answer for each selected abstention case",
+    "cases": {
+      "89a20f48": [
+        true,
+        false
+      ],
+      "922a0c56": [
+        true,
+        false
+      ],
+      "f43926d9": [
+        true,
+        false
+      ]
+    }
+  }
+}

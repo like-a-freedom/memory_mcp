@@ -217,7 +217,7 @@ the OpenAI Chat Completions protocol. A standalone MLX-LM server on Apple
 Silicon is one option. Run it with local weights and `HF_HUB_OFFLINE=1`.
 Before scoring, stage the pinned upstream Qwen3.5‑9B processor assets in
 an isolated `HF_HOME` cache and set its offline `refs/main` to the recorded
-revision. The Qwen processor measures input context. Reader and judge
+revision in the [native run profile](small-web-native-profile.json). The Qwen processor measures input context. Reader and judge
 inference use the separately configured models.
 
 The observer leaves upstream reader prompts, scoring, fallback behavior

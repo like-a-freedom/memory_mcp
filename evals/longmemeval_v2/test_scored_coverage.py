@@ -1,10 +1,11 @@
+import argparse
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
-from evals.longmemeval_v2.scored_coverage import run_observed
+from evals.longmemeval_v2.scored_coverage import loopback_endpoint, run_observed
 
 
 class ScoredCoverageTests(unittest.TestCase):
@@ -29,8 +30,8 @@ class ScoredCoverageTests(unittest.TestCase):
             def main():
                 import asyncio
                 asyncio.run(reader_phase())
-                (output / "per_question.jsonl").write_text('{"question_id":"a","score":0}\n')
-                (output / "aggregated_metrics.json").write_text('{"overall":{"overall_full_set":0,"count_all_questions":1}}')
+                (output / "per_question.jsonl").write_text('{"question_id":"a","score":1}\n')
+                (output / "aggregated_metrics.json").write_text('{"overall":{"overall_full_set":1,"count_all_questions":1}}')
 
             harness = SimpleNamespace(main=main, call_reader_model_async=reader,
                                       generate_all_reader_outputs=generate,
@@ -40,6 +41,7 @@ class ScoredCoverageTests(unittest.TestCase):
             self.assertEqual(report["cases"], {"a": "reader_timeout"})
             self.assertEqual(report["covered_case_count"], 0)
             self.assertEqual(report["native_scored_case_count"], 1)
+            self.assertEqual(report["coverage_adjusted_success_rate"], 0.0)
             self.assertEqual(report["official_metrics_status"], "emitted")
 
     def test_judge_abort_records_exact_case_and_preserves_unscored_suffix(self):
@@ -61,3 +63,8 @@ class ScoredCoverageTests(unittest.TestCase):
             report = json.loads((output / "score-coverage.json").read_text())
             self.assertEqual(report["cases"], {"a": "scored", "b": "judge_error", "c": "unscored"})
             self.assertEqual(report["official_metrics_status"], "unavailable")
+
+
+    def test_remote_reader_or_judge_endpoint_is_refused(self):
+        with self.assertRaisesRegex(argparse.ArgumentTypeError, "loopback"):
+            loopback_endpoint("http://192.0.2.1:8000/v1")
