@@ -455,3 +455,41 @@ async fn historical_transliterated_alias_reports_omitted_expansion() {
         serde_json::to_value(before).unwrap()
     );
 }
+
+#[tokio::test]
+async fn historical_explicit_subject_matches_case_variant() {
+    let memory = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(memory.service).unwrap();
+    let target = common::ingest_episode(
+        &service,
+        "copper-ledger",
+        "subject: Copper Warehouse\ndimension: capacity\nvalue: 42 crates for Copper Warehouse",
+    )
+    .await;
+    common::ingest_episode(
+        &service,
+        "neighbor-ledger",
+        "subject: Copper Warehouse West\ndimension: capacity\nvalue: 48 crates for Copper Warehouse West",
+    )
+    .await;
+    let result = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("What capacity was recorded for COPPER WAREHOUSE?"),
+        TemporalContextQuery {
+            valid_at: Some(Utc.with_ymd_and_hms(2026, 3, 2, 0, 0, 0).unwrap()),
+            known_at: None,
+            known_revision: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        result
+            .items
+            .iter()
+            .map(|item| item.source_episode.as_str())
+            .collect::<Vec<_>>(),
+        [target.as_str()],
+    );
+    assert!(result.items[0].reconciliation.is_none());
+}

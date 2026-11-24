@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-mcp-deterministic-acceptance/v1",
+  "corpus_sha256": "b48d032531a9d2d70e1be9914714b1419cbb922ca24e98ba3cf0990c8ebcd391",
+  "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+  "score_channel": "evidence_enabled_temporal",
+  "families": {
+    "uppercase": "uppercase",
+    "title-case": "title-case",
+    "neighbor": "neighbor"
+  },
+  "ordinary_cases": ["title-case", "neighbor"],
+  "minimum_gain_basis_points": 3333,
+  "maximum_items": 5
+}

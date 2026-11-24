@@ -1,0 +1,44 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "uppercase",
+      "family_id": "uppercase",
+      "event_ids": [
+        "old-record",
+        "west-record"
+      ],
+      "query": "What capacity was recorded for COPPER WAREHOUSE?",
+      "valid_at": "2026-03-02T00:00:00Z",
+      "temporal_diagnostic_as_of": "2026-03-02T00:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "title-case",
+      "family_id": "title-case",
+      "event_ids": [
+        "old-record",
+        "west-record"
+      ],
+      "query": "What capacity was recorded for Copper Warehouse?",
+      "valid_at": "2026-03-02T00:00:00Z",
+      "temporal_diagnostic_as_of": "2026-03-02T00:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "neighbor",
+      "family_id": "neighbor",
+      "event_ids": [
+        "old-record",
+        "west-record"
+      ],
+      "query": "What capacity was recorded for Copper Warehouse West?",
+      "valid_at": "2026-03-02T00:00:00Z",
+      "temporal_diagnostic_as_of": "2026-03-02T00:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    }
+  ]
+}

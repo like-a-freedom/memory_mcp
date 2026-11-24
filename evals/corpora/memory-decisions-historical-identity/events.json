@@ -1,0 +1,19 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "old-record",
+      "source_id": "old-record-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Copper Warehouse\ndimension: capacity\nvalue: 42 crates for Copper Warehouse",
+      "t_ref": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": "west-record",
+      "source_id": "west-record-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Copper Warehouse West\ndimension: capacity\nvalue: 48 crates for Copper Warehouse West",
+      "t_ref": "2026-03-01T00:00:00Z"
+    }
+  ]
+}

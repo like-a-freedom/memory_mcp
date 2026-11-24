@@ -249,6 +249,24 @@ fn query_requests_shared_personal_relief(query: &str, subject_terms: &[String]) 
 }
 
 fn inferred_subject_terms(query: &str) -> Vec<String> {
+    inferred_subject_terms_with_case(query, false)
+}
+
+fn is_uppercase_subject_word(token: &str) -> bool {
+    token.chars().filter(|c| c.is_alphabetic()).count() >= 2
+        && token
+            .chars()
+            .filter(|c| c.is_alphabetic())
+            .all(char::is_uppercase)
+}
+
+fn is_subject_word(token: &str, allow_uppercase: bool) -> bool {
+    token.chars().next().is_some_and(char::is_uppercase)
+        && (token.chars().skip(1).any(char::is_lowercase)
+            || (allow_uppercase && is_uppercase_subject_word(token)))
+}
+
+fn inferred_subject_terms_with_case(query: &str, allow_uppercase: bool) -> Vec<String> {
     const SUBJECT_QUERY_FRAME_TERMS: &[&str] = &[
         "what",
         "which",
@@ -322,8 +340,7 @@ fn inferred_subject_terms(query: &str) -> Vec<String> {
                             .iter()
                             .any(|cue| preceding.eq_ignore_ascii_case(cue))
                     })
-                    && token.chars().next().is_some_and(char::is_uppercase)
-                    && token.chars().skip(1).any(char::is_lowercase)
+                    && is_subject_word(token, allow_uppercase)
                     && !NON_PERSON_PROPER_NOUNS
                         .iter()
                         .any(|excluded| token.eq_ignore_ascii_case(excluded))
@@ -335,15 +352,18 @@ fn inferred_subject_terms(query: &str) -> Vec<String> {
 
 /// A single explicit subject, using the same admission rule as historical reads.
 pub(super) fn explicit_query_subject(query: &str) -> Option<String> {
-    let inferred = inferred_subject_terms(query);
     let tokens = query
         .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>();
-    let proper = |token: &str| {
-        token.chars().next().is_some_and(char::is_uppercase)
-            && token.chars().skip(1).any(char::is_lowercase)
-    };
+    // A run of uppercase words can be a named subject in a mixed-case
+    // question. Keep standalone acronyms and all-caps queries ambiguous.
+    let allow_uppercase = query.chars().any(char::is_lowercase)
+        && tokens
+            .windows(2)
+            .any(|pair| pair.iter().all(|token| is_uppercase_subject_word(token)));
+    let inferred = inferred_subject_terms_with_case(query, allow_uppercase);
+    let proper = |token: &str| is_subject_word(token, allow_uppercase);
     let numeric = |token: &str| token.chars().all(|c| c.is_ascii_digit());
     let direct = inferred.is_empty()
         && tokens.iter().any(|s| proper(s))

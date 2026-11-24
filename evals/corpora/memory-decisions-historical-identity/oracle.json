@@ -1,0 +1,56 @@
+{
+  "schema_version": "memory-decisions-oracle/v2",
+  "oracles": [
+    {
+      "probe_id": "uppercase",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "old-record"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "old-record": "42 crates"
+      },
+      "forbidden_event_ids": [
+        "west-record"
+      ]
+    },
+    {
+      "probe_id": "title-case",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "old-record"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "old-record": "42 crates"
+      },
+      "forbidden_event_ids": [
+        "west-record"
+      ]
+    },
+    {
+      "probe_id": "neighbor",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "west-record"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "west-record": "48 crates"
+      },
+      "forbidden_event_ids": [
+        "old-record"
+      ]
+    }
+  ]
+}
