@@ -1958,6 +1958,7 @@ mod tests {
             final_answer: None,
             memory_source_episode_ids,
             memory_reads: None,
+            read_capture_status: None,
             memory_write_episode_ids: vec!["episode:formed".into()],
             extract_fact_evidence: vec![],
             extract_fact_evidence_telemetry_complete: false,

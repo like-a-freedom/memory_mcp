@@ -877,7 +877,10 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         assert!(artifact.receipts.iter().all(|receipt| {
             receipt.direct_memory_success && receipt.task_oracle_passed == task_passed
         }));
-        assert!(!String::from_utf8_lossy(&first_bytes).contains("Juniper"));
+        let legacy = String::from_utf8_lossy(&first_bytes);
+        assert!(!legacy.contains("Juniper"));
+        assert!(!legacy.contains("read_capture_status"));
+        assert!(!legacy.contains("read_diagnostics"));
     }
     observations["schema_version"] = json!("memory-mcp-agent-observations/v2");
     write_json(&observations_path, &observations);
@@ -933,6 +936,67 @@ fn scores_external_observations_offline_using_the_private_oracle() {
             .contains("observations v2 cannot contain v3 final-answer diagnostics")
     );
     assert!(!invalid_v2.exists());
+
+    let mut v4 = valid_observations.clone();
+    v4["schema_version"] = json!("memory-mcp-agent-observations/v4");
+    for arm in ["incumbent", "candidate"] {
+        for trial in v4[arm]["trials"].as_array_mut().unwrap() {
+            trial["observation"]["read_capture_status"] = json!("observed");
+            trial["observation"]["memory_reads"] = json!([{
+                "request_sequence":2,"response_sequence":3,"outcome":"nonempty","item_count":1
+            }]);
+        }
+    }
+    write_json(&observations_path, &v4);
+    let v4_run = directory.path().join("v4-linked");
+    let output = score(&v4_run);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let v4_bytes = std::fs::read(v4_run.join("incumbent.json")).unwrap();
+    let artifact: serde_json::Value = serde_json::from_slice(&v4_bytes).unwrap();
+    assert_eq!(artifact["schema_version"], "memory-mcp-agent-paired/v7");
+    let replay = directory.path().join("v4-replay");
+    assert!(score(&replay).status.success());
+    assert_eq!(
+        v4_bytes,
+        std::fs::read(replay.join("incumbent.json")).unwrap()
+    );
+
+    assert_eq!(artifact["receipts"][0]["read_capture_status"], "observed");
+    assert_eq!(
+        artifact["receipts"][0]["read_diagnostics"][0]["item_count"],
+        1
+    );
+    let mut missing = v4.clone();
+    missing["incumbent"]["trials"][0]["observation"]["memory_reads"] = json!([]);
+    write_json(&observations_path, &missing);
+    let missing_run = directory.path().join("v4-missing-read");
+    assert_eq!(score(&missing_run).status.code(), Some(2));
+    assert!(!missing_run.exists());
+
+    missing["incumbent"]["trials"][0]["observation"]["read_capture_status"] = json!("unavailable");
+    write_json(&observations_path, &missing);
+    let unavailable_run = directory.path().join("v4-unavailable");
+    assert!(score(&unavailable_run).status.success());
+    let unavailable: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(unavailable_run.join("incumbent.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        unavailable["receipts"][0]["read_capture_status"],
+        "unavailable"
+    );
+    assert_eq!(unavailable["receipts"][0]["read_diagnostics"], json!([]));
+
+    v4["incumbent"]["trials"][0]["observation"]["trace"][2]["call_id"] = json!("different-read");
+    write_json(&observations_path, &v4);
+    let mismatch = directory.path().join("v4-mismatch");
+    let output = score(&mismatch);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("read/reply association"));
+    assert!(!mismatch.exists());
 
     observations = valid_observations;
     observations["schema_version"] = json!("memory-mcp-agent-observations/v1");
@@ -1011,6 +1075,8 @@ fn run_artifact(
     let receipts = expected_trials
         .iter()
         .map(|key| TrialReceipt {
+            read_capture_status: None,
+            read_diagnostics: None,
             key: key.clone(),
             arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                 1

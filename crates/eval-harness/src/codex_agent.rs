@@ -1655,6 +1655,7 @@ fn parse_codex_jsonl_with_terminal_status(
         final_answer,
         memory_source_episode_ids: memory_source_episode_ids.into_iter().collect(),
         memory_reads: None,
+        read_capture_status: None,
         memory_write_episode_ids: memory_write_episode_ids.into_iter().collect(),
         extract_fact_evidence,
         extract_fact_evidence_telemetry_complete: true,

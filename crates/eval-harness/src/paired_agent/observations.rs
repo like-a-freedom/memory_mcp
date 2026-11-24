@@ -18,6 +18,7 @@ use crate::paired::{
 
 pub const OBSERVATIONS_SCHEMA_V1: &str = "memory-mcp-agent-observations/v1";
 pub const OBSERVATIONS_SCHEMA_V2: &str = "memory-mcp-agent-observations/v2";
+pub const OBSERVATIONS_SCHEMA_V4: &str = "memory-mcp-agent-observations/v4";
 pub const OBSERVATIONS_SCHEMA_V3: &str = "memory-mcp-agent-observations/v3";
 
 /// Export the plan-bound inputs a runner needs without exposing expected outcomes.
@@ -90,7 +91,10 @@ impl RecordedPair {
     ) -> Result<(PairedRunArtifact, PairedRunArtifact), EvalError> {
         if !matches!(
             self.schema_version.as_str(),
-            OBSERVATIONS_SCHEMA_V1 | OBSERVATIONS_SCHEMA_V2 | OBSERVATIONS_SCHEMA_V3
+            OBSERVATIONS_SCHEMA_V1
+                | OBSERVATIONS_SCHEMA_V2
+                | OBSERVATIONS_SCHEMA_V3
+                | OBSERVATIONS_SCHEMA_V4
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired observations schema {:?}",
@@ -181,6 +185,19 @@ impl RecordedPair {
                 ))
             })?;
             trial.validate(task)?;
+            match (
+                self.schema_version.as_str(),
+                trial.observation.read_capture_status,
+                &trial.observation.memory_reads,
+            ) {
+                (OBSERVATIONS_SCHEMA_V4, Some(_), Some(_)) => {}
+                (version, None, None) if version != OBSERVATIONS_SCHEMA_V4 => {}
+                _ => {
+                    return Err(EvalError::InvalidInput(
+                        "read capture fields do not match observation version".into(),
+                    ));
+                }
+            }
             receipts.push(score_trial(
                 task,
                 trial.arm_order,
@@ -195,7 +212,11 @@ impl RecordedPair {
         let mut expected_trials = plan.expected_trials.clone();
         expected_trials.sort();
         let artifact = PairedRunArtifact {
-            schema_version: PAIRED_ARTIFACT_SCHEMA_V6.into(),
+            schema_version: if self.schema_version == OBSERVATIONS_SCHEMA_V4 {
+                crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
+            } else {
+                PAIRED_ARTIFACT_SCHEMA_V6.into()
+            },
             arm,
             run_id: Some(self.run_id.clone()),
             run_started_at: self.run_started_at,

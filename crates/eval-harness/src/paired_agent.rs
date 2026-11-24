@@ -118,6 +118,8 @@ pub struct AgentObservation {
     pub trace: Vec<AgentTraceEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_reads: Option<Vec<MemoryReadObservation>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_capture_status: Option<ReadCaptureStatus>,
     /// Exact final output text for private scoring.
     pub final_answer: Option<String>,
     /// Source episode IDs observed in successful memory reads.
@@ -171,6 +173,80 @@ pub enum MemoryReadOutcome {
     Empty,
     Nonempty,
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadCaptureStatus {
+    Observed,
+    Partial,
+    Unavailable,
+}
+
+pub(crate) fn validate_read_associations(
+    status: ReadCaptureStatus,
+    reads: &[MemoryReadObservation],
+    trace: &[AgentTraceEvent],
+) -> Result<(), EvalError> {
+    let invalid = || EvalError::InvalidInput("invalid read/reply association or coverage".into());
+    let mut requests = BTreeSet::new();
+    if status == ReadCaptureStatus::Unavailable && !reads.is_empty() {
+        return Err(invalid());
+    }
+    for read in reads {
+        let request = trace
+            .iter()
+            .find(|event| event.sequence == read.request_sequence)
+            .filter(|event| {
+                event.kind == TraceEventKind::MemoryRead
+                    && event.tool_name.as_deref() == Some("assemble_context")
+            })
+            .ok_or_else(invalid)?;
+        if !requests.insert(read.request_sequence) {
+            return Err(invalid());
+        }
+        let mut terminals = trace.iter().filter(|event| {
+            event.call_id == request.call_id
+                && matches!(
+                    event.kind,
+                    TraceEventKind::ToolResponse | TraceEventKind::ToolError
+                )
+        });
+        let terminal = terminals.next();
+        if request.call_id.is_none()
+            || terminals.next().is_some()
+            || terminal.map(|event| event.sequence) != read.response_sequence
+            || terminal.is_some_and(|event| {
+                event.sequence <= request.sequence || event.tool_name != request.tool_name
+            })
+        {
+            return Err(invalid());
+        }
+        let valid = match (
+            terminal.map(|event| event.kind),
+            read.outcome,
+            read.item_count,
+        ) {
+            (Some(TraceEventKind::ToolError), MemoryReadOutcome::Failed, None)
+            | (Some(TraceEventKind::ToolResponse), MemoryReadOutcome::Empty, Some(0))
+            | (Some(TraceEventKind::ToolResponse) | None, MemoryReadOutcome::Unknown, None) => true,
+            (Some(TraceEventKind::ToolResponse), MemoryReadOutcome::Nonempty, Some(count)) => {
+                count > 0
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(invalid());
+        }
+    }
+    if status == ReadCaptureStatus::Observed
+        && trace.iter().any(|event| {
+            event.kind == TraceEventKind::MemoryRead && !requests.contains(&event.sequence)
+        })
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -480,10 +556,14 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                 RunArm::Candidate => &candidate_journal,
             };
             append_receipt_journal(journal_path, &plan_sha256, arm, &receipt)?;
-            match arm {
-                RunArm::Incumbent => incumbent.receipts.push(receipt),
-                RunArm::Candidate => candidate.receipts.push(receipt),
+            let artifact = match arm {
+                RunArm::Incumbent => &mut incumbent,
+                RunArm::Candidate => &mut candidate,
+            };
+            if receipt.read_capture_status.is_some() {
+                artifact.schema_version = crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into();
             }
+            artifact.receipts.push(receipt);
         }
     }
 
@@ -657,7 +737,28 @@ fn score_trial(
         .len();
     let repair_turns = u32::try_from(repair_turns)
         .map_err(|_| EvalError::InvalidInput("repair-turn count overflowed".into()))?;
+    let mut trace = observation.trace.clone();
+    if let (Some(status), Some(reads)) =
+        (observation.read_capture_status, &observation.memory_reads)
+    {
+        validate_read_associations(status, reads, &trace)?;
+        let mut identifiers = BTreeMap::new();
+        for event in &mut trace {
+            if let Some(id) = &mut event.call_id {
+                let next = identifiers.len() + 1;
+                *id = identifiers
+                    .entry(std::mem::take(id))
+                    .or_insert_with(|| format!("call-{next}"))
+                    .clone();
+            }
+        }
+    }
     Ok(TrialReceipt {
+        read_capture_status: observation.read_capture_status,
+        read_diagnostics: observation
+            .memory_reads
+            .clone()
+            .filter(|_| observation.read_capture_status.is_some()),
         key: task.key.clone(),
         arm_order,
         known_revision_checkpoint,
@@ -676,7 +777,7 @@ fn score_trial(
         output_tokens: observation.output_tokens,
         wall_time_ms: observation.wall_time_ms,
         hard_violations: violations.into_iter().collect(),
-        trace: observation.trace.clone(),
+        trace,
     })
 }
 
@@ -819,7 +920,11 @@ fn append_receipt_journal(
     }
     let receipt_bytes = serde_json::to_vec(&(arm, receipt))?;
     let record = JournalRecord {
-        schema_version: RECEIPT_JOURNAL_SCHEMA_V4,
+        schema_version: if receipt.read_capture_status.is_some() {
+            "memory-mcp-agent-trial-receipt/v5"
+        } else {
+            RECEIPT_JOURNAL_SCHEMA_V4
+        },
         plan_sha256,
         arm,
         receipt,
@@ -967,6 +1072,7 @@ mod tests {
                     final_answer: Some(final_answer),
                     memory_source_episode_ids: vec![episode_id.clone()],
                     memory_reads: None,
+                    read_capture_status: None,
                     memory_write_episode_ids: vec![],
                     extract_fact_evidence: vec![],
                     extract_fact_evidence_telemetry_complete: false,
@@ -1647,6 +1753,7 @@ mod tests {
             ),
             memory_source_episode_ids: vec![episode_id.clone()],
             memory_reads: None,
+            read_capture_status: None,
             memory_write_episode_ids: vec![],
             extract_fact_evidence: vec![],
             extract_fact_evidence_telemetry_complete: false,

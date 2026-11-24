@@ -375,6 +375,7 @@ pub const PAIRED_ARTIFACT_SCHEMA_V2: &str = "memory-mcp-agent-paired/v2";
 pub const PAIRED_ARTIFACT_SCHEMA_V3: &str = "memory-mcp-agent-paired/v3";
 pub const PAIRED_ARTIFACT_SCHEMA_V4: &str = "memory-mcp-agent-paired/v4";
 pub const PAIRED_ARTIFACT_SCHEMA_V5: &str = "memory-mcp-agent-paired/v5";
+pub const PAIRED_ARTIFACT_SCHEMA_V7: &str = "memory-mcp-agent-paired/v7";
 pub const PAIRED_ARTIFACT_SCHEMA_V6: &str = "memory-mcp-agent-paired/v6";
 pub const PAIRED_COMPARISON_SCHEMA_V2: &str = "memory-mcp-agent-comparison/v2";
 pub const PAIRED_PLAN_SCHEMA_V2: &str = "memory-mcp-agent-plan/v2";
@@ -502,6 +503,10 @@ pub enum HardViolation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrialReceipt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_capture_status: Option<crate::paired_agent::ReadCaptureStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_diagnostics: Option<Vec<crate::paired_agent::MemoryReadObservation>>,
     pub key: CaseTrialKey,
     /// 1 or 2; the paired comparator requires opposite order in the two arms.
     pub arm_order: u8,
@@ -604,6 +609,7 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V4
                 | PAIRED_ARTIFACT_SCHEMA_V5
                 | PAIRED_ARTIFACT_SCHEMA_V6
+                | PAIRED_ARTIFACT_SCHEMA_V7
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired artifact schema {:?}",
@@ -642,7 +648,7 @@ impl PairedRunArtifact {
         }
         if !matches!(
             self.schema_version.as_str(),
-            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6
+            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
         ) && self
             .receipts
             .iter()
@@ -654,7 +660,7 @@ impl PairedRunArtifact {
         }
         if matches!(
             self.schema_version.as_str(),
-            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6
+            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
         ) && self.receipts.iter().any(|receipt| {
             receipt.status != TrialStatus::Skipped && receipt.task_oracle_diagnostics.is_none()
         }) {
@@ -663,6 +669,23 @@ impl PairedRunArtifact {
             ));
         }
         for receipt in &self.receipts {
+            match (
+                self.schema_version.as_str(),
+                receipt.read_capture_status,
+                &receipt.read_diagnostics,
+            ) {
+                (PAIRED_ARTIFACT_SCHEMA_V7, Some(status), Some(reads)) => {
+                    crate::paired_agent::validate_read_associations(status, reads, &receipt.trace)?;
+                }
+                (PAIRED_ARTIFACT_SCHEMA_V7, None, None)
+                    if receipt.status == TrialStatus::Skipped => {}
+                (version, None, None) if version != PAIRED_ARTIFACT_SCHEMA_V7 => {}
+                _ => {
+                    return Err(EvalError::InvalidInput(
+                        "read diagnostics do not match paired artifact version".into(),
+                    ));
+                }
+            }
             let Some(diagnostics) = &receipt.task_oracle_diagnostics else {
                 continue;
             };
@@ -673,9 +696,11 @@ impl PairedRunArtifact {
                     "paired artifact v5 cannot contain v6 answer-match diagnostics".into(),
                 ));
             }
-            if self.schema_version == PAIRED_ARTIFACT_SCHEMA_V6
-                && diagnostics.accepted_answer_match.is_some()
-                    != diagnostics.final_answer_schema_valid
+            if matches!(
+                self.schema_version.as_str(),
+                PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
+            ) && diagnostics.accepted_answer_match.is_some()
+                != diagnostics.final_answer_schema_valid
             {
                 return Err(EvalError::InvalidInput(
                     "paired artifact v6 requires answer-match diagnostics for every valid final answer".into(),
@@ -3510,6 +3535,8 @@ mod tests {
     fn failed_agent_task_is_charged_the_full_turn_budget() {
         let run = identity("fixed-agent");
         let receipt = TrialReceipt {
+            read_capture_status: None,
+            read_diagnostics: None,
             key: key("history-a", "case-a", 1),
             arm_order: 1,
             known_revision_checkpoint: None,
@@ -4211,6 +4238,8 @@ mod tests {
         let receipts = expected_trials
             .iter()
             .map(|key| TrialReceipt {
+                read_capture_status: None,
+                read_diagnostics: None,
                 key: key.clone(),
                 arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                     1
@@ -4270,6 +4299,8 @@ mod tests {
             .map(|key| {
                 let is_candidate = arm == RunArm::Candidate;
                 TrialReceipt {
+                    read_capture_status: None,
+                    read_diagnostics: None,
                     key: key.clone(),
                     arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                         1

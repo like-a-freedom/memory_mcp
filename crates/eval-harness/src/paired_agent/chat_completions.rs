@@ -307,6 +307,7 @@ impl ChatCompletionsAgent {
             final_answer: None,
             memory_source_episode_ids: Vec::new(),
             memory_reads: Some(Vec::new()),
+            read_capture_status: Some(super::ReadCaptureStatus::Observed),
             memory_write_episode_ids: Vec::new(),
             extract_fact_evidence: Vec::new(),
             extract_fact_evidence_telemetry_complete: matches!(
