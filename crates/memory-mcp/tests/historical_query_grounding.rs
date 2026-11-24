@@ -386,3 +386,72 @@ async fn historical_old_declared_subject_survives_distractor_history() {
     assert_eq!(metadata.completeness, ContextCompleteness::Partial);
     assert!(metadata.candidate_scan_truncated);
 }
+
+#[tokio::test]
+async fn historical_transliterated_alias_reports_omitted_expansion() {
+    use memory_mcp::models::ContextCompleteness;
+
+    let memory = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(memory.service).unwrap();
+    let source = common::ingest_episode(
+        &service,
+        "northern-warehouse",
+        "subject: Северный склад; dimension: capacity; value: 42 crates",
+    )
+    .await;
+    let valid_at = Utc.with_ymd_and_hms(2026, 7, 2, 9, 0, 0).unwrap();
+    let canonical = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("Северный склад"),
+        TemporalContextQuery {
+            valid_at: Some(valid_at),
+            known_at: None,
+            known_revision: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(canonical.items[0].source_episode, source);
+
+    let historical = TemporalContextQuery {
+        valid_at: Some(valid_at),
+        known_at: None,
+        known_revision: Some(canonical.metadata.unwrap().snapshot.known_revision),
+    };
+    let before = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("Severnyi sklad"),
+        historical,
+    )
+    .await
+    .unwrap();
+    common::seed_entity(
+        &memory.db_client,
+        "org",
+        "entity:northern_warehouse",
+        "concept",
+        "Северный склад",
+        &["Severnyi sklad".into()],
+    )
+    .await;
+    let after = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("Severnyi sklad"),
+        historical,
+    )
+    .await
+    .unwrap();
+    assert!(after.items.is_empty());
+    let metadata = after.metadata.as_ref().unwrap();
+    assert_eq!(metadata.completeness, ContextCompleteness::Partial);
+    assert!(
+        metadata
+            .omitted_channels
+            .iter()
+            .any(|channel| channel == "alias expansion")
+    );
+    assert_eq!(
+        serde_json::to_value(after).unwrap(),
+        serde_json::to_value(before).unwrap()
+    );
+}

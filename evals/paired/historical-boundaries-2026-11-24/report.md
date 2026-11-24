@@ -27,6 +27,11 @@ a question ending in `COPPER WAREHOUSE` returned both sources. This gap
 requires its own test and acceptance slice. The bounded search candidate
 keeps the existing subject identity policy.
 
+The transliteration guard retrieved the canonical Cyrillic subject. The
+Latin alias read remained partial and advertised omitted alias expansion.
+Seeding the current alias projection after the checkpoint left the exact
+revision response identical.
+
 The public MCP corpus and acceptance thresholds are registered in
 [the historical boundaries corpus](../../corpora/memory-decisions-historical-boundaries/acceptance.json).
 
