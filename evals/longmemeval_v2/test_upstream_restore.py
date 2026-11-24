@@ -59,11 +59,34 @@ class UpstreamRestoreTests(unittest.TestCase):
 
             restored = load_memory(snapshot)
             self.addCleanup(restored._restored_store.cleanup)
-            items = restored.query("What do I prefer?")
+            queries = ("What do I prefer?", "Which drink do I prefer?")
+            forward = {query: restored.query(query) for query in queries}
+            backward = {query: restored.query(query) for query in reversed(queries)}
 
-            self.assertTrue(any("tea" in item["value"].lower() for item in items))
+            self.assertEqual(forward, backward)
+            self.assertTrue(any("tea" in item["value"].lower() for item in forward[queries[0]]))
             self.assertNotEqual(Path(restored.db_path), original)
             self.assertFalse(original.exists())
+
+    def test_retry_after_restart_preserves_the_retrieved_context(self):
+        from evals.longmemeval_v2.memory_mcp_backend import MemoryMcpBackend
+
+        with TemporaryDirectory() as directory:
+            params = {
+                "binary": os.environ["LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY"],
+                "db_path": directory,
+            }
+            trajectory = {"id": "synthetic-trajectory", "content": "I prefer tea"}
+            first = MemoryMcpBackend(params)
+            first.insert(trajectory)
+            before = first.query("What do I prefer?")
+
+            restarted = MemoryMcpBackend(params)
+            restarted.insert(trajectory)
+            after = restarted.query("What do I prefer?")
+
+            self.assertTrue(any("tea" in item["value"].lower() for item in before))
+            self.assertEqual(after, before)
 
     def test_shared_build_extraction_failure_aborts_before_successful_reads(self):
         with TemporaryDirectory() as directory:

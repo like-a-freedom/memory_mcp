@@ -14,6 +14,7 @@ assemble_context surfaces. It does not seed facts directly.
 """
 
 import argparse
+from contextlib import nullcontext
 import hashlib
 import json
 import os
@@ -123,7 +124,13 @@ class MemoryMcpBackend(Memory):
             items = nested
         if not isinstance(items, list):
             raise RuntimeError("assemble-context response did not contain a list")
-        return [{"type": "text", "value": item.get("content", str(item)) if isinstance(item, dict) else str(item)} for item in items]
+        context = []
+        for item in items:
+            text = item.get("content") if isinstance(item, dict) else item
+            if not isinstance(text, str) or not text.strip():
+                raise RuntimeError("assemble-context item must contain nonempty text")
+            context.append({"type": "text", "value": text})
+        return context
 
     @property
     def stats(self) -> dict:
@@ -191,10 +198,19 @@ class MemoryMcpBackend(Memory):
                 stdin_content = argv[content_index + 1].encode("utf-8")
                 argv[content_index:content_index + 2] = ["--content-stdin"]
             cmd += [subcommand, *argv]
-            result = subprocess.run(
-                cmd, input=stdin_content, capture_output=True, check=True, env=env
+            read_workspace = (
+                TemporaryDirectory(prefix="longmemeval-mcp-read-")
+                if subcommand == "assemble-context" else nullcontext()
             )
-            return result.stdout.decode("utf-8")
+            with read_workspace as directory:
+                if directory is not None:
+                    store = Path(directory) / "store"
+                    shutil.copytree(self.db_path, store)
+                    env["SURREALDB_DATA_DIR"] = str(store)
+                result = subprocess.run(
+                    cmd, input=stdin_content, capture_output=True, check=True, env=env
+                )
+                return result.stdout.decode("utf-8")
 
 
 def _smoke_test() -> None:

@@ -87,6 +87,22 @@ adapter alongside the actual pinned registry also resolved
 `memory_type=memory_mcp` and exposed only the opaque invocation ID in query
 context.
 
+## Independent reads
+
+Each query copies the configured store while the adapter holds its store lock.
+The product reads and updates access counters in the temporary copy, which is
+removed at the end of the query. This prevents one question's reads from
+changing the next question's ranking inputs. The pinned upstream smoke tested
+two questions in both orders after restoring the same snapshot. A native
+retry smoke verified that restarting the adapter and replaying the same input
+preserves the retrieved context.
+
+Snapshot copy time is included in query time. Budget the store size, extra
+disk space and copy throughput before official scoring. Snapshot isolation
+controls persisted read effects. Separately qualify the product clock and
+the complete input and scorer configuration. A successful no-hit read
+returns an empty list. A malformed or blank context item fails explicitly.
+
 ## Small dataset preflight
 
 The [expected hashes](dataset-small.sha256) are from the pinned release.
