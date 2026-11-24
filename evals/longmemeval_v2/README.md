@@ -6,11 +6,20 @@
 
 ```text
 LongMemEval-V2 repository commit:
-  6f020ac2fc3275e46c706d3406e02c3ed79b7be2
+  ef67f10aacd9080c75aeb2dd527a0af25dc26f1b
 
 Hugging Face dataset revision:
   f152293e235517d504809563c833d7190b8c713b
 ```
+
+The previous adapter-smoke pin was `6f020ac2fc3275e46c706d3406e02c3ed79b7be2`. The current
+pin passes only an opaque invocation ID in backend query context. The
+dataset revision is retained. See the [upstream change](https://github.com/xiaowu0162/LongMemEval-V2/commit/ef67f10aacd9080c75aeb2dd527a0af25dc26f1b).
+
+The local smoke exercises the adapter only. Official scoring still
+requires the adapter to be registered in the upstream process before
+configuration is loaded, as well as a frozen dataset cohort, storage
+isolation, and the approved reader and judge configuration.
 
 ## Backend interface
 
@@ -59,3 +68,21 @@ LongMemEval-V2 subset is **not** the full benchmark.
 
 Python dependencies remain isolated from the Rust runtime. The adapter runs
 out-of-process and communicates via the public MCP/CLI surface.
+
+## Verify the upstream query contract
+
+Check out the repository at the commit above. In a Python environment with
+the upstream requirements and `httpx` installed, run its privacy tests
+from the pinned checkout. The registry imports backends that require
+`httpx` directly.
+
+```sh
+PYTHONPATH="$upstream" python -m unittest discover \
+  -s "$upstream/tests" -p test_query_privacy.py
+```
+
+On native Apple Silicon, the seven upstream privacy tests, the four
+adapter tests, and the local CLI integration smoke passed. Importing the
+adapter alongside the actual pinned registry also resolved
+`memory_type=memory_mcp` and exposed only the opaque invocation ID in query
+context.
