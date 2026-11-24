@@ -69,6 +69,7 @@ def run_shared_build(
     report = {
         "schema": "memory-mcp-longmemeval-v2-build-preflight/v1",
         "formation_method": formation_method,
+        "ordered_haystack_ids": mapping[ids[0]],
         "selected_case_ids": ids,
         "selected_case_count": len(ids),
         "affected_case_ids": ids if failed_step else [],

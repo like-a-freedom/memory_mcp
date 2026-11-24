@@ -182,3 +182,49 @@ To reproduce, verify the three dataset hashes, select the largest
 canonical serialization among the Small haystack IDs, and pass it as the
 sole trajectory in a fresh one-question build preflight with that method.
 [Native aggregate](dataset-small-native-preflight.json)
+
+## Local scored Small web subset
+
+[The frozen manifest](small-web-text-cohort.json) registers seven questions
+backed by three complete accessibility-tree observations. Each entry gives
+the trajectory, state, line range and span hash. The staging command checks
+the three pinned dataset hashes and retains the complete ordered 100-trajectory
+web haystack. It emits coverage for all 451 question IDs by domain, type and
+exclusion reason. The selection covers these audited UI behaviors and has
+limited ability and environment breadth.
+
+Run with `PYTHONPATH` pointing to the pinned upstream checkout and this
+repository. Use fresh private output directories for each command.
+
+```bash
+python -m evals.longmemeval_v2.text_cohort \
+  --dataset "$DATASET" --manifest evals/longmemeval_v2/small-web-text-cohort.json \
+  --output "$COHORT"
+python -m evals.longmemeval_v2.build_preflight --domain web \
+  --formation-method ordered-segments-v1 \
+  --questions "$COHORT/questions.json" --haystack "$COHORT/haystack.json" \
+  --trajectories "$COHORT/trajectories.json" --binary "$NATIVE_BINARY" \
+  --output "$BUILD"
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -m evals.longmemeval_v2.scored_coverage \
+  --domain web --questions "$COHORT/questions.json" --haystack "$COHORT/haystack.json" \
+  --trajectories "$COHORT/trajectories.json" --memory-state "$BUILD/memory_state" \
+  --reader-url "$READER_URL" --reader-model "$READER_MODEL" \
+  --judge-url "$JUDGE_URL" --judge-model "$JUDGE_MODEL" --output "$SCORES"
+```
+
+Both endpoints must use explicit loopback HTTP addresses and implement
+the OpenAI Chat Completions protocol. A standalone MLX-LM server on Apple
+Silicon is one option. Run it with local weights and `HF_HUB_OFFLINE=1`.
+Before scoring, stage the pinned upstream Qwen3.5‑9B processor assets in
+an isolated `HF_HOME` cache and set its offline `refs/main` to the recorded
+revision. The Qwen processor measures input context. Reader and judge
+inference use the separately configured models.
+
+The observer leaves upstream reader prompts, scoring, fallback behavior
+and artifacts intact. Its `score-coverage.json` records reader and judge
+errors or timeouts, partial rows and the full selection denominator. If
+upstream scores a fallback, its row remains in the native count and the
+coverage calculation excludes it. If scoring aborts, the incomplete
+suffix remains unscored. When the aggregate exists the observer verifies
+its overall denominator and score from the native case rows. Treat
+`prompt_rows.jsonl` and `per_question.jsonl` as private benchmark artifacts.
