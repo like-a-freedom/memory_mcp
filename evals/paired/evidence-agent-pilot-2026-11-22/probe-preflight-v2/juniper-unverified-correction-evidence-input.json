@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What valve dwell was verified for Juniper Station on June 9, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-09T07:00:00Z",
+  "known_revision": 3,
+  "context_budget": 5,
+  "history_sha256": "833db4a07277e89241d4cd578379118477767692282361b221890f7e19bf4020",
+  "claim_rollout_stage": "evidence"
+}

@@ -1,0 +1,19 @@
+{
+  "provider": "LM Studio local server; provider-neutral OpenAI-compatible Chat Completions adapter",
+  "endpoint": "http://127.0.0.1:1234/v1",
+  "model_id": "memory-local-eval-lfm25",
+  "model_key": "liquid/lfm2.5-1.2b",
+  "reported_parameters": "1.2B",
+  "reported_quantization": "8bit",
+  "size_bytes": 1248488982,
+  "trained_for_tool_use": true,
+  "reported_max_context_length_tokens": 128000,
+  "loaded_context_length_tokens": 16384,
+  "parallel_requests": 1,
+  "lm_studio_cli_commit": "dcefd5a",
+  "model_weights_sha256": null,
+  "server_build_identity": null,
+  "network_boundary": "numeric loopback; synthetic fixture data only",
+  "observed_at_utc": "2026-11-23T11:54:50+00:00",
+  "lm_studio_cli_sha256": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d"
+}

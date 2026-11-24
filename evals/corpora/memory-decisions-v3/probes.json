@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {"id":"cobalt-retroactive-correction","family_id":"cobalt-retroactive-history","event_ids":["cobalt-initial","cobalt-correction"],"query":"What lift capacity was recorded for Cobalt Terminal on June 3, 2026?","valid_at":"2026-06-03T09:00:00Z","temporal_diagnostic_as_of":"2026-06-03T00:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"amber-before-correction","family_id":"amber-prior-knowledge-history","event_ids":["amber-initial","amber-correction"],"knowledge_before_event_id":"amber-correction","query":"Before the correction, what safe temperature was recorded for Amber Silo on June 4, 2026?","valid_at":"2026-06-04T08:00:00Z","temporal_diagnostic_as_of":"2026-06-04T00:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"birch-valid-time-update","family_id":"birch-valid-time-history","event_ids":["birch-initial","birch-update"],"query":"What pressure applied to Birch Pump on June 11, 2026?","valid_at":"2026-06-11T08:00:00Z","temporal_diagnostic_as_of":"2026-06-11T08:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"opal-open-conflict","family_id":"opal-open-conflict-history","event_ids":["opal-initial","opal-peer"],"query":"What occupancy limit was recorded for Opal Cabin on June 7, 2026?","valid_at":"2026-06-07T11:00:00Z","temporal_diagnostic_as_of":"2026-06-07T00:00:00Z","budget":5},
+    {"id":"maple-reversed-conflict","family_id":"maple-reversed-arrival-history","event_ids":["maple-peer","maple-initial"],"query":"What humidity limit was recorded for Maple Vault on June 8, 2026?","valid_at":"2026-06-08T12:00:00Z","temporal_diagnostic_as_of":"2026-06-08T00:00:00Z","budget":5},
+    {"id":"juniper-unverified-correction","family_id":"juniper-unverified-correction-history","event_ids":["juniper-initial","juniper-forum-correction"],"query":"What valve dwell was verified for Juniper Station on June 9, 2026?","valid_at":"2026-06-09T07:00:00Z","temporal_diagnostic_as_of":"2026-06-09T00:00:00Z","budget":5},
+    {"id":"unknown-target","family_id":"unknown-abstention-history","event_ids":["remote-drum"],"query":"What fill level was recorded for Cedar Sluice on June 6, 2026?","valid_at":"2026-06-06T06:00:00Z","temporal_diagnostic_as_of":"2026-06-06T00:00:00Z","budget":5},
+    {"id":"willow-unrelated-distractor","family_id":"unrelated-distractor-history","event_ids":["willow-target","willow-distractor"],"query":"What cycle limit applied to Willow Gate on June 12, 2026?","valid_at":"2026-06-12T09:00:00Z","temporal_diagnostic_as_of":"2026-06-12T00:00:00Z","budget":5},
+    {"id":"stable-repeat","family_id":"stable-repeat-history","event_ids":["stable-marsh-lab"],"query":"Where was Marsh Lab located?","valid_at":"2026-06-20T00:00:00Z","temporal_diagnostic_as_of":"2026-06-20T00:00:00Z","budget":5,"repeat_read":2}
+  ]
+}

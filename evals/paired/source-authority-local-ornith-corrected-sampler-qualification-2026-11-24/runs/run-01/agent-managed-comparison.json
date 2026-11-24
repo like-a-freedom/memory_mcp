@@ -1,0 +1,711 @@
+{
+  "schema_version": "memory-mcp-agent-managed-comparison/v2",
+  "plan_id": "source-authority-local-ornith-35b-a3b-2026-11-24-corrected-sampler-qualification",
+  "plan_sha256": "4a587389dbfe3c54fce9addf6c9f7a4856688ecd62cced1b91f8a727283cc872",
+  "run_id": "86015-1795474107563424000-0",
+  "incumbent_artifact_sha256": "d3f731ace07fb3b30ae41b5575dc9bbb2e8620d8dc51a799aa14f0b9356b0544",
+  "candidate_artifact_sha256": "a35a05775db5b186dd093c60a7c042e7bbd14355e7c336b5e5dd0799251c9117",
+  "incumbent_stage_sha256": "a804490b9a69373a6805ddb996dcf95f9afa27dbdc2617a0cc2a936bdbe43a05",
+  "candidate_stage_sha256": "ed40ceb19d961ba7f7c01b27d3e134462a195366f00fc65e85c23d40f86e7415",
+  "paired_agent_comparison": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "86015-1795474107563424000-0",
+    "run_started_at": "2026-11-23T22:48:27.563435Z",
+    "run_completed_at": "2026-11-23T22:50:21.589294Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "source-authority-local-ornith-35b-a3b-2026-11-24-corrected-sampler-qualification",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "quillforge_registry",
+          "case_id": "quillforge_registry-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "opalwharf_archive",
+          "case_id": "opalwharf_archive-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "foxglove_pier",
+          "case_id": "foxglove_pier-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "larkspur_shed",
+          "case_id": "larkspur_shed-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 4,
+      "shared_identity": {
+        "agent_runner": "openai-compatible-chat-completions",
+        "agent_version": "LM Studio CLI commit dcefd5a; Chat Completions endpoint version unreported",
+        "model": "memory-local-eval-ornith-v2",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+        "task_prompt_sha256": "7535646d1502451a7f9ccb29b2f58e375040a929b8cf43ededd269a9393b280f",
+        "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+        "transport": "stdio",
+        "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+        "reader_config_sha256": "5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a",
+        "judge_config_sha256": null,
+        "corpus_sha256": "4e84b63fe39dbe07ebad1b484ea914aa8924af552c391087379a3a65a804df99",
+        "oracle_sha256": "b5007c2e3ebef3d952531a46c25b6661854930adb9bdf03a9ae41d2f59998dfd",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34",
+        "provider_fingerprints": {
+          "chat_completions_endpoint_config": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+          "chat_completions_sampling_config": "b9aab4410202f83d63f866f617f5988137c48e0b89de5c77f7ba13acc98d38fc",
+          "lmstudio_cli": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+          "memory_eval_cli": "7ff353b41d5cb773fefe36cb804738fa2b72303efbac0fc3bf5b46168db5146e"
+        },
+        "context_budget_tokens": 15360,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 1024,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-ornith-corrected-sampler-qualification",
+        "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-ornith-corrected-sampler-qualification",
+        "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112421,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "4a587389dbfe3c54fce9addf6c9f7a4856688ecd62cced1b91f8a727283cc872",
+    "manifest_sha256": "458e51c72c2b0a81c91745e2665f75025c961cc94a915268fe513d6e7111b5a3",
+    "incumbent_artifact_sha256": "d3f731ace07fb3b30ae41b5575dc9bbb2e8620d8dc51a799aa14f0b9356b0544",
+    "candidate_artifact_sha256": "a35a05775db5b186dd093c60a7c042e7bbd14355e7c336b5e5dd0799251c9117",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.5,
+        "interval": {
+          "estimate": 0.5,
+          "lower": 0.0,
+          "upper": 1.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 1.0,
+          "larkspur_shed": 1.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.5,
+        "interval": {
+          "estimate": 0.5,
+          "lower": 0.0,
+          "upper": 1.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 1.0,
+          "larkspur_shed": 1.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 4.0,
+        "interval": {
+          "estimate": 4.0,
+          "lower": 0.0,
+          "upper": 8.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 8.0,
+          "larkspur_shed": 8.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 3.0,
+        "interval": {
+          "estimate": 3.0,
+          "lower": 0.0,
+          "upper": 6.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 6.0,
+          "larkspur_shed": 6.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 1.0,
+        "interval": {
+          "estimate": 1.0,
+          "lower": 0.0,
+          "upper": 2.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 2.0,
+          "larkspur_shed": 2.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 0.0,
+          "larkspur_shed": 0.0,
+          "opalwharf_archive": 0.0,
+          "quillforge_registry": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 1329.0,
+        "interval": {
+          "estimate": 1329.0,
+          "lower": -7.5,
+          "upper": 2665.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 2918.0,
+          "larkspur_shed": 2413.0,
+          "opalwharf_archive": 14.0,
+          "quillforge_registry": -29.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 140.25,
+        "interval": {
+          "estimate": 140.25,
+          "lower": -20.5,
+          "upper": 395.75,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 526.0,
+          "larkspur_shed": 76.0,
+          "opalwharf_archive": -46.0,
+          "quillforge_registry": 5.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 1817.0,
+        "interval": {
+          "estimate": 1817.0,
+          "lower": -421.25,
+          "upper": 5208.75,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112421,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "foxglove_pier": 6873.0,
+          "larkspur_shed": 1111.0,
+          "opalwharf_archive": -932.0,
+          "quillforge_registry": 216.0
+        }
+      }
+    },
+    "by_stratum": {
+      "conversation_control": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 0.0,
+            "quillforge_registry": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -7.5,
+          "interval": {
+            "estimate": -7.5,
+            "lower": -29.0,
+            "upper": 14.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": 14.0,
+            "quillforge_registry": -29.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -20.5,
+          "interval": {
+            "estimate": -20.5,
+            "lower": -46.0,
+            "upper": 5.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": -46.0,
+            "quillforge_registry": 5.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": -358.0,
+          "interval": {
+            "estimate": -358.0,
+            "lower": -932.0,
+            "upper": 216.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "opalwharf_archive": -932.0,
+            "quillforge_registry": 216.0
+          }
+        }
+      },
+      "source_file_import": {
+        "direct_memory_success": {
+          "estimate": 1.0,
+          "interval": {
+            "estimate": 1.0,
+            "lower": 1.0,
+            "upper": 1.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 1.0,
+            "larkspur_shed": 1.0
+          }
+        },
+        "task_success": {
+          "estimate": 1.0,
+          "interval": {
+            "estimate": 1.0,
+            "lower": 1.0,
+            "upper": 1.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 1.0,
+            "larkspur_shed": 1.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 8.0,
+          "interval": {
+            "estimate": 8.0,
+            "lower": 8.0,
+            "upper": 8.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 8.0,
+            "larkspur_shed": 8.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 6.0,
+          "interval": {
+            "estimate": 6.0,
+            "lower": 6.0,
+            "upper": 6.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 6.0,
+            "larkspur_shed": 6.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 2.0,
+          "interval": {
+            "estimate": 2.0,
+            "lower": 2.0,
+            "upper": 2.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 2.0,
+            "larkspur_shed": 2.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 0.0,
+            "larkspur_shed": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 2665.5,
+          "interval": {
+            "estimate": 2665.5,
+            "lower": 2413.0,
+            "upper": 2918.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 2918.0,
+            "larkspur_shed": 2413.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 301.0,
+          "interval": {
+            "estimate": 301.0,
+            "lower": 76.0,
+            "upper": 526.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 526.0,
+            "larkspur_shed": 76.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 3992.0,
+          "interval": {
+            "estimate": 3992.0,
+            "lower": 1111.0,
+            "upper": 6873.0,
+            "independent_clusters": 2,
+            "draws": 10000,
+            "seed": 2026112421,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "foxglove_pier": 6873.0,
+            "larkspur_shed": 1111.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 4,
+    "independent_family_count": 4,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "conversation_control": {
+        "incumbent_first": 1,
+        "candidate_first": 1
+      },
+      "source_file_import": {
+        "incumbent_first": 1,
+        "candidate_first": 1
+      }
+    }
+  },
+  "incumbent": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 1,
+      "modelfailure": 3
+    },
+    "formation_turns_total": 6,
+    "formation_tool_calls_total": 2,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 5636,
+    "formation_output_tokens_total": 540,
+    "formation_wall_time_ms_total": 7658,
+    "retained_store_bytes_total": 136839476,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/ingest": {
+        "attempts": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 1,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 4,
+      "extract_calls": 1,
+      "evidence_requests": 1,
+      "evidence_responses": 0,
+      "evidence_before_invalidation": 0,
+      "response_sizes": {
+        "measured_responses": 1,
+        "total_wire_bytes": 2186,
+        "maximum_wire_bytes": 2186
+      }
+    }
+  },
+  "candidate": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 1,
+      "modelfailure": 3
+    },
+    "formation_turns_total": 6,
+    "formation_tool_calls_total": 2,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 5656,
+    "formation_output_tokens_total": 463,
+    "formation_wall_time_ms_total": 7048,
+    "retained_store_bytes_total": 136905012,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/ingest": {
+        "attempts": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 3,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "operator_import_fixtures_total": 2,
+    "operator_setup_actions_total": 4,
+    "operator_setup_wall_time_ms_total": 1024,
+    "fact_evidence_audit": {
+      "telemetry_trials": 2,
+      "extract_calls": 1,
+      "evidence_requests": 1,
+      "evidence_responses": 0,
+      "evidence_before_invalidation": 0,
+      "response_sizes": {
+        "measured_responses": 1,
+        "total_wire_bytes": 2186,
+        "maximum_wire_bytes": 2186
+      }
+    }
+  },
+  "independent_probe_pairs": {
+    "paired_trials": 4,
+    "both_succeeded": 1,
+    "incumbent_only_succeeded": 0,
+    "candidate_only_succeeded": 2,
+    "neither_succeeded": 1
+  }
+}

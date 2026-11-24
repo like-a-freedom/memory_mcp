@@ -36,6 +36,117 @@ impl KnowledgeStoreClient {
         Self { db }
     }
 
+    /// Resolves a timestamp to the last committed revision at or before it.
+    /// Ordering by revision makes equal recorded timestamps resolve to the
+    /// greatest commit boundary at that instant.
+    pub(crate) async fn revision_at(
+        &self,
+        known_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<i64, MemoryError> {
+        let rows = self
+            .db
+            .query_rows(
+                "SELECT revision FROM knowledge_revision WHERE recorded_at <= type::datetime($known_at) ORDER BY revision DESC LIMIT 1",
+                Some(json!({
+                    "known_at": crate::shared::temporal::normalize_dt(known_at),
+                })),
+            )
+            .await?;
+        if let Some(revision) = rows
+            .first()
+            .and_then(|row| row.get("revision"))
+            .and_then(Value::as_i64)
+        {
+            return Ok(revision);
+        }
+        // A valid zero-revision result is distinguishable from a missing
+        // migration only after confirming the clock record exists.
+        self.latest_revision().await?;
+        Ok(0)
+    }
+
+    /// Validates an exact revision and returns its commit timestamp. Revision
+    /// zero names the initialized empty snapshot and has no ledger event.
+    pub(crate) async fn recorded_at_revision(
+        &self,
+        revision: i64,
+        fallback: chrono::DateTime<chrono::Utc>,
+    ) -> Result<chrono::DateTime<chrono::Utc>, MemoryError> {
+        if revision < 0 {
+            return Err(MemoryError::Validation(
+                "known_revision must be zero or greater".into(),
+            ));
+        }
+        if revision == 0 {
+            let latest = self.latest_revision().await?;
+            if latest < revision {
+                return Err(MemoryError::Validation(
+                    "known_revision is beyond the latest committed revision".into(),
+                ));
+            }
+            return Ok(fallback);
+        }
+        let rows = self
+            .db
+            .query_rows(
+                "SELECT recorded_at FROM knowledge_revision WHERE revision = $revision LIMIT 1",
+                Some(json!({ "revision": revision })),
+            )
+            .await?;
+        let recorded_at = rows
+            .first()
+            .and_then(|row| row.get("recorded_at"))
+            .and_then(Value::as_str)
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .map(|value| value.with_timezone(&chrono::Utc))
+            .ok_or_else(|| {
+                MemoryError::Validation("known_revision does not name a committed snapshot".into())
+            })?;
+        Ok(recorded_at)
+    }
+
+    /// Reads revision-visible facts for the conservative historical selector.
+    /// The extra row indicates that the bounded candidate scan was truncated.
+    pub(crate) async fn select_facts_at_revision(
+        &self,
+        valid_at: chrono::DateTime<chrono::Utc>,
+        known_revision: i64,
+        query: Option<&str>,
+        fact_types: &[String],
+        limit: i32,
+    ) -> Result<(Vec<Value>, bool), MemoryError> {
+        let requested_limit = limit.clamp(1, 250);
+        let (sql, vars) = crate::knowledge::queries::build_select_facts_at_revision_query(
+            &crate::shared::temporal::normalize_dt(valid_at),
+            known_revision,
+            query,
+            requested_limit + 1,
+            fact_types,
+        );
+        let mut rows = self.db.query_rows(&sql, Some(vars)).await?;
+        let truncated = rows.len() > requested_limit as usize;
+        rows.truncate(requested_limit as usize);
+        Ok((rows, truncated))
+    }
+
+    async fn latest_revision(&self) -> Result<i64, MemoryError> {
+        let rows = self
+            .db
+            .query_rows(
+                "SELECT latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+                None,
+            )
+            .await?;
+        rows.first()
+            .and_then(|row| row.get("latest_revision"))
+            .and_then(Value::as_i64)
+            .ok_or_else(|| {
+                MemoryError::Unavailable(
+                    "knowledge revision clock is not initialized; apply migrations first".into(),
+                )
+            })
+    }
+
     /// Facts matching a query at query-time with bi-temporal and fact-type filters.
     pub async fn select_facts_filtered(
         &self,

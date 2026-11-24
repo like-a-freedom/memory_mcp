@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-agent-preflight-attempt/v1",
+  "status": "preflight_failed",
+  "failure_class": "configuration",
+  "reason": "The runner requires absolute paths for paired product binary files; the first invocation supplied relative binary paths.",
+  "agent_invocations": 0,
+  "model_turns": 0,
+  "memory_tool_calls": 0,
+  "memory_writes": 0,
+  "trial_output_created": false
+}

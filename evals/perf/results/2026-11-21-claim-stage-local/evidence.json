@@ -1,0 +1,1305 @@
+{
+  "schema": "memory-mcp-perf/v1",
+  "profile": "claim-stage-evidence-promotion-check",
+  "profileDigest": "7528e22d1bbb632e0587dbe3b921fc3c2a48fc1120404e3c37ee20fe499070b0",
+  "commit": "1ae1da4a",
+  "host": {
+    "hostTag": "local",
+    "os": "macos",
+    "arch": "aarch64"
+  },
+  "startedAt": "2026-11-21T22:30:50.079682+00:00",
+  "durationMs": 57134,
+  "scenarios": {
+    "latency-claim-assemble-2": {
+      "latencies": {
+        "count": 100,
+        "p50_us": 10103,
+        "p90_us": 10694,
+        "p95_us": 10729,
+        "p99_us": 10984,
+        "mean_us": 10160,
+        "total_us": 1016056
+      },
+      "throughputEps": null,
+      "samplesRaw": [
+        9581,
+        9468,
+        9461,
+        9859,
+        9543,
+        10260,
+        9973,
+        9954,
+        10082,
+        9721,
+        10196,
+        10025,
+        9997,
+        10404,
+        10105,
+        10045,
+        10534,
+        9992,
+        9851,
+        9691,
+        9991,
+        9979,
+        9626,
+        10153,
+        9986,
+        10534,
+        10177,
+        9966,
+        9978,
+        10224,
+        10052,
+        9962,
+        10256,
+        10494,
+        10484,
+        10984,
+        10739,
+        10249,
+        9911,
+        10848,
+        10451,
+        10615,
+        9867,
+        9810,
+        9874,
+        9825,
+        10267,
+        10221,
+        10669,
+        9921,
+        10164,
+        9981,
+        9882,
+        9832,
+        11109,
+        10103,
+        10326,
+        10607,
+        10720,
+        10364,
+        9630,
+        10187,
+        10712,
+        10090,
+        9733,
+        9705,
+        10430,
+        10069,
+        9981,
+        10043,
+        9844,
+        10153,
+        10274,
+        10060,
+        9895,
+        10654,
+        9711,
+        10407,
+        9797,
+        9456,
+        9800,
+        10172,
+        10011,
+        9861,
+        10251,
+        10362,
+        10337,
+        10454,
+        10101,
+        10698,
+        10703,
+        10729,
+        10846,
+        10259,
+        10694,
+        10651,
+        10277,
+        10232,
+        10515,
+        10329
+      ],
+      "sql": [
+        {
+          "templateHash": "00c85316a8d18214",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 402,
+            "p90_us": 507,
+            "p95_us": 507,
+            "p99_us": 507,
+            "mean_us": 454,
+            "total_us": 909
+          }
+        },
+        {
+          "templateHash": "013712abdee36464",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 354,
+            "p90_us": 400,
+            "p95_us": 428,
+            "p99_us": 479,
+            "mean_us": 357,
+            "total_us": 37489
+          }
+        },
+        {
+          "templateHash": "014cd05dc89a6f2d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 95,
+          "stats": {
+            "count": 95,
+            "p50_us": 2121,
+            "p90_us": 2260,
+            "p95_us": 2286,
+            "p99_us": 2416,
+            "mean_us": 2136,
+            "total_us": 202924
+          }
+        },
+        {
+          "templateHash": "08c14fbaa4cefd53",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 10,
+          "stats": {
+            "count": 10,
+            "p50_us": 2194,
+            "p90_us": 2326,
+            "p95_us": 2543,
+            "p99_us": 2543,
+            "mean_us": 2253,
+            "total_us": 22532
+          }
+        },
+        {
+          "templateHash": "0b8561cfd73297b0",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 95,
+          "stats": {
+            "count": 95,
+            "p50_us": 284,
+            "p90_us": 319,
+            "p95_us": 346,
+            "p99_us": 374,
+            "mean_us": 288,
+            "total_us": 27452
+          }
+        },
+        {
+          "templateHash": "28142996d26edb67",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 509,
+            "p90_us": 663,
+            "p95_us": 663,
+            "p99_us": 663,
+            "mean_us": 586,
+            "total_us": 1172
+          }
+        },
+        {
+          "templateHash": "2b7c7fd8863e5d7b",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1,
+          "stats": {
+            "count": 1,
+            "p50_us": 126,
+            "p90_us": 126,
+            "p95_us": 126,
+            "p99_us": 126,
+            "mean_us": 126,
+            "total_us": 126
+          }
+        },
+        {
+          "templateHash": "319e36f02dbd39cc",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 167,
+            "p90_us": 433,
+            "p95_us": 433,
+            "p99_us": 433,
+            "mean_us": 300,
+            "total_us": 600
+          }
+        },
+        {
+          "templateHash": "32dc8d6f1dad8ab1",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 8,
+          "stats": {
+            "count": 8,
+            "p50_us": 32,
+            "p90_us": 285,
+            "p95_us": 285,
+            "p99_us": 285,
+            "mean_us": 66,
+            "total_us": 533
+          }
+        },
+        {
+          "templateHash": "372ecc105e6d0cce",
+          "op": "db.execute_query",
+          "class": "FactWrite",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 2569,
+            "p90_us": 2919,
+            "p95_us": 2919,
+            "p99_us": 2919,
+            "mean_us": 2744,
+            "total_us": 5488
+          }
+        },
+        {
+          "templateHash": "464c7472cbcd984c",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 72,
+            "p90_us": 223,
+            "p95_us": 223,
+            "p99_us": 223,
+            "mean_us": 147,
+            "total_us": 295
+          }
+        },
+        {
+          "templateHash": "4d2152147616ab80",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 10,
+          "stats": {
+            "count": 10,
+            "p50_us": 294,
+            "p90_us": 322,
+            "p95_us": 346,
+            "p99_us": 346,
+            "mean_us": 295,
+            "total_us": 2958
+          }
+        },
+        {
+          "templateHash": "501a95b076b7800d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 95,
+          "stats": {
+            "count": 95,
+            "p50_us": 476,
+            "p90_us": 529,
+            "p95_us": 553,
+            "p99_us": 634,
+            "mean_us": 481,
+            "total_us": 45786
+          }
+        },
+        {
+          "templateHash": "59db7032fb925765",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 190,
+            "p90_us": 240,
+            "p95_us": 240,
+            "p99_us": 240,
+            "mean_us": 215,
+            "total_us": 430
+          }
+        },
+        {
+          "templateHash": "693f9f700c768be8",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 1,
+          "stats": {
+            "count": 1,
+            "p50_us": 589,
+            "p90_us": 589,
+            "p95_us": 589,
+            "p99_us": 589,
+            "mean_us": 589,
+            "total_us": 589
+          }
+        },
+        {
+          "templateHash": "6a2d2e36fe971b07",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 514,
+            "p90_us": 566,
+            "p95_us": 581,
+            "p99_us": 627,
+            "mean_us": 522,
+            "total_us": 54846
+          }
+        },
+        {
+          "templateHash": "6edee64996940a90",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 477,
+            "p90_us": 531,
+            "p95_us": 553,
+            "p99_us": 609,
+            "mean_us": 486,
+            "total_us": 51063
+          }
+        },
+        {
+          "templateHash": "7940895e5873e42c",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 472,
+            "p90_us": 522,
+            "p95_us": 522,
+            "p99_us": 522,
+            "mean_us": 497,
+            "total_us": 994
+          }
+        },
+        {
+          "templateHash": "8320d12aa6b12a27",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 257,
+            "p90_us": 360,
+            "p95_us": 360,
+            "p99_us": 360,
+            "mean_us": 308,
+            "total_us": 617
+          }
+        },
+        {
+          "templateHash": "8e8e5d482b4a1a0d",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 315,
+          "stats": {
+            "count": 315,
+            "p50_us": 175,
+            "p90_us": 213,
+            "p95_us": 229,
+            "p99_us": 255,
+            "mean_us": 178,
+            "total_us": 56338
+          }
+        },
+        {
+          "templateHash": "a478f19254b99cdb",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 6,
+          "stats": {
+            "count": 6,
+            "p50_us": 35,
+            "p90_us": 287,
+            "p95_us": 287,
+            "p99_us": 287,
+            "mean_us": 116,
+            "total_us": 697
+          }
+        },
+        {
+          "templateHash": "ab10a7a262b5fae7",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 951,
+            "p90_us": 1009,
+            "p95_us": 1057,
+            "p99_us": 1107,
+            "mean_us": 957,
+            "total_us": 100564
+          }
+        },
+        {
+          "templateHash": "b3d0601277227dae",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 8,
+          "stats": {
+            "count": 8,
+            "p50_us": 31,
+            "p90_us": 278,
+            "p95_us": 278,
+            "p99_us": 278,
+            "mean_us": 63,
+            "total_us": 509
+          }
+        },
+        {
+          "templateHash": "b49799ed4a29738b",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 506,
+            "p90_us": 557,
+            "p95_us": 597,
+            "p99_us": 618,
+            "mean_us": 515,
+            "total_us": 54136
+          }
+        },
+        {
+          "templateHash": "bc244b6638a6ec14",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 1,
+          "stats": {
+            "count": 1,
+            "p50_us": 2378,
+            "p90_us": 2378,
+            "p95_us": 2378,
+            "p99_us": 2378,
+            "mean_us": 2378,
+            "total_us": 2378
+          }
+        },
+        {
+          "templateHash": "bf47e8edf98b181b",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1,
+          "stats": {
+            "count": 1,
+            "p50_us": 220,
+            "p90_us": 220,
+            "p95_us": 220,
+            "p99_us": 220,
+            "mean_us": 220,
+            "total_us": 220
+          }
+        },
+        {
+          "templateHash": "ca93073288de16b4",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 10,
+          "stats": {
+            "count": 10,
+            "p50_us": 697,
+            "p90_us": 743,
+            "p95_us": 1076,
+            "p99_us": 1076,
+            "mean_us": 741,
+            "total_us": 7418
+          }
+        },
+        {
+          "templateHash": "cd6bba171f451f4d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 351,
+            "p90_us": 355,
+            "p95_us": 355,
+            "p99_us": 355,
+            "mean_us": 353,
+            "total_us": 706
+          }
+        },
+        {
+          "templateHash": "d17ecba95941bf41",
+          "op": "db.execute_query",
+          "class": "RelateEdge",
+          "phase": "setup",
+          "count": 4,
+          "stats": {
+            "count": 4,
+            "p50_us": 2169,
+            "p90_us": 2894,
+            "p95_us": 2894,
+            "p99_us": 2894,
+            "mean_us": 2347,
+            "total_us": 9389
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 184,
+            "p90_us": 197,
+            "p95_us": 197,
+            "p99_us": 197,
+            "mean_us": 190,
+            "total_us": 381
+          }
+        },
+        {
+          "templateHash": "eadd69d7b17962b8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 4,
+          "stats": {
+            "count": 4,
+            "p50_us": 247,
+            "p90_us": 265,
+            "p95_us": 265,
+            "p99_us": 265,
+            "mean_us": 250,
+            "total_us": 1000
+          }
+        },
+        {
+          "templateHash": "f2179201d381523e",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 2466,
+            "p90_us": 2492,
+            "p95_us": 2492,
+            "p99_us": 2492,
+            "mean_us": 2479,
+            "total_us": 4958
+          }
+        },
+        {
+          "templateHash": "f5485e0f8927e401",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 751,
+            "p90_us": 796,
+            "p95_us": 841,
+            "p99_us": 869,
+            "mean_us": 757,
+            "total_us": 79525
+          }
+        },
+        {
+          "templateHash": "fa6d7f94f2727969",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 95,
+          "stats": {
+            "count": 95,
+            "p50_us": 699,
+            "p90_us": 789,
+            "p95_us": 804,
+            "p99_us": 954,
+            "mean_us": 707,
+            "total_us": 67255
+          }
+        },
+        {
+          "templateHash": "fac577e757add5f2",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 2,
+          "stats": {
+            "count": 2,
+            "p50_us": 689,
+            "p90_us": 782,
+            "p95_us": 782,
+            "p99_us": 782,
+            "mean_us": 735,
+            "total_us": 1471
+          }
+        },
+        {
+          "templateHash": "fc2e3bae2415778c",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 4,
+          "stats": {
+            "count": 4,
+            "p50_us": 239,
+            "p90_us": 376,
+            "p95_us": 376,
+            "p99_us": 376,
+            "mean_us": 275,
+            "total_us": 1102
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 1982464,
+        "peakRssBytes": 3670016,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    },
+    "latency-claim-write-100": {
+      "latencies": {
+        "count": 100,
+        "p50_us": 404027,
+        "p90_us": 502098,
+        "p95_us": 515083,
+        "p99_us": 543302,
+        "mean_us": 403117,
+        "total_us": 40311748
+      },
+      "throughputEps": null,
+      "samplesRaw": [
+        274962,
+        282377,
+        280936,
+        256745,
+        269063,
+        275012,
+        295848,
+        295362,
+        301099,
+        287009,
+        309283,
+        309166,
+        331424,
+        308423,
+        287182,
+        305614,
+        308974,
+        323917,
+        325994,
+        315299,
+        334563,
+        341384,
+        336103,
+        329241,
+        345768,
+        339729,
+        332312,
+        362743,
+        363005,
+        333884,
+        358269,
+        333834,
+        354869,
+        363325,
+        374092,
+        375880,
+        375377,
+        370881,
+        365772,
+        373429,
+        367007,
+        425621,
+        387315,
+        384270,
+        401519,
+        406733,
+        388698,
+        368630,
+        392133,
+        405098,
+        401171,
+        391770,
+        404027,
+        418964,
+        416087,
+        416209,
+        424750,
+        431529,
+        428527,
+        417462,
+        418688,
+        424485,
+        427262,
+        432204,
+        456970,
+        477101,
+        443230,
+        434588,
+        428238,
+        455735,
+        442114,
+        456277,
+        473737,
+        481910,
+        451841,
+        455031,
+        496594,
+        470703,
+        469575,
+        480141,
+        470421,
+        487102,
+        499858,
+        493406,
+        475180,
+        489550,
+        511828,
+        485763,
+        490901,
+        525156,
+        520408,
+        515083,
+        496770,
+        513110,
+        502098,
+        512953,
+        565568,
+        541950,
+        509248,
+        543302
+      ],
+      "sql": [
+        {
+          "templateHash": "1af97bc21c4d5f20",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 1,
+          "stats": {
+            "count": 1,
+            "p50_us": 961,
+            "p90_us": 961,
+            "p95_us": 961,
+            "p99_us": 961,
+            "mean_us": 961,
+            "total_us": 961
+          }
+        },
+        {
+          "templateHash": "372ecc105e6d0cce",
+          "op": "db.execute_query",
+          "class": "FactWrite",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 2361,
+            "p90_us": 2627,
+            "p95_us": 2695,
+            "p99_us": 2861,
+            "mean_us": 2395,
+            "total_us": 239591
+          }
+        },
+        {
+          "templateHash": "372ecc105e6d0cce",
+          "op": "db.execute_query",
+          "class": "FactWrite",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 2423,
+            "p90_us": 2641,
+            "p95_us": 2710,
+            "p99_us": 2805,
+            "mean_us": 2424,
+            "total_us": 254589
+          }
+        },
+        {
+          "templateHash": "464c7472cbcd984c",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 61,
+            "p90_us": 88,
+            "p95_us": 93,
+            "p99_us": 132,
+            "mean_us": 65,
+            "total_us": 6510
+          }
+        },
+        {
+          "templateHash": "464c7472cbcd984c",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 59,
+            "p90_us": 88,
+            "p95_us": 95,
+            "p99_us": 113,
+            "mean_us": 62,
+            "total_us": 6573
+          }
+        },
+        {
+          "templateHash": "59db7032fb925765",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 198,
+            "p90_us": 250,
+            "p95_us": 257,
+            "p99_us": 332,
+            "mean_us": 206,
+            "total_us": 20667
+          }
+        },
+        {
+          "templateHash": "59db7032fb925765",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 212,
+            "p90_us": 276,
+            "p95_us": 322,
+            "p99_us": 350,
+            "mean_us": 220,
+            "total_us": 23168
+          }
+        },
+        {
+          "templateHash": "7940895e5873e42c",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 485,
+            "p90_us": 558,
+            "p95_us": 567,
+            "p99_us": 649,
+            "mean_us": 497,
+            "total_us": 49765
+          }
+        },
+        {
+          "templateHash": "7940895e5873e42c",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 483,
+            "p90_us": 561,
+            "p95_us": 579,
+            "p99_us": 620,
+            "mean_us": 497,
+            "total_us": 52227
+          }
+        },
+        {
+          "templateHash": "8320d12aa6b12a27",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 917,
+            "p90_us": 2268,
+            "p95_us": 2420,
+            "p99_us": 2520,
+            "mean_us": 1094,
+            "total_us": 109458
+          }
+        },
+        {
+          "templateHash": "8320d12aa6b12a27",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 6143,
+            "p90_us": 9732,
+            "p95_us": 10381,
+            "p99_us": 10786,
+            "mean_us": 6341,
+            "total_us": 665864
+          }
+        },
+        {
+          "templateHash": "8633c76c65f189af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 205,
+          "stats": {
+            "count": 205,
+            "p50_us": 360,
+            "p90_us": 516,
+            "p95_us": 544,
+            "p99_us": 582,
+            "mean_us": 388,
+            "total_us": 79570
+          }
+        },
+        {
+          "templateHash": "8e0266bc06be58b4",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 4950,
+          "stats": {
+            "count": 4950,
+            "p50_us": 2171,
+            "p90_us": 2461,
+            "p95_us": 2550,
+            "p99_us": 2845,
+            "mean_us": 2202,
+            "total_us": 10900406
+          }
+        },
+        {
+          "templateHash": "8e0266bc06be58b4",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 15960,
+          "stats": {
+            "count": 15960,
+            "p50_us": 2167,
+            "p90_us": 2450,
+            "p95_us": 2542,
+            "p99_us": 2770,
+            "mean_us": 2197,
+            "total_us": 35064533
+          }
+        },
+        {
+          "templateHash": "a478f19254b99cdb",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 200,
+          "stats": {
+            "count": 200,
+            "p50_us": 33,
+            "p90_us": 68,
+            "p95_us": 80,
+            "p99_us": 140,
+            "mean_us": 42,
+            "total_us": 8533
+          }
+        },
+        {
+          "templateHash": "a478f19254b99cdb",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 210,
+          "stats": {
+            "count": 210,
+            "p50_us": 34,
+            "p90_us": 66,
+            "p95_us": 80,
+            "p99_us": 107,
+            "mean_us": 40,
+            "total_us": 8558
+          }
+        },
+        {
+          "templateHash": "bf47e8edf98b181b",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 4950,
+          "stats": {
+            "count": 4950,
+            "p50_us": 48,
+            "p90_us": 78,
+            "p95_us": 90,
+            "p99_us": 115,
+            "mean_us": 52,
+            "total_us": 260731
+          }
+        },
+        {
+          "templateHash": "bf47e8edf98b181b",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 15960,
+          "stats": {
+            "count": 15960,
+            "p50_us": 48,
+            "p90_us": 77,
+            "p95_us": 88,
+            "p99_us": 113,
+            "mean_us": 52,
+            "total_us": 833017
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 510,
+          "stats": {
+            "count": 510,
+            "p50_us": 47,
+            "p90_us": 99,
+            "p95_us": 109,
+            "p99_us": 134,
+            "mean_us": 55,
+            "total_us": 28298
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 31,
+            "p90_us": 43,
+            "p95_us": 47,
+            "p99_us": 58,
+            "mean_us": 33,
+            "total_us": 3477
+          }
+        },
+        {
+          "templateHash": "cd6bba171f451f4d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 687,
+            "p90_us": 1009,
+            "p95_us": 1019,
+            "p99_us": 1105,
+            "mean_us": 712,
+            "total_us": 71202
+          }
+        },
+        {
+          "templateHash": "cd6bba171f451f4d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 1396,
+            "p90_us": 1689,
+            "p95_us": 1772,
+            "p99_us": 1834,
+            "mean_us": 1410,
+            "total_us": 148135
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 182,
+            "p90_us": 232,
+            "p95_us": 249,
+            "p99_us": 267,
+            "mean_us": 188,
+            "total_us": 18885
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 184,
+            "p90_us": 228,
+            "p95_us": 235,
+            "p99_us": 262,
+            "mean_us": 187,
+            "total_us": 19673
+          }
+        },
+        {
+          "templateHash": "e58a0375a7618166",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "setup",
+          "count": 205,
+          "stats": {
+            "count": 205,
+            "p50_us": 2130,
+            "p90_us": 2389,
+            "p95_us": 2455,
+            "p99_us": 2584,
+            "mean_us": 2129,
+            "total_us": 436453
+          }
+        },
+        {
+          "templateHash": "f2179201d381523e",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 2361,
+            "p90_us": 2675,
+            "p95_us": 2779,
+            "p99_us": 3129,
+            "mean_us": 2409,
+            "total_us": 240974
+          }
+        },
+        {
+          "templateHash": "f2179201d381523e",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 2393,
+            "p90_us": 2660,
+            "p95_us": 2691,
+            "p99_us": 2831,
+            "mean_us": 2413,
+            "total_us": 253391
+          }
+        },
+        {
+          "templateHash": "fac577e757add5f2",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 672,
+            "p90_us": 749,
+            "p95_us": 784,
+            "p99_us": 798,
+            "mean_us": 683,
+            "total_us": 68325
+          }
+        },
+        {
+          "templateHash": "fac577e757add5f2",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 105,
+          "stats": {
+            "count": 105,
+            "p50_us": 665,
+            "p90_us": 772,
+            "p95_us": 794,
+            "p99_us": 835,
+            "mean_us": 680,
+            "total_us": 71496
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 299827440,
+        "peakRssBytes": 304988160,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    }
+  }
+}

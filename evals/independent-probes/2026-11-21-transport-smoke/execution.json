@@ -1,0 +1,58 @@
+[
+  {
+    "label": "stdio-first",
+    "exit_code": 0,
+    "observation": {
+      "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+      "product_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+      "source_event_ids": [
+        "source-a"
+      ],
+      "budget_used": 1,
+      "completed": true
+    },
+    "error": ""
+  },
+  {
+    "label": "stdio-second",
+    "exit_code": 0,
+    "observation": {
+      "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+      "product_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+      "source_event_ids": [
+        "source-a"
+      ],
+      "budget_used": 1,
+      "completed": true
+    },
+    "error": ""
+  },
+  {
+    "label": "streamable-http-first",
+    "exit_code": 0,
+    "observation": {
+      "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+      "product_sha256": "0996b4f9d96ff8e23baed803408a982b65bbc2eb02bd61f3bdf165d67fbf5009",
+      "source_event_ids": [
+        "source-a"
+      ],
+      "budget_used": 1,
+      "completed": true
+    },
+    "error": ""
+  },
+  {
+    "label": "streamable-http-second",
+    "exit_code": 0,
+    "observation": {
+      "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+      "product_sha256": "0996b4f9d96ff8e23baed803408a982b65bbc2eb02bd61f3bdf165d67fbf5009",
+      "source_event_ids": [
+        "source-a"
+      ],
+      "budget_used": 1,
+      "completed": true
+    },
+    "error": ""
+  }
+]

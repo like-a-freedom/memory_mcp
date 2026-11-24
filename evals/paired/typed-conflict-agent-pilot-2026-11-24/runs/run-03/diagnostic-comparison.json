@@ -1,0 +1,800 @@
+{
+  "schema_version": "memory-mcp-agent-comparison/v2",
+  "run_id": "56839-1795505447237891000-1",
+  "run_started_at": "2026-11-24T07:30:47.237892Z",
+  "run_completed_at": "2026-11-24T07:42:02.422748Z",
+  "plan": {
+    "schema_version": "memory-mcp-agent-plan/v2",
+    "plan_id": "typed-conflict-agent-benefit-development-pilot-2026-11-24-v2",
+    "stage": "exploratory_comparison",
+    "expected_trials": [
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "northvale_depot",
+        "case_id": "northvale_depot-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "cindergate_hub",
+        "case_id": "cindergate_hub-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "mosslight_annex",
+        "case_id": "mosslight_annex-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "tidemark_archive",
+        "case_id": "tidemark_archive-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "ivory_lantern_clinic",
+        "case_id": "ivory_lantern_clinic-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "copperwind_quay",
+        "case_id": "copperwind_quay-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "hollowcrest_observatory",
+        "case_id": "hollowcrest_observatory-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "conflict_decisions",
+        "family_id": "junebrook_foundry",
+        "case_id": "junebrook_foundry-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_recall",
+        "family_id": "veloran_station",
+        "case_id": "veloran_station-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_recall",
+        "family_id": "opaline_workshop",
+        "case_id": "opaline_workshop-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_recall",
+        "family_id": "westmere_lab",
+        "case_id": "westmere_lab-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_recall",
+        "family_id": "brackenridge_depot",
+        "case_id": "brackenridge_depot-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      }
+    ],
+    "planned_independent_families": 12,
+    "shared_identity": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.171.0",
+      "model": "gpt-6.2-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+      "task_prompt_sha256": "39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab",
+      "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+      "transport": "stdio",
+      "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+      "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+      "judge_config_sha256": null,
+      "corpus_sha256": "c7693beefa2a9563e39592b5c863a4d57a56ccb4825ad26caa26db3a83d3ed24",
+      "oracle_sha256": "7720288a4f4b272f10152fffc24ba05d07bf1b28f48a7603ab675ccf56c56ebc",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+      "provider_fingerprints": {
+        "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 1,
+      "turn_budget": 4,
+      "output_token_budget": 512,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "incumbent_product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-typed-conflict-pilot-2026-11-24",
+      "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+      "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+      "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "shadow"
+    },
+    "candidate_product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-typed-conflict-pilot-2026-11-24",
+      "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+      "product_config_sha256": "c8f65767e70e4d0fa4ae073b7ddd7529f10dc25d05a52c440f0faad7f8cff650",
+      "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    },
+    "declared_tool_schema_change": null,
+    "bootstrap": {
+      "seed": 2026112402,
+      "draws": 10000,
+      "confidence_level_basis_points": 9500
+    }
+  },
+  "plan_sha256": "3185eb42effbd6b06e746fb368829582b21473349deb4d9d5114bab9e77cead9",
+  "manifest_sha256": "b726f31b8735f84742a532e8837faf12ad54323577464388fe423b95821a1a95",
+  "incumbent_artifact_sha256": "de6f08f09112439777fe570c2a7b1affd885dddcd9da8252beb236234fcc4c06",
+  "candidate_artifact_sha256": "056bb6b477a902a881f547eb33c7ba1011447f4c68df9e6b46b63ec84901dec9",
+  "overall": {
+    "direct_memory_success": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": -0.3333333333333333,
+        "upper": 0.3333333333333333,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": -1.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 1.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": -1.0,
+        "mosslight_annex": 1.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": 0.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "task_success": {
+      "estimate": 0.16666666666666666,
+      "interval": {
+        "estimate": 0.16666666666666666,
+        "lower": -0.16666666666666666,
+        "upper": 0.5,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": -1.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 1.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": 0.0,
+        "mosslight_annex": 1.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": 1.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "repair_turn_gain": {
+      "estimate": 0.6666666666666666,
+      "interval": {
+        "estimate": 0.6666666666666666,
+        "lower": -0.6666666666666666,
+        "upper": 2.0,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": -4.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 4.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": 0.0,
+        "mosslight_annex": 4.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": 4.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "turn_gain": {
+      "estimate": 0.5,
+      "interval": {
+        "estimate": 0.5,
+        "lower": -0.5,
+        "upper": 1.5,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": -3.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 3.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": 0.0,
+        "mosslight_annex": 3.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": 3.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "tool_call_gain": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": 0.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 0.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": 0.0,
+        "mosslight_annex": 0.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": 0.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "clarification_gain": {
+      "estimate": -0.25,
+      "interval": {
+        "estimate": -0.25,
+        "lower": -0.5,
+        "upper": 0.0,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": -1.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 0.0,
+        "hollowcrest_observatory": 0.0,
+        "ivory_lantern_clinic": 0.0,
+        "junebrook_foundry": -1.0,
+        "mosslight_annex": 0.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": 0.0,
+        "tidemark_archive": -1.0,
+        "veloran_station": 0.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "input_token_gain": {
+      "estimate": -43.666666666666664,
+      "interval": {
+        "estimate": -43.666666666666664,
+        "lower": -209.66666666666666,
+        "upper": 117.58333333333333,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": 514.0,
+        "cindergate_hub": 0.0,
+        "copperwind_quay": 20.0,
+        "hollowcrest_observatory": -589.0,
+        "ivory_lantern_clinic": -1.0,
+        "junebrook_foundry": 221.0,
+        "mosslight_annex": -615.0,
+        "northvale_depot": 0.0,
+        "opaline_workshop": -38.0,
+        "tidemark_archive": -40.0,
+        "veloran_station": 4.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "output_token_gain": {
+      "estimate": -0.08333333333333333,
+      "interval": {
+        "estimate": -0.08333333333333333,
+        "lower": -17.75,
+        "upper": 17.833333333333332,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": 49.0,
+        "cindergate_hub": 6.0,
+        "copperwind_quay": -6.0,
+        "hollowcrest_observatory": -43.0,
+        "ivory_lantern_clinic": 5.0,
+        "junebrook_foundry": 57.0,
+        "mosslight_annex": -53.0,
+        "northvale_depot": -1.0,
+        "opaline_workshop": 18.0,
+        "tidemark_archive": -35.0,
+        "veloran_station": 2.0,
+        "westmere_lab": 0.0
+      }
+    },
+    "wall_time_gain_ms": {
+      "estimate": 112.91666666666667,
+      "interval": {
+        "estimate": 112.91666666666667,
+        "lower": -621.75,
+        "upper": 834.9166666666666,
+        "independent_clusters": 12,
+        "draws": 10000,
+        "seed": 2026112402,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "brackenridge_depot": 1372.0,
+        "cindergate_hub": -475.0,
+        "copperwind_quay": -1316.0,
+        "hollowcrest_observatory": -2099.0,
+        "ivory_lantern_clinic": 1426.0,
+        "junebrook_foundry": 892.0,
+        "mosslight_annex": -1390.0,
+        "northvale_depot": 1935.0,
+        "opaline_workshop": -421.0,
+        "tidemark_archive": 1055.0,
+        "veloran_station": 1121.0,
+        "westmere_lab": -745.0
+      }
+    }
+  },
+  "by_stratum": {
+    "conflict_decisions": {
+      "direct_memory_success": {
+        "estimate": 0.125,
+        "interval": {
+          "estimate": 0.125,
+          "lower": -0.25,
+          "upper": 0.5,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 1.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": -1.0,
+          "mosslight_annex": 1.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.375,
+        "interval": {
+          "estimate": 0.375,
+          "lower": 0.0,
+          "upper": 0.75,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 1.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": 0.0,
+          "mosslight_annex": 1.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": 1.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 1.5,
+        "interval": {
+          "estimate": 1.5,
+          "lower": 0.0,
+          "upper": 3.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 4.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": 0.0,
+          "mosslight_annex": 4.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": 4.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 1.125,
+        "interval": {
+          "estimate": 1.125,
+          "lower": 0.0,
+          "upper": 2.25,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 3.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": 0.0,
+          "mosslight_annex": 3.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": 3.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 0.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": 0.0,
+          "mosslight_annex": 0.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": -0.25,
+        "interval": {
+          "estimate": -0.25,
+          "lower": -0.625,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 0.0,
+          "hollowcrest_observatory": 0.0,
+          "ivory_lantern_clinic": 0.0,
+          "junebrook_foundry": -1.0,
+          "mosslight_annex": 0.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": -1.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": -125.5,
+        "interval": {
+          "estimate": -125.5,
+          "lower": -325.875,
+          "upper": 55.125,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 0.0,
+          "copperwind_quay": 20.0,
+          "hollowcrest_observatory": -589.0,
+          "ivory_lantern_clinic": -1.0,
+          "junebrook_foundry": 221.0,
+          "mosslight_annex": -615.0,
+          "northvale_depot": 0.0,
+          "tidemark_archive": -40.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": -8.75,
+        "interval": {
+          "estimate": -8.75,
+          "lower": -30.25,
+          "upper": 15.875,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": 6.0,
+          "copperwind_quay": -6.0,
+          "hollowcrest_observatory": -43.0,
+          "ivory_lantern_clinic": 5.0,
+          "junebrook_foundry": 57.0,
+          "mosslight_annex": -53.0,
+          "northvale_depot": -1.0,
+          "tidemark_archive": -35.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 3.5,
+        "interval": {
+          "estimate": 3.5,
+          "lower": -961.75,
+          "upper": 1004.125,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "cindergate_hub": -475.0,
+          "copperwind_quay": -1316.0,
+          "hollowcrest_observatory": -2099.0,
+          "ivory_lantern_clinic": 1426.0,
+          "junebrook_foundry": 892.0,
+          "mosslight_annex": -1390.0,
+          "northvale_depot": 1935.0,
+          "tidemark_archive": 1055.0
+        }
+      }
+    },
+    "ordinary_recall": {
+      "direct_memory_success": {
+        "estimate": -0.25,
+        "interval": {
+          "estimate": -0.25,
+          "lower": -0.75,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": -1.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": -0.25,
+        "interval": {
+          "estimate": -0.25,
+          "lower": -0.75,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": -1.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": -1.0,
+        "interval": {
+          "estimate": -1.0,
+          "lower": -3.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": -4.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": -0.75,
+        "interval": {
+          "estimate": -0.75,
+          "lower": -2.25,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": -3.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": 0.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": -0.25,
+        "interval": {
+          "estimate": -0.25,
+          "lower": -0.75,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": -1.0,
+          "opaline_workshop": 0.0,
+          "veloran_station": 0.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 120.0,
+        "interval": {
+          "estimate": 120.0,
+          "lower": -27.5,
+          "upper": 385.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": 514.0,
+          "opaline_workshop": -38.0,
+          "veloran_station": 4.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 17.25,
+        "interval": {
+          "estimate": 17.25,
+          "lower": 1.0,
+          "upper": 37.25,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": 49.0,
+          "opaline_workshop": 18.0,
+          "veloran_station": 2.0,
+          "westmere_lab": 0.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 331.75,
+        "interval": {
+          "estimate": 331.75,
+          "lower": -583.0,
+          "upper": 1246.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112402,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "brackenridge_depot": 1372.0,
+          "opaline_workshop": -421.0,
+          "veloran_station": 1121.0,
+          "westmere_lab": -745.0
+        }
+      }
+    }
+  },
+  "paired_trial_count": 12,
+  "independent_family_count": 12,
+  "hard_violation_count": 0,
+  "budget_exceeded_trial_count": 0,
+  "arm_order_counts": {
+    "conflict_decisions": {
+      "incumbent_first": 4,
+      "candidate_first": 4
+    },
+    "ordinary_recall": {
+      "incumbent_first": 2,
+      "candidate_first": 2
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "memory-mcp-rollout-preregistration/v1",
+  "status": "frozen-before-final-build-regression-replay",
+  "frozen_at": "2026-11-22",
+  "product_binary_sha256": "4ec78618868d35e38f6832716c26973420bfb7e3976ccba141dd05738b0c141c",
+  "evaluator_binary_sha256": "654ae3d9c186028ab7a3a63f91233a366fd315d3d7e8ff40c25a0efcab79ed43",
+  "acceptance_plan_sha256": "32655e8fb73a9010aac1211cc2e57569ca276a20824f21900f5fb27edf830c53",
+  "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+  "cohort": {
+    "cases": 8,
+    "independent_families": 8,
+    "repetitions_per_arm": 2,
+    "storage": "fresh embedded store for every case and capture",
+    "relationship_to_previous_v9": "same frozen finite synthetic cohort; a binary-pinned regression replay, not a new family sample"
+  },
+  "arms": {
+    "incumbent": "explicit MEMORY_CLAIM_ROLLOUT_STAGE=shadow",
+    "candidate": "product default with MEMORY_CLAIM_ROLLOUT_STAGE absent"
+  },
+  "acceptance": {
+    "score_channel": "primary public observation",
+    "minimum_equal_family_decision_gain_basis_points": 2500,
+    "evidence_success_nonregression_per_case": true,
+    "ordinary_decision_nonregression_per_case": true,
+    "new_candidate_safety_findings": 0,
+    "maximum_returned_items": 5,
+    "both_repeats_match_per_arm": true,
+    "same_product_binary_and_public_contract_across_arms": true,
+    "all_cases_valid_and_covered": true
+  },
+  "agent_or_provider_required": false,
+  "scope_limit": "This replay checks deterministic no-regression on the already-used synthetic cohort. It is not an independent population sample or a measured agent-usability/productivity result."
+}

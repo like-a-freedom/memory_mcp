@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What cycle limit applied to Willow Gate on June 12, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-12T09:00:00Z",
+  "known_revision": 14,
+  "context_budget": 5,
+  "history_sha256": "1e612be7b3135c3d92a9404a613189df26f8bc177bde5e667a22c8e964896ac2",
+  "claim_rollout_stage": "evidence"
+}

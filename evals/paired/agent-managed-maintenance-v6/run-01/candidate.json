@@ -1,0 +1,931 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v2",
+  "arm": "candidate",
+  "run_id": "42340-1795391210844230000-0",
+  "run_started_at": "2026-11-22T23:46:50.844257Z",
+  "run_completed_at": "2026-11-23T00:02:25.616736Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.171.0",
+      "model": "gpt-6.1-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "1f608baad1673f98aa136c81d4081299b63b49faf841728de0a2e23ccfd2d8e7",
+      "task_prompt_sha256": "3bfd4c04493d172b07edcf2e560c4ed461c14c3ed3550127ba3f59b9d52c2d1e",
+      "host_policy_sha256": "ed8d7baa9795709c7737db43fba19b49959028484406d8f8501bc9c15156aeb7",
+      "transport": "stdio",
+      "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+      "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+      "judge_config_sha256": null,
+      "corpus_sha256": "1d3c3c18e458684d215b163611815cd0fd9944544dd9680dd7b8b95b22d06da7",
+      "oracle_sha256": "d6a6c781bfa41e3165962bab32bfe663e2ec74db6bd1c4cfa2fa237a90dcbc60",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+      "provider_fingerprints": {
+        "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+        "memory_eval_cli": "48f4b70785e0ced4d4af6d358b658e3c2e16c360d2d017395ade5f35ddf315ff"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-bounded-extract-evidence-2026-11-23-v6",
+      "binary_sha256": "58695c4ab2f0da8f5897bb677e51ebb48247d993ccffd6207b42aad77a09c231",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "f90fc7e2c541e1243792f0ba12c4462e72bb1e1d0a5a57b2dfb31b6d1fa0c0d2",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "emberline-studio-history",
+      "case_id": "emberline-studio-current-render-staging-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "quartzpoint-archive-history",
+      "case_id": "quartzpoint-archive-current-cold-backup-region",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "mariner-bio-history",
+      "case_id": "mariner-bio-current-sequencing-snapshot-namespace",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "bluepeak-robotics-history",
+      "case_id": "bluepeak-robotics-current-firmware-signing-alias",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "northwind-transit-history",
+      "case_id": "northwind-transit-current-schedule-export-prefix",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "sunlark-foundry-history",
+      "case_id": "sunlark-foundry-current-CAD-release-archive-key",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "redfern-research-history",
+      "case_id": "redfern-research-current-sample-cold-storage-tier",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "coralpath-mapping-history",
+      "case_id": "coralpath-mapping-current-map-tile-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "receipts": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "bluepeak-robotics-history",
+        "case_id": "bluepeak-robotics-current-firmware-signing-alias",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37172,
+      "output_tokens": 205,
+      "wall_time_ms": 19994,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "06b3373436ebdf54037dd1d2c5b7466ca5be742866273070faf31ec34445e190",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "48e693b2d74e0c75e1149b0958e5dc015b501f4da6d4d27129f922f7e0a4f683",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "827702c0e0299e9f7fb8030dc10945a8b922fb6b09638fd7de434b24db145daa",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "4d3c562c59b963438223f743efaad3b97e9cb36bac4de725f0d97284f25ec21c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37172,
+          "output_tokens": 205
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "coralpath-mapping-history",
+        "case_id": "coralpath-mapping-current-map-tile-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37168,
+      "output_tokens": 206,
+      "wall_time_ms": 16974,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "0a2e406ee1742dfd04a9da3180a830dea56cb1f06a7d491c4ee6531e6463cf00",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "8dbb95cdc6f6b16b1f594dc66e79e3d5f3e2a8d79795e4f89e80ec02b6f679f4",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "35aa96c4fdd9954adf596654b5a3c2492db4b9b97f02be97db4b0bfbd9a9c075",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "30b85a74f40ec4b8357178e20984d8af7b5e16fc8fb6af7cfcbd281da09a022e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37168,
+          "output_tokens": 206
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "emberline-studio-history",
+        "case_id": "emberline-studio-current-render-staging-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37170,
+      "output_tokens": 215,
+      "wall_time_ms": 18651,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "50992d8c9c55f25ae34c740f0c84be8df2122c2073d67f03ef8d31eec4a6547a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "8c8c398b2a3aaee5c670ad70b964fef48af615d3815b076e5d012bfbd95915db",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "ec11d44f554d6de89870e3d7d2a9d400f791a0cf190fd90b152eee1558b9ffb1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "0fbae51f4eae903e952a1d670c3d066295f71926771b8b93c5a522877e37c12f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37170,
+          "output_tokens": 215
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "mariner-bio-history",
+        "case_id": "mariner-bio-current-sequencing-snapshot-namespace",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 3,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 35223,
+      "output_tokens": 233,
+      "wall_time_ms": 23775,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "e8afb1997737a6f908a4ea8531519326c2f4d91eb2387ba9e6c475e0f46f93b9",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "e18fa91dc2d4487987a0a0fae5dcaf8faace6c35ab111d119edc5725dba4f71c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "d6ca724377e1fbc452542b654d5e65af052e02f52cde2ee156b443a5b8ddacd4",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "b60c5f449c48d00e8986a6bd60aea435d3c84462fe89f11ae3c37d47300662c6",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "09935efae0638159b4b27dcd3a80450aac315782f755735b5f70d226b9f2b38e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "1b8f1161bf84de9aef875f65ba903ec51ccf644d8895a83c578134bc05f31e39",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 35223,
+          "output_tokens": 233
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "northwind-transit-history",
+        "case_id": "northwind-transit-current-schedule-export-prefix",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37162,
+      "output_tokens": 211,
+      "wall_time_ms": 23163,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "3f2f65ee5db64c47ababb9bd3301d36478c3fff8262e0935ae28d0688b753039",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "01a8fe205df43dc9efe0b4f9cc49d3b22315e14ea5aaabd7e6c2a87ab5fa198d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "66150fd695a381f66ab6eb677ec536d15b4b8346acd7a765062129c0fcb21802",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "da7ead1158f13f9d7fc5c57fe436024e56dbc2483f680ad6b2b993ce8c827a0f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37162,
+          "output_tokens": 211
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "quartzpoint-archive-history",
+        "case_id": "quartzpoint-archive-current-cold-backup-region",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 26005,
+      "output_tokens": 166,
+      "wall_time_ms": 17758,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "e20e0b3af7434627e792923b119e5f91e706a24750464ef2143e4f90f31b7d70",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "e18fa91dc2d4487987a0a0fae5dcaf8faace6c35ab111d119edc5725dba4f71c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "40a83296c4bf95b65f68b1dcaa9aeb3df73ddf2ab73200230f6ccc3b1be7e645",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "d8ba5f300d2351a5f863f1f0343d6f8d3b63597da6e051438668ad0baf251b3c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "be4b9c754ce6b01aaab4a88b63aa245343ccb911824617a899fb4c66c8f2b064",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 26005,
+          "output_tokens": 166
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "redfern-research-history",
+        "case_id": "redfern-research-current-sample-cold-storage-tier",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37157,
+      "output_tokens": 201,
+      "wall_time_ms": 20279,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "490fca98c8ed744182d5c9ea57fefd990299cc8e21e3a302fab99079673f3924",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "a61e0674ce628a6b7b1c92afb15fb346108cef8578fc3f5508843a8ca2f809be",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "40122288ffc247db5e4759c5c8ae0a055bdb236f7f82fdee452dd0deb6f9b1d8",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "a5aebd06986096d54eab62ef242e49c4fc9cc0fed09e935ff2dadf172e176b9e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37157,
+          "output_tokens": 201
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "sunlark-foundry-history",
+        "case_id": "sunlark-foundry-current-CAD-release-archive-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 37226,
+      "output_tokens": 237,
+      "wall_time_ms": 23199,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "7950f5e9f3ceaf370af665af370b57e86dc60af9431709c70e68e10fc4dddec9",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_0",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ab2f4e0b603f7823fadc546acee66ced8c2f7f478b451c5ac92c735b8ead8c3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "bc4ba8de0eb95abde20711f48cdc026cb4b8817898dedaf0cb23fb9543cc3cc5",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "item_1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "14c9b74af0cd7693fc29e9ce51ce3e8f5912e52dae4a3cd57e948b7cbf55413d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "db519ce3dff53d23217e11b986b9de63780368d6ecf5ef5f3a6d10d0966ae281",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 37226,
+          "output_tokens": 237
+        }
+      ]
+    }
+  ]
+}

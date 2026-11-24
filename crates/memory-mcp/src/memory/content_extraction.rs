@@ -1,25 +1,16 @@
-//! Turning raw file or message bytes into an ingest request.
+//! Turning explicitly authorized source bytes into episode text.
 //!
 //! Memory owns ingestion, so deciding that a PDF is a document with a
 //! quoted title and an ISO date, or that a commit message is a log with
 //! a lineage, is memory's rule about what an episode is — not a
-//! transport concern. The detection is content-only: it reads bytes and
-//! a path, and touches no network or database beyond what the caller
-//! supplies.
-//!
-//! `detect_ingest_transport` classifies by content rather than by
-//! extension, because a file's name is not a reliable signal about what
-//! is in it and ingesting the wrong transport kind produces an episode
-//! nobody can retrieve correctly later.
+//! transport concern. This module only parses bytes or fetches a URL after
+//! the explicit operator-import adapter authorizes that operation.
 
-use std::fs;
 use std::net::IpAddr;
 use std::path::Path;
 use std::time::Duration;
 
 use sha2::{Digest, Sha256};
-
-use crate::models::IngestRequest;
 
 use crate::error::MemoryError;
 
@@ -100,123 +91,60 @@ const FILE_PARSERS: [FileFormat; 7] = [
     FileFormat::Email,
 ];
 
-struct PreparedIngestContent {
-    content: String,
-    source_id: Option<String>,
+/// Parses bytes already read through an explicit, root-confined operator
+/// capability. The path is used only as a format hint; this function never
+/// opens it.
+pub(crate) fn parse_operator_import_file(
+    relative_path: &Path,
+    bytes: &[u8],
+) -> Result<String, MemoryError> {
+    const MAX_FILE_BYTES: usize = 4 * 1024 * 1024;
+    if bytes.len() > MAX_FILE_BYTES {
+        return Err(MemoryError::Validation(
+            "operator import file exceeds the 4 MiB limit".into(),
+        ));
+    }
+    let format = detect_format(relative_path, bytes)
+        .map_err(|_| MemoryError::Validation("unsupported operator import file format".into()))?;
+    let chunks = format
+        .parse(bytes)
+        .map_err(|_| MemoryError::Validation("operator import file could not be parsed".into()))?;
+    let prepared = finalize_text_chunks(chunks)
+        .map_err(|_| MemoryError::Validation("operator import file could not be parsed".into()))?;
+    if prepared.is_empty() {
+        return Err(MemoryError::Validation(
+            "operator import file contains no extractable text".into(),
+        ));
+    }
+    Ok(prepared)
 }
 
-pub(crate) fn detect_ingest_transport(content: &str) -> &'static str {
-    let path = Path::new(content);
-    if path.exists() {
-        if path.is_file() {
-            return "file";
-        }
-        if path.is_dir() {
-            return "directory";
-        }
+pub(crate) async fn fetch_operator_url_content(raw_url: &str) -> Result<String, MemoryError> {
+    if crate::models::contains_credential_material(raw_url) {
+        return Err(MemoryError::Validation(
+            "operator import URL must not contain credentials".into(),
+        ));
+    }
+    let parsed_url = reqwest::Url::parse(raw_url)
+        .map_err(|_| MemoryError::Validation("operator import URL is invalid".into()))?;
+    if has_url_credentials(&parsed_url) || has_credential_query_parameter(&parsed_url) {
+        return Err(MemoryError::Validation(
+            "operator import URL must not contain credentials".into(),
+        ));
     }
 
-    if looks_like_remote_url(content) {
-        "url"
-    } else {
-        "inline"
-    }
+    let (url, resolved_addresses) = validate_remote_url(raw_url).await?;
+    fetch_operator_url_content_for_resolved_url(url, &resolved_addresses).await
 }
 
-pub(crate) async fn prepare_ingest_request(
-    mut request: IngestRequest,
-) -> Result<IngestRequest, MemoryError> {
-    let path_prepared = maybe_prepare_path_content(&request.content)?;
-    if apply_prepared_content(&mut request, path_prepared) {
-        return Ok(request);
-    }
-
-    let dir_prepared = maybe_prepare_directory_content(&request.content)?;
-    if apply_prepared_content(&mut request, dir_prepared) {
-        return Ok(request);
-    }
-
-    let url_prepared = maybe_prepare_url_content(&request.content).await?;
-    if apply_prepared_content(&mut request, url_prepared) {
-        return Ok(request);
-    }
-
-    Ok(request)
-}
-
-/// Applies a successfully-prepared ingest content to the request in place.
-/// Returns `true` when content was found and applied, `false` when `None`.
-fn apply_prepared_content(
-    request: &mut IngestRequest,
-    prepared: Option<PreparedIngestContent>,
-) -> bool {
-    let Some(prep) = prepared else {
-        return false;
-    };
-    request.content = prep.content;
-    if let Some(source_id) = prep.source_id {
-        request.source_id = source_id;
-    }
-    true
-}
-
-#[cfg(test)]
-pub(crate) fn maybe_extract_path_content(content: &str) -> Result<Option<String>, MemoryError> {
-    Ok(maybe_prepare_path_content(content)?.map(|prepared| prepared.content))
-}
-
-fn maybe_prepare_path_content(content: &str) -> Result<Option<PreparedIngestContent>, MemoryError> {
-    let path = Path::new(content);
-    if !path.exists() || !path.is_file() {
-        return Ok(None);
-    }
-
-    Ok(Some(PreparedIngestContent {
-        content: extract_file_content(path)?,
-        source_id: Some(stable_transport_source_id_for_path(path)?),
-    }))
-}
-
-#[cfg(test)]
-fn maybe_extract_directory_content(content: &str) -> Result<Option<String>, MemoryError> {
-    Ok(maybe_prepare_directory_content(content)?.map(|prepared| prepared.content))
-}
-
-fn maybe_prepare_directory_content(
-    content: &str,
-) -> Result<Option<PreparedIngestContent>, MemoryError> {
-    let path = Path::new(content);
-    if !path.exists() || !path.is_dir() {
-        return Ok(None);
-    }
-
-    let mut collected = Vec::new();
-    collect_directory_fragments(path, path, &mut collected)?;
-    if collected.is_empty() {
-        return Err(MemoryError::Validation(format!(
-            "no supported ingest files found in {}",
-            path.display()
-        )));
-    }
-
-    Ok(Some(PreparedIngestContent {
-        content: normalize_extracted_text(&collected.join("\n\n")),
-        source_id: Some(stable_transport_source_id_for_path(path)?),
-    }))
-}
-
-async fn maybe_prepare_url_content(
-    content: &str,
-) -> Result<Option<PreparedIngestContent>, MemoryError> {
-    if !looks_like_remote_url(content) {
-        return Ok(None);
-    }
-
-    let (url, resolved_addresses) = validate_remote_url(content).await?;
+async fn fetch_operator_url_content_for_resolved_url(
+    url: reqwest::Url,
+    resolved_addresses: &[std::net::SocketAddr],
+) -> Result<String, MemoryError> {
     const MAX_URL_BODY_BYTES: u64 = 4 * 1024 * 1024;
     let host = url
         .host_str()
-        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no host: {content}")))?;
+        .ok_or_else(|| MemoryError::Validation("operator import URL has no host".into()))?;
     let resolve_host = host
         .strip_prefix('[')
         .and_then(|host| host.strip_suffix(']'))
@@ -228,74 +156,101 @@ async fn maybe_prepare_url_content(
         .connect_timeout(Duration::from_secs(5))
         .timeout(Duration::from_secs(20))
         .redirect(reqwest::redirect::Policy::none())
-        .resolve_to_addrs(resolve_host, &resolved_addresses)
+        .resolve_to_addrs(resolve_host, resolved_addresses)
         .build()
-        .map_err(|err| {
-            MemoryError::Validation(format!("failed to build ingest url client: {err}"))
+        .map_err(|_| {
+            MemoryError::Validation("operator import client could not be created".into())
         })?;
-    let response = client.get(url.clone()).send().await.map_err(|err| {
-        MemoryError::Validation(format!("failed to fetch ingest url {content}: {err}"))
-    })?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(MemoryError::Validation(format!(
-            "failed to fetch ingest url {content}: http {status}"
-        )));
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|_| MemoryError::Validation("operator import request failed".into()))?;
+    if !response.status().is_success() {
+        return Err(MemoryError::Validation(
+            "operator import server returned a non-success status".into(),
+        ));
     }
 
     if response
         .content_length()
         .is_some_and(|length| length > MAX_URL_BODY_BYTES)
     {
-        return Err(MemoryError::Validation(format!(
-            "ingest url body exceeds {MAX_URL_BODY_BYTES} bytes: {content}"
-        )));
+        return Err(MemoryError::Validation(
+            "operator import response exceeds the 4 MiB limit".into(),
+        ));
     }
     let mut body = Vec::new();
     let mut response = response;
-    while let Some(chunk) = response.chunk().await.map_err(|err| {
-        MemoryError::Validation(format!("failed to read ingest url body {content}: {err}"))
-    })? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| MemoryError::Validation("operator import response could not be read".into()))?
+    {
         if body.len() as u64 + chunk.len() as u64 > MAX_URL_BODY_BYTES {
-            return Err(MemoryError::Validation(format!(
-                "ingest url body exceeds {MAX_URL_BODY_BYTES} bytes: {content}"
-            )));
+            return Err(MemoryError::Validation(
+                "operator import response exceeds the 4 MiB limit".into(),
+            ));
         }
         body.extend_from_slice(&chunk);
     }
-    let body = String::from_utf8(body).map_err(|err| {
-        MemoryError::Validation(format!("ingest url body is not UTF-8 {content}: {err}"))
-    })?;
+    let body = String::from_utf8(body)
+        .map_err(|_| MemoryError::Validation("operator import response is not UTF-8".into()))?;
     let extracted = normalize_extracted_text(&strip_html_to_text(&body));
     if extracted.is_empty() {
-        return Err(MemoryError::Validation(format!(
-            "no extractable text found at ingest url {content}"
-        )));
+        return Err(MemoryError::Validation(
+            "operator import response contains no extractable text".into(),
+        ));
     }
+    finalize_text_chunks(vec![TextChunk::new(extracted)])
+}
 
-    Ok(Some(PreparedIngestContent {
-        content: finalize_text_chunks(vec![TextChunk::new(extracted)])?,
-        source_id: Some(stable_transport_source_id(content)),
-    }))
+fn has_url_credentials(url: &reqwest::Url) -> bool {
+    !url.username().is_empty() || url.password().is_some()
+}
+
+fn has_credential_query_parameter(url: &reqwest::Url) -> bool {
+    url.query_pairs().any(|(name, _)| {
+        let normalized = name
+            .chars()
+            .filter(|character| character.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect::<String>();
+        [
+            "token",
+            "secret",
+            "password",
+            "passwd",
+            "apikey",
+            "accesskey",
+            "authorization",
+            "auth",
+            "credential",
+            "signature",
+            "sig",
+            "session",
+        ]
+        .iter()
+        .any(|marker| normalized == *marker || normalized.ends_with(marker))
+    })
 }
 
 async fn validate_remote_url(
     content: &str,
 ) -> Result<(reqwest::Url, Vec<std::net::SocketAddr>), MemoryError> {
     let url = reqwest::Url::parse(content)
-        .map_err(|err| MemoryError::Validation(format!("invalid ingest url {content}: {err}")))?;
-    if !matches!(url.scheme(), "http" | "https") || url.username() != "" || url.password().is_some()
-    {
-        return Err(MemoryError::Validation(format!(
-            "ingest url must be HTTP(S) without credentials: {content}"
-        )));
+        .map_err(|_| MemoryError::Validation("operator import URL is invalid".into()))?;
+    if !matches!(url.scheme(), "http" | "https") || has_url_credentials(&url) {
+        return Err(MemoryError::Validation(
+            "operator import URL must be HTTP(S) without credentials".into(),
+        ));
     }
     let host = url
         .host_str()
-        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no host: {content}")))?;
+        .ok_or_else(|| MemoryError::Validation("operator import URL has no host".into()))?;
     let port = url
         .port_or_known_default()
-        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no port: {content}")))?;
+        .ok_or_else(|| MemoryError::Validation("operator import URL has no port".into()))?;
     // URL serialization retains brackets around IPv6 literals; socket IP
     // parsing expects the address without those URI delimiters.
     let address_host = host
@@ -310,16 +265,16 @@ async fn validate_remote_url(
             tokio::net::lookup_host((host, port)),
         )
         .await
-        .map_err(|_| MemoryError::Validation("ingest url DNS resolution timed out".into()))?
-        .map_err(|err| {
-            MemoryError::Validation(format!("cannot resolve ingest url {content}: {err}"))
+        .map_err(|_| {
+            MemoryError::Validation("operator import URL DNS resolution timed out".into())
         })?
+        .map_err(|_| MemoryError::Validation("operator import URL DNS resolution failed".into()))?
         .collect::<Vec<_>>()
     };
     if addresses.is_empty() || addresses.iter().any(|address| !is_public_ip(&address.ip())) {
-        return Err(MemoryError::Validation(format!(
-            "ingest url resolves to a non-public address: {content}"
-        )));
+        return Err(MemoryError::Validation(
+            "operator import URL resolves to a non-public address".into(),
+        ));
     }
     Ok((url, addresses))
 }
@@ -353,25 +308,6 @@ fn is_public_ip(ip: &IpAddr) -> bool {
                     .is_some_and(|v4| !is_public_ip(&IpAddr::V4(v4)))
         }
     }
-}
-
-fn extract_file_content(path: &Path) -> Result<String, MemoryError> {
-    let bytes = fs::read(path).map_err(|err| {
-        MemoryError::Validation(format!(
-            "failed to read ingest file {}: {err}",
-            path.display()
-        ))
-    })?;
-    let format = detect_format(path, &bytes)?;
-    let prepared = finalize_text_chunks(format.parse(&bytes)?)?;
-    if prepared.is_empty() {
-        return Err(MemoryError::Validation(format!(
-            "no extractable text found in {}",
-            path.display()
-        )));
-    }
-
-    Ok(prepared)
 }
 
 fn detect_format(path: &Path, bytes: &[u8]) -> Result<FileFormat, MemoryError> {
@@ -416,19 +352,7 @@ fn finalize_text_chunks(chunks: Vec<TextChunk>) -> Result<String, MemoryError> {
     Ok(chunker::render_chunks(&chunker::chunk_text(normalized)))
 }
 
-fn stable_transport_source_id_for_path(path: &Path) -> Result<String, MemoryError> {
-    let canonical = path.canonicalize().map_err(|err| {
-        MemoryError::Validation(format!(
-            "failed to canonicalize ingest path {}: {err}",
-            path.display()
-        ))
-    })?;
-    Ok(stable_transport_source_id(
-        canonical.to_string_lossy().as_ref(),
-    ))
-}
-
-fn stable_transport_source_id(seed: &str) -> String {
+pub(crate) fn stable_transport_source_id(seed: &str) -> String {
     hex::encode(Sha256::digest(seed.as_bytes()))
 }
 
@@ -438,56 +362,6 @@ fn normalize_extracted_text(raw: &str) -> String {
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn collect_directory_fragments(
-    root: &Path,
-    directory: &Path,
-    fragments: &mut Vec<String>,
-) -> Result<(), MemoryError> {
-    let mut entries = fs::read_dir(directory)
-        .map_err(|err| {
-            MemoryError::Validation(format!(
-                "failed to read ingest directory {}: {err}",
-                directory.display()
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| {
-            MemoryError::Validation(format!(
-                "failed to enumerate ingest directory {}: {err}",
-                directory.display()
-            ))
-        })?;
-    entries.sort_by_key(|entry| entry.path());
-
-    for entry in entries {
-        let path = entry.path();
-        let file_type = entry.file_type().map_err(|err| {
-            MemoryError::Validation(format!(
-                "failed to inspect ingest path {}: {err}",
-                path.display()
-            ))
-        })?;
-        if file_type.is_dir() {
-            collect_directory_fragments(root, &path, fragments)?;
-            continue;
-        }
-        if !file_type.is_file() {
-            continue;
-        }
-
-        if let Ok(extracted) = extract_file_content(&path) {
-            let relative = path.strip_prefix(root).unwrap_or(path.as_path());
-            fragments.push(format!("File: {}\n{}", relative.display(), extracted));
-        }
-    }
-
-    Ok(())
-}
-
-fn looks_like_remote_url(content: &str) -> bool {
-    content.starts_with("http://") || content.starts_with("https://")
 }
 
 fn strip_html_to_text(raw: &str) -> String {
@@ -517,10 +391,8 @@ fn strip_html_to_text(raw: &str) -> String {
 }
 
 fn unsupported_format(path: &Path) -> MemoryError {
-    MemoryError::Validation(format!(
-        "unsupported ingest file format for {}",
-        path.display()
-    ))
+    let _ = path;
+    MemoryError::Validation("unsupported ingest file format".into())
 }
 
 /// Parses raw bytes for the filesystem watcher using the relative path's
@@ -533,10 +405,10 @@ pub(crate) fn parse_bytes_for_watch(
     let format = detect_format(Path::new(relative_path), bytes)?;
     let prepared = finalize_text_chunks(format.parse(bytes)?)?;
     if prepared.is_empty() {
-        return Err(MemoryError::Validation(format!(
-            "no extractable text found in {}",
-            relative_path
-        )));
+        let _ = relative_path;
+        return Err(MemoryError::Validation(
+            "watch source file contains no extractable text".into(),
+        ));
     }
     let source_type = match format {
         FileFormat::Email => "email",
@@ -576,162 +448,58 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    use chrono::Utc;
-    use sha2::{Digest, Sha256};
-    use tempfile::tempdir;
+    #[tokio::test]
+    async fn operator_import_rejects_redirect_without_contacting_target() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    fn fixture_path(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("fixtures")
-            .join("docs")
-            .join(name)
-    }
-
-    #[test]
-    fn extracts_known_phrases_from_supported_fixtures() {
-        let cases = [
-            ("sample.pdf", "Hello World"),
-            ("sample.docx", "I am a test document"),
-            ("sample.xlsx", "Test spreadsheet"),
-            ("sample.pptx", "Title of the first slide"),
-            ("sample.md", "Maple markdown action item"),
-            ("sample.eml", "Cedar email follow-up"),
-        ];
-
-        for (fixture_name, expected_phrase) in cases {
-            let path = fixture_path(fixture_name);
-            let extracted = maybe_extract_path_content(path.to_string_lossy().as_ref())
-                .expect("fixture extraction should succeed")
-                .expect("fixture path should be detected");
-            assert!(
-                extracted.contains(expected_phrase),
-                "fixture {} should contain {:?}, got {:?}",
-                path.display(),
-                expected_phrase,
-                extracted,
+        let redirect_target = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind redirect target");
+        let target_port = redirect_target.local_addr().expect("target address").port();
+        let source = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind redirect source");
+        let source_port = source.local_addr().expect("source address").port();
+        let source_task = tokio::spawn(async move {
+            let (mut stream, _) = source.accept().await.expect("accept source request");
+            let mut request = [0; 2048];
+            let _ = stream.read(&mut request).await.expect("read request");
+            let response = format!(
+                "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{target_port}/blocked\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             );
-        }
-    }
+            stream
+                .write_all(response.as_bytes())
+                .await
+                .expect("send redirect response");
+        });
 
-    #[test]
-    fn ignores_plain_inline_content() {
+        let url = reqwest::Url::parse(&format!("http://redirect.test:{source_port}/source"))
+            .expect("test source URL");
+        let resolved = vec![std::net::SocketAddr::from(([127, 0, 0, 1], source_port))];
+        let result = fetch_operator_url_content_for_resolved_url(url, &resolved).await;
+
         assert!(
-            maybe_extract_path_content("inline content")
-                .unwrap()
-                .is_none()
+            matches!(result, Err(MemoryError::Validation(ref message)) if message.contains("non-success status")),
+            "a redirect must be refused instead of followed: {result:?}"
         );
-    }
-
-    #[test]
-    fn extracts_known_phrases_from_recursive_directory() {
-        let temp_dir = tempdir().expect("temp dir should exist");
-        let root_markdown = temp_dir.path().join("sample.md");
-        std::fs::copy(fixture_path("sample.md"), &root_markdown)
-            .expect("markdown fixture should copy");
-
-        let nested_dir = temp_dir.path().join("nested/mail");
-        std::fs::create_dir_all(&nested_dir).expect("nested directory should exist");
-        std::fs::copy(fixture_path("sample.eml"), nested_dir.join("sample.eml"))
-            .expect("email fixture should copy");
-        std::fs::write(temp_dir.path().join("ignored.json"), "{}")
-            .expect("unsupported file should write");
-
-        let extracted = maybe_extract_directory_content(temp_dir.path().to_string_lossy().as_ref())
-            .expect("directory extraction should succeed")
-            .expect("directory path should be detected");
-        assert!(extracted.contains("Maple markdown action item"));
-        assert!(extracted.contains("Cedar email follow-up"));
+        source_task.await.expect("source server completes");
+        assert!(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(250),
+                redirect_target.accept()
+            )
+            .await
+            .is_err(),
+            "the redirect destination must not receive a request"
+        );
     }
 
     #[test]
     fn strips_known_phrase_from_html_fixture() {
-        let html = std::fs::read_to_string(fixture_path("sample.html"))
-            .expect("html fixture should be readable");
-        let extracted = normalize_extracted_text(&strip_html_to_text(&html));
+        let extracted = normalize_extracted_text(&strip_html_to_text(
+            "<p>Aspen url ingest briefing</p><script>ignored()</script>",
+        ));
         assert!(extracted.contains("Aspen url ingest briefing"));
-    }
-
-    #[tokio::test]
-    async fn prepare_ingest_request_rewrites_file_source_id_to_canonical_path_hash() {
-        let temp_dir = tempdir().expect("temp dir should exist");
-        let file_path = temp_dir.path().join("memo.txt");
-        std::fs::write(&file_path, "spruce follow-up memo")
-            .expect("fixture file should be writable");
-
-        let canonical = file_path
-            .canonicalize()
-            .expect("file path should canonicalize");
-        let expected_hash = hex::encode(Sha256::digest(canonical.to_string_lossy().as_bytes()));
-
-        let prepared = prepare_ingest_request(IngestRequest {
-            source_context: None,
-            source_type: "document".to_string(),
-            source_id: "caller-provided".to_string(),
-            content: file_path.to_string_lossy().into_owned(),
-            t_ref: Utc::now(),
-            t_ingested: None,
-            policy_tags: vec![],
-        })
-        .await
-        .expect("file ingest request should prepare");
-
-        assert_eq!(prepared.source_id, expected_hash);
-        assert!(prepared.content.contains("spruce follow-up memo"));
-    }
-
-    #[tokio::test]
-    async fn prepare_ingest_request_chunks_large_file_content_with_overlap() {
-        let temp_dir = tempdir().expect("temp dir should exist");
-        let file_path = temp_dir.path().join("long-note.txt");
-        let content = (1..=450)
-            .map(|index| format!("w{index:04}"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        std::fs::write(&file_path, content).expect("long fixture file should be writable");
-
-        let prepared = prepare_ingest_request(IngestRequest {
-            source_context: None,
-            source_type: "document".to_string(),
-            source_id: "caller-provided".to_string(),
-            content: file_path.to_string_lossy().into_owned(),
-            t_ref: Utc::now(),
-            t_ingested: None,
-            policy_tags: vec![],
-        })
-        .await
-        .expect("long file ingest request should prepare");
-
-        assert!(prepared.content.contains("Chunk 1/2"));
-        assert!(prepared.content.contains("Chunk 2/2"));
-        assert!(prepared.content.contains("w0351 w0352 w0353"));
-        assert!(prepared.content.contains("w0401 w0402 w0403"));
-    }
-
-    #[test]
-    fn detect_ingest_transport_identifies_file() {
-        let temp_dir = tempdir().expect("temp dir should exist");
-        let file_path = temp_dir.path().join("test.txt");
-        std::fs::write(&file_path, "content").expect("write file");
-        assert_eq!(
-            detect_ingest_transport(file_path.to_string_lossy().as_ref()),
-            "file"
-        );
-    }
-
-    #[test]
-    fn detect_ingest_transport_identifies_directory() {
-        let temp_dir = tempdir().expect("temp dir should exist");
-        assert_eq!(
-            detect_ingest_transport(temp_dir.path().to_string_lossy().as_ref()),
-            "directory"
-        );
-    }
-
-    #[test]
-    fn detect_ingest_transport_identifies_url() {
-        assert_eq!(detect_ingest_transport("https://example.com/doc"), "url");
-        assert_eq!(detect_ingest_transport("http://localhost:8080/api"), "url");
     }
 
     #[test]
@@ -870,21 +638,6 @@ mod tests {
         let observed = detect_format(Path::new("LICENSE"), b"MIT License\n");
 
         assert!(observed.is_err(), "naming alone must not pick a parser");
-    }
-
-    #[test]
-    fn a_remote_url_is_recognized() {
-        assert!(looks_like_remote_url("https://example.com/doc"));
-    }
-
-    #[test]
-    fn a_bare_host_is_not_a_remote_url() {
-        assert!(!looks_like_remote_url("example.com/doc"));
-    }
-
-    #[test]
-    fn an_ftp_url_is_not_a_remote_url() {
-        assert!(!looks_like_remote_url("ftp://example.com/file"));
     }
 
     #[test]
@@ -1032,12 +785,6 @@ mod tests {
     }
 
     #[test]
-    fn detect_ingest_transport_identifies_inline() {
-        assert_eq!(detect_ingest_transport("plain text content"), "inline");
-        assert_eq!(detect_ingest_transport("just some inline text"), "inline");
-    }
-
-    #[test]
     fn normalize_extracted_text_trims_and_dedup_empty_lines() {
         let raw = "  line one  \n\n  line two  \n   \nline three";
         let result = normalize_extracted_text(raw);
@@ -1048,56 +795,6 @@ mod tests {
     fn normalize_extracted_text_handles_empty_input() {
         assert_eq!(normalize_extracted_text(""), "");
         assert_eq!(normalize_extracted_text("   \n\n  "), "");
-    }
-
-    #[test]
-    fn apply_prepared_content_updates_request_when_some() {
-        let mut req = IngestRequest {
-            source_context: None,
-            source_type: "test".to_string(),
-            source_id: "original".to_string(),
-            content: "old".to_string(),
-            t_ref: Utc::now(),
-            t_ingested: None,
-            policy_tags: vec![],
-        };
-
-        assert!(apply_prepared_content(
-            &mut req,
-            Some(PreparedIngestContent {
-                content: "new content".to_string(),
-                source_id: Some("new-id".to_string()),
-            }),
-        ));
-        assert_eq!(req.content, "new content");
-        assert_eq!(req.source_id, "new-id");
-
-        assert!(apply_prepared_content(
-            &mut req,
-            Some(PreparedIngestContent {
-                content: "only content".to_string(),
-                source_id: None,
-            }),
-        ));
-        assert_eq!(req.content, "only content");
-        assert_eq!(req.source_id, "new-id"); // unchanged
-    }
-
-    #[test]
-    fn apply_prepared_content_returns_false_when_none() {
-        let mut req = IngestRequest {
-            source_context: None,
-            source_type: "test".to_string(),
-            source_id: "id".to_string(),
-            content: "old".to_string(),
-            t_ref: Utc::now(),
-            t_ingested: None,
-            policy_tags: vec![],
-        };
-
-        assert!(!apply_prepared_content(&mut req, None));
-        assert_eq!(req.content, "old");
-        assert_eq!(req.source_id, "id");
     }
 
     #[test]

@@ -1,0 +1,12 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "birch-initial"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [
+    "birch-update"
+  ]
+}

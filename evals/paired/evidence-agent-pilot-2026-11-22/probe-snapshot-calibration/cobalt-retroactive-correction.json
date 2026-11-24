@@ -1,0 +1,39 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "cobalt-retroactive-correction",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "d3a7f68d8266ae15d30651906eab8cd6c100f6d60cbab880c9542753b2709824",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-03T09:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:08.023727Z",
+    "known_revision": 15,
+    "valid_at": "2026-06-03T09:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "cobalt-initial",
+      "episode_id": "episode:8a66d876b12d13360468a096",
+      "fact_ids": [
+        "fact:333c561b78d806a54edddb6a"
+      ],
+      "reconciliation": null
+    },
+    {
+      "event_id": "cobalt-correction",
+      "episode_id": "episode:8831ff7c8c85bc95c5bee296",
+      "fact_ids": [
+        "fact:876bbfd66c832f84e17e47aa"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

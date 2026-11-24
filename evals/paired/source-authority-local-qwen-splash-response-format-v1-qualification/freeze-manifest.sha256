@@ -1,0 +1,17 @@
+41392b51bda556fb033d576f80aa9b2ab5decade2a3ad0979baff9513b07f075  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/README.md
+92fb29eefc261a169a67c44520e20c4ddfecd681708a2b45dbe29e6aab18d123  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/host-policy.json
+4c87e99c125006ac014e4ac2887f1af9d2dbb657954cc980ae27946d5728f915  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/plan.json
+3576443eea9fab2cafb877d22d7238aeb157fcffc6026a28c9e03de760650c09  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/prompts/memory-recall-task-rules-v1.txt
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/protocol-config.json
+88c94af3c07aa8fa97ec18eaab38b5427cae6177ab3e9d87318fb10b1491d726  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/provider-inventory.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/retry-policy.json
+1e48d785c422ac29ecfabccebca7039b54857aef5389335e329d479b5a502f03  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/response-format.json
+4847b5155bf327ea8b105a03689cb25ff3b3fb68fe42e7f2507be90dcbb47ea1  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/sampling-config.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/simulator.json
+bb155f2c1a59479096f71dbc4e5881828fd88f7cdbb94809a54b41361c6715d2  evals/paired/source-authority-local-qwen-splash-response-format-v1-qualification/tasks-v1.json

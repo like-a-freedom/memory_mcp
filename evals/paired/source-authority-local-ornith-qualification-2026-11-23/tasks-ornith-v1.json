@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "silverpine_signal",
+        "case_id": "silverpine_signal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Silverpine Signal Lab, the weather mast is kept in Gull-28. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Silverpine Signal Lab, where is the weather mast kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Silverpine Signal Lab, where is the weather mast kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-2026-11-23-silverpine_signal",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-2026-11-23-silverpine_signal"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Gull-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "brackenmill_archive",
+        "case_id": "brackenmill_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Brackenmill Archive, the lease index is kept in Cobalt-63. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Brackenmill Archive, where is the lease index kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Brackenmill Archive, where is the lease index kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-2026-11-23-brackenmill_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-2026-11-23-brackenmill_archive"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-63"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonquay_station",
+        "case_id": "moonquay_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Moonquay Weather Station for a later session. It is in the source file fixtures/moonquay_station.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Moonquay Weather Station, where is the rain ledger kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Moonquay Weather Station, where is the rain ledger kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-2026-11-23-moonquay_station",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-2026-11-23-moonquay_station"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Tern-47"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Moonquay Weather Station before this phase. Use assemble_context to verify the memory fact: At Moonquay Weather Station, where is the rain ledger kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "moonquay_station",
+          "relative_path": "fixtures/moonquay_station.txt",
+          "content": "Fact: At Moonquay Weather Station, the rain ledger is kept in Tern-47.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-ornith-2026-11-23-moonquay_station"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cinderbrook_survey",
+        "case_id": "cinderbrook_survey-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Cinderbrook Survey House for a later session. It is in the source file fixtures/cinderbrook_survey.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Cinderbrook Survey House, where is the safety atlas kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cinderbrook Survey House, where is the safety atlas kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-2026-11-23-cinderbrook_survey",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-2026-11-23-cinderbrook_survey"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Pine-95"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Cinderbrook Survey House before this phase. Use assemble_context to verify the memory fact: At Cinderbrook Survey House, where is the safety atlas kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "cinderbrook_survey",
+          "relative_path": "fixtures/cinderbrook_survey.txt",
+          "content": "Fact: At Cinderbrook Survey House, the safety atlas is kept in Pine-95.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-ornith-2026-11-23-cinderbrook_survey"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "absent-entry",
+      "source_id": "absent-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Orchid Depot\ndimension: capacity\nvalue: 57 crates for Orchid Depot",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "east-entry",
+      "source_id": "east-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Juniper Terminal East\ndimension: capacity\nvalue: 42 crates for Juniper Terminal East",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "west-entry",
+      "source_id": "west-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Juniper Terminal West\ndimension: capacity\nvalue: 26 crates for Juniper Terminal West",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "sole-entry",
+      "source_id": "sole-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Mossline Plant\ndimension: capacity\nvalue: 54 crates for Mossline Plant",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-a",
+      "source_id": "dispute-a-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Cedar Annex\ndimension: capacity\nvalue: 38 crates for Cedar Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-b",
+      "source_id": "dispute-b-peer",
+      "source_type": "inspection-record",
+      "content": "subject: Cedar Annex\ndimension: capacity\nvalue: 39 crates for Cedar Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "supported-entry",
+      "source_id": "supported-entry-ledger",
+      "source_type": "maintenance-record",
+      "content": "subject: Thistle Port\ndimension: capacity\nvalue: 24 crates for Thistle Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "forum-entry",
+      "source_id": "forum-entry-ledger",
+      "source_type": "forum-report",
+      "content": "subject: Thistle Port\ndimension: capacity\nvalue: 30 crates, unverified correction reported on a forum for Thistle Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "pre-report",
+      "source_id": "pre-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Amber Quay\ndimension: capacity\nvalue: 11 crates for Amber Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "post-report",
+      "source_id": "post-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Amber Quay\ndimension: capacity\nvalue: 17 crates, correction claimed by another inspector for Amber Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "earlier-valid",
+      "source_id": "earlier-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Copper Wharf\ndimension: capacity\nvalue: 14 crates for Copper Wharf",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "later-valid",
+      "source_id": "later-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Copper Wharf\ndimension: capacity\nvalue: 23 crates for Copper Wharf",
+      "t_ref": "2026-07-05T09:00:00Z"
+    },
+    {
+      "id": "office-entry",
+      "source_id": "office-entry-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Mossline Office\ndimension: location\nvalue: Dovetail Lane for Mossline Office",
+      "t_ref": "2026-08-01T09:00:00Z"
+    }
+  ]
+}

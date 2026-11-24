@@ -16,6 +16,23 @@ pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryErro
         return Err(MemoryError::Validation("content is required".into()));
     }
 
+    let credential_bearing = std::iter::once(request.source_type.as_str())
+        .chain(std::iter::once(request.source_id.as_str()))
+        .chain(std::iter::once(request.content.as_str()))
+        .chain(request.policy_tags.iter().map(String::as_str))
+        .chain(
+            request
+                .source_context
+                .iter()
+                .map(|context| context.group.as_str()),
+        )
+        .any(crate::models::contains_credential_material);
+    if credential_bearing {
+        return Err(MemoryError::Validation(
+            "ingest refused because the content or metadata resembles credential material".into(),
+        ));
+    }
+
     if let Some(context) = &request.source_context
         && (context.group.trim().is_empty()
             || context.position == 0

@@ -191,11 +191,22 @@ jobs:
           EMBEDDINGS_MODEL_DIR: target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3
           RETRIEVAL_RERANKER_MODEL_DIR: target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825
           RETRIEVAL_RERANKER_ADMISSION_FLOOR: '0'
-          MEMORY_CLAIM_ROLLOUT_STAGE: evidence
         run: |
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval --locked -- run --profile "evals/profiles/$EVAL_PROFILE.json" --artifact "target/evals/$EVAL_PROFILE.json" --baseline "evals/baselines/one-active-namespace-$EVAL_PROFILE.json"
           make eval-response-size
+      - name: Build public memory executable for deterministic decisions
+        run: cargo build -p memory_mcp --bin memory_mcp --features streamable-http --locked
+      - name: Deterministic memory decision acceptance
+        env:
+          MEMORY_DECISIONS_SERVER_BIN: ${{ github.workspace }}/target/debug/memory_mcp
+          MEMORY_QUALITY_GATE_OUTPUT: ${{ github.workspace }}/target/evals/deterministic-memory
+        run: cargo test -p eval-harness --test deterministic_quality_gate --locked -- --ignored
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: deterministic-memory-decisions
+          path: target/evals/deterministic-memory
       - name: Perf smoke
         run: make perf-smoke
       - uses: actions/upload-artifact@v7

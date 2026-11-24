@@ -14,16 +14,13 @@ use memory_mcp::memory::api::{
 struct CloseCall {
     fact_id: String,
     t_invalid: String,
-    t_invalid_ingested: Option<String>,
     reason: String,
 }
 
 struct RecordingPort {
     existing: Mutex<Option<String>>,
     close_calls: Mutex<Vec<CloseCall>>,
-    claim_calls: Mutex<Vec<String>>,
     cache_invalidated: Mutex<usize>,
-    claim_pipeline_wired: bool,
 }
 
 impl RecordingPort {
@@ -31,9 +28,7 @@ impl RecordingPort {
         Arc::new(Self {
             existing: Mutex::new(Some(fact_id.to_owned())),
             close_calls: Mutex::new(Vec::new()),
-            claim_calls: Mutex::new(Vec::new()),
             cache_invalidated: Mutex::new(0),
-            claim_pipeline_wired: true,
         })
     }
 
@@ -41,9 +36,7 @@ impl RecordingPort {
         Arc::new(Self {
             existing: Mutex::new(None),
             close_calls: Mutex::new(Vec::new()),
-            claim_calls: Mutex::new(Vec::new()),
             cache_invalidated: Mutex::new(0),
-            claim_pipeline_wired: true,
         })
     }
 
@@ -61,11 +54,10 @@ impl InvalidationPort for RecordingPort {
         })
     }
 
-    async fn close_record(
+    async fn close_fact_and_claims(
         &self,
         fact_id: &str,
         t_invalid: DateTime<Utc>,
-        t_invalid_ingested: Option<DateTime<Utc>>,
         reason: &str,
     ) -> Result<(), MemoryError> {
         self.close_calls
@@ -74,22 +66,9 @@ impl InvalidationPort for RecordingPort {
             .push(CloseCall {
                 fact_id: fact_id.to_owned(),
                 t_invalid: t_invalid.to_rfc3339(),
-                t_invalid_ingested: t_invalid_ingested.map(|value| value.to_rfc3339()),
                 reason: reason.to_owned(),
             });
         Ok(())
-    }
-
-    async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError> {
-        self.claim_calls
-            .lock()
-            .expect("claim lock")
-            .push(fact_id.to_owned());
-        Ok(())
-    }
-
-    fn claim_pipeline_is_wired(&self) -> bool {
-        self.claim_pipeline_wired
     }
 
     async fn invalidate_assembled_context(&self) -> Result<(), MemoryError> {
@@ -138,10 +117,6 @@ async fn invalidation_closes_both_bi_temporal_fields_through_one_port() {
         calls[0].t_invalid, "2026-01-02T00:00:00+00:00",
         "the caller-supplied valid time is the recorded invalid time"
     );
-    assert_eq!(
-        calls[0].t_invalid_ingested, None,
-        "transaction time defaults to server-side now, not the caller"
-    );
     assert_eq!(calls[0].reason, "superseded by a correction");
 }
 
@@ -154,9 +129,9 @@ async fn invalidation_closes_derived_claims_and_drops_cached_context() {
         .expect("invalidation succeeds");
 
     assert_eq!(
-        *port.claim_calls.lock().expect("claim lock"),
-        vec!["fact:abc123".to_owned()],
-        "derived claims are closed with the fact"
+        port.close_calls().len(),
+        1,
+        "fact and claims share one atomic close"
     );
     assert_eq!(
         *port.cache_invalidated.lock().expect("cache lock"),
@@ -196,26 +171,5 @@ async fn a_refused_caller_never_reaches_the_close_owner() {
     assert!(
         port.close_calls().is_empty(),
         "a rate-limited caller must not invalidate anything"
-    );
-}
-
-#[tokio::test]
-async fn a_missing_claim_pipeline_still_closes_the_fact() {
-    let port = Arc::new(RecordingPort {
-        existing: Mutex::new(Some("fact:abc123".to_owned())),
-        close_calls: Mutex::new(Vec::new()),
-        claim_calls: Mutex::new(Vec::new()),
-        cache_invalidated: Mutex::new(0),
-        claim_pipeline_wired: false,
-    });
-
-    invalidate_fact(port.as_ref(), &AllowAll, &request("fact:abc123"))
-        .await
-        .expect("the fact is still invalidated without claims");
-
-    assert_eq!(port.close_calls().len(), 1);
-    assert!(
-        port.claim_calls.lock().expect("claim lock").is_empty(),
-        "no claim close is attempted when the pipeline is unwired"
     );
 }

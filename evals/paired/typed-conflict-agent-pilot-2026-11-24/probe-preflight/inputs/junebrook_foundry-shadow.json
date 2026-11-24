@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What temperature alert threshold was recorded for Junebrook Foundry on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "ecbae1eb57c8bdd8e89a6a6cb3847866e98981c5128209cf6f9051c15cd24563",
+  "claim_rollout_stage": "shadow"
+}

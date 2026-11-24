@@ -1,0 +1,234 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "78931-1795471053980137000-0",
+  "identity_sha256": "bb6743f7568a00267a67c2f9be205d952d22891a1b99a77b360d2eb41a40534c",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "eiderwick_signal_vault",
+      "case_id": "eiderwick_signal_vault-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "mossbridge_archive",
+      "case_id": "mossbridge_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cinderloom_array",
+      "case_id": "cinderloom_array-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "vesperline_depot",
+      "case_id": "vesperline_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "eiderwick_signal_vault",
+        "case_id": "eiderwick_signal_vault-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 6218,
+        "output_tokens": 759,
+        "wall_time_ms": 62787
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "a1cf7d97e26a6eaa9f48ac70fc47480c0eee795b1bcb1ab538f37d542b531e43",
+        "response_sha256": "0710c01cbb44ff429b10997b90fe4632d5a44cc4d35d01a98ca21d20cbac74a1",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-v2-eiderwick-relay-ledger"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2132,
+          "maximum_wire_bytes": 2132
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mossbridge_archive",
+        "case_id": "mossbridge_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 6237,
+        "output_tokens": 744,
+        "wall_time_ms": 58707
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "dc51f4ecfcc123ba142d389d6a4501aaaaf7d8ac19bcafb6309188471f36e0f6",
+        "response_sha256": "e61c1d15b24f92d920c90421d47d799d391a3cb1b4bceba647bc58e2d08e59be",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-v2-mossbridge-grant-register"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2190,
+          "maximum_wire_bytes": 2190
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cinderloom_array",
+        "case_id": "cinderloom_array-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "af09916636221d91072379965e37df5ddbc7bcfc91a1a65e6f25b89f4d543af9",
+        "response_sha256": "ada4e56422192385b32b9fb14b960e65e542f91c0600bd2f2632e4323c34f973",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "vesperline_depot",
+        "case_id": "vesperline_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "e0b3ac6c396b4d3dc01e9c130402360a97ebca4be0731e06eed622853524f767",
+        "response_sha256": "7f4bb1a09bca594f2d63db4eacd3f28b0f06f9b1e3ce366def2cd90e312712c7",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

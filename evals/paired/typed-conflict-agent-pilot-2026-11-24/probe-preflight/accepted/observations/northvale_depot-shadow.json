@@ -1,0 +1,15 @@
+{
+  "input_sha256": "605b0d66d65bf2f290a626200e4ae13cfe1aef6cae43df7bbd183f4fbf2e9f95",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "northvale_depot-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "northvale_depot-record-b",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

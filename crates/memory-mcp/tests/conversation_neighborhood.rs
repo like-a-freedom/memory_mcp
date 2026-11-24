@@ -67,6 +67,21 @@ async fn ingest_tagged_turn_at(
     let episode_id = IngestCapability::ingest_from_service(service, request, None)
         .await
         .expect("turn should ingest");
+    if let Some(ingested) = times.ingested {
+        // The production ingest boundary owns t_ingested and ignores caller
+        // backdating. These tests exercise legacy persisted time cutoffs, so
+        // set the fixture value directly after the real ingest write.
+        service
+            .db_client_for_port()
+            .update(
+                &episode_id,
+                serde_json::json!({ "t_ingested": ingested }),
+                "org",
+                memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .expect("seed stored ingestion time for temporal fixture");
+    }
     ExtractCapability::extract_from_service(service, &episode_id, None, None)
         .await
         .expect("turn should extract");

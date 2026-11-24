@@ -1,0 +1,32 @@
+{
+  "schema_version": "memory-mcp-deterministic-acceptance-report/v2",
+  "plan_sha256": "742a78c11755647a6df2318e5a369766fd67348ea2a739c2f64f4eb0a6280b07",
+  "incumbent_sha256": "320707567b63d8d816326d42fc4e07321fa93ae46efca4a33cad2673dc05702e",
+  "candidate_sha256": "320707567b63d8d816326d42fc4e07321fa93ae46efca4a33cad2673dc05702e",
+  "cases": 8,
+  "families": 8,
+  "wins": [
+    "peer-conflict",
+    "prior-knowledge",
+    "unverified-correction"
+  ],
+  "losses": [],
+  "incumbent_family_success": 0.125,
+  "candidate_family_success": 0.5,
+  "hard_failures": [],
+  "baseline_safety_findings": [
+    "similar-name:forbidden_source",
+    "valid-boundary:forbidden_source"
+  ],
+  "descriptive_family_gain_interval": {
+    "estimate": 0.375,
+    "lower": 0.125,
+    "upper": 0.75,
+    "independent_clusters": 8,
+    "draws": 10000,
+    "seed": 20261121,
+    "confidence_level_basis_points": 9500,
+    "algorithm": "splitmix64-v1"
+  },
+  "accepted": true
+}

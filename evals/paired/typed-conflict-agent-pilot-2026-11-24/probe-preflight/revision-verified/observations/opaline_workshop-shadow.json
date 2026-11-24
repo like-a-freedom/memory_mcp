@@ -1,0 +1,15 @@
+{
+  "input_sha256": "e36ed1c1eab4daf94f6bc84b6b4aa851b0484abab69631a85f3c32a8a2ca5b2a",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "opaline_workshop-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "opaline_workshop-record-a",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

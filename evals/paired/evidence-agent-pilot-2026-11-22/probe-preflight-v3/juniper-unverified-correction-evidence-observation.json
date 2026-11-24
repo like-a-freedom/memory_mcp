@@ -1,0 +1,10 @@
+{
+  "input_sha256": "ff19801ded24d67a276f57622d8747fdb61565c0c6b22237226c9daf79888e8a",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "juniper-forum-correction",
+    "juniper-initial"
+  ],
+  "budget_used": 2,
+  "completed": true
+}

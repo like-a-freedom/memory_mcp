@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-candidate-freeze/v1",
+  "binary_sha256": "e0d68b335cf91a99190f6a2c3c168fca69f138e1de349dd14a9b925d5383ea10",
+  "revision": "1ae1da4a+subject-admission-and-revision-fact-pool",
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/retrieval/admission.rs": "cf0361c8738a438a2f95f3472e066667b7b621b400109790cf758f8aa1012b83",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "50ac88def7cfdb1ae56e668056105f07f4f65d357128dcd9c8df25bf0cf8b7f4"
+  },
+  "confirmation_outcomes_not_inspected": true
+}

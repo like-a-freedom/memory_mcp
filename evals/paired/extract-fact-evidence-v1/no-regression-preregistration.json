@@ -1,0 +1,61 @@
+{
+  "schema_version": "memory-mcp-deterministic-no-regression-preregistration/v1",
+  "status": "frozen-before-candidate-quality-runs",
+  "frozen_at": "2026-11-22",
+  "question": "Does adding opt-in persisted fact evidence to extract leave the established deterministic memory scores unchanged?",
+  "scope": "Response-contract change only. No retrieval, extraction-decision, ranking, claim-rollout, or default-evidence behavior change is intended.",
+  "product": {
+    "reference_binary_sha256": "a06d3151ce1e854692e343cfcdbf829cfa26e46f283ca19fc37ae9ff2ff35273",
+    "reference_tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+    "candidate_binary_sha256": "4d029b407f798dab5e50cf5f531d898d0d99bb4d8f02e88be1bef7d745c12fb1",
+    "candidate_tool_schema_sha256": "9ecfa559499e708eb95b7d2fba953218029a970a6ecb1b9edc533b79bb36c0a9",
+    "product_configuration_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "enabled_features": ["fs-watch"]
+  },
+  "registered_checks": [
+    {
+      "profile": "evals/profiles/memory_decisions_v9_default.json",
+      "cases": 8,
+      "repeats": 2,
+      "expected_reference": {"evidence_successes": 8, "decision_successes": 5, "probe_successes": 5},
+      "candidate_rule": "same per-case scored outcomes as the pinned reference and identical scored outcomes across candidate repeats"
+    },
+    {
+      "profile": "evals/profiles/memory_decisions_v9_shadow.json",
+      "cases": 8,
+      "repeats": 2,
+      "expected_reference": {"evidence_successes": 8, "decision_successes": 1, "probe_successes": 1},
+      "candidate_rule": "same per-case scored outcomes as the pinned reference and identical scored outcomes across candidate repeats"
+    },
+    {
+      "profile": "evals/profiles/memory_decisions_source_authority_v4.json",
+      "cases": 4,
+      "repeats": 2,
+      "expected_reference": {"evidence_successes": 4, "decision_successes": 4, "probe_successes": 4},
+      "candidate_rule": "same per-case scored outcomes as the pinned reference and identical scored outcomes across candidate repeats"
+    },
+    {
+      "profile": "evals/profiles/claim_reconciliation_baseline.json",
+      "cases": 41,
+      "repeats": 1,
+      "expected_reference": {"passed": 41, "invalid": 0},
+      "candidate_rule": "all 41 cases pass with no invalid cases"
+    },
+    {
+      "profile": "evals/profiles/retrieval_quality.json",
+      "cases": 37,
+      "repeats": 1,
+      "expected_reference": {"passed": 37, "invalid": 0, "established_floor_metrics": 6, "all_floor_metrics": 1.0},
+      "candidate_rule": "all 37 cases pass, no invalid cases, all six established metric floors remain 1.0"
+    }
+  ],
+  "acceptance": {
+    "all_registered_cases_valid": true,
+    "zero_per_case_score_regressions": true,
+    "candidate_repeats_match_on_scored_outcomes": true,
+    "zero_new_safety_findings": true,
+    "agent_usability_or_population_benefit_claim": false
+  },
+  "schema_change_sha256_file": "schema-change.json",
+  "agent_feasibility_is_separately_preregistered": true
+}

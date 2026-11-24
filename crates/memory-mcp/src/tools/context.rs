@@ -20,8 +20,8 @@ use serde_json::Value;
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{
-    AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainRequest,
-    IngestRequest, InvalidateRequest,
+    AccessPayload, AssembleContextRequest, AssembledContextItem, ContextAssemblyResult,
+    EntityCandidate, ExplainRequest, IngestRequest, InvalidateRequest, TemporalContextQuery,
 };
 
 /// A recorded tool lifecycle event.
@@ -85,6 +85,21 @@ pub trait ToolContext {
         &self,
         request: AssembleContextRequest,
     ) -> impl Future<Output = Result<Vec<AssembledContextItem>, MemoryError>> + Send;
+
+    /// Assemble a revision-bounded context using independent valid and known
+    /// time axes. Implementations that do not support the historical path fail
+    /// closed instead of silently collapsing the cutoffs.
+    fn assemble_context_temporal(
+        &self,
+        _request: AssembleContextRequest,
+        _temporal: TemporalContextQuery,
+    ) -> impl Future<Output = Result<ContextAssemblyResult, MemoryError>> + Send {
+        async {
+            Err(MemoryError::Unavailable(
+                "historical context retrieval is unavailable in this adapter".into(),
+            ))
+        }
+    }
 
     /// Look up a source episode for extract's completion log.
     ///

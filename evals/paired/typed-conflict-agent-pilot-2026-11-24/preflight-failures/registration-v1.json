@@ -1,0 +1,13 @@
+{
+  "cause": "registration v1 task_prompt_sha256 did not equal the SHA-256 of evals/paired/prompts/memory-recall-task-rules-v2.txt required by the RecallOnly Codex runner",
+  "corrected_task_prompt_sha256": "39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab",
+  "corrective_registration_id": "typed-conflict-agent-benefit-development-pilot-2026-11-24-v2",
+  "error": "paired task prompt hash does not match the task rules embedded in this runner",
+  "impact": "no model data exposed; no trial output was produced",
+  "model_process_invoked": false,
+  "registration_id": "typed-conflict-agent-benefit-development-pilot-2026-11-24-v1",
+  "schema_version": "paired-codex-preflight-failure/v1",
+  "status": "rejected_before_model_invocation",
+  "task_rules_file_sha256": "39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab",
+  "task_sent": false
+}

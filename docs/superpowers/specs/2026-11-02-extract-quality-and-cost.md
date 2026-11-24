@@ -2,6 +2,12 @@
 
 **Status:** Implemented locally and verified 2026-11-03 (see [`EXTRACT_QUALITY_COST_BASELINE.md`](../../performance/EXTRACT_QUALITY_COST_BASELINE.md) and [`EXTRACT_QUALITY_RECOVERY.md`](../../operations/EXTRACT_QUALITY_RECOVERY.md)). No production rollout or historical repair.
 
+## Current completion and remaining conditions — 2026-11-24
+
+Local extraction changes were implemented in `3baafb94`. The [baseline](../../performance/EXTRACT_QUALITY_COST_BASELINE.md) owns the measured corpus, timing, query-count and test evidence. The [recovery assessment](../../operations/EXTRACT_QUALITY_RECOVERY.md) owns the historical-repair boundaries. Earlier per-step checkboxes were not maintained and are superseded by these outcome reports.
+
+A representative production database and production per-request stage attribution remain unmeasured. After an authorized deployment, compare a fresh production cohort against the pinned original window, reporting denominators, latency distributions, candidate work, genuine and false contradictions, entity precision/recall and retrieval outcomes. Historical entity/claim/relation repair still requires affected-record inventory, dry-run selection, an append-only recovery design, audit/readback and the necessary migration approval before mutation. Existing fact invalidation alone does not establish repair of derived records.
+
 ## Problem and evidence
 
 An `extract` response classified dates and percentages as entities, and training terms as people or companies. It also reported contradictions between unrelated historical records. The supplied response is truncated, so its source episode and full output cannot be reconstructed from the attachment alone.

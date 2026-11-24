@@ -1,0 +1,605 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_cedar",
+        "case_id": "source_cedar-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Cedar Observatory for a later session. It is in the source file fixtures/source_cedar.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Cedar Observatory, the calibration ledger is stored in? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Cedar Observatory, the calibration ledger is stored in?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_cedar",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_cedar"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Cedar Observatory before this session. Use assemble_context to check the source-backed calibration ledger location for Cedar Observatory. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_cedar",
+          "relative_path": "fixtures/source_cedar.txt",
+          "content": "Fact: Cedar Observatory the calibration ledger is stored in Cabinet-28.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_cedar"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_copper",
+        "case_id": "source_copper-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Copper Orchard for a later session. It is in the source file fixtures/source_copper.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Copper Orchard, the quarterly export is delivered to? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Copper Orchard, the quarterly export is delivered to?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_copper",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_copper"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Bucket-71"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Copper Orchard before this session. Use assemble_context to check the source-backed quarterly export destination for Copper Orchard. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_copper",
+          "relative_path": "fixtures/source_copper.txt",
+          "content": "Fact: Copper Orchard the quarterly export is delivered to Bucket-71.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_copper"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_frost",
+        "case_id": "source_frost-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Frost Meridian for a later session. It is in the source file fixtures/source_frost.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Frost Meridian, the incident handoff channel is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Frost Meridian, the incident handoff channel is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_frost",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_frost"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "#handoff-46"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Frost Meridian before this session. Use assemble_context to check the source-backed incident handoff channel for Frost Meridian. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_frost",
+          "relative_path": "fixtures/source_frost.txt",
+          "content": "Fact: Frost Meridian the incident handoff channel is #handoff-46.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_frost"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_golden",
+        "case_id": "source_golden-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Golden Kestrel for a later session. It is in the source file fixtures/source_golden.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Golden Kestrel, the release audit tag is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Golden Kestrel, the release audit tag is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_golden",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_golden"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Audit-93"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Golden Kestrel before this session. Use assemble_context to check the source-backed release audit tag for Golden Kestrel. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_golden",
+          "relative_path": "fixtures/source_golden.txt",
+          "content": "Fact: Golden Kestrel the release audit tag is Audit-93.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_golden"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_ivory",
+        "case_id": "source_ivory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Ivory Circuit for a later session. It is in the source file fixtures/source_ivory.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Ivory Circuit, the archive checksum prefix is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Ivory Circuit, the archive checksum prefix is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_ivory",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_ivory"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "9ac4"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Ivory Circuit before this session. Use assemble_context to check the source-backed archive checksum prefix for Ivory Circuit. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_ivory",
+          "relative_path": "fixtures/source_ivory.txt",
+          "content": "Fact: Ivory Circuit the archive checksum prefix is 9ac4.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_ivory"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_jade",
+        "case_id": "source_jade-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Jade Compass for a later session. It is in the source file fixtures/source_jade.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Jade Compass, the recovery queue is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Jade Compass, the recovery queue is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_jade",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_jade"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Queue-52"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Jade Compass before this session. Use assemble_context to check the source-backed recovery queue for Jade Compass. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_jade",
+          "relative_path": "fixtures/source_jade.txt",
+          "content": "Fact: Jade Compass the recovery queue is Queue-52.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_jade"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_lunar",
+        "case_id": "source_lunar-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Lunar Orchard for a later session. It is in the source file fixtures/source_lunar.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Lunar Orchard, the rotation notebook code is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Lunar Orchard, the rotation notebook code is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_lunar",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_lunar"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Notebook-37"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Lunar Orchard before this session. Use assemble_context to check the source-backed rotation notebook code for Lunar Orchard. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_lunar",
+          "relative_path": "fixtures/source_lunar.txt",
+          "content": "Fact: Lunar Orchard the rotation notebook code is Notebook-37.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_lunar"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_silver",
+        "case_id": "source_silver-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Silver Tundra for a later session. It is in the source file fixtures/source_silver.txt. Use the exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "For Silver Tundra, the escalation channel is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Silver Tundra, the escalation channel is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-source_silver",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-source_silver"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "#escalate-84"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "A separate operator source-import step was scheduled for Silver Tundra before this session. Use assemble_context to check the source-backed escalation channel for Silver Tundra. Do not write or modify memory. Report a value only when supported by returned memory evidence. Cite only exact source_episode IDs returned by assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "source_silver",
+          "relative_path": "fixtures/source_silver.txt",
+          "content": "Fact: Silver Tundra the escalation channel is #escalate-84.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "source-authority-source_silver"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_mauve",
+        "case_id": "conversation_mauve-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Mauve Harbor the backup cabinet label is Willow-38. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Mauve Harbor, the backup cabinet label is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Mauve Harbor, the backup cabinet label is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_mauve",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_mauve"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Willow-38"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_cinder",
+        "case_id": "conversation_cinder-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Cinder Atlas the export marker is Rook-26. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Cinder Atlas, the export marker is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Cinder Atlas, the export marker is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_cinder",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_cinder"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Rook-26"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_pollen",
+        "case_id": "conversation_pollen-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Pollen Circuit the nightly handoff queue is Amber-51. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Pollen Circuit, the nightly handoff queue is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Pollen Circuit, the nightly handoff queue is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_pollen",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_pollen"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Amber-51"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_quiet",
+        "case_id": "conversation_quiet-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Quiet Juniper the review packet code is Dune-73. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Quiet Juniper, the review packet code is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Quiet Juniper, the review packet code is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_quiet",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_quiet"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Dune-73"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_orchid",
+        "case_id": "conversation_orchid-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Orchid Relay the release ledger tag is Slate-19. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Orchid Relay, the release ledger tag is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Orchid Relay, the release ledger tag is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_orchid",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_orchid"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Slate-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_blue",
+        "case_id": "conversation_blue-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Blue Granite the rollback shelf code is Shelf-64. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Blue Granite, the rollback shelf code is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Blue Granite, the rollback shelf code is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_blue",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_blue"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Shelf-64"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_river",
+        "case_id": "conversation_river-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: River Beacon the cold-storage label is Frost-22. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For River Beacon, the cold-storage label is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For River Beacon, the cold-storage label is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_river",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_river"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Frost-22"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_winter",
+        "case_id": "conversation_winter-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Winter Signal the maintenance window key is Window-95. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Winter Signal, the maintenance window key is? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Winter Signal, the maintenance window key is?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "source-authority-conversation_winter",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "source-authority-conversation_winter"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Window-95"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

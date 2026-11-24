@@ -1,0 +1,42 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "ivory_lantern_clinic-record-a"
+      ]
+    ],
+    [
+      [
+        "ivory_lantern_clinic-record-b"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [],
+  "required_claim_annotation_alternatives": [
+    [
+      {
+        "source_event_id": "ivory_lantern_clinic-record-a",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "source_event_id": "ivory_lantern_clinic-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ]
+  ]
+}

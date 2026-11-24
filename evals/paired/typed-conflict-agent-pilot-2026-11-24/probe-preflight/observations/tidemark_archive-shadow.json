@@ -1,0 +1,15 @@
+{
+  "input_sha256": "cfacb421e167d5b3bd4c2d11ca9bdf1dd201eed8b1cc9b5fc9166a9867bddebe",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "tidemark_archive-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "tidemark_archive-record-b",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

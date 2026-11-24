@@ -18,7 +18,6 @@ struct CloseCall {
 struct RecordingPort {
     known: Mutex<Vec<String>>,
     close_calls: Mutex<Vec<CloseCall>>,
-    claim_calls: Mutex<Vec<String>>,
     cache_invalidated: Mutex<usize>,
 }
 
@@ -27,7 +26,6 @@ impl RecordingPort {
         Arc::new(Self {
             known: Mutex::new(vec!["fact:abc123".to_owned()]),
             close_calls: Mutex::new(Vec::new()),
-            claim_calls: Mutex::new(Vec::new()),
             cache_invalidated: Mutex::new(0),
         })
     }
@@ -55,11 +53,10 @@ impl InvalidationPort for RecordingPort {
         )
     }
 
-    async fn close_record(
+    async fn close_fact_and_claims(
         &self,
         fact_id: &str,
         _t_invalid: DateTime<Utc>,
-        _t_invalid_ingested: Option<DateTime<Utc>>,
         reason: &str,
     ) -> Result<(), MemoryError> {
         self.close_calls
@@ -70,18 +67,6 @@ impl InvalidationPort for RecordingPort {
                 reason: reason.to_owned(),
             });
         Ok(())
-    }
-
-    async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError> {
-        self.claim_calls
-            .lock()
-            .expect("claim lock")
-            .push(fact_id.to_owned());
-        Ok(())
-    }
-
-    fn claim_pipeline_is_wired(&self) -> bool {
-        true
     }
 
     async fn invalidate_assembled_context(&self) -> Result<(), MemoryError> {
@@ -137,8 +122,8 @@ async fn an_episode_id_is_refused_and_never_closed() {
         .expect_err("an episode is not a fact and must not be invalidated");
 
     assert!(
-        matches!(&error, MemoryError::Validation(message) if message.contains("episode:xyz")),
-        "the refusal must name the offending id, got {error:?}"
+        matches!(&error, MemoryError::Validation(message) if !message.contains("episode:xyz") && message.contains("fact:<id>")),
+        "the refusal must hide the submitted id and name the expected table, got {error:?}"
     );
     assert!(
         port.close_calls().is_empty(),
@@ -212,11 +197,10 @@ impl InvalidationPort for RecordingStoreBareId {
         Ok(StoredRecord::Present)
     }
 
-    async fn close_record(
+    async fn close_fact_and_claims(
         &self,
         fact_id: &str,
         _t_invalid: DateTime<Utc>,
-        _t_invalid_ingested: Option<DateTime<Utc>>,
         _reason: &str,
     ) -> Result<(), MemoryError> {
         self.close_calls
@@ -224,14 +208,6 @@ impl InvalidationPort for RecordingStoreBareId {
             .expect("close lock")
             .push(fact_id.to_owned());
         Ok(())
-    }
-
-    async fn close_claims_for_fact(&self, _fact_id: &str) -> Result<(), MemoryError> {
-        Ok(())
-    }
-
-    fn claim_pipeline_is_wired(&self) -> bool {
-        false
     }
 
     async fn invalidate_assembled_context(&self) -> Result<(), MemoryError> {

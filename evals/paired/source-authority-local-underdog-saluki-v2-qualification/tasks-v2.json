@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "thornwick_lighthouse",
+        "case_id": "thornwick_lighthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Thornwick Lighthouse, the signal register is stored in Brass-19. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Thornwick Lighthouse, where is the signal register stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Thornwick Lighthouse, where is the signal register stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-v2-thornwick-signal-register",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "underdog-saluki-v2-thornwick-signal-register"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Brass-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "marrowfield_clinic",
+        "case_id": "marrowfield_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Marrowfield Clinic, the night rota is stored in Quartz-83. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Marrowfield Clinic, where is the night rota stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Marrowfield Clinic, where is the night rota stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-v2-marrowfield-night-rota",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "underdog-saluki-v2-marrowfield-night-rota"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-83"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "blueheath_foundry",
+        "case_id": "blueheath_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Blueheath Foundry, the valve plan is stored in Amber-46. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Blueheath Foundry, where is the valve plan stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Blueheath Foundry, where is the valve plan stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-v2-blueheath-valve-diagrams",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "underdog-saluki-v2-blueheath-valve-diagrams"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Amber-46"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Blueheath Foundry before this phase. Use assemble_context to verify: At Blueheath Foundry, where is the valve plan stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "blueheath_foundry",
+          "relative_path": "fixtures/blueheath_foundry.txt",
+          "content": "Fact: At Blueheath Foundry, the valve plan is stored in Amber-46.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "underdog-saluki-v2-blueheath-valve-diagrams"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "amberley_greenhouse",
+        "case_id": "amberley_greenhouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Amberley Greenhouse, the irrigation log is stored in Indigo-72. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Amberley Greenhouse, where is the irrigation log stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Amberley Greenhouse, where is the irrigation log stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-v2-amberley-irrigation-log",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "underdog-saluki-v2-amberley-irrigation-log"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Indigo-72"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Amberley Greenhouse before this phase. Use assemble_context to verify: At Amberley Greenhouse, where is the irrigation log stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "amberley_greenhouse",
+          "relative_path": "fixtures/amberley_greenhouse.txt",
+          "content": "Fact: At Amberley Greenhouse, the irrigation log is stored in Indigo-72.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "underdog-saluki-v2-amberley-irrigation-log"
+        }
+      ]
+    }
+  ]
+}

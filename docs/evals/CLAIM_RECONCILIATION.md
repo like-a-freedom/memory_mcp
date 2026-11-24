@@ -1,5 +1,18 @@
 # Claim Reconciliation Evaluation
 
+## Current rollout status (2026-11-22)
+
+The product default is `evidence` in both local and HTTP composition roots;
+`shadow` is an explicit rollback/control setting. The earlier promotion gate
+below records the proposal from before the default changed and is historical,
+not a current release criterion. The current finite-cohort, same-binary
+comparison and its limits are recorded in
+[`claim-rollout-current-master-2026-11-22`](../../evals/paired/claim-rollout-current-master-2026-11-22/README.md).
+That deterministic public-MCP comparison measures these eight registered
+scenarios only. It does not claim population-level quality or model-mediated
+agent productivity. The 41-case claim reconciliation run is a separate
+deterministic regression check for persisted relation quality.
+
 ## Metrics
 
 | Metric | Description | Success Criteria |
@@ -121,9 +134,13 @@ Per-case diagnostic metrics: `persisted_relations`,
 `persisted_policy_mismatches`, `persisted_unresolved_lineage`, and
 `unresolved_lineage`.
 
-## Promotion Gate
+## Historical promotion proposal (superseded)
 
-The default rollout stage is `Shadow` (projects claims but does not expose relations in `assemble_context`). Promotion to `Evidence` requires:
+This proposal was written while the default rollout stage was `Shadow`
+(projects claims but does not expose relations in `assemble_context`). The
+default was subsequently changed after the current finite-cohort comparison
+accepted. These original thresholds are retained as historical design context;
+they are not represented as passing current performance limits:
 
 1. All `development` split cases pass with precision ≥ 80 % and recall ≥ 85 %
 2. All `test` split cases pass with precision ≥ 75 % and recall ≥ 80 %

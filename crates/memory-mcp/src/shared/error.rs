@@ -62,6 +62,27 @@ pub enum MemoryError {
 }
 
 impl MemoryError {
+    /// Stable, content-free identifier suitable for diagnostic events.
+    ///
+    /// Error messages may include caller-provided values or backend details;
+    /// logs that cross a trust boundary should record this class instead.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            MemoryError::ConfigMissing(_) => "config_missing",
+            MemoryError::ConfigInvalid(_) => "config_invalid",
+            MemoryError::Storage(_) => "storage",
+            MemoryError::Transient(_) => "transient",
+            MemoryError::NotFound(_) => "not_found",
+            MemoryError::Validation(_) => "validation",
+            MemoryError::Conflict(_) => "conflict",
+            MemoryError::BudgetExhausted(_) => "budget_exhausted",
+            MemoryError::ModelNotReady(_) => "model_not_ready",
+            MemoryError::Auth(_) => "auth",
+            MemoryError::Unavailable(_) => "unavailable",
+        }
+    }
+
     /// The severity this error earns on a log record, per ADR-0079 §4.1.
     ///
     /// The error class decides, not the callsite. A failed unit of work or a
@@ -93,6 +114,14 @@ impl MemoryError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn error_code_is_content_free_and_classifies_the_failure() {
+        let error = MemoryError::Validation("credential=secret-canary".into());
+
+        assert_eq!(error.code(), "validation");
+        assert!(!error.code().contains("secret-canary"));
+    }
 
     #[test]
     fn auth_and_unavailable_variants_display_stable_prefixes() {

@@ -1,0 +1,994 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "87470-1795444986251012000-0",
+  "identity_sha256": "40a7a5fd81f2888398baad12720aad9ef70403707103d5fbaf81faa949202f6d",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_blue",
+      "case_id": "conversation_blue-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_cinder",
+      "case_id": "conversation_cinder-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_mauve",
+      "case_id": "conversation_mauve-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_orchid",
+      "case_id": "conversation_orchid-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_pollen",
+      "case_id": "conversation_pollen-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_quiet",
+      "case_id": "conversation_quiet-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_river",
+      "case_id": "conversation_river-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "conversation_winter",
+      "case_id": "conversation_winter-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_cedar",
+      "case_id": "source_cedar-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_copper",
+      "case_id": "source_copper-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_frost",
+      "case_id": "source_frost-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_golden",
+      "case_id": "source_golden-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_ivory",
+      "case_id": "source_ivory-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_jade",
+      "case_id": "source_jade-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_lunar",
+      "case_id": "source_lunar-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "source_silver",
+      "case_id": "source_silver-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_blue",
+        "case_id": "conversation_blue-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39151,
+        "output_tokens": 188,
+        "wall_time_ms": 19785
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "6d83721481e2b8048b5e0cbc24e8c51d98f9457635709a1f7e8515ee24463813",
+        "response_sha256": "ef86ff1ca7ed2a48b7379a6c88ebf8a15abe0502884437bf973b740036ab36ce",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_blue"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2119,
+          "maximum_wire_bytes": 2119
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_cinder",
+        "case_id": "conversation_cinder-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39224,
+        "output_tokens": 201,
+        "wall_time_ms": 20031
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "109e56a6cde51cd20f2bc1629a3335f0ff644648fa40c8fa43367ae8a54fc33d",
+        "response_sha256": "3391beb8becc0c72e85598df334578c5492418d365b1e8e3f6ad2d8b258e9749",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_cinder"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2117,
+          "maximum_wire_bytes": 2117
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_mauve",
+        "case_id": "conversation_mauve-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39158,
+        "output_tokens": 195,
+        "wall_time_ms": 17197
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "40b66b341f03ae9520f23e8805dc9216e8c1c2483dcf29c7b0346b1f659524ab",
+        "response_sha256": "9d0a53c220a17672e28da99ba3fbca917c1ab6bf129e1be3318b39b9759ea196",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_mauve"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2121,
+          "maximum_wire_bytes": 2121
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_orchid",
+        "case_id": "conversation_orchid-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39131,
+        "output_tokens": 193,
+        "wall_time_ms": 19829
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "fb3aab19c2601f8caa0777af0a86f20fc1dba0252167d7032375f4c67b0169d7",
+        "response_sha256": "7b11e9e212b193dc8bffb63008db0e4d8c5ab03dbad372af13a5a0a5ff89fe52",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_orchid"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2119,
+          "maximum_wire_bytes": 2119
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_pollen",
+        "case_id": "conversation_pollen-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39150,
+        "output_tokens": 190,
+        "wall_time_ms": 17647
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "69319c74d38b1a4fb43c6175b1d10f9a5cc5bd1963dbcd6027fa69b22e3ff214",
+        "response_sha256": "f6601b1558ef1f4a32ee17bf0ed669d07fc0fc93eab4836390c905f1ef93718a",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_pollen"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2123,
+          "maximum_wire_bytes": 2123
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_quiet",
+        "case_id": "conversation_quiet-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39160,
+        "output_tokens": 197,
+        "wall_time_ms": 22352
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "39bb4a3a854b6c27a5ec9bcb389ab3edba838f3d0147caae000e9609a239628c",
+        "response_sha256": "c94620f4c935f75974d64c9e79447fc4a88e15289c8d421a00bdfe10c1a8367a",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_quiet"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2119,
+          "maximum_wire_bytes": 2119
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_river",
+        "case_id": "conversation_river-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39215,
+        "output_tokens": 196,
+        "wall_time_ms": 17065
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "3775eac50b825ffb7d6c7bc8d01002bc2ce3facb486cac4cb781d4f2c30cf2ad",
+        "response_sha256": "e9c8e776b7b53c706b15a7eea26e7340c8376cbaa503a207e55948628c111245",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_river"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2119,
+          "maximum_wire_bytes": 2119
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "conversation_winter",
+        "case_id": "conversation_winter-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39187,
+        "output_tokens": 199,
+        "wall_time_ms": 18512
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "245876f681c4f5baaceea1eb99c60c1964d17d66187c8e288c34c63e1be78fab",
+        "response_sha256": "18a99986f4fbf704b620b2e8ecc00bb66aa9c9eb2e3ce99388a79186cea26938",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "source-authority-conversation_winter"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2123,
+          "maximum_wire_bytes": 2123
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_cedar",
+        "case_id": "source_cedar-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 17382,
+        "output_tokens": 110,
+        "wall_time_ms": 15260
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "6d625117e4aa9e230aee7c48a4e86f9769eeccd35aa82973bd670496d7d49030",
+        "response_sha256": "2a6166c6c7551fe8723cb091b4bd18ec55c98f7c4e86c8f5ce1ca73d9ddab0c8",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "source-authority-source_cedar"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_cedar",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 442
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_copper",
+        "case_id": "source_copper-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 26927,
+        "output_tokens": 132,
+        "wall_time_ms": 14475
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d034abd5268069ea4c193598dd037eff5a164a176c29f73da5137bf494bd3c1a",
+        "response_sha256": "1b136156f297b3c3b7b35058778f112dafa901dd23ac588bc47a75fb101b9dab",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "source-authority-source_copper"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_copper",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 431
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_frost",
+        "case_id": "source_frost-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 26938,
+        "output_tokens": 137,
+        "wall_time_ms": 12951
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d19c44fdf9b1275a7860609db6debd8f3603ae1e2571ac9290c4638aad5e60e6",
+        "response_sha256": "b863cc440a18a0359e8389621c3129467317ddca4a0342d5674d4584323e4d78",
+        "known_revision": 5,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "source-authority-source_frost"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_frost",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 433
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_golden",
+        "case_id": "source_golden-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 26944,
+        "output_tokens": 134,
+        "wall_time_ms": 15241
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "2a8c3d6ebd9246756b7c1cef3761b0fc75a1735bc03a45cd1e0d0c7e34a73e63",
+        "response_sha256": "6274dcc8ef731eba82683fd372c8f5642178ef7f7378bc9f1bb0bb0ef2be21a9",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "source-authority-source_golden"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_golden",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 421
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_ivory",
+        "case_id": "source_ivory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 17404,
+        "output_tokens": 110,
+        "wall_time_ms": 12094
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "1091935aecc6d5bc06f2bb31d670fb30db61bc1966e6d4599e539990033348a9",
+        "response_sha256": "cb775f86cc89fadc8366b40c0894bb1f73b98e4fa1529b6398483e2667217b3d",
+        "known_revision": 5,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "source-authority-source_ivory"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_ivory",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 436
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_jade",
+        "case_id": "source_jade-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 27278,
+        "output_tokens": 132,
+        "wall_time_ms": 12656
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "bf41905b59bc9e8fcae50d9a651717e7151419c70d8106433b272eb140ef45b4",
+        "response_sha256": "717238a606c343eb8cee4023b20e5d0e50045d518839334f37f27c78b19fe59e",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "source-authority-source_jade"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_jade",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 424
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_lunar",
+        "case_id": "source_lunar-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 26932,
+        "output_tokens": 136,
+        "wall_time_ms": 15601
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "110deb133668aa5c14229faaf541961f37acdfda2c8fea554b63de78e78ce3dc",
+        "response_sha256": "ef643b32998863a017c99af1ca9b1a78c390c6edd94719e0e743610f086db9b8",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "source-authority-source_lunar"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_lunar",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 436
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "source_silver",
+        "case_id": "source_silver-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 1,
+        "user_clarifications": 0,
+        "input_tokens": 26950,
+        "output_tokens": 142,
+        "wall_time_ms": 14012
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "c92e1e8515489fc303dfbf87fc81dbce4ab63c8908b8c991c812130ac3c36586",
+        "response_sha256": "4dff81d832d8379bf77c86107d09b4757cf3256085c65fcf7bc0f2bdb571a29a",
+        "known_revision": 5,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "source-authority-source_silver"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "source_silver",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 401
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

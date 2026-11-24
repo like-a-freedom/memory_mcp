@@ -55,9 +55,14 @@ pub enum Command {
     /// Requires `--source-type`, `--source-id`, `--content`, `--t-ref` (ISO 8601).
     /// Output: ToolResponse with status, episode_id. Next step: `extract --episode-id <id>`.
     Ingest(args::IngestArgs),
+    /// Import a local file or public URL explicitly as an operator action.
+    /// Agent-facing MCP `content` fields remain literal and never initiate I/O.
+    Import(args::OperatorImportArgs),
     /// Extract entities, facts, and relationships from an episode or inline content.
     /// Provide exactly one input: `--episode-id` (from ingest) or `--content` inline.
-    /// Output: ToolResponse with lists of entities and facts. Next step: `resolve`
+    /// Extract evidence is included by default within the bounded response limit;
+    /// pass `--compact` to omit statement/quote pairs. Output: ToolResponse with
+    /// lists of entities and facts. Next step: `resolve`
     /// to deduplicate aliases, or `assemble-context` to query stored facts.
     Extract(args::ExtractArgs),
     /// Resolve entity aliases to a canonical entity id (deduplication).
@@ -120,6 +125,7 @@ impl Command {
             Command::Lifecycle(_) => "cli.lifecycle",
             Command::Init(_) => "cli.init",
             Command::Ingest(_) => "cli.ingest",
+            Command::Import(_) => "cli.import",
             Command::Extract(_) => "cli.extract",
             Command::Resolve(_) => "cli.resolve",
             Command::Invalidate(_) => "cli.invalidate",
@@ -155,6 +161,7 @@ impl Command {
             | Command::SurrealdbV4Maintenance(_) => None,
             Command::Lifecycle(args) => one_shot!(run_lifecycle, args),
             Command::Ingest(args) => one_shot!(run_ingest, args),
+            Command::Import(args) => one_shot!(run_import, args),
             Command::Extract(args) => one_shot!(run_extract, args),
             Command::Resolve(args) => one_shot!(run_resolve, args),
             Command::Invalidate(args) => one_shot!(run_invalidate, args),
@@ -171,6 +178,30 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extract_includes_evidence_by_default_and_accepts_compact_mode() {
+        let default =
+            Cli::try_parse_from(["memory_mcp", "extract", "--episode-id", "episode:test"])
+                .expect("default evidence extraction parses");
+        let Some(Command::Extract(default_args)) = default.command else {
+            panic!("expected extract command");
+        };
+        assert!(!default_args.compact);
+
+        let compact = Cli::try_parse_from([
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:test",
+            "--compact",
+        ])
+        .expect("compact evidence extraction parses");
+        let Some(Command::Extract(compact_args)) = compact.command else {
+            panic!("expected extract command");
+        };
+        assert!(compact_args.compact);
+    }
 
     #[test]
     fn lifecycle_subcommand_parses_typed_operation() {

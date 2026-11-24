@@ -679,6 +679,7 @@ async fn mcp_gliner_ingest_then_extract_completes_end_to_end() {
             source_id: None,
             t_ref: None,
             zero_shot_labels: None,
+            include_fact_evidence: false,
         }))
         .await
         .expect("MCP extract should succeed")

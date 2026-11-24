@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-paired-product-config/v1",
+  "transport": "stdio",
+  "storage": "embedded SurrealKV",
+  "database": "memory_decisions",
+  "namespace": "main",
+  "fresh_store_per_trial": true,
+  "embeddings_enabled": false,
+  "ner_extractor": "regex",
+  "claim_rollout_stage": "shadow"
+}

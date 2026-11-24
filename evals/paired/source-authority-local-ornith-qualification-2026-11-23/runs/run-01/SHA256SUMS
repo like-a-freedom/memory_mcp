@@ -1,0 +1,7 @@
+a79882b242af72f6fc8fca3afe40e3deb82c23c86dd9192dcb4b4ea8b0fdb9ef  runs/run-01/agent-managed-comparison.json
+ef19abbe2256778f36df52219365b2e7d7a090c1c2fc52ef8e8bb43925a4c254  runs/run-01/agent-managed-incumbent.json
+e072aab69327c472f687b7d2fbd7baf527e64efcf2999228ba2129d1b91bba63  runs/run-01/agent-managed-candidate.json
+3ae1d64f5f114a24bb91b5dc4d17f1871e5d28e6049281f14e1e073e47fdaddf  runs/run-01/incumbent.json
+df4879e637c3bcbd1337e1219302b2239fef4d79c9bf9508516871a1fefdeda5  runs/run-01/candidate.json
+8547d9994d66e1ef69b99d4d82c67574aec2c148f7d2c8972ff643baed1df14e  runs/run-01/incumbent-receipts.jsonl
+abb14e14e1ef2049d6040aca6317f793d92d3176423aef6e00398d39969c9b32  runs/run-01/candidate-receipts.jsonl

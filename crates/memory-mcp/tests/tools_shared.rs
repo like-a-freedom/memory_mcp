@@ -21,7 +21,7 @@ async fn tools_ingest_returns_validation_error_for_bad_t_ref() {
         source_type: "test".to_string(),
         source_id: "t-1".to_string(),
         content: "hello".to_string(),
-        t_ref: "not-a-date".to_string(),
+        t_ref: "credential=secret-timestamp-canary".to_string(),
         t_ingested: None,
         policy_tags: vec![],
         source_group: None,
@@ -33,6 +33,10 @@ async fn tools_ingest_returns_validation_error_for_bad_t_ref() {
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {
             assert!(msg.contains("Invalid `t_ref` value"), "msg: {msg}");
+            assert!(
+                !msg.contains("secret-timestamp-canary"),
+                "validation errors must not echo caller input: {msg}"
+            );
         }
         other => panic!("expected Validation error, got: {other:?}"),
     }
@@ -50,6 +54,7 @@ async fn tools_extract_rejects_both_episode_and_inline() {
         source_id: None,
         t_ref: None,
         zero_shot_labels: None,
+        include_fact_evidence: false,
     };
 
     let result = memory_mcp::tools::extract(&service, params).await;
@@ -77,6 +82,7 @@ async fn tools_extract_rejects_no_input() {
         source_id: None,
         t_ref: None,
         zero_shot_labels: None,
+        include_fact_evidence: false,
     };
 
     let result = memory_mcp::tools::extract(&service, params).await;
@@ -132,6 +138,7 @@ async fn tools_ingest_and_extract_happy_path() {
         source_id: None,
         t_ref: None,
         zero_shot_labels: None,
+        include_fact_evidence: false,
     };
 
     let extract_response = memory_mcp::tools::extract(&service, extract_params)
@@ -200,6 +207,9 @@ async fn tools_assemble_context_returns_empty_for_empty_db() {
         query: "nothing relevant".to_string(),
         fact_types: vec![],
         as_of: String::new(),
+        valid_at: None,
+        known_at: None,
+        known_revision: None,
         budget: 5,
         view_mode: None,
         window_start: None,

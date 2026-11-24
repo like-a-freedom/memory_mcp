@@ -1,0 +1,450 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "27970-1795374096798974000-0",
+  "identity_sha256": "a65c43542700d9df40ad58ace63eb69f487faf61c85696c7d875db4f8d3d00a7",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "copper-lantern-history",
+      "case_id": "copper-lantern-current-artifact-signing-profile",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "granite-orchard-history",
+      "case_id": "granite-orchard-current-build-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "marble-garden-history",
+      "case_id": "marble-garden-current-database-failover-zone",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "quiet-citadel-history",
+      "case_id": "quiet-citadel-current-rollback-manifest-prefix",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "silver-meadow-history",
+      "case_id": "silver-meadow-current-audit-export-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "tundra-observatory-history",
+      "case_id": "tundra-observatory-current-export-encryption-profile",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "velvet-compass-history",
+      "case_id": "velvet-compass-current-incident-routing-queue",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "willow-bridge-history",
+      "case_id": "willow-bridge-current-nightly-snapshot-region",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "copper-lantern-history",
+        "case_id": "copper-lantern-current-artifact-signing-profile",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69801,
+        "output_tokens": 423,
+        "wall_time_ms": 36001
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "07ffdcd9780177ca5de6c74bfd41e64c54d21e49018ea2ff12c623bf59dfe1eb",
+        "response_sha256": "0a9caaa0c423f5e30da00dc334c5e7b17334350da11c3212b23d5261840feefd",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "granite-orchard-history",
+        "case_id": "granite-orchard-current-build-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 71215,
+        "output_tokens": 417,
+        "wall_time_ms": 32518
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d5f64698fdd0d86c729435e4aa1e458326fb8307d286e9af07619622c42a38c3",
+        "response_sha256": "9e0e78e492a1dea172ed5fd27c0e19c2073a9a95519d7273bfde529775ebccad",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "marble-garden-history",
+        "case_id": "marble-garden-current-database-failover-zone",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 71172,
+        "output_tokens": 406,
+        "wall_time_ms": 28689
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "241b66a08de49bf20ef280ea9b4442f44b17c02bfcc1c2758c7554a4e20bc35b",
+        "response_sha256": "dccd7dd9595d4c8a97d665fab75d8f1d1830ca047067ab2086136ae542d7bf72",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "quiet-citadel-history",
+        "case_id": "quiet-citadel-current-rollback-manifest-prefix",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69781,
+        "output_tokens": 407,
+        "wall_time_ms": 32244
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "20c040d92839fdc4e0482abb0756c463a39d0e77f4f7315f485faa1e38f8d453",
+        "response_sha256": "4125084958e8cc3bfa8a29495529158e2b20c6320288149ac2691daae52c44a7",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "silver-meadow-history",
+        "case_id": "silver-meadow-current-audit-export-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69706,
+        "output_tokens": 410,
+        "wall_time_ms": 35716
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ffdd9428c8608c3d60c0cb8b10b665c0f46e53ea6d2413e3de4c93cddc0cd28f",
+        "response_sha256": "07618323f355d393a60b395c1b591b7a58bc4dc7160e9cb629d3dcdbcb91f7af",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "tundra-observatory-history",
+        "case_id": "tundra-observatory-current-export-encryption-profile",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69194,
+        "output_tokens": 394,
+        "wall_time_ms": 32238
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "f571ab87899d343ad500528e4c4a59b1d15ba95c6c3488f3956c896ba219ee43",
+        "response_sha256": "df439c3d9ba0a9fdd853998a332587635f366ed13d60d2a1cc1da5096d2bd204",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "velvet-compass-history",
+        "case_id": "velvet-compass-current-incident-routing-queue",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69971,
+        "output_tokens": 427,
+        "wall_time_ms": 31044
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "bac09b7662b68e5179780609034e952ebf832a76597661f3b490615495428b50",
+        "response_sha256": "053d9c013ac64cbc2c297c7b2af4e6ce38ba7452a8268bf2988dd302d22b1205",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "willow-bridge-history",
+        "case_id": "willow-bridge-current-nightly-snapshot-region",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69713,
+        "output_tokens": 404,
+        "wall_time_ms": 35142
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "96a3860fe4b37a525b1346c5a0fc3ad58604dc06a90adb67abc8554a3a99c4c5",
+        "response_sha256": "6fe764416d3a3d5848c8cc7e2e7eca7dd8d0083c7ab6c2d05a31d28b965ca4ec",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v3-update-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    }
+  ]
+}

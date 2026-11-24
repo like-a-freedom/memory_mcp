@@ -395,8 +395,21 @@ mod tests {
 
     #[test]
     fn cli_assemble_context_subcommand() {
-        let cli = Cli::parse_from(["memory_mcp", "assemble-context", "--query", "test"]);
-        assert!(matches!(cli.command, Some(Command::AssembleContext(_))));
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "test",
+            "--valid-at",
+            "2026-11-01T00:00:00Z",
+            "--known-revision",
+            "12",
+        ]);
+        let Some(Command::AssembleContext(args)) = cli.command else {
+            panic!("assemble-context command parsed");
+        };
+        assert_eq!(args.valid_at.as_deref(), Some("2026-11-01T00:00:00Z"));
+        assert_eq!(args.known_revision, Some(12));
     }
 
     #[test]

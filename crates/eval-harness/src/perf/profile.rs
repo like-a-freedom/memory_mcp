@@ -62,6 +62,8 @@ pub enum ScenarioId {
     LatencyResolve,
     LatencyExplain,
     LatencyInvalidate,
+    LatencyClaimWrite,
+    LatencyClaimAssemble,
 }
 
 impl ScenarioId {
@@ -74,6 +76,8 @@ impl ScenarioId {
             ScenarioId::LatencyResolve => "latency-resolve",
             ScenarioId::LatencyExplain => "latency-explain",
             ScenarioId::LatencyInvalidate => "latency-invalidate",
+            ScenarioId::LatencyClaimWrite => "latency-claim-write",
+            ScenarioId::LatencyClaimAssemble => "latency-claim-assemble",
         }
     }
 }

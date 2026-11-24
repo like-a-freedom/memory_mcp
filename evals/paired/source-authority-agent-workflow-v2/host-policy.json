@@ -1,0 +1,25 @@
+{
+  "schema_version": "memory-mcp-source-authority-host-policy/v1",
+  "codex_cli": "identity-pinned optional adapter",
+  "authentication": "existing local Codex home or explicit API key; credentials never enter artifacts",
+  "ephemeral_session": true,
+  "ignore_user_config": true,
+  "ignore_exec_rules": true,
+  "agent_sandbox": "read-only",
+  "disabled_codex_features": [
+    "apps",
+    "memories",
+    "plugins",
+    "request_permissions_tool",
+    "shell_tool"
+  ],
+  "web_search": "disabled",
+  "memory_server": "required isolated local stdio server",
+  "incumbent_agent_tools": ["ingest", "extract"],
+  "candidate_agent_tools": ["assemble_context"],
+  "operator_import": "evaluator-owned bounded CLI invocation; absolute root and relative confined path",
+  "operator_stderr": "drained and discarded",
+  "operator_stdout_limit_bytes": 1048576,
+  "operator_timeout_seconds": 120,
+  "fixture_content_and_paths_in_receipts": false
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "memory-mcp-local-chat-completions-capture-status/v1",
+  "plan_id": "source-authority-local-chat-completions-2026-11-23-v2",
+  "run_id": "99817-1795421637860319000-0",
+  "status": "paired_receipts_preserved_managed_sidecars_rejected",
+  "validation_error_code": "inconsistent_write_operation_metadata",
+  "validation_error": "Agent-managed phase receipt contains inconsistent write-operation metadata.",
+  "runner_sha256_pinned": "75b58649a757efa72e2a0b122b6f76a9d864fc64938fe66dbce0c9fa3b585fce",
+  "incumbent": {
+    "artifact": "incumbent.json",
+    "sha256": "5a44a5cc6ea4e171444bf190386eb680f7111d0f48a345faed6c8d30c6e03012",
+    "receipt_count": 16,
+    "status_counts": {
+      "model_failure": 16
+    },
+    "task_oracle_passes": 0
+  },
+  "candidate": {
+    "artifact": "candidate.json",
+    "sha256": "426157afba46a46a0d5527bc9051120ccb92ef1fdcb1f9b628dd43dc00617ccd",
+    "receipt_count": 16,
+    "status_counts": {
+      "model_failure": 10,
+      "budget_exceeded": 4,
+      "completed": 2
+    },
+    "task_oracle_passes": 0
+  },
+  "managed_sidecars_written": false,
+  "accepted_as_workflow_evidence": false,
+  "raw_model_or_memory_content_recorded": false,
+  "follow_up": "Preserve both paired artifacts. The new deterministic regression reproduces this rejection with public MCP tool names and fixes the aggregation boundary. The frozen v2 run is not replayed with changed evaluator code; any further model capture requires a new disjoint preregistration."
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What crane safe load was recorded for Cindergate Fabrication Hub on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "17c5c96f1b7c111d578076cf7d52002110e8ddc48ca4e5826f8c55aec9c107db",
+  "claim_rollout_stage": "evidence"
+}

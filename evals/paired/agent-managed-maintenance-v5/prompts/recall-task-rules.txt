@@ -1,0 +1,1 @@
+Evaluation rules: Use only the memory_decisions/assemble_context tool. Do not use other tools or external sources. Cite only exact source_episode IDs returned by that memory tool. Return the final response as JSON with exactly these fields: answer (string), citations (array of source_episode IDs), needs_clarification (boolean).

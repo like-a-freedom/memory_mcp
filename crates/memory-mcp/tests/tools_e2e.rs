@@ -880,11 +880,11 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
 /// After the fix (Tasks 1-3 in this plan):
 ///   - `validate_record_id` runs at every record-id entry point and rejects
 ///     bare hex with a `Validation` error that names the canonical
-///     `<table>:<id>` form and echoes the bad input.
+///     `<table>:<id>` form without reflecting the bad input.
 ///   - The owner-scoped gate (`require_record_kind`) refines that further:
 ///     because it knows the table the caller wanted, the refusal names the
-///     exact id to send back (`pass 'episode:<hex>' exactly as returned`),
-///     so the retry needs no inference from the parameter name.
+///     expected table with a generic `<id>` placeholder, so the retry needs
+///     no inference from the parameter name and does not reflect the input.
 ///   - The MCP `extract` tool surfaces this as `INVALID_PARAMS` (the same
 ///     error code as before) but with a message that explains the input
 ///     shape, not a fake "not found".
@@ -933,12 +933,8 @@ async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found
         "the refusal must name the prefix to restore, got: {message}"
     );
     assert!(
-        message.contains(&bare_hex),
-        "validation message should echo the bad input '{bare_hex}', got: {message}"
-    );
-    assert!(
-        message.contains(&format!("episode:{bare_hex}")),
-        "the refusal must name the exact id to pass back, got: {message}"
+        !message.contains(&bare_hex),
+        "validation message must not reflect the submitted id '{bare_hex}', got: {message}"
     );
     assert!(
         !message.starts_with("Episode not found"),
@@ -957,8 +953,8 @@ async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found
 /// WRONG prefix (`fact:`) on the retry — which fails with a different
 /// message that never says which kind was wanted.
 ///
-/// The refusal must therefore name the expected kind, so a retry
-/// following the error message succeeds without guessing.
+/// The refusal must name the expected kind without reflecting the submitted
+/// record id, so a retry following the message succeeds without guessing.
 #[tokio::test]
 async fn extract_with_a_foreign_table_prefix_names_the_expected_kind() {
     let service = common::make_service().await;
@@ -992,8 +988,10 @@ async fn extract_with_a_foreign_table_prefix_names_the_expected_kind() {
     let message = err.to_string();
 
     assert!(
-        message.contains("fact") && message.contains("episode"),
-        "the refusal must name both the given and the expected kind, got: {message}"
+        message.contains("episode:<id>")
+            && !message.contains("fact")
+            && !message.contains(&bare_hex),
+        "the refusal must name the expected kind without reflecting the input, got: {message}"
     );
     assert!(
         !message.contains("not a episode"),

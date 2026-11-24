@@ -37,11 +37,37 @@ impl EntityResolver {
         entity_service: &EntityService,
         candidate: EntityCandidate,
     ) -> Result<(String, bool), MemoryError> {
+        self.resolve(entity_service, candidate, true).await
+    }
+
+    /// A declared structured subject is an identity boundary. Similar spelling
+    /// alone cannot turn two declared subjects into one claim slot.
+    pub(crate) async fn resolve_explicit_subject(
+        &self,
+        entity_service: &EntityService,
+        candidate: EntityCandidate,
+    ) -> Result<(String, bool), MemoryError> {
+        self.resolve(entity_service, candidate, false).await
+    }
+
+    async fn resolve(
+        &self,
+        entity_service: &EntityService,
+        candidate: EntityCandidate,
+        allow_fuzzy: bool,
+    ) -> Result<(String, bool), MemoryError> {
         let normalized = normalize_entity_name(&candidate.canonical_name);
 
         // Fast path: exact match by normalized name (via DB index).
-        if let Some(entity_id) = entity_service.find_entity_id_by_name(&normalized).await? {
+        if let Some(entity_id) = entity_service
+            .find_entity_id_by_canonical_name(&normalized)
+            .await?
+        {
             return Ok((entity_id, false));
+        }
+
+        if !allow_fuzzy {
+            return Ok((entity_service.create_entity(candidate).await?, true));
         }
 
         // Alias check: look up by alias for an exact match.

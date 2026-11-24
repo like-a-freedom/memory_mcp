@@ -399,6 +399,7 @@ mod tests {
                         id: (*id).into(),
                         mode: None,
                         corpus_root: None,
+                        claim_rollout_stage: None,
                         expected_coverage: None,
                     })
                     .collect(),

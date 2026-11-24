@@ -1,0 +1,15 @@
+{
+  "input_sha256": "8a52e10e9d0cf56b87f220f33ee230b861378532e052d57e98145031ff0d3c88",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "copperwind_quay-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "copperwind_quay-record-a",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

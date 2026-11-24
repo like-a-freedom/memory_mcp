@@ -1,0 +1,17 @@
+4a1add1d72ddef59c747ec8b058478c33ce969f2fa4f57810b74411b924b3ff2  evals/paired/source-authority-local-underdog-saluki-v2-qualification/README.md
+87ff1e8a6578276bd9a728e385b0d24cec4bbbef8285539e0eaffe59c6961c18  evals/paired/source-authority-local-underdog-saluki-v2-qualification/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-underdog-saluki-v2-qualification/host-policy.json
+c114839ba3677556e415b32b1f89590ce0746526c328788fa222b0b02d95926c  evals/paired/source-authority-local-underdog-saluki-v2-qualification/plan.json
+c8173b07622b70d40c35fc771ddbed63ec87186da9344d6052610da5d0cafc2e  evals/paired/source-authority-local-underdog-saluki-v2-qualification/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-underdog-saluki-v2-qualification/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-underdog-saluki-v2-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-underdog-saluki-v2-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-underdog-saluki-v2-qualification/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-underdog-saluki-v2-qualification/prompts/memory-recall-task-rules-v1.txt
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-underdog-saluki-v2-qualification/protocol-config.json
+d76203f38e599d94d177fe44ee88a9439c4ae138eda5bc557ed2bdc4a1355e2f  evals/paired/source-authority-local-underdog-saluki-v2-qualification/provider-inventory.json
+d0884f217d7d3661f19a7596c4aafdaed3ee34e259fa57b93e386c714da740b0  evals/paired/source-authority-local-underdog-saluki-v2-qualification/request-parameters.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-underdog-saluki-v2-qualification/retry-policy.json
+3b2fe7c1b91fdc708128dc1e9af14ab6db580cbf1e2e3dcaec6e619198518b37  evals/paired/source-authority-local-underdog-saluki-v2-qualification/sampling-config.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-underdog-saluki-v2-qualification/simulator.json
+c3f7fc9ad86962a40e588875312093983726507babdf1c9edcff00978f681167  evals/paired/source-authority-local-underdog-saluki-v2-qualification/tasks-v2.json

@@ -1,0 +1,3203 @@
+{
+  "case_id": "ordinary-location",
+  "config_sha256": "3144a7d443da339afa86af571d95cc486ae959fa28c61e2610598194fdbcc483",
+  "corpus_sha256": "b171280ab3b71e493956bf8703820bbe90e3dc4f4077e769cfce2646017b7383",
+  "desired_goal": {
+    "knowledge_before_event_id": null,
+    "oracle": {
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "ordinary-location"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "ordinary-location": "Harbor Road"
+      },
+      "expected_roles": {
+        "ordinary-location": "current"
+      },
+      "forbidden_event_ids": [],
+      "probe_id": "ordinary-location",
+      "relation_outcome": null
+    },
+    "requires_separate_time_cutoffs": false,
+    "valid_at": "2026-07-01T09:00:00Z"
+  },
+  "episode_bindings": {
+    "episode:843241121ee5d2d252141498": "ordinary-location"
+  },
+  "events": [
+    {
+      "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+      "correction_of": null,
+      "id": "ordinary-location",
+      "source_id": "ordinary-location-log",
+      "source_type": "inventory-record",
+      "t_ref": "2026-07-01T09:00:00Z"
+    }
+  ],
+  "evidence_enabled_diagnostic": {
+    "claim_rollout_stage": "evidence",
+    "episode_bindings": {
+      "episode:843241121ee5d2d252141498": "ordinary-location"
+    },
+    "explain_error": null,
+    "explain_followup": {
+      "id": 9,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"guidance\":\"Use these citations directly in the final response.\",\"result\":[{\"all_sources\":[{\"episode_content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"episode_id\":\"episode:843241121ee5d2d252141498\",\"episode_t_ref\":\"2026-07-01T09:00:00+00:00\",\"relationship\":\"direct\"}],\"citation_context\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"decayed_confidence\":0.4,\"fact_age_days\":143,\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"graph_insights\":{\"hub_entities\":[{\"canonical_name\":\"Harbor Road\",\"degree\":2,\"entity_id\":\"entity:f1d55145af0ec389805281f9\"},{\"canonical_name\":\"Onyx Plant Office\",\"degree\":2,\"entity_id\":\"entity:6d906e90e608112196ac5522\"}],\"surprising_connections\":[]},\"ingestion_method\":\"extraction\",\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"source_episode\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"source_episode\":\"episode:843241121ee5d2d252141498\",\"t_ingested\":\"2026-11-21T18:28:11.049663Z\",\"t_ref\":\"2026-07-01T09:00:00Z\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "guidance": "Use these citations directly in the final response.",
+          "result": [
+            {
+              "all_sources": [
+                {
+                  "episode_content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                  "episode_id": "episode:843241121ee5d2d252141498",
+                  "episode_t_ref": "2026-07-01T09:00:00+00:00",
+                  "relationship": "direct"
+                }
+              ],
+              "citation_context": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "decayed_confidence": 0.4,
+              "fact_age_days": 143,
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "graph_insights": {
+                "hub_entities": [
+                  {
+                    "canonical_name": "Harbor Road",
+                    "degree": 2,
+                    "entity_id": "entity:f1d55145af0ec389805281f9"
+                  },
+                  {
+                    "canonical_name": "Onyx Plant Office",
+                    "degree": 2,
+                    "entity_id": "entity:6d906e90e608112196ac5522"
+                  }
+                ],
+                "surprising_connections": []
+              },
+              "ingestion_method": "extraction",
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "source_episode": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record"
+              },
+              "source_episode": "episode:843241121ee5d2d252141498",
+              "t_ingested": "2026-11-21T18:28:11.049663Z",
+              "t_ref": "2026-07-01T09:00:00Z"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    },
+    "extract_receipts": [
+      {
+        "event_id": "ordinary-location",
+        "request": {
+          "episode_id": "episode:843241121ee5d2d252141498"
+        },
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"guidance\":\"Resolve canonical entities for any ambiguous names before creating manual links.\",\"result\":{\"entities\":[{\"canonical_name\":\"Harbor Road\",\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"type\":\"person\"},{\"canonical_name\":\"Onyx Plant Office\",\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"type\":\"person\"}],\"episode_id\":\"episode:843241121ee5d2d252141498\",\"facts\":[{\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"type\":\"experience\"}],\"links\":[{\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"episode_id\":\"episode:843241121ee5d2d252141498\"},{\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"episode_id\":\"episode:843241121ee5d2d252141498\"}],\"reconciliation\":{\"active_relations\":0,\"claims_projected\":1,\"reason_codes\":[],\"status\":\"complete\"},\"warnings\":[]},\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "guidance": "Resolve canonical entities for any ambiguous names before creating manual links.",
+              "result": {
+                "entities": [
+                  {
+                    "canonical_name": "Harbor Road",
+                    "entity_id": "entity:f1d55145af0ec389805281f9",
+                    "type": "person"
+                  },
+                  {
+                    "canonical_name": "Onyx Plant Office",
+                    "entity_id": "entity:6d906e90e608112196ac5522",
+                    "type": "person"
+                  }
+                ],
+                "episode_id": "episode:843241121ee5d2d252141498",
+                "facts": [
+                  {
+                    "fact_id": "fact:42be3d8ebecd75cb26538336",
+                    "type": "experience"
+                  }
+                ],
+                "links": [
+                  {
+                    "entity_id": "entity:f1d55145af0ec389805281f9",
+                    "episode_id": "episode:843241121ee5d2d252141498"
+                  },
+                  {
+                    "entity_id": "entity:6d906e90e608112196ac5522",
+                    "episode_id": "episode:843241121ee5d2d252141498"
+                  }
+                ],
+                "reconciliation": {
+                  "active_relations": 0,
+                  "claims_projected": 1,
+                  "reason_codes": [],
+                  "status": "complete"
+                },
+                "warnings": []
+              },
+              "status": "success"
+            }
+          }
+        }
+      }
+    ],
+    "ingest_receipts": [
+      {
+        "episode_id": "episode:843241121ee5d2d252141498",
+        "event_id": "ordinary-location",
+        "request": {
+          "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+          "source_id": "ordinary-location-log",
+          "source_type": "inventory-record",
+          "t_ref": "2026-07-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"guidance\":\"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\",\"result\":\"episode:843241121ee5d2d252141498\",\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "guidance": "Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.",
+              "result": "episode:843241121ee5d2d252141498",
+              "status": "success"
+            }
+          }
+        },
+        "t_ingested": "server_assigned_not_supplied"
+      }
+    ],
+    "observation": {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Call explain if you need provenance-ready citations for selected items.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "unknown",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    },
+    "request": {
+      "budget": 5,
+      "compact": true,
+      "query": "Where was Onyx Plant Office located?"
+    },
+    "responses": [
+      {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"rationale\":\"tier=direct\",\"relevance\":0.11,\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call explain if you need provenance-ready citations for selected items.",
+            "result": [
+              {
+                "confidence": 0.4,
+                "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "fact_id": "fact:42be3d8ebecd75cb26538336",
+                "grounding": 0.61,
+                "provenance": {
+                  "extraction_strategy": "explicit_schema_record",
+                  "ingestion_method": "extraction",
+                  "matched_query_terms": [
+                    "onyx",
+                    "plant",
+                    "office"
+                  ],
+                  "retrieval_admission": {
+                    "basis": "lexical",
+                    "community": null,
+                    "explicit_date_admitted": false,
+                    "graph_anchor_origin": null,
+                    "hop_count": null,
+                    "matched_content_terms": [],
+                    "matched_index_key_terms": [],
+                    "matched_references": [],
+                    "policy_version": "retrieval-admission-v1",
+                    "repeated_topic": null,
+                    "resolved_entity_ids": [],
+                    "semantic_similarity": null
+                  },
+                  "source_episode_id": "episode:843241121ee5d2d252141498",
+                  "source_id": "ordinary-location-log",
+                  "source_type": "inventory-record"
+                },
+                "rationale": "tier=direct",
+                "relevance": 0.11,
+                "retrieval_tier": "direct",
+                "semantic_available": false,
+                "source_episode": "episode:843241121ee5d2d252141498"
+              }
+            ],
+            "status": "success"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"rationale\":\"tier=direct\",\"relevance\":0.11,\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call explain if you need provenance-ready citations for selected items.",
+            "result": [
+              {
+                "confidence": 0.4,
+                "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "fact_id": "fact:42be3d8ebecd75cb26538336",
+                "grounding": 0.61,
+                "provenance": {
+                  "extraction_strategy": "explicit_schema_record",
+                  "ingestion_method": "extraction",
+                  "matched_query_terms": [
+                    "onyx",
+                    "plant",
+                    "office"
+                  ],
+                  "retrieval_admission": {
+                    "basis": "lexical",
+                    "community": null,
+                    "explicit_date_admitted": false,
+                    "graph_anchor_origin": null,
+                    "hop_count": null,
+                    "matched_content_terms": [],
+                    "matched_index_key_terms": [],
+                    "matched_references": [],
+                    "policy_version": "retrieval-admission-v1",
+                    "repeated_topic": null,
+                    "resolved_entity_ids": [],
+                    "semantic_similarity": null
+                  },
+                  "source_episode_id": "episode:843241121ee5d2d252141498",
+                  "source_id": "ordinary-location-log",
+                  "source_type": "inventory-record"
+                },
+                "rationale": "tier=direct",
+                "relevance": 0.11,
+                "retrieval_tier": "direct",
+                "semantic_available": false,
+                "source_episode": "episode:843241121ee5d2d252141498"
+              }
+            ],
+            "status": "success"
+          }
+        }
+      }
+    ],
+    "revision_checkpoint_receipts": [
+      {
+        "after_event_id": "ordinary-location",
+        "known_revision": 7,
+        "request": {
+          "budget": 1,
+          "compact": true,
+          "query": "",
+          "valid_at": "2026-07-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:28:11.188471Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"current\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":1.0,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":1.0,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-21T18:28:11.188471Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-07-01T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                  "evidence_status": "current",
+                  "fact_id": "fact:42be3d8ebecd75cb26538336",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 7,
+                    "source_episode_id": "episode:843241121ee5d2d252141498",
+                    "source_id": "ordinary-location-log",
+                    "source_type": "inventory-record",
+                    "valid_at": "2026-07-01T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 1.0,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:843241121ee5d2d252141498"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        }
+      }
+    ],
+    "temporal_revision_observation": {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "current",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    },
+    "temporal_revision_request": {
+      "budget": 5,
+      "compact": true,
+      "known_revision": 7,
+      "query": "Where was Onyx Plant Office located?",
+      "valid_at": "2026-07-01T09:00:00+00:00"
+    },
+    "temporal_revision_response": {
+      "id": 6,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:28:11.169949Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"current\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.75,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.75,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "context": {
+            "candidate_scan_truncated": false,
+            "completeness": "partial",
+            "omitted_channels": [
+              "alias expansion",
+              "experience, source episode siblings and source context neighborhoods",
+              "triples, graph edges and community summaries",
+              "semantic ANN and mutable embeddings",
+              "mutable fact access heat",
+              "legacy facts and episodes without committed revision provenance"
+            ],
+            "snapshot": {
+              "known_at": "2026-11-21T18:28:11.169949Z",
+              "known_revision": 7,
+              "valid_at": "2026-07-01T09:00:00Z"
+            }
+          },
+          "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+          "result": [
+            {
+              "confidence": 0.7,
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "evidence_status": "current",
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "grounding": 0.75,
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "known_revision": 7,
+                "source_episode_id": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record",
+                "valid_at": "2026-07-01T09:00:00+00:00"
+              },
+              "rationale": "historical",
+              "relevance": 0.75,
+              "retrieval_tier": "historical_direct",
+              "semantic_available": false,
+              "source_episode": "episode:843241121ee5d2d252141498"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    },
+    "temporal_revision_snapshot_valid": true
+  },
+  "evidence_enabled_temporal_revision_score": {
+    "decision_success": true,
+    "evidence_success": true,
+    "probe_success": true,
+    "reason_codes": []
+  },
+  "explain_error": null,
+  "explain_followup": {
+    "id": 9,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"guidance\":\"Use these citations directly in the final response.\",\"result\":[{\"all_sources\":[{\"episode_content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"episode_id\":\"episode:843241121ee5d2d252141498\",\"episode_t_ref\":\"2026-07-01T09:00:00+00:00\",\"relationship\":\"direct\"}],\"citation_context\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"decayed_confidence\":0.4,\"fact_age_days\":143,\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"graph_insights\":{\"hub_entities\":[{\"canonical_name\":\"Harbor Road\",\"degree\":2,\"entity_id\":\"entity:f1d55145af0ec389805281f9\"},{\"canonical_name\":\"Onyx Plant Office\",\"degree\":2,\"entity_id\":\"entity:6d906e90e608112196ac5522\"}],\"surprising_connections\":[]},\"ingestion_method\":\"extraction\",\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"source_episode\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"source_episode\":\"episode:843241121ee5d2d252141498\",\"t_ingested\":\"2026-11-21T18:27:45.562373Z\",\"t_ref\":\"2026-07-01T09:00:00Z\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "guidance": "Use these citations directly in the final response.",
+        "result": [
+          {
+            "all_sources": [
+              {
+                "episode_content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "episode_id": "episode:843241121ee5d2d252141498",
+                "episode_t_ref": "2026-07-01T09:00:00+00:00",
+                "relationship": "direct"
+              }
+            ],
+            "citation_context": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+            "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+            "decayed_confidence": 0.4,
+            "fact_age_days": 143,
+            "fact_id": "fact:42be3d8ebecd75cb26538336",
+            "graph_insights": {
+              "hub_entities": [
+                {
+                  "canonical_name": "Harbor Road",
+                  "degree": 2,
+                  "entity_id": "entity:f1d55145af0ec389805281f9"
+                },
+                {
+                  "canonical_name": "Onyx Plant Office",
+                  "degree": 2,
+                  "entity_id": "entity:6d906e90e608112196ac5522"
+                }
+              ],
+              "surprising_connections": []
+            },
+            "ingestion_method": "extraction",
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "source_episode": "episode:843241121ee5d2d252141498",
+              "source_id": "ordinary-location-log",
+              "source_type": "inventory-record"
+            },
+            "source_episode": "episode:843241121ee5d2d252141498",
+            "t_ingested": "2026-11-21T18:27:45.562373Z",
+            "t_ref": "2026-07-01T09:00:00Z"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "extract_receipts": [
+    {
+      "event_id": "ordinary-location",
+      "request": {
+        "episode_id": "episode:843241121ee5d2d252141498"
+      },
+      "response": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Resolve canonical entities for any ambiguous names before creating manual links.\",\"result\":{\"entities\":[{\"canonical_name\":\"Harbor Road\",\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"type\":\"person\"},{\"canonical_name\":\"Onyx Plant Office\",\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"type\":\"person\"}],\"episode_id\":\"episode:843241121ee5d2d252141498\",\"facts\":[{\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"type\":\"experience\"}],\"links\":[{\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"episode_id\":\"episode:843241121ee5d2d252141498\"},{\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"episode_id\":\"episode:843241121ee5d2d252141498\"}],\"warnings\":[]},\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Resolve canonical entities for any ambiguous names before creating manual links.",
+            "result": {
+              "entities": [
+                {
+                  "canonical_name": "Harbor Road",
+                  "entity_id": "entity:f1d55145af0ec389805281f9",
+                  "type": "person"
+                },
+                {
+                  "canonical_name": "Onyx Plant Office",
+                  "entity_id": "entity:6d906e90e608112196ac5522",
+                  "type": "person"
+                }
+              ],
+              "episode_id": "episode:843241121ee5d2d252141498",
+              "facts": [
+                {
+                  "fact_id": "fact:42be3d8ebecd75cb26538336",
+                  "type": "experience"
+                }
+              ],
+              "links": [
+                {
+                  "entity_id": "entity:f1d55145af0ec389805281f9",
+                  "episode_id": "episode:843241121ee5d2d252141498"
+                },
+                {
+                  "entity_id": "entity:6d906e90e608112196ac5522",
+                  "episode_id": "episode:843241121ee5d2d252141498"
+                }
+              ],
+              "warnings": []
+            },
+            "status": "success"
+          }
+        }
+      }
+    }
+  ],
+  "ingest_receipts": [
+    {
+      "episode_id": "episode:843241121ee5d2d252141498",
+      "event_id": "ordinary-location",
+      "request": {
+        "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+        "source_id": "ordinary-location-log",
+        "source_type": "inventory-record",
+        "t_ref": "2026-07-01T09:00:00+00:00"
+      },
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\",\"result\":\"episode:843241121ee5d2d252141498\",\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.",
+            "result": "episode:843241121ee5d2d252141498",
+            "status": "success"
+          }
+        }
+      },
+      "t_ingested": "server_assigned_not_supplied"
+    }
+  ],
+  "initialize": {
+    "capabilities": {
+      "extensions": {
+        "io.modelcontextprotocol/tasks": {}
+      },
+      "resources": {},
+      "tools": {}
+    },
+    "instructions": "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context. All tool arguments and structured results use flat snake_case JSON keys that must match the published schemas exactly. Do not wrap tool arguments in `payload`.",
+    "protocolVersion": "2025-11-25",
+    "serverInfo": {
+      "name": "rmcp",
+      "version": "3.10.0"
+    }
+  },
+  "normalization": "memory-decisions-public-read/v1",
+  "primary_claim_rollout_stage": "shadow",
+  "primary_compact_responses": [
+    {
+      "id": 7,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"rationale\":\"tier=direct\",\"relevance\":0.11,\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "guidance": "Call explain if you need provenance-ready citations for selected items.",
+          "result": [
+            {
+              "confidence": 0.4,
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "grounding": 0.61,
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "onyx",
+                  "plant",
+                  "office"
+                ],
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [],
+                  "matched_index_key_terms": [],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": null,
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record"
+              },
+              "rationale": "tier=direct",
+              "relevance": 0.11,
+              "retrieval_tier": "direct",
+              "semantic_available": false,
+              "source_episode": "episode:843241121ee5d2d252141498"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"rationale\":\"tier=direct\",\"relevance\":0.11,\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "guidance": "Call explain if you need provenance-ready citations for selected items.",
+          "result": [
+            {
+              "confidence": 0.4,
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "grounding": 0.61,
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "onyx",
+                  "plant",
+                  "office"
+                ],
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [],
+                  "matched_index_key_terms": [],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": null,
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record"
+              },
+              "rationale": "tier=direct",
+              "relevance": 0.11,
+              "retrieval_tier": "direct",
+              "semantic_available": false,
+              "source_episode": "episode:843241121ee5d2d252141498"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    }
+  ],
+  "primary_observation": {
+    "budget_used": 1,
+    "disposition": "supported",
+    "guidance": "Call explain if you need provenance-ready citations for selected items.",
+    "item_count": 1,
+    "relation_outcomes": [],
+    "sources": [
+      {
+        "event_id": "ordinary-location",
+        "role": "unknown",
+        "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+      }
+    ]
+  },
+  "primary_request": {
+    "budget": 5,
+    "compact": true,
+    "query": "Where was Onyx Plant Office located?"
+  },
+  "product_binary_sha256": "5a9e9c597cbbf9d27c5fcc6429b98b54cb520852930cdcfe287662d24fea0583",
+  "product_revision": "subject-admission-5a9e9c59",
+  "provider_configuration": "storage=embedded-surreal-local;namespace=main;embeddings=disabled;retrieval=lexical-fallback;ner=regex-builtin;primary_claim_rollout=shadow;evidence_diagnostic_claim_rollout=evidence;transaction_time=server-assigned",
+  "repeat_observations": [
+    {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Call explain if you need provenance-ready citations for selected items.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "unknown",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    },
+    {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Call explain if you need provenance-ready citations for selected items.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "unknown",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    }
+  ],
+  "revision_checkpoint_receipts": [
+    {
+      "after_event_id": "ordinary-location",
+      "known_revision": 7,
+      "request": {
+        "budget": 1,
+        "compact": true,
+        "query": "",
+        "valid_at": "2026-07-01T09:00:00+00:00"
+      },
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:27:45.683613Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":1.0,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":1.0,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "context": {
+              "candidate_scan_truncated": false,
+              "completeness": "partial",
+              "omitted_channels": [
+                "alias expansion",
+                "experience, source episode siblings and source context neighborhoods",
+                "triples, graph edges and community summaries",
+                "semantic ANN and mutable embeddings",
+                "mutable fact access heat",
+                "legacy facts and episodes without committed revision provenance",
+                "claim relations and conflict projection are not enabled for this rollout"
+              ],
+              "snapshot": {
+                "known_at": "2026-11-21T18:27:45.683613Z",
+                "known_revision": 7,
+                "valid_at": "2026-07-01T09:00:00Z"
+              }
+            },
+            "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+            "result": [
+              {
+                "confidence": 0.7,
+                "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "evidence_status": "unknown",
+                "fact_id": "fact:42be3d8ebecd75cb26538336",
+                "grounding": 1.0,
+                "provenance": {
+                  "extraction_strategy": "explicit_schema_record",
+                  "ingestion_method": "extraction",
+                  "known_revision": 7,
+                  "source_episode_id": "episode:843241121ee5d2d252141498",
+                  "source_id": "ordinary-location-log",
+                  "source_type": "inventory-record",
+                  "valid_at": "2026-07-01T09:00:00+00:00"
+                },
+                "rationale": "historical",
+                "relevance": 1.0,
+                "retrieval_tier": "historical_direct",
+                "semantic_available": false,
+                "source_episode": "episode:843241121ee5d2d252141498"
+              }
+            ],
+            "status": "success"
+          }
+        }
+      }
+    }
+  ],
+  "schema_version": "memory-decisions-receipt/v3",
+  "score": {
+    "decision_success": false,
+    "evidence_success": true,
+    "probe_success": false,
+    "reason_codes": [
+      "decision_unobservable"
+    ]
+  },
+  "stderr_excerpt": "",
+  "supported_api": {
+    "independent_valid_and_known_cutoffs": true,
+    "input_schema": [
+      {
+        "description": "Execute a coarse-grained command for an app session opened via open_app. Use this only for session-scoped workflows that are not already covered by canonical memory tools. Arguments must be a flat snake_case object and must not be wrapped in `payload`. Supports ingestion review actions (`approve_items`, `reject_items`, `edit_item`, `commit_review`, `cancel_review`), lifecycle actions (`archive_candidates`, `restore_archived`, `recompute_decay`, `rebuild_communities`), diff export (`export_diff`), graph exploration actions (`expand_neighbors`, `open_edge_details`, `use_path_as_context`), and the generic `close_session`. Returns command status and whether the caller should re-read the app resource.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "description": "Coarse-grained action name for the active app session.",
+              "type": "string"
+            },
+            "confirmed": {
+              "description": "Optional explicit confirmation flag for destructive actions.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "depth": {
+              "description": "Optional graph traversal depth for graph exploration commands.",
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "direction": {
+              "description": "Optional graph traversal direction for graph exploration commands.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dry_run": {
+              "description": "Optional dry-run flag for destructive actions.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "format": {
+              "description": "Optional export format for diff-like actions.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "item_id": {
+              "description": "Singular draft item identifier for edit-like actions.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "item_ids": {
+              "default": [],
+              "description": "Draft item identifiers for bulk review actions.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "patch_json": {
+              "description": "Optional JSON object payload encoded as a string for edit-like actions.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "Optional rationale for rejection-like actions.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_id": {
+              "description": "Session identifier returned by `open_app`.",
+              "type": "string"
+            },
+            "target_id": {
+              "description": "Generic singular target identifier for graph-like session actions.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "target_ids": {
+              "default": [],
+              "description": "Generic target identifiers for lifecycle and graph-like batch actions.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "session_id",
+            "action"
+          ],
+          "type": "object"
+        },
+        "name": "app_command",
+        "outputSchema": {
+          "$defs": {
+            "AppCommandResult": {
+              "description": "Result payload returned by the public `app_command` bridge.",
+              "properties": {
+                "action": {
+                  "description": "Canonical action name.",
+                  "type": "string"
+                },
+                "app": {
+                  "description": "Canonical public app identifier.",
+                  "type": "string"
+                },
+                "details": {
+                  "description": "Raw command details for clients that need extra metadata."
+                },
+                "message": {
+                  "description": "Human-readable outcome message.",
+                  "type": "string"
+                },
+                "ok": {
+                  "description": "Whether the command completed successfully.",
+                  "type": "boolean"
+                },
+                "refresh_required": {
+                  "description": "Whether callers should re-read the session resource.",
+                  "type": "boolean"
+                },
+                "resource_uri": {
+                  "description": "Resource URI to re-read when `refresh_required` is true.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "session_id": {
+                  "description": "Target session identifier.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "app",
+                "session_id",
+                "action",
+                "ok",
+                "message",
+                "refresh_required"
+              ],
+              "type": "object"
+            },
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "$ref": "#/$defs/AppCommandResult",
+              "description": "The actual result data."
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Assemble the most relevant memory context for a query. Use this tool to retrieve stored facts before answering or planning. Do not use this tool to ingest new content. Arguments are a flat snake_case object with `query`, `fact_types`, legacy `as_of`, independent `valid_at` and `known_at` timestamps, optional exact `known_revision`, `budget`, `view_mode`, `window_start`, and `window_end`. `as_of` cannot be combined with the new temporal fields; `known_at` and `known_revision` are mutually exclusive. Historical reads return snapshot and completeness metadata and can be partial while revision-unsafe selectors are withheld. Do not wrap arguments in `payload`. On error, fix the query parameters and retry.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "as_of": {
+              "default": "",
+              "description": "The timestamp to assemble context as-of (ISO 8601 format, default: now)",
+              "type": "string"
+            },
+            "budget": {
+              "default": 5,
+              "description": "Maximum number of facts to return (default: 5)",
+              "format": "int32",
+              "type": "integer"
+            },
+            "compact": {
+              "default": true,
+              "description": "Request compact (token-efficient) response. Defaults to true.\nSet to false for verbose debug output including full rationale strings.",
+              "type": "boolean"
+            },
+            "fact_types": {
+              "default": [],
+              "description": "Optional fact types to include in the response",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "known_at": {
+              "default": null,
+              "description": "Server-knowledge boundary (ISO 8601), resolved to a committed revision.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "known_revision": {
+              "default": null,
+              "description": "Exact committed knowledge revision; mutually exclusive with known_at.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "query": {
+              "description": "The query to assemble context for",
+              "type": "string"
+            },
+            "valid_at": {
+              "default": null,
+              "description": "Valid-time boundary (ISO 8601), independent of server knowledge time.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "view_mode": {
+              "description": "Optional retrieval view mode (for example, \"timeline\")",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "window_end": {
+              "description": "Optional upper bound for result timestamps (ISO 8601 format)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "window_start": {
+              "description": "Optional lower bound for result timestamps (ISO 8601 format)",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "name": "assemble_context",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "description": "The actual result data."
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Explain context items with provenance-ready citations. Use this tool when you already have context items and need source snippets for an answer. Do not use this tool to search memory. Pass `context_items` as a JSON array string; object entries must use snake_case keys such as `fact_id` and `source_episode`, while plain source ID strings are also accepted. Do not wrap arguments in `payload`. Returns citation-ready items. On error, fix the JSON payload shape and retry.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "compact": {
+              "default": true,
+              "description": "Request compact (token-efficient) response. Defaults to true.",
+              "type": "boolean"
+            },
+            "context_items": {
+              "description": "JSON array string of context items to explain.\n\nAccepted forms inside the JSON array:\n- objects with snake_case keys such as `content`, `quote`, `fact_id`, and `source_episode`\n- plain source ID strings such as `episode:abc123`",
+              "type": "string"
+            }
+          },
+          "required": [
+            "context_items"
+          ],
+          "type": "object"
+        },
+        "name": "explain",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "description": "The actual result data."
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "description": "Content to analyze (optional if episode_id provided)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "episode_id": {
+              "description": "Episode ID to extract from (optional if content provided).\nUse the canonical `episode:<id>` form exactly as returned by `ingest`;\na bare hex ID without the `episode:` prefix is rejected.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_id": {
+              "description": "Source ID (optional)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_type": {
+              "description": "Source type (default: \"ad-hoc\")",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "t_ref": {
+              "description": "Reference timestamp (ISO 8601 format, optional)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "description": "Alternative content field",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "zero_shot_labels": {
+              "description": "Custom zero-shot entity labels for GLiNER (opt-in, overrides default labels)",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "name": "extract",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            },
+            "ContradictionWarning": {
+              "description": "A non-blocking warning about a newly extracted fact that may contradict an active fact.",
+              "properties": {
+                "conflicting_fact_id": {
+                  "type": "string"
+                },
+                "entity_ids": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "existing_content": {
+                  "type": "string"
+                },
+                "fact_type": {
+                  "type": "string"
+                },
+                "new_content": {
+                  "type": "string"
+                },
+                "new_fact_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fact_type",
+                "new_fact_id",
+                "conflicting_fact_id",
+                "existing_content",
+                "new_content",
+                "entity_ids",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "ExtractResult": {
+              "description": "Structured result returned by the MCP `extract` tool.",
+              "properties": {
+                "entities": {
+                  "items": {
+                    "$ref": "#/$defs/ExtractedEntity"
+                  },
+                  "type": "array"
+                },
+                "episode_id": {
+                  "type": "string"
+                },
+                "facts": {
+                  "items": {
+                    "$ref": "#/$defs/ExtractedFact"
+                  },
+                  "type": "array"
+                },
+                "links": {
+                  "items": {
+                    "$ref": "#/$defs/ExtractedLink"
+                  },
+                  "type": "array"
+                },
+                "reconciliation": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ReconciliationSummary"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional reconciliation metadata."
+                },
+                "warnings": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/ContradictionWarning"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "episode_id",
+                "entities",
+                "facts",
+                "links",
+                "warnings"
+              ],
+              "type": "object"
+            },
+            "ExtractedEntity": {
+              "description": "A compact extracted entity returned by the MCP `extract` tool.",
+              "properties": {
+                "canonical_name": {
+                  "type": "string"
+                },
+                "entity_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "entity_id",
+                "type",
+                "canonical_name"
+              ],
+              "type": "object"
+            },
+            "ExtractedFact": {
+              "description": "A compact extracted fact returned by the MCP `extract` tool.",
+              "properties": {
+                "fact_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fact_id",
+                "type"
+              ],
+              "type": "object"
+            },
+            "ExtractedLink": {
+              "description": "A relationship link produced during extraction.",
+              "properties": {
+                "entity_id": {
+                  "type": "string"
+                },
+                "episode_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "entity_id",
+                "episode_id"
+              ],
+              "type": "object"
+            },
+            "ReconciliationStatus": {
+              "description": "Status of claim reconciliation processing.",
+              "enum": [
+                "complete",
+                "pending",
+                "partial",
+                "failed",
+                "unsupported"
+              ],
+              "type": "string"
+            },
+            "ReconciliationSummary": {
+              "description": "Summary of claim reconciliation for an extract operation.",
+              "properties": {
+                "active_relations": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "claims_projected": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reason_codes": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "$ref": "#/$defs/ReconciliationStatus"
+                }
+              },
+              "required": [
+                "status",
+                "claims_projected",
+                "active_relations",
+                "reason_codes"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "$ref": "#/$defs/ExtractResult",
+              "description": "The actual result data."
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and optional `policy_tags`. `t_ingested` is server-assigned and must be omitted. Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "description": "Content to ingest",
+              "type": "string"
+            },
+            "policy_tags": {
+              "default": [],
+              "description": "Policy tags (optional)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "source_group": {
+              "description": "Producer-declared identity of an ordered source stream (optional).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_id": {
+              "description": "Unique identifier for the source",
+              "type": "string"
+            },
+            "source_position": {
+              "description": "One-based turn position within source_group (optional; supply both).",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source_type": {
+              "description": "Type of source (e.g., \"email\", \"tfs_work_item\", \"document\")",
+              "type": "string"
+            },
+            "t_ingested": {
+              "description": "Deprecated compatibility field. Omit it: transaction time is assigned by the memory server.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "t_ref": {
+              "description": "Reference timestamp (ISO 8601 format)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_type",
+            "source_id",
+            "content",
+            "t_ref"
+          ],
+          "type": "object"
+        },
+        "name": "ingest",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "description": "The actual result data.",
+              "type": "string"
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Invalidate a fact while preserving historical traceability. Use this tool when a fact becomes outdated or superseded. Do not use this tool to delete memory. Arguments must be a flat snake_case object with `fact_id`, `reason`, and ISO 8601 `t_invalid`. Do not wrap arguments in `payload`. Returns confirmation. On error, verify the fact identifier and retry.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "fact_id": {
+              "description": "ID of the fact to invalidate.\nUse the canonical `fact:<id>` form exactly as returned by `extract`;\na bare hex ID without the `fact:` prefix is rejected.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Reason for invalidation",
+              "type": "string"
+            },
+            "t_invalid": {
+              "description": "Timestamp when fact became invalid (ISO 8601 format)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fact_id",
+            "reason",
+            "t_invalid"
+          ],
+          "type": "object"
+        },
+        "name": "invalidate",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "description": "The actual result data.",
+              "type": "string"
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> optional `source_text` or `draft_episode_id`; lifecycle -> no partition field. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "app": {
+              "description": "Public app identifier (for example: inspector, diff, ingestion_review, lifecycle, graph).",
+              "type": "string"
+            },
+            "as_of": {
+              "description": "Timestamp for single-timepoint views.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "as_of_left": {
+              "description": "Left boundary timestamp for temporal diff.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "as_of_right": {
+              "description": "Right boundary timestamp for temporal diff.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cursor": {
+              "description": "Cursor for paginated app views.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "draft_episode_id": {
+              "description": "Existing draft episode identifier for ingestion review.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "from_entity_id": {
+              "description": "Source entity for graph navigation.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "max_depth": {
+              "description": "Maximum path depth for graph navigation.",
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "page_size": {
+              "description": "Page size for paginated app views.",
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source_text": {
+              "description": "Inline source text for ingestion review.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "target_id": {
+              "description": "Target identifier for entity/fact/episode-driven apps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "target_type": {
+              "description": "Target kind for entity/fact/episode-driven apps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "time_axis": {
+              "description": "Time axis for temporal diff.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to_entity_id": {
+              "description": "Destination entity for graph navigation.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ttl_seconds": {
+              "description": "Optional session TTL in seconds.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "view": {
+              "description": "Optional app view variant.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "app"
+          ],
+          "type": "object"
+        },
+        "name": "open_app",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            },
+            "OpenAppResult": {
+              "description": "Result payload returned by the public `open_app` launcher.",
+              "properties": {
+                "app": {
+                  "description": "Canonical public app identifier.",
+                  "type": "string"
+                },
+                "fallback": {
+                  "description": "Immediate JSON fallback payload for clients that do not read resources yet."
+                },
+                "resource_uri": {
+                  "description": "Session-backed resource URI for reading the current view.",
+                  "type": "string"
+                },
+                "session_id": {
+                  "description": "Created session identifier.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "app",
+                "session_id",
+                "resource_uri",
+                "fallback"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "$ref": "#/$defs/OpenAppResult",
+              "description": "The actual result data."
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      },
+      {
+        "description": "Resolve a canonical entity identifier for a name and its aliases. Use this tool when a person, company, or project may appear under multiple names. Do not use this tool for full-text retrieval. Arguments must be a flat snake_case object with `entity_type`, `canonical_name`, and optional `aliases`. Do not wrap arguments in `payload`. Returns the canonical `entity_id`. On error, fix the entity fields and retry.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "aliases": {
+              "default": [],
+              "description": "Known aliases for the entity",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "canonical_name": {
+              "description": "Canonical name for the entity",
+              "type": "string"
+            },
+            "entity_type": {
+              "description": "Type of entity (e.g., \"person\", \"project\", \"company\")",
+              "type": "string"
+            }
+          },
+          "required": [
+            "entity_type",
+            "canonical_name"
+          ],
+          "type": "object"
+        },
+        "name": "resolve",
+        "outputSchema": {
+          "$defs": {
+            "ContextAssemblyMetadata": {
+              "description": "Context-level temporal metadata. `omitted_channels` names selectors that\nwere bypassed because their historical state is not yet revisioned.",
+              "properties": {
+                "candidate_scan_truncated": {
+                  "type": "boolean"
+                },
+                "completeness": {
+                  "$ref": "#/$defs/ContextCompleteness"
+                },
+                "omitted_channels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "snapshot": {
+                  "$ref": "#/$defs/ContextSnapshot"
+                }
+              },
+              "required": [
+                "snapshot",
+                "completeness",
+                "candidate_scan_truncated"
+              ],
+              "type": "object"
+            },
+            "ContextCompleteness": {
+              "description": "How much of the configured memory selector surface contributed to a read.",
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "ContextSnapshot": {
+              "description": "A database snapshot boundary attached to a historical context response.",
+              "properties": {
+                "known_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "known_revision": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "valid_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "valid_at",
+                "known_at",
+                "known_revision"
+              ],
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextAssemblyMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot and completeness metadata for revision-bounded context reads."
+            },
+            "guidance": {
+              "description": "Optional next-step guidance for the caller.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "has_more": {
+              "description": "Pagination flag for list responses.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "next_offset": {
+              "description": "Offset for the next page when pagination is supported.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "result": {
+              "description": "The actual result data.",
+              "type": "string"
+            },
+            "status": {
+              "description": "Result status for the tool call.",
+              "type": "string"
+            },
+            "total_count": {
+              "description": "Total count of records in the current response slice.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "result"
+          ],
+          "type": "object"
+        }
+      }
+    ]
+  },
+  "temporal_diagnostic_request": null,
+  "temporal_diagnostic_response": null,
+  "temporal_revision_observation": {
+    "budget_used": 1,
+    "disposition": "supported",
+    "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+    "item_count": 1,
+    "relation_outcomes": [],
+    "sources": [
+      {
+        "event_id": "ordinary-location",
+        "role": "unknown",
+        "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+      }
+    ]
+  },
+  "temporal_revision_request": {
+    "budget": 5,
+    "compact": true,
+    "known_revision": 7,
+    "query": "Where was Onyx Plant Office located?",
+    "valid_at": "2026-07-01T09:00:00+00:00"
+  },
+  "temporal_revision_response": {
+    "id": 6,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:27:45.666816Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.75,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.75,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations and conflict projection are not enabled for this rollout"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-21T18:27:45.666816Z",
+            "known_revision": 7,
+            "valid_at": "2026-07-01T09:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+            "evidence_status": "unknown",
+            "fact_id": "fact:42be3d8ebecd75cb26538336",
+            "grounding": 0.75,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 7,
+              "source_episode_id": "episode:843241121ee5d2d252141498",
+              "source_id": "ordinary-location-log",
+              "source_type": "inventory-record",
+              "valid_at": "2026-07-01T09:00:00+00:00"
+            },
+            "rationale": "historical",
+            "relevance": 0.75,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:843241121ee5d2d252141498"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "temporal_revision_score": {
+    "decision_success": false,
+    "evidence_success": true,
+    "probe_success": false,
+    "reason_codes": [
+      "decision_unobservable"
+    ]
+  },
+  "temporal_revision_snapshot_valid": true,
+  "verbose_diagnostic": {
+    "claim_rollout_stage": "shadow",
+    "episode_bindings": {
+      "episode:843241121ee5d2d252141498": "ordinary-location"
+    },
+    "explain_error": null,
+    "explain_followup": {
+      "id": 9,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"guidance\":\"Use these citations directly in the final response.\",\"result\":[{\"all_sources\":[{\"episode_content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"episode_id\":\"episode:843241121ee5d2d252141498\",\"episode_t_ref\":\"2026-07-01T09:00:00+00:00\",\"relationship\":\"direct\"}],\"citation_context\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"decayed_confidence\":0.4,\"fact_age_days\":143,\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"graph_insights\":{\"hub_entities\":[{\"canonical_name\":\"Harbor Road\",\"degree\":2,\"entity_id\":\"entity:f1d55145af0ec389805281f9\"},{\"canonical_name\":\"Onyx Plant Office\",\"degree\":2,\"entity_id\":\"entity:6d906e90e608112196ac5522\"}],\"surprising_connections\":[]},\"ingestion_method\":\"extraction\",\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"source_episode\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"source_episode\":\"episode:843241121ee5d2d252141498\",\"t_ingested\":\"2026-11-21T18:27:57.608500Z\",\"t_ref\":\"2026-07-01T09:00:00Z\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "guidance": "Use these citations directly in the final response.",
+          "result": [
+            {
+              "all_sources": [
+                {
+                  "episode_content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                  "episode_id": "episode:843241121ee5d2d252141498",
+                  "episode_t_ref": "2026-07-01T09:00:00+00:00",
+                  "relationship": "direct"
+                }
+              ],
+              "citation_context": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "decayed_confidence": 0.4,
+              "fact_age_days": 143,
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "graph_insights": {
+                "hub_entities": [
+                  {
+                    "canonical_name": "Harbor Road",
+                    "degree": 2,
+                    "entity_id": "entity:f1d55145af0ec389805281f9"
+                  },
+                  {
+                    "canonical_name": "Onyx Plant Office",
+                    "degree": 2,
+                    "entity_id": "entity:6d906e90e608112196ac5522"
+                  }
+                ],
+                "surprising_connections": []
+              },
+              "ingestion_method": "extraction",
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "source_episode": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record"
+              },
+              "source_episode": "episode:843241121ee5d2d252141498",
+              "t_ingested": "2026-11-21T18:27:57.608500Z",
+              "t_ref": "2026-07-01T09:00:00Z"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    },
+    "extract_receipts": [
+      {
+        "event_id": "ordinary-location",
+        "request": {
+          "episode_id": "episode:843241121ee5d2d252141498"
+        },
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"guidance\":\"Resolve canonical entities for any ambiguous names before creating manual links.\",\"result\":{\"entities\":[{\"canonical_name\":\"Harbor Road\",\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"type\":\"person\"},{\"canonical_name\":\"Onyx Plant Office\",\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"type\":\"person\"}],\"episode_id\":\"episode:843241121ee5d2d252141498\",\"facts\":[{\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"type\":\"experience\"}],\"links\":[{\"entity_id\":\"entity:f1d55145af0ec389805281f9\",\"episode_id\":\"episode:843241121ee5d2d252141498\"},{\"entity_id\":\"entity:6d906e90e608112196ac5522\",\"episode_id\":\"episode:843241121ee5d2d252141498\"}],\"warnings\":[]},\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "guidance": "Resolve canonical entities for any ambiguous names before creating manual links.",
+              "result": {
+                "entities": [
+                  {
+                    "canonical_name": "Harbor Road",
+                    "entity_id": "entity:f1d55145af0ec389805281f9",
+                    "type": "person"
+                  },
+                  {
+                    "canonical_name": "Onyx Plant Office",
+                    "entity_id": "entity:6d906e90e608112196ac5522",
+                    "type": "person"
+                  }
+                ],
+                "episode_id": "episode:843241121ee5d2d252141498",
+                "facts": [
+                  {
+                    "fact_id": "fact:42be3d8ebecd75cb26538336",
+                    "type": "experience"
+                  }
+                ],
+                "links": [
+                  {
+                    "entity_id": "entity:f1d55145af0ec389805281f9",
+                    "episode_id": "episode:843241121ee5d2d252141498"
+                  },
+                  {
+                    "entity_id": "entity:6d906e90e608112196ac5522",
+                    "episode_id": "episode:843241121ee5d2d252141498"
+                  }
+                ],
+                "warnings": []
+              },
+              "status": "success"
+            }
+          }
+        }
+      }
+    ],
+    "ingest_receipts": [
+      {
+        "episode_id": "episode:843241121ee5d2d252141498",
+        "event_id": "ordinary-location",
+        "request": {
+          "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+          "source_id": "ordinary-location-log",
+          "source_type": "inventory-record",
+          "t_ref": "2026-07-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"guidance\":\"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\",\"result\":\"episode:843241121ee5d2d252141498\",\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "guidance": "Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.",
+              "result": "episode:843241121ee5d2d252141498",
+              "status": "success"
+            }
+          }
+        },
+        "t_ingested": "server_assigned_not_supplied"
+      }
+    ],
+    "observation": {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Call explain if you need provenance-ready citations for selected items.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "unknown",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office\nsubject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    },
+    "request": {
+      "budget": 5,
+      "compact": false,
+      "query": "Where was Onyx Plant Office located?"
+    },
+    "responses": [
+      {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"has_more\":false,\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"quote\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"rationale\":\"tier=direct fts=13.62 access_count=0 confidence=0.40 relevance=0.11 grounding=0.61 alignment=1.03 semantic=disabled matched lexical query=\\\"Where was Onyx Plant Office located?\\\" and active at 2026-11-21\",\"relevance\":0.11,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\"},\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\",\"total_count\":1}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call explain if you need provenance-ready citations for selected items.",
+            "has_more": false,
+            "result": [
+              {
+                "confidence": 0.4,
+                "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "fact_id": "fact:42be3d8ebecd75cb26538336",
+                "grounding": 0.61,
+                "provenance": {
+                  "extraction_strategy": "explicit_schema_record",
+                  "ingestion_method": "extraction",
+                  "matched_query_terms": [
+                    "onyx",
+                    "plant",
+                    "office"
+                  ],
+                  "retrieval_admission": {
+                    "basis": "lexical",
+                    "community": null,
+                    "explicit_date_admitted": false,
+                    "graph_anchor_origin": null,
+                    "hop_count": null,
+                    "matched_content_terms": [],
+                    "matched_index_key_terms": [],
+                    "matched_references": [],
+                    "policy_version": "retrieval-admission-v1",
+                    "repeated_topic": null,
+                    "resolved_entity_ids": [],
+                    "semantic_similarity": null
+                  },
+                  "source_episode_id": "episode:843241121ee5d2d252141498",
+                  "source_id": "ordinary-location-log",
+                  "source_type": "inventory-record"
+                },
+                "quote": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "rationale": "tier=direct fts=13.62 access_count=0 confidence=0.40 relevance=0.11 grounding=0.61 alignment=1.03 semantic=disabled matched lexical query=\"Where was Onyx Plant Office located?\" and active at 2026-11-21",
+                "relevance": 0.11,
+                "retrieval_evidence": {
+                  "admission_basis": "lexical",
+                  "policy_version": "retrieval-admission-v1"
+                },
+                "retrieval_tier": "direct",
+                "semantic_available": false,
+                "source_episode": "episode:843241121ee5d2d252141498"
+              }
+            ],
+            "status": "success",
+            "total_count": 1
+          }
+        }
+      },
+      {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"has_more\":false,\"result\":[{\"confidence\":0.4,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.61,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"onyx\",\"plant\",\"office\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\"},\"quote\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"rationale\":\"tier=direct fts=13.62 access_count=0 confidence=0.40 relevance=0.11 grounding=0.61 alignment=1.03 semantic=disabled matched lexical query=\\\"Where was Onyx Plant Office located?\\\" and active at 2026-11-21\",\"relevance\":0.11,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\"},\"retrieval_tier\":\"direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\",\"total_count\":1}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call explain if you need provenance-ready citations for selected items.",
+            "has_more": false,
+            "result": [
+              {
+                "confidence": 0.4,
+                "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "fact_id": "fact:42be3d8ebecd75cb26538336",
+                "grounding": 0.61,
+                "provenance": {
+                  "extraction_strategy": "explicit_schema_record",
+                  "ingestion_method": "extraction",
+                  "matched_query_terms": [
+                    "onyx",
+                    "plant",
+                    "office"
+                  ],
+                  "retrieval_admission": {
+                    "basis": "lexical",
+                    "community": null,
+                    "explicit_date_admitted": false,
+                    "graph_anchor_origin": null,
+                    "hop_count": null,
+                    "matched_content_terms": [],
+                    "matched_index_key_terms": [],
+                    "matched_references": [],
+                    "policy_version": "retrieval-admission-v1",
+                    "repeated_topic": null,
+                    "resolved_entity_ids": [],
+                    "semantic_similarity": null
+                  },
+                  "source_episode_id": "episode:843241121ee5d2d252141498",
+                  "source_id": "ordinary-location-log",
+                  "source_type": "inventory-record"
+                },
+                "quote": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                "rationale": "tier=direct fts=13.62 access_count=0 confidence=0.40 relevance=0.11 grounding=0.61 alignment=1.03 semantic=disabled matched lexical query=\"Where was Onyx Plant Office located?\" and active at 2026-11-21",
+                "relevance": 0.11,
+                "retrieval_evidence": {
+                  "admission_basis": "lexical",
+                  "policy_version": "retrieval-admission-v1"
+                },
+                "retrieval_tier": "direct",
+                "semantic_available": false,
+                "source_episode": "episode:843241121ee5d2d252141498"
+              }
+            ],
+            "status": "success",
+            "total_count": 1
+          }
+        }
+      }
+    ],
+    "revision_checkpoint_receipts": [
+      {
+        "after_event_id": "ordinary-location",
+        "known_revision": 7,
+        "request": {
+          "budget": 1,
+          "compact": true,
+          "query": "",
+          "valid_at": "2026-07-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:27:57.764420Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":1.0,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":1.0,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-21T18:27:57.764420Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-07-01T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:42be3d8ebecd75cb26538336",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 7,
+                    "source_episode_id": "episode:843241121ee5d2d252141498",
+                    "source_id": "ordinary-location-log",
+                    "source_type": "inventory-record",
+                    "valid_at": "2026-07-01T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 1.0,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:843241121ee5d2d252141498"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        }
+      }
+    ],
+    "temporal_revision_observation": {
+      "budget_used": 1,
+      "disposition": "supported",
+      "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+      "item_count": 1,
+      "relation_outcomes": [],
+      "sources": [
+        {
+          "event_id": "ordinary-location",
+          "role": "unknown",
+          "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+        }
+      ]
+    },
+    "temporal_revision_request": {
+      "budget": 5,
+      "compact": true,
+      "known_revision": 7,
+      "query": "Where was Onyx Plant Office located?",
+      "valid_at": "2026-07-01T09:00:00+00:00"
+    },
+    "temporal_revision_response": {
+      "id": 6,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-21T18:27:57.735186Z\",\"known_revision\":7,\"valid_at\":\"2026-07-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Onyx Plant Office\\ndimension: location\\nvalue: Harbor Road for Onyx Plant Office\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:42be3d8ebecd75cb26538336\",\"grounding\":0.75,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:843241121ee5d2d252141498\",\"source_id\":\"ordinary-location-log\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-07-01T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.75,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:843241121ee5d2d252141498\"}],\"status\":\"success\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "context": {
+            "candidate_scan_truncated": false,
+            "completeness": "partial",
+            "omitted_channels": [
+              "alias expansion",
+              "experience, source episode siblings and source context neighborhoods",
+              "triples, graph edges and community summaries",
+              "semantic ANN and mutable embeddings",
+              "mutable fact access heat",
+              "legacy facts and episodes without committed revision provenance",
+              "claim relations and conflict projection are not enabled for this rollout"
+            ],
+            "snapshot": {
+              "known_at": "2026-11-21T18:27:57.735186Z",
+              "known_revision": 7,
+              "valid_at": "2026-07-01T09:00:00Z"
+            }
+          },
+          "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+          "result": [
+            {
+              "confidence": 0.7,
+              "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+              "evidence_status": "unknown",
+              "fact_id": "fact:42be3d8ebecd75cb26538336",
+              "grounding": 0.75,
+              "provenance": {
+                "extraction_strategy": "explicit_schema_record",
+                "ingestion_method": "extraction",
+                "known_revision": 7,
+                "source_episode_id": "episode:843241121ee5d2d252141498",
+                "source_id": "ordinary-location-log",
+                "source_type": "inventory-record",
+                "valid_at": "2026-07-01T09:00:00+00:00"
+              },
+              "rationale": "historical",
+              "relevance": 0.75,
+              "retrieval_tier": "historical_direct",
+              "semantic_available": false,
+              "source_episode": "episode:843241121ee5d2d252141498"
+            }
+          ],
+          "status": "success"
+        }
+      }
+    },
+    "temporal_revision_snapshot_valid": true
+  }
+}

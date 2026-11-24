@@ -1,0 +1,9 @@
+682830b8869deb245f240b7f1ac95661c174a925bf1b05ee524266044dbb7f97  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/agent-managed-comparison.json
+682830b8869deb245f240b7f1ac95661c174a925bf1b05ee524266044dbb7f97  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/agent-managed-comparison-replay.json
+9ee381954ad7be7b65e87811c52e99560966dd832e0fddc8acd4261062e57535  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/agent-managed-incumbent.json
+14806f8bda4e088e62484bcfa4e2a5f1399d698b60c4645fb3f54843ffe0c61b  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/agent-managed-candidate.json
+8dfb69fa18e608762540c6d6a9c006ff497ede9303bf7198364b1fd8f8ee0560  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/incumbent.json
+5407b286cffbc2a2544bee14e9c8937f938639f500c0c09059276bebb79a7a35  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/candidate.json
+b1a8f4fac5e33d5d7a698bd01efcb57583d7dab4373d34e77b7e6d765679cdff  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/incumbent-receipts.jsonl
+5a91afe7ff61864e6fbfcd565f27f437e73071dda589e48cbcf366b35dc7cf2e  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/candidate-receipts.jsonl
+48305e6a17fed98b70744b5b162a821ed3ab10263eeaabbc25c3f7fd62cf0f72  evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/report.md

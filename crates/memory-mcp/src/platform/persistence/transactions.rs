@@ -22,6 +22,10 @@ use crate::shared::error::MemoryError;
 pub(crate) const DEFAULT_DB_RETRY_ATTEMPTS: u32 = 3;
 /// Initial delay in milliseconds for database retry backoff (doubles each attempt).
 pub(crate) const DEFAULT_DB_RETRY_INITIAL_DELAY_MS: u64 = 200;
+/// Transaction conflicts on the namespace revision clock need to outlast a
+/// small burst of competing writers without inheriting the general query delay.
+const TRANSACTION_RETRY_ATTEMPTS: u32 = 4;
+const TRANSACTION_RETRY_INITIAL_DELAY_MS: u64 = 10;
 /// Per-query timeout to guard against stalled database connections (e.g. WebSocket hang).
 const DEFAULT_DB_QUERY_TIMEOUT_SECS: u64 = 30;
 /// Maximum attempts for an attempt that hits the per-query timeout.
@@ -35,7 +39,7 @@ pub(crate) const DEFAULT_DB_TIMEOUT_ATTEMPTS: u32 = 2;
 ///
 /// A timeout and a transient conflict are not the same failure and are not
 /// retried the same number of times. A conflict is contention the next attempt
-/// may win, so it keeps [`DEFAULT_DB_RETRY_ATTEMPTS`]. A timeout means the
+/// may win, so its budget comes from the selected retry policy. A timeout means the
 /// server did not answer within the per-attempt budget; re-running it against
 /// an already overloaded server re-reads the same data and multiplies the load
 /// that caused the stall, so it gets two attempts — enough to ride out a
@@ -76,6 +80,25 @@ where
     Fut: std::future::Future<Output = Result<T, MemoryError>>,
 {
     with_db_retry_policy(op_name, &DbRetryPolicy::default(), logger, f).await
+}
+
+/// Retries remote atomic writes with the bounded backoff measured for
+/// revision-clock contention. Embedded stores retain the general retry policy.
+pub(crate) async fn with_remote_transaction_retry<T, F, Fut>(
+    op_name: &str,
+    logger: &StdoutLogger,
+    f: F,
+) -> Result<T, MemoryError>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, MemoryError>>,
+{
+    let policy = DbRetryPolicy {
+        attempts: TRANSACTION_RETRY_ATTEMPTS,
+        initial_delay: Duration::from_millis(TRANSACTION_RETRY_INITIAL_DELAY_MS),
+        ..DbRetryPolicy::default()
+    };
+    with_db_retry_policy(op_name, &policy, logger, f).await
 }
 
 /// Backoff for `attempt`, doubling from the policy's initial delay up to 64x.
@@ -242,6 +265,27 @@ mod tests {
         .await;
         assert_eq!(result.unwrap(), 7);
         assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn retries_three_consecutive_revision_clock_conflicts() {
+        let calls = Arc::new(AtomicU32::new(0));
+        let counter = calls.clone();
+        let result = with_remote_transaction_retry("transaction_query", &logger(), || {
+            let counter = counter.clone();
+            async move {
+                let attempt = counter.fetch_add(1, Ordering::SeqCst);
+                if attempt < 3 {
+                    Err(MemoryError::Storage("Transaction conflict".into()))
+                } else {
+                    Ok("committed")
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(result.unwrap(), "committed");
+        assert_eq!(calls.load(Ordering::SeqCst), 4);
     }
 
     #[tokio::test]

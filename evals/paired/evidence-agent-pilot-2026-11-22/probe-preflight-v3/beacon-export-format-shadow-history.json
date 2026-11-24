@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "beacon-export-format-decision",
+    "source_id": "beacon-design-review",
+    "source_type": "decision-record",
+    "content": "subject: Beacon export\ndecision: use JSON Lines, one JSON object per line",
+    "valid_at": "2026-06-03T11:30:00Z"
+  }
+]

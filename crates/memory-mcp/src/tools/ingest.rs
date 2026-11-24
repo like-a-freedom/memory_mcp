@@ -32,14 +32,19 @@ async fn ingest_inner<T: ToolContext>(
 ) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("ingest");
     let t_ref = parse_datetime(&params.t_ref).ok_or_else(|| {
-        MemoryError::Validation(format!(
-            "Invalid `t_ref` value: {}. \
+        MemoryError::Validation(
+            "Invalid `t_ref` value. \
              Provide a valid ISO 8601 timestamp with seconds, e.g. 2026-05-11T17:34:00Z or \
-             2026-05-11T17:34:00+00:00.",
-            params.t_ref
-        ))
+             2026-05-11T17:34:00+00:00."
+                .into(),
+        )
     })?;
-    let t_ingested = params.t_ingested.as_ref().and_then(|s| parse_datetime(s));
+    if params.t_ingested.is_some() {
+        return Err(MemoryError::Validation(
+            "`t_ingested` is assigned by the memory server; omit this field".into(),
+        ));
+    }
+    let t_ingested = None;
     let source_context = match (params.source_group, params.source_position) {
         (Some(group), Some(position)) => Some(SourceContext { group, position }),
         (None, None) => None,
@@ -61,10 +66,9 @@ async fn ingest_inner<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let source_id = request.source_id.clone();
     ctx.record(ToolEvent {
         op: "ingest.start",
-        args: json!({"source_type": &request.source_type, "source_id": &source_id}),
+        args: json!({"content_len": request.content.len()}),
         result: json!({}),
         level: LogLevel::Info,
         duration: None,
@@ -84,7 +88,7 @@ async fn ingest_inner<T: ToolContext>(
             operation_metrics.success();
             ctx.record(ToolEvent {
                 op: "ingest.done",
-                args: json!({"source_id": &source_id}),
+                args: json!({}),
                 result: json!({"episode_id": &episode_id}),
                 level: LogLevel::Info,
                 duration: Some(timer.elapsed()),
@@ -99,8 +103,8 @@ async fn ingest_inner<T: ToolContext>(
         Err(err) => {
             ctx.record(ToolEvent {
                 op: "ingest.error",
-                args: json!({"source_id": &source_id}),
-                result: json!({"error": err.to_string()}),
+                args: json!({}),
+                result: json!({"error_code": err.code()}),
                 level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
@@ -117,14 +121,22 @@ mod tests {
     use crate::models::Episode;
     use crate::tools::context::ToolContext;
 
+    type LifecycleEventRecord = (
+        &'static str,
+        Option<String>,
+        LogLevel,
+        serde_json::Value,
+        serde_json::Value,
+    );
+
     /// The one capability `ingest` reaches; every other one panics if
     /// the tool ever grows a call to it.
     struct StubContext {
         episode_id: String,
         /// When set, the one capability returns this error instead of succeeding.
         fail_with: Option<MemoryError>,
-        /// `(op, correlation id in force, level)` for each recorded event.
-        events: Mutex<Vec<(&'static str, Option<String>, LogLevel)>>,
+        /// Lifecycle events with their public payloads and correlation IDs.
+        events: Mutex<Vec<LifecycleEventRecord>>,
     }
 
     impl ToolContext for StubContext {
@@ -133,6 +145,8 @@ mod tests {
                 event.op,
                 crate::logging::correlation::current(),
                 event.level,
+                event.args,
+                event.result,
             ));
         }
 
@@ -213,6 +227,53 @@ mod tests {
             .block_on(ingest(ctx, params()))
     }
 
+    #[tokio::test]
+    async fn ingest_rejects_caller_supplied_transaction_time() {
+        let ctx = StubContext {
+            episode_id: "episode:unused".into(),
+            fail_with: None,
+            events: Mutex::new(Vec::new()),
+        };
+        let mut params = params();
+        params.t_ingested = Some("2020-01-01T00:00:00Z".into());
+
+        let result = ingest(&ctx, params).await;
+
+        assert!(matches!(
+            result,
+            Err(MemoryError::Validation(message))
+                if message == "`t_ingested` is assigned by the memory server; omit this field"
+        ));
+        assert!(ctx.events.lock().expect("event log").is_empty());
+    }
+
+    #[tokio::test]
+    async fn ingest_lifecycle_events_do_not_include_caller_source_identity() {
+        let ctx = StubContext {
+            episode_id: "episode:unused".into(),
+            fail_with: None,
+            events: Mutex::new(Vec::new()),
+        };
+        let mut params = params();
+        let source_id = "credential-like-source-id-secret-canary";
+        params.source_id = source_id.into();
+
+        ingest(&ctx, params).await.expect("ingest should succeed");
+
+        let events = ctx.events.lock().expect("event log");
+        let serialized = serde_json::to_string(
+            &events
+                .iter()
+                .map(|row| (&row.0, &row.3, &row.4))
+                .collect::<Vec<_>>(),
+        )
+        .expect("serialize recorded events");
+        assert!(
+            !serialized.contains(source_id),
+            "tool lifecycle events must not disclose caller source IDs: {serialized}"
+        );
+    }
+
     #[test]
     fn guidance_tells_the_caller_to_pass_the_id_back_unchanged() {
         // `ingest` returns the id as a bare string and then tells the
@@ -286,7 +347,7 @@ mod tests {
         assert!(
             events
                 .iter()
-                .all(|(_, id, _)| id.as_deref() == Some("req_x")),
+                .all(|(_, id, _, _, _)| id.as_deref() == Some("req_x")),
             "every event must carry the ambient id: {events:?}"
         );
     }
@@ -308,7 +369,7 @@ mod tests {
         assert!(
             events
                 .iter()
-                .all(|(_, id, _)| id.as_deref().is_some_and(|id| id.starts_with("req_"))),
+                .all(|(_, id, _, _, _)| id.as_deref().is_some_and(|id| id.starts_with("req_"))),
             "a tool with no ambient id must mint one: {events:?}"
         );
     }
@@ -328,11 +389,13 @@ mod tests {
             .expect_err("a storage failure propagates to the caller");
 
         let events = ctx.events.lock().expect("event log");
-        let (_, _, level) = events
+        let (_, _, level, _, result) = events
             .iter()
-            .find(|(op, _, _)| *op == "ingest.error")
+            .find(|(op, _, _, _, _)| *op == "ingest.error")
             .expect("the failure is recorded");
         assert_eq!(*level, LogLevel::Error, "a storage failure is an ERROR");
+        assert_eq!(result["error_code"], "storage");
+        assert!(result.get("error").is_none(), "error text is not logged");
     }
 
     /// A handled refusal is not a failure of this service, so it stays a `WARN`.
@@ -349,9 +412,9 @@ mod tests {
             .expect_err("a validation failure propagates to the caller");
 
         let events = ctx.events.lock().expect("event log");
-        let (_, _, level) = events
+        let (_, _, level, _, _) = events
             .iter()
-            .find(|(op, _, _)| *op == "ingest.error")
+            .find(|(op, _, _, _, _)| *op == "ingest.error")
             .expect("the refusal is recorded");
         assert_eq!(*level, LogLevel::Warn, "a refusal is a WARN");
     }

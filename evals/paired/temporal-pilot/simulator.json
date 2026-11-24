@@ -1,0 +1,6 @@
+{
+  "schema_version": "memory-mcp-paired-simulator/v1",
+  "simulator": "none",
+  "task_state": "fixed seeded memory episodes",
+  "external_state_mutations": false
+}

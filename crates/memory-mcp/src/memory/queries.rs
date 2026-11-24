@@ -37,6 +37,38 @@ pub fn build_select_episodes_by_content_query(
     (sql, Value::Object(vars))
 }
 
+/// Selects immutable episode content visible at both a world-valid instant
+/// and one exact server-owned knowledge revision. Legacy rows without a
+/// committed revision are intentionally omitted from historical reads.
+pub(crate) fn build_select_episodes_at_revision_query(
+    valid_at: &str,
+    known_revision: i64,
+    query_contains: Option<&str>,
+    limit: i32,
+) -> (String, Value) {
+    let mut clauses = vec![
+        "known_revision IS NOT NONE".to_string(),
+        "known_revision <= $known_revision".to_string(),
+        "t_ref <= type::datetime($valid_at)".to_string(),
+    ];
+    let mut vars = serde_json::Map::from_iter([
+        ("valid_at".to_string(), json!(valid_at)),
+        ("known_revision".to_string(), json!(known_revision)),
+        ("limit".to_string(), json!(limit.max(1))),
+    ]);
+    if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
+        vars.insert("query".to_string(), json!(query.to_lowercase()));
+        clauses.push("string::contains(string::lowercase(content), $query)".into());
+    }
+    (
+        format!(
+            "SELECT episode_id, source_type, source_id, content, t_ref, t_ingested, scope, visibility_scope, policy_tags, source_lineage, source_group, source_position, known_revision FROM episode WHERE {} ORDER BY t_ref DESC, episode_id ASC LIMIT $limit",
+            clauses.join(" AND ")
+        ),
+        Value::Object(vars),
+    )
+}
+
 /// The temporal columns an episode carries.
 ///
 /// `DbClient::create` used to guess which columns were datetimes, and for an
@@ -128,6 +160,19 @@ pub(crate) fn build_select_episodes_by_ids_query_with_access(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn revision_bounded_episode_query_uses_valid_time_and_committed_revision() {
+        let (sql, vars) =
+            build_select_episodes_at_revision_query("2026-05-13T00:00:00Z", 7, None, 11);
+
+        assert!(sql.contains("known_revision IS NOT NONE"));
+        assert!(sql.contains("known_revision <= $known_revision"));
+        assert!(sql.contains("t_ref <= type::datetime($valid_at)"));
+        assert!(!sql.contains("t_ingested <="));
+        assert_eq!(vars["known_revision"], 7);
+        assert_eq!(vars["limit"], 11);
+    }
 
     #[test]
     fn fact_ids_via_entity_binds_type_record_parts() {

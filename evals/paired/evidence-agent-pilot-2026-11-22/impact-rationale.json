@@ -1,0 +1,25 @@
+{
+  "schema_version": "memory-mcp-agent-impact-rationale/v1",
+  "status": "frozen before the development comparison; not promotion criteria",
+  "treatment": "same frozen product binary, shadow control versus evidence exposure",
+  "impact_margins": {
+    "task_success_gain": 0.1,
+    "agent_observed_direct_memory_gain": 0.1,
+    "repair_turn_gain": 0.5,
+    "ordinary_task_success_noninferiority": -0.1
+  },
+  "target_alternatives_for_power": {
+    "task_success_gain": 0.25,
+    "agent_observed_direct_memory_gain": 0.25,
+    "repair_turn_gain": 1.0,
+    "ordinary_task_success_gain": 0.0,
+    "ordinary_resource_gains": 0.0
+  },
+  "rationale": [
+    "A 10 percentage-point gain means one additional evidence-grounded success per ten attempted tasks and is the minimum agent-facing improvement considered worth claiming.",
+    "A 0.5 repair-turn gain means one fewer recovery turn for every two tasks; failures remain charged the full registered turn budget.",
+    "The target alternative is larger than each positive primary margin; it is not an estimate of the effect.",
+    "Ordinary-workflow cases are an explicit guard against degrading common factual recall. Their task-success margin allows at most one additional failure per ten cases.",
+    "Resource ceilings and the joint power method must be set after the pilot using observed family-cluster variance, before any confirmatory outcomes are opened."
+  ]
+}\n

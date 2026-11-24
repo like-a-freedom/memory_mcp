@@ -1,0 +1,15 @@
+{
+  "schema_version": "memory-decisions-oracle/v1",
+  "oracles": [
+    {"probe_id":"late-before","disposition":"answerable","evidence_alternatives":[[["north-initial"]]],"expected_assertions":{"north-initial":"North City"},"expected_roles":{"north-initial":"current"},"forbidden_event_ids":[]},
+    {"probe_id":"late-after","disposition":"conflict","evidence_alternatives":[[["north-initial"],["north-correction"]]],"expected_assertions":{"north-initial":"North City","north-correction":"South City"},"expected_roles":{"north-initial":"conflicting","north-correction":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"late-retrospective","disposition":"answerable","evidence_alternatives":[[["north-initial"]]],"expected_assertions":{"north-initial":"North City"},"expected_roles":{"north-initial":"current"},"forbidden_event_ids":[]},
+    {"probe_id":"ordinary-update","disposition":"answerable","evidence_alternatives":[[["north-initial"]]],"expected_assertions":{"north-initial":"North City"},"expected_roles":{"north-initial":"current"},"forbidden_event_ids":["north-update"]},
+    {"probe_id":"conflict-open","disposition":"conflict","evidence_alternatives":[[["north-initial"],["north-peer"]]],"expected_assertions":{"north-initial":"North City","north-peer":"South City"},"expected_roles":{"north-initial":"conflicting","north-peer":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"conflict-reversed","disposition":"conflict","evidence_alternatives":[[["north-initial"],["north-peer"]]],"expected_assertions":{"north-initial":"North City","north-peer":"South City"},"expected_roles":{"north-initial":"conflicting","north-peer":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"conflict-resolved","disposition":"conflict","evidence_alternatives":[[["north-initial"],["north-peer"],["north-resolution"]]],"expected_assertions":{"north-initial":"North City","north-peer":"South City","north-resolution":"South City"},"expected_roles":{"north-initial":"conflicting","north-peer":"conflicting","north-resolution":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"unknown","disposition":"unknown","evidence_alternatives":[],"expected_assertions":{},"expected_roles":{},"forbidden_event_ids":["south-depot"]},
+    {"probe_id":"stable-repeat","disposition":"answerable","evidence_alternatives":[[["stable-depot"]]],"expected_assertions":{"stable-depot":"West City"},"expected_roles":{"stable-depot":"current"},"forbidden_event_ids":[]},
+    {"probe_id":"unrelated","disposition":"answerable","evidence_alternatives":[[["north-initial"]]],"expected_assertions":{"north-initial":"North City"},"expected_roles":{"north-initial":"current"},"forbidden_event_ids":["south-depot"]}
+  ]
+}

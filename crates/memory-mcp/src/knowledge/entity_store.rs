@@ -29,17 +29,28 @@ impl EntityStoreClient {
         &self,
         normalized_name: &str,
     ) -> Result<Option<String>, MemoryError> {
-        // Canonical-name index lookup first (fast path), then alias lookup.
-        let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
-        if let Some(record) = self
-            .db
-            .query_first(canonical_sql, Some(json!({ "name": normalized_name })))
+        if let Some(id) = self
+            .find_entity_id_by_canonical_name(normalized_name)
             .await?
         {
-            return Ok(entity_id_from_record(&record));
+            return Ok(Some(id));
         }
-
         self.find_entity_id_by_alias(normalized_name).await
+    }
+
+    /// Canonical identity only; unproven aliases cannot identify a declared subject.
+    pub(crate) async fn find_entity_id_by_canonical_name(
+        &self,
+        normalized_name: &str,
+    ) -> Result<Option<String>, MemoryError> {
+        let row = self
+            .db
+            .query_first(
+                "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1",
+                Some(json!({"name":normalized_name})),
+            )
+            .await?;
+        Ok(row.as_ref().and_then(entity_id_from_record))
     }
 
     /// Find an entity ID by searching aliases. Returns `None` if no entity

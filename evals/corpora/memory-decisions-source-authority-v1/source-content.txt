@@ -1,0 +1,1 @@
+This private fixture must never be substituted for an agent-provided literal source reference.

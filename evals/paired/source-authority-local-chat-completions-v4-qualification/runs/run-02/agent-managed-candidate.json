@@ -1,0 +1,220 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "73799-1795440291369517000-0",
+  "identity_sha256": "0616f2fbaad7e66a18260629d450b8680722b9fa018a1cad3656852acfed1f08",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "amberdune_metrology",
+      "case_id": "amberdune_metrology-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "copperleaf_orchard",
+      "case_id": "copperleaf_orchard-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "harborfog_maproom",
+      "case_id": "harborfog_maproom-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "opalridge_station",
+      "case_id": "opalridge_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "amberdune_metrology",
+        "case_id": "amberdune_metrology-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5574,
+        "output_tokens": 781,
+        "wall_time_ms": 45924
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "0aeae49a0b9638d54d4bab45a81101224af864017b9686bc240d313b2c1faf61",
+        "response_sha256": "4456da02595a842499b6be1cf0d8ed0e9f3b0a455a59872b4254e0003ae2ad4d",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-v4-amberdune_metrology"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2124,
+          "maximum_wire_bytes": 2124
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "copperleaf_orchard",
+        "case_id": "copperleaf_orchard-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "f9a6807bcab9a7f385f8222b56e3dfa8ec56a842f5ba544ed52c5f5dec5fcf04",
+        "response_sha256": "9019d9aa4a7a12e5494d4e77dd8dff8054c62301132cf770af6b523021de5212",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "harborfog_maproom",
+        "case_id": "harborfog_maproom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 8,
+        "tool_calls": 8,
+        "user_clarifications": 0,
+        "input_tokens": 31415,
+        "output_tokens": 890,
+        "wall_time_ms": 71078
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "72faf7e09b0126456cc83e39711b303ad56ad72bc75ac4ec0c6cf7d37dafafad",
+        "response_sha256": "e465a79485bf2f5741fc84a84bc7e47d0491b6bc8b8341a299f3b8a8d9a36a94",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v4-harborfog_maproom"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "harborfog_maproom",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 439
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opalridge_station",
+        "case_id": "opalridge_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "368a101295cc09f99261c50b6f08c6ea1aa4d78c286214adf466256a7e060355",
+        "response_sha256": "33b9eda03e6965aa66308c710ab4e90e995036226a66520673eea4c31b0ff6b1",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v4-opalridge_station"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "opalridge_station",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 434
+        }
+      ]
+    }
+  ]
+}

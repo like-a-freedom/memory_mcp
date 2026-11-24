@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Args, Subcommand};
 
 #[derive(Debug, Args)]
@@ -24,6 +26,51 @@ pub struct IngestArgs {
     pub policy_tags: Vec<String>,
 }
 
+/// Explicit operator-authorized source import. These arguments are only
+/// available through the local CLI; agent-facing MCP content stays literal.
+#[derive(Debug, Clone, Args)]
+pub struct OperatorImportArgs {
+    #[command(subcommand)]
+    pub operation: OperatorImportOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum OperatorImportOperation {
+    /// Read one file beneath an explicitly selected root directory.
+    File {
+        /// Absolute directory that bounds the import.
+        #[arg(long)]
+        root: PathBuf,
+        /// File path relative to --root; absolute paths and parent traversal are refused.
+        #[arg(long)]
+        path: PathBuf,
+        /// Source type label, such as "doc" or "email".
+        #[arg(long)]
+        source_type: String,
+        /// Reference (valid) time in ISO 8601.
+        #[arg(long)]
+        t_ref: String,
+        /// Policy tags for content governance.
+        #[arg(long = "policy-tag")]
+        policy_tags: Vec<String>,
+    },
+    /// Fetch one public HTTP(S) document with no redirects or credentials.
+    Url {
+        /// Public URL without userinfo or credential-like query parameters.
+        #[arg(long)]
+        url: String,
+        /// Source type label, such as "web".
+        #[arg(long)]
+        source_type: String,
+        /// Reference (valid) time in ISO 8601.
+        #[arg(long)]
+        t_ref: String,
+        /// Policy tags for content governance.
+        #[arg(long = "policy-tag")]
+        policy_tags: Vec<String>,
+    },
+}
+
 #[derive(Debug, Args)]
 pub struct ExtractArgs {
     /// Episode ID from a prior ingest call (mutually exclusive with --content/--text)
@@ -48,6 +95,10 @@ pub struct ExtractArgs {
     /// Zero-shot classification labels for entity type detection (repeatable)
     #[arg(long = "zero-shot-label")]
     pub zero_shot_labels: Option<Vec<String>>,
+
+    /// Omit statement/quote pairs and keep the compact extraction response.
+    #[arg(long)]
+    pub compact: bool,
 }
 
 #[derive(Debug, Args)]
@@ -96,6 +147,15 @@ pub struct AssembleContextArgs {
     /// Point-in-time query in ISO 8601 — only facts valid at this time (default: now)
     #[arg(long, default_value = "")]
     pub as_of: String,
+    /// World-valid time, independent from when the server learned the fact
+    #[arg(long)]
+    pub valid_at: Option<String>,
+    /// Knowledge timestamp resolved to the last committed revision at or before it
+    #[arg(long)]
+    pub known_at: Option<String>,
+    /// Exact server-owned knowledge revision (mutually exclusive with --known-at)
+    #[arg(long)]
+    pub known_revision: Option<i64>,
     /// Maximum number of context items to return (default: 5)
     #[arg(long, default_value_t = 5)]
     pub budget: i32,

@@ -1,0 +1,2980 @@
+{
+  "schema_version": "memory-mcp-independent-paired/v1",
+  "agent_observed": {
+    "schema_version": "memory-mcp-agent-paired/v2",
+    "arm": "incumbent",
+    "run_id": "80725-1795319559715864000-1",
+    "run_started_at": "2026-11-22T03:52:39.715864Z",
+    "run_completed_at": "2026-11-22T04:06:07.584277Z",
+    "identity": {
+      "shared": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "fad8adc3beaf27f582eb9c0adfb0061605de82d47e9c78511adb4a428757e99c",
+        "oracle_sha256": "1c4391c5d037210227d71b319491c89ccf3de97861535ab7b42d4294de5517c4",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "shadow"
+      }
+    },
+    "expected_trials": [
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      }
+    ],
+    "receipts": [
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "alder-workshop-booking-history",
+          "case_id": "alder-workshop-location",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 16635,
+        "output_tokens": 122,
+        "wall_time_ms": 12332,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e900d9b61bbc7558d4c14b0d05b28077a54b7e25f5d8ad5e525fea101e82eabe",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "07092e6ebac2adaed770045ac6c69ae3a6c49359ae9ed7f340740fea05f3fba7",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "473f5dcf7cecc082c147e4eba27930744a7f2a979cc4b24c3adeb88bac06cb64",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 16635,
+            "output_tokens": 122
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "beacon-export-decision-history",
+          "case_id": "beacon-export-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26568,
+        "output_tokens": 121,
+        "wall_time_ms": 11337,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "79d1d8156038580d8646bae084403db1cf4eb5eb241e90af1f5f52402b190336",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e65c194547dabdfe1a93f80c314894da5a76d40f5e28cd808a6c1750366b07ce",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "f78000e13897c2b8fdb7bfdd956df2d96c034a860f829a14a8b4fef97ace7228",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26568,
+            "output_tokens": 121
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "cedar-release-readiness-history",
+          "case_id": "cedar-release-check",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26554,
+        "output_tokens": 120,
+        "wall_time_ms": 12460,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "6b493ad443c168dc81d99c52ae8ff343bb81f04ed8c47617502eadb1d842a056",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "91436e99259890cf75f6a28037112b0497f498aa97b4cf5009c1b00c378a3915",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "2b5ef368ef8aeca0170ee937fc9144fbfbe485b5525f416e6e937579905daed5",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26554,
+            "output_tokens": 120
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "mara-status-preference-history",
+          "case_id": "mara-status-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26548,
+        "output_tokens": 116,
+        "wall_time_ms": 11708,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "0024f5177ff5bade9f5d82199204bce0ec3c3372cf60a6bf92d42c7f0b9529cb",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "5b10ad9c32518bc7a3184326e51219b02ccdbe450e88f1b5b79d00f35d3f4cea",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "ccd98f7dbca282f2a2dcbd2139040203a08e72afda264d4eaebcae864b0c3f20",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26548,
+            "output_tokens": 116
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "slate-review-schedule-history",
+          "case_id": "slate-review-start-time",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26540,
+        "output_tokens": 121,
+        "wall_time_ms": 11330,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "be39e831cfbdb3cf539c940a696c12990981eeb81f9784fb5a4fa6bed7e292c4",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "094740ce7b39f2d92d7da1b48012f44f5bfc4526b42c9a78d5338a7bfb77ef8a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "2717a4eaf14ede9d938096dac6c078106b9e788f4aab7b7eceab382dc49820ef",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26540,
+            "output_tokens": 121
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "transient-retry-policy-history",
+          "case_id": "retry-after-rate-limit",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 16847,
+        "output_tokens": 117,
+        "wall_time_ms": 9641,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "fdc4b20661ec88ab7d229d0d24be24db71ae685624558325099107ff6bde2125",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "fa6834abb3a068b331d0bdf8e1d8c1e2c1f83bd4284c8ff37e2cfdf5da35de0a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "a037714093f7f71d810583b6e2ecf76d23af8f1a75a80c50b79080d3aee8d7e9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 16847,
+            "output_tokens": 117
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 27023,
+        "output_tokens": 135,
+        "wall_time_ms": 18988,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "c3225f1ed748074863b618dd9eefddf865b89240bd2760cf1ba59259886877f4",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e95221322e7c0b0c739aba4cdb754230892c28875bf9019ca69deadd56e749c1",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "8bed789a11e742f57ed160864680da61dd80cdef7a913e17781cfc683ec13aca",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27023,
+            "output_tokens": 135
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 26882,
+        "output_tokens": 182,
+        "wall_time_ms": 14854,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "0ea97dc63a42bcb1c7d0f0911105069df23cd7bd6eba0184092f2c6c5bc7558f",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "06edfb004cf620ce9f30f10066630b625083504f3948282fbed66eba40de1013",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "fead51fdd25dfb88b5ff302da3fca6a787d893e5bb874e0e0e3714353f65b3c0",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26882,
+            "output_tokens": 182
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 27491,
+        "output_tokens": 166,
+        "wall_time_ms": 14379,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "b1374600fb0b911c789983baacce2ec6e60a451e75dc5176d80dc011c0823179",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "06b312ab3b8d0591fec5e015baec8627ca01af3948c5e6d617b935ec4bd5d04d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "1cd5e7de29cac6c3dc53e0578d64c69bf47d6cfb260e224e6e1707887b2e5a4d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27491,
+            "output_tokens": 166
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 2,
+        "repair_turns": 1,
+        "user_clarifications": 1,
+        "input_tokens": 26295,
+        "output_tokens": 233,
+        "wall_time_ms": 15798,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "31a684f4361f02e93109fb8f300010f6304baf9be4125f4af6fe93b7543700b4",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_error",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": "invalid_arguments",
+            "payload_sha256": "7a3541c35f214cf426047c58e910fc90b96a3ee78b4747717be20deb2d417187",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "08d28218ed390948832f9e67b0f0fe2ae4303a8383d53c9b3ce53a3213c70802",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "54a61dea6b3b404a01f9e75b99db481267a94eb1f1a34134cfea5f79919e378c",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 7,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "c8a19416e661ad7cf6a8a8463b1463306b3e064d7771a209cf21cf1fba1831e9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 8,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26295,
+            "output_tokens": 233
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 2,
+        "repair_turns": 1,
+        "user_clarifications": 1,
+        "input_tokens": 26254,
+        "output_tokens": 219,
+        "wall_time_ms": 14665,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "0c46e553fbdc32d1149898f505f8fd359677aa897a12b6a3005dea8af27e6311",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_error",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": "invalid_arguments",
+            "payload_sha256": "7a3541c35f214cf426047c58e910fc90b96a3ee78b4747717be20deb2d417187",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "c4f4e52fef1d3b5480497bf8d57a9d77099678c901138fc4298c66a00998665f",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "9950f6621a9137ff86b4452e1c93d68da5a730c5e165a52666e95e13f47f2f9f",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 7,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "971c0a8547e83fdfdff8f0f8ae2a9c6456e2b60b4d59f931490ad61c920c7cc1",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 8,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26254,
+            "output_tokens": 219
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 27011,
+        "output_tokens": 127,
+        "wall_time_ms": 13558,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "17bf7b39c39db9fbff0018e4e579366dbb7299eb4ebfad10acf037d8b1b93d6e",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "afe6b8fcc035dbe82ad9777bb380fbfdbcd86423a5fae8c93637b40f879f1ac6",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "204e3d4cc2035470234438f07618aa477304cf1d2a01ea1acdbdb3171072722d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27011,
+            "output_tokens": 127
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": false,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 2,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 36096,
+        "output_tokens": 220,
+        "wall_time_ms": 19090,
+        "hard_violations": [
+          "prohibited_evidence"
+        ],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "96942be8b64b8045cedbe8895fa6b0440c377b427a91e1b5e70fe5492f12c94a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "7355c73ac2c9cf4292e2956cb41609720ec9adf092ae022c627bd6874e43882f",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "c11e7fb3b1dcefaa5aab75884496767dcc5ab0efe0bab0233dc05f520ad0d4de",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "2938bdf35cc608a265eb0fbef06b60568da07b7cd6cdb8d6fc5f9262d271f4b5",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 7,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "ddf8440d898b510a97a75744d51e47303ea28a8a33d41ccefb92532d08bd03d9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 8,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 36096,
+            "output_tokens": 220
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 27031,
+        "output_tokens": 137,
+        "wall_time_ms": 13222,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "a4cddd5538c2c46f65b37d7fb53a0c0adb8e80e0b3e64c5ca126fbe7f334c1e0",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "3761dd20efb04f109c0ea8cbfe09d97ddc1fd4360b6229a7336ad200526f6826",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "f2b6549cfada27a3b00c8eaf4769f4eaf53f1962ea78635e47bf3ea5e8cb85ac",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27031,
+            "output_tokens": 137
+          }
+        ]
+      }
+    ]
+  },
+  "probes_sha256": "b031f1118f22eb3d7904d69bb314f50673ea42e263da9e547553452b183f89c3",
+  "independent_memory": [
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:6c5a213a6c874120baae2875": "alder-workshop-location"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "4b4803eed9d549e5f7f34f6c5f4cd5e26c49ce1016e63930f94ea6563bf02a4e",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "alder-workshop-location"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 4,
+          "query": "Where was the Alder workshop booked?",
+          "valid_at": "2026-06-02T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:52:46.786498Z\",\"known_revision\":4,\"valid_at\":\"2026-06-02T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Alder workshop\\nlocation: Room 4B at North Campus\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:6c5a213a6c874120baae2875\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":4,\"reference_time\":\"2026-06-02T10:00:00Z\",\"source_episode\":\"episode:6c5a213a6c874120baae2875\",\"source_id\":\"alder-event-planning\",\"source_type\":\"project-note\",\"valid_at\":\"2026-06-02T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:6c5a213a6c874120baae2875\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:52:46.786498Z",
+                  "known_revision": 4,
+                  "valid_at": "2026-06-02T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Alder workshop\nlocation: Room 4B at North Campus",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:6c5a213a6c874120baae2875",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 4,
+                    "reference_time": "2026-06-02T10:00:00Z",
+                    "source_episode": "episode:6c5a213a6c874120baae2875",
+                    "source_id": "alder-event-planning",
+                    "source_type": "project-note",
+                    "valid_at": "2026-06-02T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:6c5a213a6c874120baae2875"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "4b4803eed9d549e5f7f34f6c5f4cd5e26c49ce1016e63930f94ea6563bf02a4e",
+        "oracle_sha256": "1197307fe0462e2da96291e731c88b9dc1a228e734aeff220917a7f850fbb567",
+        "observation_sha256": "cd7c425d1277cbdd4c5e639839b466d7538ba360fc9e1c7b0f55582deba2f347",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:da1eede41c5c13b43bacc4e7": "beacon-export-format-decision"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "b287f9927fa6c90586dcdd5994f99f44a38d7643c79dd12a173787e5a278e5f8",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "beacon-export-format-decision"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 7,
+          "query": "Which serialization format was selected for the Beacon export?",
+          "valid_at": "2026-06-03T11:30:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:54:04.926417Z\",\"known_revision\":7,\"valid_at\":\"2026-06-03T11:30:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.75,\"content\":\"subject: Beacon export\\ndecision: use JSON Lines, one JSON object per line\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:da1eede41c5c13b43bacc4e7\",\"grounding\":0.8,\"provenance\":{\"episode_fallback\":true,\"known_revision\":7,\"reference_time\":\"2026-06-03T11:30:00Z\",\"source_episode\":\"episode:da1eede41c5c13b43bacc4e7\",\"source_id\":\"beacon-design-review\",\"source_type\":\"decision-record\",\"valid_at\":\"2026-06-03T11:30:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":0.8,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:da1eede41c5c13b43bacc4e7\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:54:04.926417Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-06-03T11:30:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.75,
+                  "content": "subject: Beacon export\ndecision: use JSON Lines, one JSON object per line",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:da1eede41c5c13b43bacc4e7",
+                  "grounding": 0.8,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 7,
+                    "reference_time": "2026-06-03T11:30:00Z",
+                    "source_episode": "episode:da1eede41c5c13b43bacc4e7",
+                    "source_id": "beacon-design-review",
+                    "source_type": "decision-record",
+                    "valid_at": "2026-06-03T11:30:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 0.8,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:da1eede41c5c13b43bacc4e7"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "b287f9927fa6c90586dcdd5994f99f44a38d7643c79dd12a173787e5a278e5f8",
+        "oracle_sha256": "f31225a27648bc6c8a349936f0ef7c42b57527eca0de9716699a6b460d3190ec",
+        "observation_sha256": "d0fb4a40e79daaeeb5f8cfb67bc30f92c80577c47cdcdbe4d855f32a705bf6e4",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:8577bc81425d9b5fb2c4dca2": "cedar-release-check"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "5e362fdba59278e970554552bc9dc6e6cb11cca90a80aa9fb63d66168b19ee4e",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "cedar-release-check"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 2,
+          "query": "What check remains before approving the Cedar release?",
+          "valid_at": "2026-06-04T14:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:54:30.687658Z\",\"known_revision\":2,\"valid_at\":\"2026-06-04T14:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.68,\"content\":\"subject: Cedar release\\nremaining check: verify restoration from a clean backup before approval\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:8577bc81425d9b5fb2c4dca2\",\"grounding\":0.67,\"provenance\":{\"episode_fallback\":true,\"known_revision\":2,\"reference_time\":\"2026-06-04T14:00:00Z\",\"source_episode\":\"episode:8577bc81425d9b5fb2c4dca2\",\"source_id\":\"cedar-release-review\",\"source_type\":\"release-note\",\"valid_at\":\"2026-06-04T14:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":0.67,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:8577bc81425d9b5fb2c4dca2\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:54:30.687658Z",
+                  "known_revision": 2,
+                  "valid_at": "2026-06-04T14:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.68,
+                  "content": "subject: Cedar release\nremaining check: verify restoration from a clean backup before approval",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:8577bc81425d9b5fb2c4dca2",
+                  "grounding": 0.67,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 2,
+                    "reference_time": "2026-06-04T14:00:00Z",
+                    "source_episode": "episode:8577bc81425d9b5fb2c4dca2",
+                    "source_id": "cedar-release-review",
+                    "source_type": "release-note",
+                    "valid_at": "2026-06-04T14:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 0.67,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:8577bc81425d9b5fb2c4dca2"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "5e362fdba59278e970554552bc9dc6e6cb11cca90a80aa9fb63d66168b19ee4e",
+        "oracle_sha256": "2f5a137d3e7d9fe373ae06141dac2cbeaee2b4357583c5389a2de56a121a2580",
+        "observation_sha256": "e742f867a90490eb999ff6f1d654966f15de6658321817ecae27f0a90fce4bc8",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:bb6d33a44ee7952462f691d3": "mara-status-format-note"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "21ab0574ad7651ed8463b0ea411b74868c65974fbbf6689c9d9f88e9edf5abd7",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "mara-status-format-note"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 2,
+          "query": "What response format does Mara prefer for weekly status updates?",
+          "valid_at": "2026-06-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:55:47.344982Z\",\"known_revision\":2,\"valid_at\":\"2026-06-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Mara\\npreference: weekly status updates should be concise bullet lists\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:bb6d33a44ee7952462f691d3\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":2,\"reference_time\":\"2026-06-01T09:00:00Z\",\"source_episode\":\"episode:bb6d33a44ee7952462f691d3\",\"source_id\":\"mara-project-brief\",\"source_type\":\"user-preference\",\"valid_at\":\"2026-06-01T09:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:bb6d33a44ee7952462f691d3\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:55:47.344982Z",
+                  "known_revision": 2,
+                  "valid_at": "2026-06-01T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Mara\npreference: weekly status updates should be concise bullet lists",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:bb6d33a44ee7952462f691d3",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 2,
+                    "reference_time": "2026-06-01T09:00:00Z",
+                    "source_episode": "episode:bb6d33a44ee7952462f691d3",
+                    "source_id": "mara-project-brief",
+                    "source_type": "user-preference",
+                    "valid_at": "2026-06-01T09:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:bb6d33a44ee7952462f691d3"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "21ab0574ad7651ed8463b0ea411b74868c65974fbbf6689c9d9f88e9edf5abd7",
+        "oracle_sha256": "3728b2508b6aa51e9d4527c180ea50e6371fbf61a2f558ef29bc653cd38914a7",
+        "observation_sha256": "45a1d9a64e3c97d9046603f255b734c1a560c2e56306f6a6cc01800ce304eee2",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:73c025aee018d3d64fc7bbc8": "slate-review-start"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "d93348227d5fe57c5e3ba97807646cd40378927e742a878671568ef2626fb21d",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "slate-review-start"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 4,
+          "query": "When does the Slate review start?",
+          "valid_at": "2026-06-05T08:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:56:13.703933Z\",\"known_revision\":4,\"valid_at\":\"2026-06-05T08:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Slate review\\nstart time: June 20, 2026 at 15:30 UTC\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:73c025aee018d3d64fc7bbc8\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":4,\"reference_time\":\"2026-06-05T08:00:00Z\",\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\",\"source_id\":\"slate-team-calendar\",\"source_type\":\"meeting-note\",\"valid_at\":\"2026-06-05T08:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:56:13.703933Z",
+                  "known_revision": 4,
+                  "valid_at": "2026-06-05T08:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Slate review\nstart time: June 20, 2026 at 15:30 UTC",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:73c025aee018d3d64fc7bbc8",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 4,
+                    "reference_time": "2026-06-05T08:00:00Z",
+                    "source_episode": "episode:73c025aee018d3d64fc7bbc8",
+                    "source_id": "slate-team-calendar",
+                    "source_type": "meeting-note",
+                    "valid_at": "2026-06-05T08:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:73c025aee018d3d64fc7bbc8"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "d93348227d5fe57c5e3ba97807646cd40378927e742a878671568ef2626fb21d",
+        "oracle_sha256": "76ad33d23e06ef033abc0072f23d9622ecbfd2add4e139bd91c626a44f4d7735",
+        "observation_sha256": "5be68f0f9b2f7f9aa8f5f00ed7b3ad5071cfd28407beda14eb9140f503b30699",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:e5529ce74420376870a4d152": "retry-after-rate-limit-policy"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "35a7cb2021a1e49c18771a66c661a0143ff53517527ac1060d1ba0451adb04aa",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "retry-after-rate-limit-policy"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 1,
+          "query": "How should a write be retried after a transient rate limit?",
+          "valid_at": "2026-06-06T16:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:57:30.789223Z\",\"known_revision\":1,\"valid_at\":\"2026-06-06T16:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: transient rate limit retry\\npolicy: wait for the backoff window, then retry only the failed write\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:e5529ce74420376870a4d152\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":1,\"reference_time\":\"2026-06-06T16:00:00Z\",\"source_episode\":\"episode:e5529ce74420376870a4d152\",\"source_id\":\"service-operations-runbook\",\"source_type\":\"operations-note\",\"valid_at\":\"2026-06-06T16:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:e5529ce74420376870a4d152\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:57:30.789223Z",
+                  "known_revision": 1,
+                  "valid_at": "2026-06-06T16:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: transient rate limit retry\npolicy: wait for the backoff window, then retry only the failed write",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:e5529ce74420376870a4d152",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 1,
+                    "reference_time": "2026-06-06T16:00:00Z",
+                    "source_episode": "episode:e5529ce74420376870a4d152",
+                    "source_id": "service-operations-runbook",
+                    "source_type": "operations-note",
+                    "valid_at": "2026-06-06T16:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:e5529ce74420376870a4d152"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "35a7cb2021a1e49c18771a66c661a0143ff53517527ac1060d1ba0451adb04aa",
+        "oracle_sha256": "2cbfb5e4d17967a4dc1253b575bac007a11300cd0762a6d4514b3d67577904c6",
+        "observation_sha256": "9994f3aa93707970b8752e5b46a149b4c59e0750aa6dd2936bbed8131998510b",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:4347f47605f2246a6ba83ece": "birch-initial",
+          "episode:831718fc5d9ccc40dc9d0ebc": "birch-update"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "825191a52962288ee90a2e5f91cc1345f903c7bfeb46fee7839b4c01fb5fa64c",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "birch-initial"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What pressure applied to Birch Pump on June 11, 2026?",
+          "valid_at": "2026-06-11T08:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:57:54.782405Z\",\"known_revision\":15,\"valid_at\":\"2026-06-11T08:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Birch Pump\\ndimension: pressure\\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:dfa374a5b56b61c6f928fd59\",\"grounding\":0.71,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:4347f47605f2246a6ba83ece\",\"source_id\":\"birch-pump-operator\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-06-11T08:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.71,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:4347f47605f2246a6ba83ece\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:57:54.782405Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-11T08:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Birch Pump\ndimension: pressure\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:dfa374a5b56b61c6f928fd59",
+                  "grounding": 0.71,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:4347f47605f2246a6ba83ece",
+                    "source_id": "birch-pump-operator",
+                    "source_type": "owner-record",
+                    "valid_at": "2026-06-11T08:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.71,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:4347f47605f2246a6ba83ece"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "825191a52962288ee90a2e5f91cc1345f903c7bfeb46fee7839b4c01fb5fa64c",
+        "oracle_sha256": "e1e38bb5362ccd6fadde163bf79a0a047769213f62c737108a12de5d6fd314a7",
+        "observation_sha256": "7168ffb25397ac7132f95020fd1eb742569338cbd0013c999e8f4fa1b0383ce7",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:8831ff7c8c85bc95c5bee296": "cobalt-correction",
+          "episode:8a66d876b12d13360468a096": "cobalt-initial"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "5a0e690ba821d80b59acd2bc679e96a583503e4005d69a9e4030c8209a96e805",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "cobalt-correction",
+            "cobalt-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What lift capacity was recorded for Cobalt Terminal on June 3, 2026?",
+          "valid_at": "2026-06-03T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:59:39.326014Z\",\"known_revision\":15,\"valid_at\":\"2026-06-03T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Cobalt Terminal\\ndimension: lift_capacity\\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:876bbfd66c832f84e17e47aa\",\"grounding\":1.0,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:8831ff7c8c85bc95c5bee296\",\"source_id\":\"cobalt-terminal-ledger\",\"source_type\":\"owner-correction\",\"valid_at\":\"2026-06-03T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":1.0,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:8831ff7c8c85bc95c5bee296\"},{\"confidence\":0.7,\"content\":\"subject: Cobalt Terminal\\ndimension: lift_capacity\\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:333c561b78d806a54edddb6a\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:8a66d876b12d13360468a096\",\"source_id\":\"cobalt-terminal-ledger\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-06-03T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:8a66d876b12d13360468a096\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T03:59:39.326014Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-03T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:876bbfd66c832f84e17e47aa",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:8831ff7c8c85bc95c5bee296",
+                    "source_id": "cobalt-terminal-ledger",
+                    "source_type": "owner-correction",
+                    "valid_at": "2026-06-03T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 1.0,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:8831ff7c8c85bc95c5bee296"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:333c561b78d806a54edddb6a",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:8a66d876b12d13360468a096",
+                    "source_id": "cobalt-terminal-ledger",
+                    "source_type": "owner-record",
+                    "valid_at": "2026-06-03T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:8a66d876b12d13360468a096"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "5a0e690ba821d80b59acd2bc679e96a583503e4005d69a9e4030c8209a96e805",
+        "oracle_sha256": "71f6dfcaeaf48577c320574d25f2abe5568aea9b442984c56f85b8dfdd98db28",
+        "observation_sha256": "4a2c101923e9d683ac015100acb07402e81e3f90ab2ee47bf6e783c741671094",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:33ce80cd97f4b3ae710607c4": "juniper-initial",
+          "episode:dc91e0a5f0ccbb0f5abbcc7c": "juniper-forum-correction"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "eea7071fa077c8928891cc35b3dfc5aa43515efdca55aa0d88693ae6132615ea",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "juniper-forum-correction",
+            "juniper-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What valve dwell was verified for Juniper Station on June 9, 2026?",
+          "valid_at": "2026-06-09T07:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:00:11.984576Z\",\"known_revision\":15,\"valid_at\":\"2026-06-09T07:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Juniper Station\\ndimension: valve_dwell\\nvalue: 45 seconds, an unverified forum post calls this a correction to the Juniper Station valve dwell effective June 9, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:69adbbd045e750e028184a34\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:dc91e0a5f0ccbb0f5abbcc7c\",\"source_id\":\"unverified-forum-post-17\",\"source_type\":\"forum-report\",\"valid_at\":\"2026-06-09T07:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:dc91e0a5f0ccbb0f5abbcc7c\"},{\"confidence\":0.7,\"content\":\"subject: Juniper Station\\ndimension: valve_dwell\\nvalue: 30 seconds for the Juniper Station valve dwell effective June 9, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:a4202e2d62e2dc3043db11b5\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:33ce80cd97f4b3ae710607c4\",\"source_id\":\"juniper-station-maintenance\",\"source_type\":\"maintenance-record\",\"valid_at\":\"2026-06-09T07:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:33ce80cd97f4b3ae710607c4\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:00:11.984576Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-09T07:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 45 seconds, an unverified forum post calls this a correction to the Juniper Station valve dwell effective June 9, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:69adbbd045e750e028184a34",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:dc91e0a5f0ccbb0f5abbcc7c",
+                    "source_id": "unverified-forum-post-17",
+                    "source_type": "forum-report",
+                    "valid_at": "2026-06-09T07:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:dc91e0a5f0ccbb0f5abbcc7c"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 30 seconds for the Juniper Station valve dwell effective June 9, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:a4202e2d62e2dc3043db11b5",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:33ce80cd97f4b3ae710607c4",
+                    "source_id": "juniper-station-maintenance",
+                    "source_type": "maintenance-record",
+                    "valid_at": "2026-06-09T07:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:33ce80cd97f4b3ae710607c4"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "eea7071fa077c8928891cc35b3dfc5aa43515efdca55aa0d88693ae6132615ea",
+        "oracle_sha256": "bf91744c0c5883eea032ad4ae60ee4e741c8f55986b7d14b51c13e69c1db3cb1",
+        "observation_sha256": "630567f0a8cad38435b18da4afc5e4ee71346f005e22d2829ff7dbae5cd511fc",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:0e8b3d10a5d0b9f4a8990ee3": "maple-initial",
+          "episode:42b87986f5a5cbf28ba4cac3": "maple-peer"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "a328e74a58adec2c987881dac8e7ae4eb0565109114eaf3005fdd7e1c9ab244b",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "maple-peer",
+            "maple-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What humidity limit was recorded for Maple Vault on June 8, 2026?",
+          "valid_at": "2026-06-08T12:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:01:39.767333Z\",\"known_revision\":15,\"valid_at\":\"2026-06-08T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Maple Vault\\ndimension: humidity_limit\\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:0c941fe8d947642c177d491b\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:42b87986f5a5cbf28ba4cac3\",\"source_id\":\"maple-vault-sensor\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-08T12:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:42b87986f5a5cbf28ba4cac3\"},{\"confidence\":0.7,\"content\":\"subject: Maple Vault\\ndimension: humidity_limit\\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:e59caf8eafb4730007f3c8ea\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:0e8b3d10a5d0b9f4a8990ee3\",\"source_id\":\"maple-vault-engineer\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-08T12:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:0e8b3d10a5d0b9f4a8990ee3\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:01:39.767333Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-08T12:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:0c941fe8d947642c177d491b",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:42b87986f5a5cbf28ba4cac3",
+                    "source_id": "maple-vault-sensor",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-08T12:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:42b87986f5a5cbf28ba4cac3"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:e59caf8eafb4730007f3c8ea",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:0e8b3d10a5d0b9f4a8990ee3",
+                    "source_id": "maple-vault-engineer",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-08T12:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:0e8b3d10a5d0b9f4a8990ee3"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "a328e74a58adec2c987881dac8e7ae4eb0565109114eaf3005fdd7e1c9ab244b",
+        "oracle_sha256": "fb783dd0f909b465de19c366f5409e6211f412c455631f345ec66f056db03696",
+        "observation_sha256": "e1d8f2633db227f237c196a8dba46cf4df37225cd4aef2e236639531af2c3c50",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:03fbad000e3426188fb49264": "opal-initial",
+          "episode:e9a91391887dac6914faadaf": "opal-peer"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "bd64d6da03cef873cc8f935276f0a880a911b339d2a756a86cce2827199702ca",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "opal-initial",
+            "opal-peer"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What occupancy limit was recorded for Opal Cabin on June 7, 2026?",
+          "valid_at": "2026-06-07T11:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:02:10.078947Z\",\"known_revision\":15,\"valid_at\":\"2026-06-07T11:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Opal Cabin\\ndimension: occupancy_limit\\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:846bb832e23a4eed72c99c82\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:03fbad000e3426188fb49264\",\"source_id\":\"opal-cabin-inspector\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-07T11:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:03fbad000e3426188fb49264\"},{\"confidence\":0.7,\"content\":\"subject: Opal Cabin\\ndimension: occupancy_limit\\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:be1b6acdfc0d239f82dad66a\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:e9a91391887dac6914faadaf\",\"source_id\":\"opal-cabin-visitor-log\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-07T11:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:e9a91391887dac6914faadaf\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:02:10.078947Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-07T11:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:846bb832e23a4eed72c99c82",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:03fbad000e3426188fb49264",
+                    "source_id": "opal-cabin-inspector",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-07T11:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:03fbad000e3426188fb49264"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:be1b6acdfc0d239f82dad66a",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:e9a91391887dac6914faadaf",
+                    "source_id": "opal-cabin-visitor-log",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-07T11:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:e9a91391887dac6914faadaf"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "bd64d6da03cef873cc8f935276f0a880a911b339d2a756a86cce2827199702ca",
+        "oracle_sha256": "3464c605246413222f760c6a9e541cf7365bbd87e72af2e0127de9d7bcd29b70",
+        "observation_sha256": "ffbaed6604fd5bb1acbf66a319fcc981f9a1c41a7f3d168494e7cc5864fb7b92",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:81c008e084bd3d07e6db0452": "stable-marsh-lab"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "f7c875a0850c5591f724ad990dee6ea7c1d1c1c23b8d4966caa514ee4b8ab1f7",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "stable-marsh-lab"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 9,
+          "query": "Where was Marsh Lab located?",
+          "valid_at": "2026-06-20T00:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:03:42.020460Z\",\"known_revision\":9,\"valid_at\":\"2026-06-20T00:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.65,\"content\":\"subject: Marsh Lab\\ndimension: location\\nvalue: West Annex for the Marsh Lab location on June 1, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:73e2e9614869275f6f270abd\",\"grounding\":0.67,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":9,\"source_episode_id\":\"episode:81c008e084bd3d07e6db0452\",\"source_id\":\"marsh-lab-inventory\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-06-20T00:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.67,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:81c008e084bd3d07e6db0452\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:03:42.020460Z",
+                  "known_revision": 9,
+                  "valid_at": "2026-06-20T00:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.65,
+                  "content": "subject: Marsh Lab\ndimension: location\nvalue: West Annex for the Marsh Lab location on June 1, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:73e2e9614869275f6f270abd",
+                  "grounding": 0.67,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 9,
+                    "source_episode_id": "episode:81c008e084bd3d07e6db0452",
+                    "source_id": "marsh-lab-inventory",
+                    "source_type": "inventory-record",
+                    "valid_at": "2026-06-20T00:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.67,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:81c008e084bd3d07e6db0452"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "f7c875a0850c5591f724ad990dee6ea7c1d1c1c23b8d4966caa514ee4b8ab1f7",
+        "oracle_sha256": "e24f4772a82fe89e4b4f21563fc9ec3ef4df3a702709e48330aaad389a2f391f",
+        "observation_sha256": "bd41c5eb97930b18bb62165365bdb139c62364bdb7a6bbb4598b4feb6cc7c1c8",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:d4e2465d3f8861a73a6bf5af": "remote-drum"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "52f8650fd2bf157e7f8539ffdfc0bfa2c807afe783acd828a5bcfc554644e9e8",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [],
+          "budget_used": 0,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 7,
+          "query": "What fill level was recorded for Cedar Sluice on June 6, 2026?",
+          "valid_at": "2026-06-06T06:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:04:09.927105Z\",\"known_revision\":7,\"valid_at\":\"2026-06-06T06:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:04:09.927105Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-06-06T06:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "52f8650fd2bf157e7f8539ffdfc0bfa2c807afe783acd828a5bcfc554644e9e8",
+        "oracle_sha256": "ccb0903a387a19eed0ab51bc9e0fc93ea602657a993eb9f9234c5d01dd1b430c",
+        "observation_sha256": "0f7e9f029053885372d1a07bb832b64c078240b7d4c940fb53b82260d8aee7f8",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:71afa1108096f2979dc520f7": "willow-distractor",
+          "episode:a8e50b3321c83d3386b1524b": "willow-target"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "ddb11a0152acf931a2dc2ccffe67c05fa013c86b5cd38c55e8d17ce0019da65c",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "willow-target"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 14,
+          "query": "What cycle limit applied to Willow Gate on June 12, 2026?",
+          "valid_at": "2026-06-12T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:05:47.122471Z\",\"known_revision\":14,\"valid_at\":\"2026-06-12T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Willow Gate\\ndimension: cycle_limit\\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:d9123f364c5ae88cee98149e\",\"grounding\":0.88,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":14,\"source_episode_id\":\"episode:a8e50b3321c83d3386b1524b\",\"source_id\":\"willow-gate-log\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-12T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.88,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:a8e50b3321c83d3386b1524b\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations and conflict projection are not enabled for this rollout"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:05:47.122471Z",
+                  "known_revision": 14,
+                  "valid_at": "2026-06-12T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Willow Gate\ndimension: cycle_limit\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026",
+                  "evidence_status": "unknown",
+                  "fact_id": "fact:d9123f364c5ae88cee98149e",
+                  "grounding": 0.88,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 14,
+                    "source_episode_id": "episode:a8e50b3321c83d3386b1524b",
+                    "source_id": "willow-gate-log",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-12T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.88,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:a8e50b3321c83d3386b1524b"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "shadow"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "ddb11a0152acf931a2dc2ccffe67c05fa013c86b5cd38c55e8d17ce0019da65c",
+        "oracle_sha256": "d4c2f6414eb0dd924c09f607f04eab7bffb449a5d5a805cb04501a7d4dc70327",
+        "observation_sha256": "1ba1f4d3ac1bc0b31e0f42db09d1573136763ce83c1a4d73eb402154188092d8",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    }
+  ]
+}

@@ -37,6 +37,62 @@ pub fn build_scan_nonsemantic_facts_as_of_query(cutoff: &str) -> (String, Value)
     )
 }
 
+/// Selects only facts whose source revision is visible at one exact knowledge
+/// boundary and whose valid-time interval contains the requested valid time.
+/// This deliberately excludes legacy rows with no revision provenance.
+pub(crate) fn build_select_facts_at_revision_query(
+    valid_at: &str,
+    known_revision: i64,
+    query_contains: Option<&str>,
+    limit: i32,
+    fact_types: &[String],
+) -> (String, Value) {
+    // Historical candidate discovery must not depend on `index_keys`: the
+    // embedding/reindex jobs can rewrite that mutable projection after the
+    // requested snapshot. Fact content is immutable after creation and is the
+    // only lexical selector used by this conservative path.
+    let projection = "fact_id, fact_type, content, quote, source_episode, t_valid, t_ingested, \
+        t_invalid, t_invalid_ingested, confidence, \
+        entity_links, scope, policy_tags, provenance, known_revision, closed_revision";
+    let mut clauses = vec![
+        "known_revision IS NOT NONE".to_string(),
+        "known_revision <= $known_revision".to_string(),
+        "t_valid <= type::datetime($valid_at)".to_string(),
+        "(closed_revision IS NONE OR closed_revision > $known_revision OR t_invalid IS NONE OR t_invalid > type::datetime($valid_at))".to_string(),
+    ];
+    let mut vars = serde_json::Map::from_iter([
+        ("valid_at".to_string(), json!(valid_at)),
+        ("known_revision".to_string(), json!(known_revision)),
+        ("limit".to_string(), json!(limit.max(1))),
+    ]);
+    if !fact_types.is_empty() {
+        clauses.push("fact_type IN $fact_types".to_string());
+        vars.insert("fact_types".to_string(), json!(fact_types));
+    }
+    if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
+        // Current global FTS statistics cannot rank a historical snapshot.
+        // Membership uses immutable content; order uses revision-visible fields.
+        let query_literal = surreal_string_literal(query);
+        clauses.push(format!("content @1@ {query_literal}"));
+        vars.insert("query".to_string(), json!(query));
+        (
+            format!(
+                "SELECT {projection} FROM fact WHERE {} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit",
+                clauses.join(" AND ")
+            ),
+            Value::Object(vars),
+        )
+    } else {
+        (
+            format!(
+                "SELECT {projection} FROM fact WHERE {} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit",
+                clauses.join(" AND ")
+            ),
+            Value::Object(vars),
+        )
+    }
+}
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -539,6 +595,27 @@ mod tests {
         assert!(!sql.contains("AND scope"));
         assert!(!sql.contains("project"));
         assert_eq!(vars["limit"], 10);
+    }
+
+    #[test]
+    fn revision_bounded_fact_query_avoids_mutable_lexical_and_heat_selectors() {
+        let (sql, vars) = build_select_facts_at_revision_query(
+            "2026-05-13T00:00:00Z",
+            7,
+            Some("archive cobalt"),
+            11,
+            &[],
+        );
+
+        assert!(sql.contains("known_revision <= $known_revision"));
+        assert!(sql.contains("closed_revision > $known_revision"));
+        assert!(sql.contains("t_valid <= type::datetime($valid_at)"));
+        assert!(sql.contains("content @1@ \"archive cobalt\""));
+        assert!(!sql.contains("index_keys"));
+        assert!(!sql.contains("access_count"));
+        assert!(!sql.contains("last_accessed"));
+        assert_eq!(vars["known_revision"], 7);
+        assert_eq!(vars["limit"], 11);
     }
 
     #[test]

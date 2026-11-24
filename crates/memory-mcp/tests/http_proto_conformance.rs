@@ -941,6 +941,394 @@ async fn modern_tools_call_returns_envelope_with_result_block() {
 }
 
 #[tokio::test]
+async fn streamable_http_assembles_the_requested_exact_knowledge_snapshot() {
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+
+    let initial = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "assemble_context",
+            "arguments": {
+                "query": "violet archive marker",
+                "fact_types": [],
+                "valid_at": "2026-11-21T00:00:00Z",
+                "known_at": "2099-01-01T00:00:00Z",
+                "budget": 5,
+                "compact": true
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        initial["http_status"], 200,
+        "initial read failed: {initial}"
+    );
+    let initial_result = &initial["payload"]["result"]["structuredContent"];
+    let initial_revision = initial_result["context"]["snapshot"]["known_revision"]
+        .as_i64()
+        .expect("HTTP context exposes the committed snapshot revision");
+
+    let stored = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "ingest",
+            "arguments": {
+                "content": "The violet archive marker was written after the requested snapshot.",
+                "source_type": "temporal_http_test",
+                "source_id": "violet-archive-marker",
+                "t_ref": "2026-11-01T00:00:00Z",
+                "policy_tags": []
+            }
+        }),
+    )
+    .await;
+    assert_eq!(stored["http_status"], 200, "HTTP ingest failed: {stored}");
+
+    let historical = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "assemble_context",
+            "arguments": {
+                "query": "violet archive marker",
+                "fact_types": [],
+                "valid_at": "2026-11-21T00:00:00Z",
+                "known_revision": initial_revision,
+                "budget": 5,
+                "compact": true
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        historical["http_status"], 200,
+        "historical read failed: {historical}"
+    );
+    let historical_result = &historical["payload"]["result"]["structuredContent"];
+    assert_eq!(historical_result["status"], "success");
+    assert_eq!(
+        historical_result["context"]["snapshot"]["known_revision"],
+        initial_revision
+    );
+    assert_eq!(
+        historical_result["context"]["completeness"], "partial",
+        "an exact historical snapshot must disclose bypassed selector channels"
+    );
+    assert!(
+        historical_result["result"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "the later episode must not leak into the earlier HTTP snapshot: {historical_result}"
+    );
+
+    let current = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "assemble_context",
+            "arguments": {
+                "query": "violet archive marker",
+                "fact_types": [],
+                "valid_at": "2026-11-21T00:00:00Z",
+                "known_at": "2099-01-01T00:00:00Z",
+                "budget": 5,
+                "compact": true
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        current["http_status"], 200,
+        "current read failed: {current}"
+    );
+    let current_result = &current["payload"]["result"]["structuredContent"];
+    assert!(
+        current_result["result"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["content"]
+                .as_str()
+                .is_some_and(|content| content.contains("violet archive marker")))),
+        "the later episode remains visible in a current HTTP snapshot: {current_result}"
+    );
+}
+
+#[tokio::test]
+async fn streamable_http_ingest_keeps_reference_content_literal_and_refuses_credentials() {
+    use std::time::Duration;
+
+    let root = tempfile::tempdir().expect("temporary source root");
+    let log_path = root.path().join("server.log");
+    let fixture = HttpServerFixture::spawn(
+        HttpServerConfig::default()
+            .with_tenant(conformance_tenant())
+            .with_env("NER_EXTRACTOR", "regex")
+            .with_env("MEMORY_LOG_FILE", log_path.to_string_lossy()),
+    )
+    .await;
+    let file = root.path().join("source-authority-canary.txt");
+    let private_file_text = "file contents must not replace the caller's literal path";
+    std::fs::write(&file, private_file_text).expect("write controlled file");
+    let literal_path = file.to_string_lossy().into_owned();
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind local canary");
+    let loopback_url = format!(
+        "http://{}/agent-reference",
+        listener.local_addr().expect("local canary address")
+    );
+    listener
+        .set_nonblocking(true)
+        .expect("make local canary nonblocking");
+    let listener = tokio::net::TcpListener::from_std(listener).expect("tokio canary listener");
+
+    let ingest_path = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "ingest",
+            "arguments": {
+                "content": literal_path,
+                "source_type": "agent_note",
+                "source_id": "http-source-id-path-canary",
+                "t_ref": "2020-01-01T12:00:00Z",
+                "policy_tags": ["http-policy-tag-path-canary"],
+                "source_group": "http-source-group-path-canary",
+                "source_position": 1
+            }
+        }),
+    )
+    .await;
+    assert_eq!(ingest_path["http_status"], 200);
+    let episode_id = ingest_path["payload"]["result"]["structuredContent"]["result"]
+        .as_str()
+        .expect("literal path ingest returns its episode id")
+        .to_string();
+
+    let extract_path = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "extract",
+            "arguments": {"episode_id": episode_id}
+        }),
+    )
+    .await;
+    assert_eq!(extract_path["http_status"], 200);
+    assert_eq!(
+        extract_path["payload"]["result"]["structuredContent"]["status"],
+        "success"
+    );
+
+    let ingest_url = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "ingest",
+            "arguments": {
+                "content": loopback_url,
+                "source_type": "agent_note",
+                "source_id": "http-source-id-url-canary",
+                "t_ref": "2020-01-01T12:01:00Z",
+                "policy_tags": ["http-policy-tag-url-canary"],
+                "source_group": "http-source-group-url-canary",
+                "source_position": 2
+            }
+        }),
+    )
+    .await;
+    assert_eq!(ingest_url["http_status"], 200);
+    let url_episode_id = ingest_url["payload"]["result"]["structuredContent"]["result"]
+        .as_str()
+        .expect("loopback URL ingest returns its episode id")
+        .to_string();
+
+    let extract_url = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "extract",
+            "arguments": {"episode_id": url_episode_id}
+        }),
+    )
+    .await;
+    assert_eq!(extract_url["http_status"], 200);
+    assert_eq!(
+        extract_url["payload"]["result"]["structuredContent"]["status"],
+        "success"
+    );
+
+    let path_context = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "assemble_context",
+            "arguments": {
+                "query": format!("Which exact source path should I remember? {literal_path}"),
+                "fact_types": [],
+                "valid_at": "2026-11-22T12:00:00Z",
+                "known_at": "2099-01-01T00:00:00Z",
+                "budget": 5,
+                "compact": true
+            }
+        }),
+    )
+    .await;
+    let path_items = path_context["payload"]["result"]["structuredContent"]["result"]
+        .as_array()
+        .expect("path recall returns a context list");
+    assert!(path_items.iter().any(|item| {
+        item["content"]
+            .as_str()
+            .is_some_and(|content| content.contains(&literal_path))
+    }));
+    assert!(!path_context.to_string().contains(private_file_text));
+
+    let url_context = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "assemble_context",
+            "arguments": {
+                "query": format!("Which exact URL should I remember as a reference? {loopback_url}"),
+                "fact_types": [],
+                "valid_at": "2026-11-22T12:00:00Z",
+                "known_at": "2099-01-01T00:00:00Z",
+                "budget": 5,
+                "compact": true
+            }
+        }),
+    )
+    .await;
+    let url_items = url_context["payload"]["result"]["structuredContent"]["result"]
+        .as_array()
+        .expect("URL recall returns a context list");
+    assert!(url_items.iter().any(|item| {
+        item["content"]
+            .as_str()
+            .is_some_and(|content| content.contains(&loopback_url))
+    }));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(250), listener.accept())
+            .await
+            .is_err(),
+        "literal agent URL must not make a request to its loopback target"
+    );
+
+    let secret = "http-source-authority-credential-canary";
+    let refused = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "ingest",
+            "arguments": {
+                "content": format!("API_KEY={secret}"),
+                "source_type": "agent_note",
+                "source_id": "http-source-id-credential-canary",
+                "t_ref": "2020-01-01T12:02:00Z",
+                "policy_tags": []
+            }
+        }),
+    )
+    .await;
+    assert!(
+        refused["payload"]["error"].is_object() || refused["payload"]["result"]["isError"] == true,
+        "credential material must be refused through real HTTP ingest: {refused}"
+    );
+    assert!(!refused.to_string().contains(secret));
+
+    let inline_secret = "http-inline-extract-credential-canary";
+    let inline_refused = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "extract",
+            "arguments": {
+                "content": format!("API_KEY={inline_secret}"),
+                "source_type": "agent_note",
+                "source_id": "http-inline-extract-source-id-canary",
+                "t_ref": "2020-01-01T12:03:00Z"
+            }
+        }),
+    )
+    .await;
+    assert!(
+        inline_refused["payload"]["error"].is_object()
+            || inline_refused["payload"]["result"]["isError"] == true,
+        "inline extract must refuse credential-bearing content: {inline_refused}"
+    );
+    assert!(!inline_refused.to_string().contains(inline_secret));
+
+    let malformed_id = "http-malformed-record-id-canary";
+    let malformed = common::http_server::mcp_call(
+        fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        json!({
+            "name": "extract",
+            "arguments": {"episode_id": malformed_id}
+        }),
+    )
+    .await;
+    assert!(
+        malformed["payload"]["error"].is_object()
+            || malformed["payload"]["result"]["isError"] == true,
+        "malformed record IDs must be refused through HTTP: {malformed}"
+    );
+    assert!(
+        malformed.to_string().contains("missing its table prefix"),
+        "the response should explain the correction: {malformed}"
+    );
+    assert!(
+        !malformed.to_string().contains(malformed_id),
+        "the response must not echo the malformed identifier: {malformed}"
+    );
+
+    let logs = std::fs::read_to_string(&log_path).expect("HTTP server log file");
+    assert!(!logs.contains(&literal_path));
+    assert!(!logs.contains(private_file_text));
+    assert!(!logs.contains(&loopback_url));
+    assert!(!logs.contains(secret));
+    assert!(!logs.contains("http-source-id-path-canary"));
+    assert!(!logs.contains("http-source-id-url-canary"));
+    assert!(!logs.contains("http-source-id-credential-canary"));
+    assert!(!logs.contains(inline_secret));
+    assert!(!logs.contains("http-inline-extract-source-id-canary"));
+    assert!(!logs.contains(malformed_id));
+    assert!(!logs.contains("http-source-group-path-canary"));
+    assert!(!logs.contains("http-source-group-url-canary"));
+    assert!(!logs.contains("http-policy-tag-path-canary"));
+    assert!(!logs.contains("http-policy-tag-url-canary"));
+}
+
+#[tokio::test]
 async fn http_status_codes_cover_mcp_error_paths() {
     // The HTTP profile MUST map every JSON-RPC error to an
     // appropriate HTTP status. The cases below are the contract:

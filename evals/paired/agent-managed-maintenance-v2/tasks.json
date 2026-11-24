@@ -1,0 +1,341 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "zephyr-quarry-history",
+        "case_id": "zephyr-quarry-current-archive-retention-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Zephyr Quarry uses Quartz-31 as its archive retention tag. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/zephyr-quarry/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Zephyr Quarry's current archive retention tag? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Zephyr Quarry's current archive retention tag?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-01",
+          "source_id": "conversation://maintenance-v2/zephyr-quarry/original-01",
+          "source_type": "conversation",
+          "content": "Zephyr Quarry uses Amber-08 as its archive retention tag.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-31"
+        ],
+        "forbidden_event_ids": [
+          "old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "willow-signal-history",
+        "case_id": "willow-signal-current-build-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Willow Signal uses Pine-93 as its build cache namespace. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/willow-signal/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Willow Signal's current build cache namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Willow Signal's current build cache namespace?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-02",
+          "source_id": "conversation://maintenance-v2/willow-signal/original-01",
+          "source_type": "conversation",
+          "content": "Willow Signal uses Drift-26 as its build cache namespace.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-02",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-02"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Pine-93"
+        ],
+        "forbidden_event_ids": [
+          "old-02"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cobalt-terrace-history",
+        "case_id": "cobalt-terrace-current-nightly-backup-region",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Cobalt Terrace uses South-71 as its nightly backup region. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/cobalt-terrace/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Cobalt Terrace's current nightly backup region? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Cobalt Terrace's current nightly backup region?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-03",
+          "source_id": "conversation://maintenance-v2/cobalt-terrace/original-01",
+          "source_type": "conversation",
+          "content": "Cobalt Terrace uses North-12 as its nightly backup region.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-03",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-03"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "South-71"
+        ],
+        "forbidden_event_ids": [
+          "old-03"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "atlas-workshop-history",
+        "case_id": "atlas-workshop-current-rollback-manifest-prefix",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Atlas Workshop uses Maple-65 as its rollback manifest prefix. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/atlas-workshop/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Atlas Workshop's current rollback manifest prefix? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Atlas Workshop's current rollback manifest prefix?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-04",
+          "source_id": "conversation://maintenance-v2/atlas-workshop/original-01",
+          "source_type": "conversation",
+          "content": "Atlas Workshop uses Cedar-40 as its rollback manifest prefix.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-04",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-04"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Maple-65"
+        ],
+        "forbidden_event_ids": [
+          "old-04"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "moonlit-console-history",
+        "case_id": "moonlit-console-current-escalation-queue",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Moonlit Console uses Delta-52 as its escalation queue. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/moonlit-console/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Moonlit Console's current escalation queue? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Moonlit Console's current escalation queue?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-05",
+          "source_id": "conversation://maintenance-v2/moonlit-console/original-01",
+          "source_type": "conversation",
+          "content": "Moonlit Console uses Echo-19 as its escalation queue.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-05",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-05"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Delta-52"
+        ],
+        "forbidden_event_ids": [
+          "old-05"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "silver-bridge-history",
+        "case_id": "silver-bridge-current-release-signing-profile",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Silver Bridge uses Fern-84 as its release signing profile. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/silver-bridge/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Silver Bridge's current release signing profile? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Silver Bridge's current release signing profile?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-06",
+          "source_id": "conversation://maintenance-v2/silver-bridge/original-01",
+          "source_type": "conversation",
+          "content": "Silver Bridge uses Orchid-33 as its release signing profile.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-06",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-06"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Fern-84"
+        ],
+        "forbidden_event_ids": [
+          "old-06"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "quiet-compass-history",
+        "case_id": "quiet-compass-current-audit-export-channel",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Quiet Compass uses Summit-27 as its audit export channel. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/quiet-compass/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Quiet Compass's current audit export channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Quiet Compass's current audit export channel?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-07",
+          "source_id": "conversation://maintenance-v2/quiet-compass/original-01",
+          "source_type": "conversation",
+          "content": "Quiet Compass uses Harbor-06 as its audit export channel.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-07",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-07"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Summit-27"
+        ],
+        "forbidden_event_ids": [
+          "old-07"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "velvet-library-history",
+        "case_id": "velvet-library-current-deployment-canary-group",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-22T14:00:00Z: Velvet Library uses Indigo-91 as its deployment canary group. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance-v2/velvet-library/update-01, and t_ref=2026-11-22T14:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Velvet Library's current deployment canary group? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Velvet Library's current deployment canary group?",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-08",
+          "source_id": "conversation://maintenance-v2/velvet-library/original-01",
+          "source_type": "conversation",
+          "content": "Velvet Library uses Cobalt-54 as its deployment canary group.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-08",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-08"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Indigo-91"
+        ],
+        "forbidden_event_ids": [
+          "old-08"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

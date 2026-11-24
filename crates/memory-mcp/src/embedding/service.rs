@@ -462,6 +462,7 @@ impl EmbeddingService {
                     ("kind".to_string(), json!("fact")),
                     ("namespace".to_string(), json!(namespace)),
                     ("fact_id".to_string(), json!(fact_id)),
+                    ("error_code".to_string(), json!(err.code())),
                     ("error".to_string(), json!(err.to_string())),
                 ]),
                 err.log_level(),
@@ -507,6 +508,7 @@ impl EmbeddingService {
                             ("fact_id".to_string(), json!(fact_id)),
                             ("attempt".to_string(), json!(attempt)),
                             ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
+                            ("error_code".to_string(), json!(err.code())),
                             ("error".to_string(), json!(err.to_string())),
                         ]),
                         LogLevel::Warn,
@@ -531,6 +533,7 @@ impl EmbeddingService {
                     ("op".to_string(), json!("embedding.background_failed")),
                     ("kind".to_string(), json!("query")),
                     ("input_bytes".to_string(), json!(input.len())),
+                    ("error_code".to_string(), json!(err.code())),
                     ("error".to_string(), json!(err.to_string())),
                 ]),
                 err.log_level(),
@@ -581,6 +584,7 @@ impl EmbeddingService {
                             ("input_chars".to_string(), json!(input.chars().count())),
                             ("attempt".to_string(), json!(attempt)),
                             ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
+                            ("error_code".to_string(), json!(err.code())),
                             ("error".to_string(), json!(err.to_string())),
                         ]),
                         LogLevel::Warn,
@@ -767,6 +771,7 @@ async fn generate_with_provider(
         Err(err) => {
             let mut result = crate::platform::log_event::build_embedding_log_result(0, None);
             if let Some(map) = result.as_object_mut() {
+                map.insert("error_code".to_string(), json!(err.code()));
                 map.insert("error".to_string(), json!(err.to_string()));
             }
             logger.log(
@@ -1516,7 +1521,8 @@ mod tests {
             lines.iter().any(|line| {
                 line.contains("op=embedding.generate.error")
                     && line.contains("ERROR")
-                    && line.contains("permanent failure")
+                    && line.contains("result.error_code=storage")
+                    && line.contains("result.error=[redacted]")
             }),
             "a storage failure must stay an error: {lines:?}"
         );
@@ -1524,7 +1530,8 @@ mod tests {
             lines.iter().any(|line| {
                 line.contains("op=embedding.generate.error")
                     && line.contains("WARN")
-                    && line.contains("bad dimension")
+                    && line.contains("result.error_code=validation")
+                    && line.contains("result.error=[redacted]")
             }),
             "a rejected input must not read as a storage outage: {lines:?}"
         );

@@ -1,0 +1,546 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "38976-1795388948182860000-0",
+  "identity_sha256": "af6b4045d7bdba9f7be1c5f970e56073edce6e69fc9406a0e3711ab49a6dfaef",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "birch-archive-history",
+      "case_id": "birch-archive-current-cold-backup-tier",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "cinder-harbor-history",
+      "case_id": "cinder-harbor-current-vessel-backup-region",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "eclipse-transit-history",
+      "case_id": "eclipse-transit-current-schedule-export-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "fern-mapping-history",
+      "case_id": "fern-mapping-current-map-tile-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "maple-vault-history",
+      "case_id": "maple-vault-current-signing-key-alias",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "opal-studio-history",
+      "case_id": "opal-studio-current-render-archive-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "raven-canyon-history",
+      "case_id": "raven-canyon-current-telemetry-ingress-queue",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "solstice-lab-history",
+      "case_id": "solstice-lab-current-dataset-snapshot-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "birch-archive-history",
+        "case_id": "birch-archive-current-cold-backup-tier",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69495,
+        "output_tokens": 396,
+        "wall_time_ms": 30815
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "e12d248b5107480c4ff3e5bee46745211bc577a5acaa5b70b2c659564256077e",
+        "response_sha256": "3922897c9a86db0b2a22f65d3b0f0e2807a28f3553429afeab20c638425d6358",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2463,
+          "maximum_wire_bytes": 2463
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cinder-harbor-history",
+        "case_id": "cinder-harbor-current-vessel-backup-region",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69278,
+        "output_tokens": 366,
+        "wall_time_ms": 30738
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "2331fef17ab3f711ecb05dad5a8ce10c5e94c93c4406cf29160be7b1bce3ff24",
+        "response_sha256": "3bdaf39ebcfa439d687c71f6850abef948fd45d66e2cd01d9714c7152f010b2a",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2463,
+          "maximum_wire_bytes": 2463
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "eclipse-transit-history",
+        "case_id": "eclipse-transit-current-schedule-export-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 70755,
+        "output_tokens": 363,
+        "wall_time_ms": 31253
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "fc16bb0d045af92079ac3fce86fcf906e4e8c5de3bf1199edde22e86cf617351",
+        "response_sha256": "b9b7f54a8688562b5777b9b64d26f01c5a6895aaa68381c5010e9d71d27fbca2",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2467,
+          "maximum_wire_bytes": 2467
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "fern-mapping-history",
+        "case_id": "fern-mapping-current-map-tile-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 70724,
+        "output_tokens": 367,
+        "wall_time_ms": 31759
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "22a782aaa6e98e5740816bce901104a17e55d849e9337de49fbebc361ac1561f",
+        "response_sha256": "bb87d2c3cd7ac7339cf61609ac6d87da01f73d890bd1f59c4fdecdf4860d83f2",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2459,
+          "maximum_wire_bytes": 2459
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "maple-vault-history",
+        "case_id": "maple-vault-current-signing-key-alias",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 70673,
+        "output_tokens": 362,
+        "wall_time_ms": 29625
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ef265a9ac22aafb7cdb38625306d11651e57d103d81f04ba81da5809a7c3eb95",
+        "response_sha256": "93e72d913fa3a7e4683dde46a90960ebddb7e6f078d2abb84dd64592a1c96246",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2459,
+          "maximum_wire_bytes": 2459
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "opal-studio-history",
+        "case_id": "opal-studio-current-render-archive-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 70795,
+        "output_tokens": 372,
+        "wall_time_ms": 33624
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "cefdc31708b8ae71b3d52766e5f2e0ecbada90f2f58e063e768cfa276eb7b3a6",
+        "response_sha256": "42283ee46db00a896e7224276f415f39452eda5568621a611bbdde2a5aae4a46",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2461,
+          "maximum_wire_bytes": 2461
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "raven-canyon-history",
+        "case_id": "raven-canyon-current-telemetry-ingress-queue",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69563,
+        "output_tokens": 385,
+        "wall_time_ms": 31883
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "3bfc85f0f5dea1c40eeffcdcfb0d4f2e0d60fa6f113321f410cccbce67f8933f",
+        "response_sha256": "c1ff684517e2a360d97e92b80219382d461b7ac5484c0033ef2a20e45d4a6d6c",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2459,
+          "maximum_wire_bytes": 2459
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "solstice-lab-history",
+        "case_id": "solstice-lab-current-dataset-snapshot-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 69869,
+        "output_tokens": 420,
+        "wall_time_ms": 34009
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ccc0c8aa78521a7dbdaf3e5177ee524dac05b10b636805fcd137cb0236d632a4",
+        "response_sha256": "60c560c7ed25965a15ca96f2be3a3cb453fcbb1d686937ddfa588e64e4f9c15b",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "v5-update-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2461,
+          "maximum_wire_bytes": 2461
+        }
+      }
+    }
+  ]
+}

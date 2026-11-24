@@ -1,0 +1,43 @@
+{
+  "schema_version": "memory-decisions-oracle/v1",
+  "oracles": [
+    {
+      "probe_id": "literal-path-preservation",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["literal-source-reference"]]],
+      "expected_assertions": {
+        "literal-source-reference": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt"
+      },
+      "expected_roles": {},
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "literal-url-preservation",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["literal-url-reference"]]],
+      "expected_assertions": {
+        "literal-url-reference": "http://127.0.0.1:9/agent-reference"
+      },
+      "expected_roles": {},
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "ordinary-fact-control",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["ordinary-fact"]]],
+      "expected_assertions": {
+        "ordinary-fact": "December 4"
+      },
+      "expected_roles": {},
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "unknown-reference-control",
+      "disposition": "unknown",
+      "evidence_alternatives": [],
+      "expected_assertions": {},
+      "expected_roles": {},
+      "forbidden_event_ids": []
+    }
+  ]
+}

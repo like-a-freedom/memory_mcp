@@ -1,0 +1,31 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "beacon-export-format",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "53b1314203439b395dde25947bab21be01970d9f95c3afdbc2d7e44d20f77ebe",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-03T11:30:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:37:26.898895Z",
+    "known_revision": 7,
+    "valid_at": "2026-06-03T11:30:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "beacon-export-format-decision",
+      "episode_id": "episode:da1eede41c5c13b43bacc4e7",
+      "fact_ids": [
+        "fact:cc8f29333a598ced9dbd96e9"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

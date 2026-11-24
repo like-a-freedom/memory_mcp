@@ -1,0 +1,212 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "82535-1795443201113412000-0",
+  "identity_sha256": "37a6e43a11ca2b9c83807981a33cc2a506caa87138a2e24b75e973ea3db4fa12",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "brackenmill_archive",
+      "case_id": "brackenmill_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "silverpine_signal",
+      "case_id": "silverpine_signal-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cinderbrook_survey",
+      "case_id": "cinderbrook_survey-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "moonquay_station",
+      "case_id": "moonquay_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "brackenmill_archive",
+        "case_id": "brackenmill_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5434,
+        "output_tokens": 520,
+        "wall_time_ms": 6844
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ec48a8a83255a81bce5889d379656b0ff22cfcaa9e414594e904788ecd0a827a",
+        "response_sha256": "2cb36086d8b78580493ed7b54ca53830b4ad4ea1b460d4a0d013b2aab380223c",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-ornith-2026-11-23-brackenmill_archive"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2190,
+          "maximum_wire_bytes": 2190
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "silverpine_signal",
+        "case_id": "silverpine_signal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "cbcb4bd30cb725a5890f3b9172ac29c7bd405980a1bf159bfc41253641456ebd",
+        "response_sha256": "c6d404daa1a1b8d824301f3429137cb6ec72ed1dee8b129f0b0b111500a99781",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cinderbrook_survey",
+        "case_id": "cinderbrook_survey-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d9f3e9f450db143718cdc79fc5692d7f66e78ce507e9f9401ba992a63dc3b2de",
+        "response_sha256": "193f7d2d7a2c46e4d3813963b8a8a84b77a5ac44b51418c04c18ed25607ecc43",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonquay_station",
+        "case_id": "moonquay_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "976765f20e17e55a0b461667baf2ec29043219b1143192ec7a0d2a7546cfb59c",
+        "response_sha256": "b15fc06d8b49b3d9573c2b52177d6d264b28402530bf76b4a11dff74434e43cd",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

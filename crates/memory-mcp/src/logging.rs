@@ -331,6 +331,26 @@ fn render_foreign(
     ansi: bool,
     format: LogFormat,
 ) -> String {
+    // rmcp logs outbound error values at WARN before the caller receives the
+    // response. Those values may contain caller-supplied IDs, names, or source
+    // metadata. The MCP response remains detailed; only dependency diagnostics
+    // are redacted here. Application-level tool events retain the safe error
+    // code and request correlation needed to investigate the failure.
+    let sanitized_fields = fields
+        .iter()
+        .map(|(key, value)| (key.clone(), sanitize_log_value(key, value)))
+        .collect::<Vec<_>>();
+    let redacted_fields;
+    let fields = if target.starts_with("rmcp::") {
+        redacted_fields = vec![(
+            "message".to_string(),
+            Value::String("MCP diagnostic details redacted".to_string()),
+        )];
+        redacted_fields.as_slice()
+    } else {
+        sanitized_fields.as_slice()
+    };
+
     let message = fields
         .iter()
         .find(|(key, _)| key == "message")
@@ -586,6 +606,7 @@ impl<S: Subscriber> Filter<S> for OpFilter {
 /// `tracing` event obey one rule and a deep module never has to build a logger
 /// just to log one line.
 pub fn emit(event: HashMap<String, Value>, level: LogLevel) {
+    let event = sanitize_log_event(&event);
     let op = event.get("op").and_then(Value::as_str).unwrap_or("");
     // The subscriber would drop this too, but skipping the serialization here
     // keeps a filtered event free.
@@ -1048,6 +1069,7 @@ impl StdoutLogger {
     /// a directive can turn one subsystem up without turning up the hot paths
     /// that would drown it.
     pub fn log(&self, event: HashMap<String, Value>, level: LogLevel) {
+        let event = sanitize_log_event(&event);
         let op = event.get("op").and_then(Value::as_str).unwrap_or("");
         if !self.is_event_enabled(level, op) {
             return;
@@ -1244,6 +1266,8 @@ pub(crate) fn render_human(
     ts: &str,
     ansi: bool,
 ) -> String {
+    let sanitized = sanitize_log_event(event);
+    let event = &sanitized;
     let level_text = level_field(level, ansi);
 
     let mut tokens = Vec::with_capacity(event.len());
@@ -1288,6 +1312,8 @@ pub(crate) fn render_human(
 /// beside the payload so a collector parses one line and has the whole event.
 #[must_use]
 pub(crate) fn render_json(event: &HashMap<String, Value>, level: LogLevel, ts: &str) -> String {
+    let sanitized = sanitize_log_event(event);
+    let event = &sanitized;
     let mut object = serde_json::Map::with_capacity(event.len() + 2);
     for (key, value) in event {
         object.insert(key.clone(), value.clone());
@@ -1296,6 +1322,112 @@ pub(crate) fn render_json(event: &HashMap<String, Value>, level: LogLevel, ts: &
     // overwrite what a collector reads.
     insert_meta(&mut object, level, ts);
     Value::Object(object).to_string()
+}
+
+/// Redact values whose field names can carry memory content, caller-controlled
+/// source metadata, credentials, or opaque identifiers. This is the final
+/// boundary shared by stderr, file logging, human formatting and JSON logging;
+/// product responses and explicitly enabled query-history storage are separate
+/// data contracts and are not altered here.
+fn sanitize_log_event(event: &HashMap<String, Value>) -> HashMap<String, Value> {
+    event
+        .iter()
+        .map(|(key, value)| (key.clone(), sanitize_log_value(key, value)))
+        .collect()
+}
+
+fn sanitize_log_value(key: &str, value: &Value) -> Value {
+    let normalized = key.to_ascii_lowercase().replace('-', "_");
+    let structured_container =
+        matches!(normalized.as_str(), "args" | "params" | "payload") && value.is_object();
+    if is_sensitive_log_field(key) && !structured_container {
+        return Value::String("[redacted]".to_string());
+    }
+
+    match value {
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, value)| (key.clone(), sanitize_log_value(key, value)))
+                .collect(),
+        ),
+        Value::Array(values) => Value::Array(
+            values
+                .iter()
+                .map(|value| sanitize_log_value("", value))
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
+}
+
+fn is_sensitive_log_field(key: &str) -> bool {
+    let normalized = key.to_ascii_lowercase().replace('-', "_");
+    matches!(
+        normalized.as_str(),
+        "content"
+            | "query"
+            | "input"
+            | "arguments"
+            | "args"
+            | "params"
+            | "prompt"
+            | "response"
+            | "payload"
+            | "path"
+            | "url"
+            | "uri"
+            | "source"
+            | "source_id"
+            | "source_type"
+            | "source_group"
+            | "source_position"
+            | "policy_tags"
+            | "tags"
+            | "labels"
+            | "name"
+            | "canonical_name"
+            | "alias"
+            | "aliases"
+            | "fact_id"
+            | "episode_id"
+            | "entity_id"
+            | "claim_id"
+            | "record_id"
+            | "error"
+            | "message"
+            | "detail"
+            | "token"
+            | "secret"
+            | "credential"
+            | "password"
+            | "authorization"
+            | "api_key"
+            | "sql"
+            | "statement"
+    ) || normalized.ends_with("_content")
+        || normalized.ends_with("_query")
+        || normalized.ends_with("_input")
+        || normalized.ends_with("_name")
+        || normalized.ends_with("_alias")
+        || normalized.ends_with("_prompt")
+        || normalized.ends_with("_source_id")
+        || normalized.ends_with("_source_type")
+        || normalized.ends_with("_source_group")
+        || normalized.ends_with("_path")
+        || normalized.ends_with("_url")
+        || normalized.ends_with("_uri")
+        || normalized.ends_with("_fact_id")
+        || normalized.ends_with("_episode_id")
+        || normalized.ends_with("_entity_id")
+        || normalized.ends_with("_claim_id")
+        || normalized.ends_with("_record_id")
+        || normalized.ends_with("_token")
+        || normalized.ends_with("_secret")
+        || normalized.ends_with("_credential")
+        || normalized.ends_with("_password")
+        || normalized.ends_with("_authorization")
+        || normalized.ends_with("_api_key")
 }
 
 /// Capture what the logger writes, for a test that has to observe a line
@@ -1639,7 +1771,7 @@ mod tests {
         assert!(!line.contains("req="), "no request id, no token: {line}");
         assert!(line.contains("op=schema.migrations"));
         assert!(line.contains("stage=start"));
-        assert!(line.contains("source=filesystem"));
+        assert!(line.contains("source=[redacted]"));
     }
 
     #[test]
@@ -1655,9 +1787,9 @@ mod tests {
             "2026-01-01T00:00:00+00:00",
         );
 
-        assert!(line.contains("name=\"Dmitry Ivanov\""));
+        assert!(line.contains("name=[redacted]"));
         assert!(line.contains("list=[a,b,c]"));
-        assert!(line.contains("args.query=ARR"));
+        assert!(line.contains("args.query=[redacted]"));
         assert!(line.contains("args.scope=org"));
     }
 
@@ -2095,7 +2227,7 @@ mod tests {
         assert_eq!(
             line,
             "2026-10-06T12:34:56.789012Z  INFO  op=ingest.done  req=req_0042  \
-             duration_ms=152  args.source_id=note-1  result.episode_id=episode:x"
+             duration_ms=152  args.source_id=[redacted]  result.episode_id=[redacted]"
         );
     }
 
@@ -2151,7 +2283,7 @@ mod tests {
 
         let line = render_human(&event, LogLevel::Info, "2026-10-06T12:34:56.789012Z", false);
 
-        assert!(line.contains("name=\"Dmitry Ivanov\""), "{line}");
+        assert!(line.contains("name=[redacted]"), "{line}");
         assert!(line.contains("list=[a,b,c]"), "{line}");
         assert!(line.contains("args.nested.deep=true"), "{line}");
     }
@@ -2194,7 +2326,51 @@ mod tests {
         assert_eq!(parsed["op"], "ingest.done");
         assert_eq!(parsed["request_id"], "req_0042");
         assert_eq!(parsed["duration_ms"], 152);
-        assert_eq!(parsed["args"]["source_id"], "note-1");
+        assert_eq!(parsed["args"]["source_id"], "[redacted]");
+    }
+
+    #[test]
+    fn render_human_redacts_memory_content_queries_and_error_details() {
+        let event = event(&[
+            ("op", json!("assemble_context.failed")),
+            ("query", json!("private query canary")),
+            ("content", json!("private content canary")),
+            ("error", json!("provider echoed private content canary")),
+            ("error_code", json!("transient")),
+        ]);
+
+        let line = render_human(&event, LogLevel::Warn, "2026-10-06T12:34:56.789012Z", false);
+
+        assert!(!line.contains("private query canary"), "{line}");
+        assert!(!line.contains("private content canary"), "{line}");
+        assert!(line.contains("error_code=transient"), "{line}");
+        assert!(line.contains("query=[redacted]"), "{line}");
+    }
+
+    #[test]
+    fn render_json_redacts_nested_source_ids_and_caller_tags() {
+        let event = event(&[(
+            "details",
+            json!({
+                "source_id": "private-source-id-canary",
+                "episode_id": "private-episode-id-canary",
+                "canonical_name": "private-name-canary",
+                "aliases": ["private-alias-canary"],
+                "policy_tags": ["private-tag-canary"],
+                "safe_count": 3,
+            }),
+        )]);
+
+        let line = render_json(&event, LogLevel::Info, "2026-10-06T12:34:56.789012Z");
+        let parsed: Value = serde_json::from_str(&line).expect("valid NDJSON object");
+
+        assert!(!line.contains("private-source-id-canary"), "{line}");
+        assert!(!line.contains("private-episode-id-canary"), "{line}");
+        assert!(!line.contains("private-name-canary"), "{line}");
+        assert!(!line.contains("private-alias-canary"), "{line}");
+        assert!(!line.contains("private-tag-canary"), "{line}");
+        assert_eq!(parsed["details"]["source_id"], "[redacted]");
+        assert_eq!(parsed["details"]["safe_count"], 3);
     }
 
     /// `MEMORY_LOG_FORMAT=json` selects the machine format; anything else,
@@ -2269,7 +2445,7 @@ mod tests {
         let line = buffer.contents();
         assert!(line.contains("op=ingest.done"), "{line}");
         assert!(line.contains("req=req_1"), "{line}");
-        assert!(line.contains("args.source_id=note-1"), "{line}");
+        assert!(line.contains("args.source_id=[redacted]"), "{line}");
     }
 
     /// `MEMORY_LOG_FORMAT=json` yields one parseable object per event.
@@ -2323,13 +2499,14 @@ mod tests {
             tracing::warn!(
                 target: "surrealdb::kvs",
                 count = 8,
-                message = "level-0 slowdown"
+                message = "memory content canary"
             );
         });
 
         let line = buffer.contents();
         assert!(line.contains("surrealdb::kvs:"), "{line}");
-        assert!(line.contains("level-0 slowdown"), "{line}");
+        assert!(!line.contains("memory content canary"), "{line}");
+        assert!(line.contains("[redacted]"), "{line}");
         assert!(line.contains("count=8"), "{line}");
     }
 
@@ -2405,7 +2582,8 @@ mod tests {
 
         let line = buffer.contents();
         assert!(!line.contains("should not appear"), "{line}");
-        assert!(line.contains("should appear"), "{line}");
+        assert!(!line.contains("should appear"), "{line}");
+        assert!(line.contains("ERROR noisy_dep: [redacted]"), "{line}");
     }
 
     /// A native `tracing` producer — a migrated module, or a span — is rendered
@@ -2573,21 +2751,53 @@ mod tests {
 
     /// The shared best-effort-failure event carries `op` and `error` at `WARN`.
     /// Every site that discards a `Result` relies on this shape.
-    #[test]
-    fn a_best_effort_failure_names_its_operation_and_error() {
-        let sink = capture::install();
-
-        emit_best_effort_failure("db.migration_mark_failed", &"disk gone");
-
-        let recorded = sink.lines();
+    #[tokio::test]
+    async fn a_best_effort_failure_names_its_operation_and_redacts_error_text() {
+        let recorded = capture::with_level("warn", || async {
+            let sink = capture::install();
+            emit_best_effort_failure("db.migration_mark_failed", &"disk gone canary");
+            sink.lines()
+        })
+        .await;
         assert!(
             recorded
                 .iter()
                 .any(|line| line.contains("op=db.migration_mark_failed")
-                    && line.contains("error=\"disk gone\"")
+                    && line.contains("error=[redacted]")
                     && line.contains("WARN")),
             "the shared helper must emit op and error at WARN: {recorded:?}"
         );
+        assert!(
+            recorded
+                .iter()
+                .all(|line| !line.contains("disk gone canary")),
+            "raw error details must not escape through the shared helper: {recorded:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn emit_redacts_values_before_a_tracing_subscriber_observes_them() {
+        let buffer = SharedBuf::default();
+        let event = HashMap::from([
+            ("op".to_string(), json!("ingest.failed")),
+            ("content".to_string(), json!("private content canary")),
+            (
+                "error".to_string(),
+                json!("provider echoed private content canary"),
+            ),
+            ("error_code".to_string(), json!("transient")),
+        ]);
+
+        capture::with_level("info", || async {
+            let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+            tracing::subscriber::with_default(subscriber, || emit(event, LogLevel::Warn));
+        })
+        .await;
+
+        let line = buffer.contents();
+        assert!(!line.contains("private content canary"), "{line}");
+        assert!(line.contains("error_code=transient"), "{line}");
+        assert!(line.contains("error=[redacted]"), "{line}");
     }
 
     /// The first segment of every emitted operation name must be a member of

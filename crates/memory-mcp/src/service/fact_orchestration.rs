@@ -27,6 +27,12 @@ use crate::shared::validation::validate_fact_input;
 
 type LinkedEntityNames = std::collections::HashMap<String, (String, Vec<String>)>;
 
+pub(crate) struct PersistedFactEvidence {
+    pub(crate) fact_id: String,
+    pub(crate) content: Option<String>,
+    pub(crate) quote: Option<String>,
+}
+
 impl FactService {
     /// Adds a new fact, orchestrating embedding generation, triple extraction,
     /// and claim projection.
@@ -48,6 +54,38 @@ impl FactService {
         policy_tags: Vec<String>,
         provenance: Provenance,
     ) -> Result<String, MemoryError> {
+        self.add_fact_with_evidence(
+            ctx,
+            fact_type,
+            content,
+            quote,
+            source_episode,
+            t_valid,
+            confidence,
+            entity_links,
+            policy_tags,
+            provenance,
+        )
+        .await
+        .map(|fact| fact.fact_id)
+    }
+
+    /// Adds a fact and returns the content and quote that were actually stored.
+    /// Idempotent repeats read these values from the existing deterministic fact.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn add_fact_with_evidence(
+        &self,
+        ctx: &crate::memory::capabilities::deps::ExtractDeps,
+        fact_type: &str,
+        content: &str,
+        quote: &str,
+        source_episode: &str,
+        t_valid: DateTime<Utc>,
+        confidence: f64,
+        entity_links: Vec<String>,
+        policy_tags: Vec<String>,
+        provenance: Provenance,
+    ) -> Result<PersistedFactEvidence, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, "")?;
 
         // Storage routing comes from the process-bound stores in the context;
@@ -102,7 +140,11 @@ impl FactService {
         )
         .await;
 
-        Ok(outcome.fact_id)
+        Ok(PersistedFactEvidence {
+            fact_id: outcome.fact_id,
+            content: outcome.content,
+            quote: outcome.quote,
+        })
     }
 
     /// Pre-fetch linked entity records and the episode's source lineage,
@@ -212,7 +254,7 @@ impl FactService {
                             "provider".to_string(),
                             json!(ctx.embedding_service.embedding_provider().provider_name()),
                         ),
-                        ("error".to_string(), json!(err.to_string())),
+                        ("error_code".to_string(), json!(err.code())),
                         ("fact_type".to_string(), json!(fact_type)),
                     ]),
                     err.log_level(),
@@ -433,16 +475,39 @@ mod tests {
     use super::*;
     use crate::knowledge::FactStoreClient;
     use crate::service::mock_db::MockDbClient;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     #[tokio::test]
     async fn create_fact_persists_record() {
         let t = Utc::now();
         let fact_id = deterministic_fact_id("note", "hello world", "episode:test", t);
-        let db = MockDbClient::new().expect_create(
-            &fact_id,
-            json!({"fact_id": fact_id.clone(), "status": "ok"}),
-        );
+        let committed_fact = Arc::new(Mutex::new(None::<String>));
+        let select_state = Arc::clone(&committed_fact);
+        let write_state = Arc::clone(&committed_fact);
+        let db = MockDbClient::new()
+            .expect_select_one_with(move |record_id| {
+                let committed = select_state
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                Ok((committed.as_deref() == Some(record_id))
+                    .then(|| json!({"fact_id": record_id, "status": "ok"})))
+            })
+            .expect_transaction_with(
+                |sql| sql.contains("UPDATE knowledge_revision_clock:active"),
+                move |_, vars| {
+                    let record_id = vars
+                        .and_then(|value| value.get("__knowledge_revision_record_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| {
+                            MemoryError::Unavailable("revision record id missing".into())
+                        })?;
+                    *write_state
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                        Some(record_id.to_owned());
+                    Ok(())
+                },
+            );
         let svc = FactService::new(FactStoreClient::new(Arc::new(db), "org"));
         let provenance = Provenance::agent_observation("episode:test");
 
@@ -464,6 +529,7 @@ mod tests {
             .expect("create fact");
 
         assert!(outcome.created, "expected a fresh fact record");
+        assert_eq!(outcome.fact_id, fact_id);
         assert!(outcome.fact_id.starts_with("fact:"));
     }
 
@@ -495,5 +561,7 @@ mod tests {
 
         assert_eq!(outcome.fact_id, fact_id);
         assert!(!outcome.created, "duplicate must not re-write the fact");
+        assert!(outcome.content.is_none());
+        assert!(outcome.quote.is_none());
     }
 }

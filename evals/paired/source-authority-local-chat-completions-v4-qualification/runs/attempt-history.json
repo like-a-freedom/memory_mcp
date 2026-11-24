@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-model-qualification-attempts/v1",
+  "attempts": [
+    {
+      "attempt_id": "setup-01",
+      "output_directory": "runs/run-01",
+      "status": "setup_failed_before_model_process",
+      "reason": "The CLI rejected a relative paired output directory; no model request or paired receipt was produced.",
+      "preserve_directory": true
+    }
+  ]
+}

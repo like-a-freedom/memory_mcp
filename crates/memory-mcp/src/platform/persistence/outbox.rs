@@ -115,6 +115,30 @@ pub async fn commit_tenant_mutation_with_event(
     event: TenantChangeEvent,
     fault_injector: &Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
+    commit_tenant_mutation(db, mutation, event, None, fault_injector).await
+}
+
+/// Apply a create mutation, allocate its knowledge revision, and publish its
+/// tenant change event in one database transaction. A repeated idempotency
+/// key skips the entire unit, including a second event.
+#[cfg_attr(not(feature = "streamable-http"), allow(dead_code))]
+pub(crate) async fn commit_revisioned_tenant_mutation_with_event(
+    db: &BoundDbClient,
+    mutation: TenantMutation,
+    event: TenantChangeEvent,
+    revision: crate::knowledge::revisions::KnowledgeRevisionMetadata,
+    fault_injector: &Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
+    commit_tenant_mutation(db, mutation, event, Some(revision), fault_injector).await
+}
+
+async fn commit_tenant_mutation(
+    db: &BoundDbClient,
+    mutation: TenantMutation,
+    event: TenantChangeEvent,
+    revision: Option<crate::knowledge::revisions::KnowledgeRevisionMetadata>,
+    fault_injector: &Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
     let mut vars = match mutation.vars {
         serde_json::Value::Null => serde_json::Map::new(),
         serde_json::Value::Object(vars) => vars,
@@ -124,7 +148,16 @@ pub async fn commit_tenant_mutation_with_event(
             ));
         }
     };
-    for reserved in ["__outbox_resource_id", "__outbox_revision", "__outbox_kind"] {
+    let mut reserved_bindings = vec!["__outbox_resource_id", "__outbox_revision", "__outbox_kind"];
+    if revision.is_none() {
+        reserved_bindings.extend([
+            "__knowledge_revision",
+            "__knowledge_revision_key",
+            "__knowledge_revision_kind",
+            "__knowledge_revision_record_id",
+        ]);
+    }
+    for reserved in reserved_bindings {
         if vars.contains_key(reserved) {
             return Err(MemoryError::Validation(format!(
                 "outbox mutation variables reserve {reserved}"
@@ -144,14 +177,55 @@ pub async fn commit_tenant_mutation_with_event(
         serde_json::Value::String(event.change_kind),
     );
 
-    let script = format!(
-        "BEGIN TRANSACTION; {REPAIR_MISSING_SEQUENCE} UPDATE tenant_change_sequence:default SET value = value + 1; LET $outbox_event_seq = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1)[0]; {}; CREATE tenant_change_event SET event_seq = $outbox_event_seq, resource_id = $__outbox_resource_id, rev = $__outbox_revision, change_kind = $__outbox_kind, created_at = time::now(); COMMIT TRANSACTION;",
-        mutation.sql
-    );
+    let event_sql = "UPDATE tenant_change_sequence:default SET value = value + 1; \
+        LET $outbox_event_seq = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1)[0]; \
+        CREATE tenant_change_event SET event_seq = $outbox_event_seq, resource_id = $__outbox_resource_id, \
+        rev = $__outbox_revision, change_kind = $__outbox_kind, created_at = time::now();";
+    let (script, revisioned_transaction) = match revision {
+        Some(revision) => {
+            let revision_bindings_match = vars
+                .get("__knowledge_revision_key")
+                .and_then(serde_json::Value::as_str)
+                == Some(revision.idempotency_key.as_str())
+                && vars
+                    .get("__knowledge_revision_kind")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(revision.operation_kind.as_str())
+                && vars
+                    .get("__knowledge_revision_record_id")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(revision.record_id.as_str());
+            if !revision_bindings_match {
+                return Err(MemoryError::Validation(
+                    "knowledge revision metadata does not match mutation bindings".into(),
+                ));
+            }
+            (
+                crate::knowledge::revisions::revision_transaction_script_with_affected_ids(
+                    &format!("{REPAIR_MISSING_SEQUENCE} {}", mutation.sql),
+                    event_sql,
+                    &revision.affected_record_ids_sql,
+                ),
+                true,
+            )
+        }
+        None => (
+            format!(
+                "BEGIN TRANSACTION; {REPAIR_MISSING_SEQUENCE} {}; {event_sql} COMMIT TRANSACTION;",
+                mutation.sql
+            ),
+            false,
+        ),
+    };
     let vars = serde_json::Value::Object(vars);
     for attempt in 0..5u64 {
-        match db.query(&script, Some(vars.clone())).await {
-            Ok(_) => {
+        let result = if revisioned_transaction {
+            db.transaction_query(&script, Some(vars.clone())).await
+        } else {
+            db.query(&script, Some(vars.clone())).await.map(|_| ())
+        };
+        match result {
+            Ok(()) => {
                 // Hit AFTER the transaction is durable. The event
                 // row and sequence increment are committed; the
                 // caller observes the transient and the row stays.

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What pressure applied to Birch Pump on June 11, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-11T08:00:00Z",
+  "known_revision": 3,
+  "context_budget": 5,
+  "history_sha256": "f70a840d6aadba2a948eaf6ae9bcef8536030fa7d96e1cae07b634b02b3a813a",
+  "claim_rollout_stage": "shadow"
+}

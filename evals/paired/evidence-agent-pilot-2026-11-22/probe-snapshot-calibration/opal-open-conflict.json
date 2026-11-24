@@ -1,0 +1,39 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "opal-open-conflict",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "1114cdcad8287a0b0db3c1deb565bb77982f95e8276ab7c3da531d1be23b67e2",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-07T11:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:28.760981Z",
+    "known_revision": 15,
+    "valid_at": "2026-06-07T11:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "opal-initial",
+      "episode_id": "episode:03fbad000e3426188fb49264",
+      "fact_ids": [
+        "fact:846bb832e23a4eed72c99c82"
+      ],
+      "reconciliation": null
+    },
+    {
+      "event_id": "opal-peer",
+      "episode_id": "episode:e9a91391887dac6914faadaf",
+      "fact_ids": [
+        "fact:be1b6acdfc0d239f82dad66a"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

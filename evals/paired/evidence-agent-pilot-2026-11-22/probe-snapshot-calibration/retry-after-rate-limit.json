@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "retry-after-rate-limit",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "787e69299e88f5983ae38519dbacbef20cf80ca688945858676bd1d30c780d7f",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-06T16:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:37:54.015566Z",
+    "known_revision": 1,
+    "valid_at": "2026-06-06T16:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "retry-after-rate-limit-policy",
+      "episode_id": "episode:e5529ce74420376870a4d152",
+      "fact_ids": [],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

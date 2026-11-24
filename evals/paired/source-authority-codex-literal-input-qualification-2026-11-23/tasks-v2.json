@@ -1,0 +1,177 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "juniper_arc_foundry",
+        "case_id": "juniper_arc_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Juniper Arc Foundry, the microfilm key is filed in Vault-57.",
+      "recall_prompt": "At Juniper Arc Foundry, where is the microfilm key filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Juniper Arc Foundry, where is the microfilm key filed?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "literal-source-juniper_arc_foundry",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "literal-source-juniper_arc_foundry"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Vault-57"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Juniper Arc Foundry before this session. Use assemble_context to check this memory question: At Juniper Arc Foundry, where is the microfilm key filed? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "juniper_arc_foundry",
+          "relative_path": "fixtures/juniper_arc_foundry.txt",
+          "content": "Fact: At Juniper Arc Foundry, the microfilm key is filed in Vault-57.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "literal-source-juniper_arc_foundry"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "pewter_wave_relay",
+        "case_id": "pewter_wave_relay-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Pewter Wave Relay, the storm log arrives at Port-68.",
+      "recall_prompt": "At Pewter Wave Relay, what is the storm log arrival port? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Pewter Wave Relay, what is the storm log arrival port?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "literal-source-pewter_wave_relay",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "literal-source-pewter_wave_relay"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Port-68"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Pewter Wave Relay before this session. Use assemble_context to check this memory question: At Pewter Wave Relay, what is the storm log arrival port? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "pewter_wave_relay",
+          "relative_path": "fixtures/pewter_wave_relay.txt",
+          "content": "Fact: At Pewter Wave Relay, the storm log arrives at Port-68.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "literal-source-pewter_wave_relay"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "quartz_lark_annex",
+        "case_id": "quartz_lark_annex-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Quartz Lark Annex, the assay binder is stored in Shelf-31.",
+      "recall_prompt": "At Quartz Lark Annex, where is the assay binder stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Quartz Lark Annex, where is the assay binder stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "literal-source-quartz_lark_annex",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "literal-source-quartz_lark_annex"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Shelf-31"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Quartz Lark Annex before this session. Use assemble_context to check this memory question: At Quartz Lark Annex, where is the assay binder stored? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "quartz_lark_annex",
+          "relative_path": "fixtures/quartz_lark_annex.txt",
+          "content": "Fact: At Quartz Lark Annex, the assay binder is stored in Shelf-31.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "literal-source-quartz_lark_annex"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "vermilion_halcyon_station",
+        "case_id": "vermilion_halcyon_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Vermilion Halcyon Station, the spare beacon battery is stored in Locker-92.",
+      "recall_prompt": "At Vermilion Halcyon Station, where is the spare beacon battery stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Vermilion Halcyon Station, where is the spare beacon battery stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "literal-source-vermilion_halcyon_station",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "literal-source-vermilion_halcyon_station"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Locker-92"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Vermilion Halcyon Station before this session. Use assemble_context to check this memory question: At Vermilion Halcyon Station, where is the spare beacon battery stored? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "vermilion_halcyon_station",
+          "relative_path": "fixtures/vermilion_halcyon_station.txt",
+          "content": "Fact: At Vermilion Halcyon Station, the spare beacon battery is stored in Locker-92.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "literal-source-vermilion_halcyon_station"
+        }
+      ]
+    }
+  ]
+}

@@ -89,8 +89,8 @@ async fn an_episode_update_refuses_a_non_episode_record_id() {
         .expect_err("a fact id must not be written as an episode");
 
     assert!(
-        matches!(&error, MemoryError::Validation(message) if message.contains("fact:abc")),
-        "the refusal must name the offending id, got {error:?}"
+        matches!(&error, MemoryError::Validation(message) if !message.contains("fact:abc") && message.contains("episode:<id>")),
+        "the refusal must hide the submitted id and name the expected table, got {error:?}"
     );
 }
 

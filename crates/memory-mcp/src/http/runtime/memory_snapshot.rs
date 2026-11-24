@@ -272,6 +272,7 @@ mod tests {
                 retrieval_tier: None,
                 reconciliation: None,
                 retrieval_evidence: None,
+                evidence_status: None,
             };
             assert_eq!(
                 context.insert(generation, cache_key, &[item]),

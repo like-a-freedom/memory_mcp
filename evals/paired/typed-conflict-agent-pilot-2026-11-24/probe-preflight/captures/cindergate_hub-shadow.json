@@ -1,0 +1,100 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:75c6a7b3e692b0e0975dd0b0": "cindergate_hub-record-a",
+    "episode:9c7969e8d8b3d3afee2759d0": "cindergate_hub-record-b"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "8acc2e5d44df5fb3d2e58e6ef6f41b57c65e72e28238f69a97763421437fcc6a",
+    "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+    "source_event_ids": [
+      "cindergate_hub-record-a"
+    ],
+    "claim_annotations": [
+      {
+        "source_event_id": "cindergate_hub-record-a",
+        "evidence_status": "unknown"
+      }
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 1,
+    "compact": true,
+    "known_revision": 15,
+    "query": "What crane safe load was recorded for Cindergate Fabrication Hub on July 15, 2026?",
+    "valid_at": "2026-07-15T12:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-24T06:45:01.168875Z\",\"known_revision\":15,\"valid_at\":\"2026-07-15T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Cindergate Fabrication Hub\\ndimension: crane_safe_load\\nvalue: 31 tonnes effective July 15, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:4bcd6ae4a88e3ee3f057d48c\",\"grounding\":0.9,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:75c6a7b3e692b0e0975dd0b0\",\"source_id\":\"cindergate_hub-operations-log-a\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-07-15T12:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.9,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:75c6a7b3e692b0e0975dd0b0\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations and conflict projection are not enabled for this rollout"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-24T06:45:01.168875Z",
+            "known_revision": 15,
+            "valid_at": "2026-07-15T12:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Cindergate Fabrication Hub\ndimension: crane_safe_load\nvalue: 31 tonnes effective July 15, 2026",
+            "evidence_status": "unknown",
+            "fact_id": "fact:4bcd6ae4a88e3ee3f057d48c",
+            "grounding": 0.9,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 15,
+              "source_episode_id": "episode:75c6a7b3e692b0e0975dd0b0",
+              "source_id": "cindergate_hub-operations-log-a",
+              "source_type": "owner-record",
+              "valid_at": "2026-07-15T12:00:00+00:00"
+            },
+            "rationale": "historical",
+            "relevance": 0.9,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:75c6a7b3e692b0e0975dd0b0"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "claim_rollout_stage": "shadow"
+}

@@ -1,0 +1,220 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "57879-1795462142295371000-0",
+  "identity_sha256": "1fd318a44ee20bfaebdd3d69a6340fb22b0758d3ac5216bd1c8bd3e826fe7f3c",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "emberlane_station",
+      "case_id": "emberlane_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "mosslight_library",
+      "case_id": "mosslight_library-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "brambleford_archive",
+      "case_id": "brambleford_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "clearwater_observatory",
+      "case_id": "clearwater_observatory-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "emberlane_station",
+        "case_id": "emberlane_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5638,
+        "output_tokens": 452,
+        "wall_time_ms": 8962
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d4b198792f1ca43ddd40f78a49d7ba00347283c912dbbb75fdfea16a31b0bf71",
+        "response_sha256": "214d9a4c46d42590f61da92c3d92446637a2a1c156acd2ce1ea04b374bf173a6",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "qwen-splash-json-emberlane-night-register"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2186,
+          "maximum_wire_bytes": 2186
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mosslight_library",
+        "case_id": "mosslight_library-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "759d0f23bdce4e785879643516ad2e1d0d65d6aed90db7a8cd27b1337e8f2729",
+        "response_sha256": "52bf21969a998c67bbc507f0555184d4ba33bee655d7f7f0480a47fc4a845f6c",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brambleford_archive",
+        "case_id": "brambleford_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "9dace14bb67455ece4ef9b963f9dec83bb6e3d2d9cf834efc7be2e038fc91024",
+        "response_sha256": "55b97739a8b219b8f9fbba0b404f20b2ac116d1d35b01dadcf3fa3c0c8ee558b",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "qwen-splash-json-brambleford-tide-chart"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "brambleford_archive",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 509
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "clearwater_observatory",
+        "case_id": "clearwater_observatory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "04a6bdd52073cd8e6a2d3b4ea2a5bd38079c764c94f32de6bbcc1bef12e2529f",
+        "response_sha256": "90d4f86a5a7761c0deb30f69ab1d7a72b588e488e2e1ac6920d149fcd95f7d4c",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "qwen-splash-json-clearwater-solar-log"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "clearwater_observatory",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 524
+        }
+      ]
+    }
+  ]
+}

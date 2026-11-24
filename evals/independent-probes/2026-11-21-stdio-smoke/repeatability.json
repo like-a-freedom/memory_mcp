@@ -1,0 +1,7 @@
+{
+  "schema_version": "memory-mcp-independent-probe-smoke-repeat/v1",
+  "normalized_observations_equal": true,
+  "tool_schema_equal": true,
+  "product_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+  "quality_claim": false
+}

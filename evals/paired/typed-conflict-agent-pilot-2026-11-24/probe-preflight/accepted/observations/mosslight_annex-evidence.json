@@ -1,0 +1,21 @@
+{
+  "input_sha256": "04c69933841f950257f2fd5a4ed2e29940b3308c0f6fdc074f77282c37b50d58",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "mosslight_annex-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "mosslight_annex-record-a",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

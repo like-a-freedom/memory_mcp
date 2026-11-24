@@ -1,0 +1,16 @@
+{
+  "schema_version": "memory-mcp-local-chat-completions-attempt-history/v1",
+  "plan_id": "source-authority-local-chat-completions-2026-11-23-v3",
+  "attempts": [
+    {
+      "attempt_id": "preflight-01-corpus-oracle-hash-mismatch",
+      "recorded_at_utc": "2026-11-23T09:10:53Z",
+      "status": "preflight_rejected_before_provider_request",
+      "failure": "The plan retained the source-authority v2 corpus and oracle hashes; v3 task hashing generated new fingerprints.",
+      "model_calls_occurred": false,
+      "trial_processes_started": false,
+      "task_or_prompt_changed": false,
+      "correction": "Updated only the plan corpus_sha256 and oracle_sha256 to the current CLI-generated v3 fingerprints; no task, prompt, model, budget or outcome was changed."
+    }
+  ]
+}

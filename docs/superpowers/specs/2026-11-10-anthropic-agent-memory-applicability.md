@@ -1,9 +1,18 @@
 # Anthropic “The components of agent memory”: applicability to Memory MCP
 
+> **Status as of 2026-11-24.** Native fixed-history evidence and decision checks passed on their registered cases. Separate agent pilots did not establish broad downstream utility. Sequential feedback, repair, indexing and consolidation remain conditional experiments with separate endpoints. See [measured results](../../evals/DETERMINISTIC_MEMORY_QUALITY.md) and [follow-up tasks](2026-11-24-agent-memory-follow-up-design.md).
+
 - **Date:** 2026-11-10
+- **Current master reviewed:** 2026-11-20, `1ae1da4a` (v1.41.0)
 - **Status:** Research addendum and conditional experiment, not authorization to build an always-on consolidation worker
 - **Primary source:** [Anthropic, “The components of agent memory”](https://www.anthropic.com/research/components-of-agent-memory), published 2026-11-06; checked with `keenable-cli`
 - **Related contracts:** [decision-grounded quality](2026-11-09-decision-grounded-memory-quality-design.md) and [agent outcome evaluation](2026-11-09-agent-memory-outcome-evaluation-design.md)
+
+## Decision on v1.41.0
+
+Repeat the comparison against the current hybrid search and its broadened lexical fallback. Start with two separate development experiments. For repair, freeze the transcript and verified correction, then score later queries for complete supported evidence and persistence of the wrong note. For an index, hold the source bundle and context budget fixed and require all supporting groups for a multi-source answer. Include a stale index after a source revision and a single-source control. Derived summaries must resolve back to permitted source versions. Freeze offline-work boundaries and charge construction and refresh to the candidate.
+
+Apply the [deterministic memory-quality gate](2026-11-09-agent-memory-outcome-evaluation-design.md#deterministic-memory-quality-gate) to each arm. A deterministic replay of a hand-corrected note demonstrates the potential value of a correction. Qualifying a production generator additionally requires repeatable generation from the original sources and the same held-out evidence gain. A cost-only benefit belongs in a separate efficiency decision. A live agent study is still required for a claim about ease of use. Keep both mechanisms experimental until those results exist.
 
 ## What the article establishes
 

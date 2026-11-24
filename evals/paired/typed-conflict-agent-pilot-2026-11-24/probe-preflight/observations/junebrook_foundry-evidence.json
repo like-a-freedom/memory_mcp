@@ -1,0 +1,21 @@
+{
+  "input_sha256": "38de2cf92c31a010f1bc03f87afa72ec9e7f67c968bcfff804982e03e9a04a44",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "junebrook_foundry-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "junebrook_foundry-record-b",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

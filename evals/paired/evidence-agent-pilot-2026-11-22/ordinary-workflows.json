@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What response format does Mara prefer for weekly status updates?",
+      "seed_episodes": [
+        {
+          "event_id": "mara-status-format-note",
+          "source_id": "mara-project-brief",
+          "source_type": "user-preference",
+          "content": "subject: Mara\npreference: weekly status updates should be concise bullet lists",
+          "valid_at": "2026-06-01T09:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["mara-status-format-note"]]],
+        "accepted_answers": ["concise bullet lists"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: Where was the Alder workshop booked?",
+      "seed_episodes": [
+        {
+          "event_id": "alder-workshop-location",
+          "source_id": "alder-event-planning",
+          "source_type": "project-note",
+          "content": "subject: Alder workshop\nlocation: Room 4B at North Campus",
+          "valid_at": "2026-06-02T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["alder-workshop-location"]]],
+        "accepted_answers": ["Room 4B at North Campus"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: Which serialization format was selected for the Beacon export?",
+      "seed_episodes": [
+        {
+          "event_id": "beacon-export-format-decision",
+          "source_id": "beacon-design-review",
+          "source_type": "decision-record",
+          "content": "subject: Beacon export\ndecision: use JSON Lines, one JSON object per line",
+          "valid_at": "2026-06-03T11:30:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["beacon-export-format-decision"]]],
+        "accepted_answers": ["JSON Lines"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What check remains before approving the Cedar release?",
+      "seed_episodes": [
+        {
+          "event_id": "cedar-release-check",
+          "source_id": "cedar-release-review",
+          "source_type": "release-note",
+          "content": "subject: Cedar release\nremaining check: verify restoration from a clean backup before approval",
+          "valid_at": "2026-06-04T14:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["cedar-release-check"]]],
+        "accepted_answers": ["verify restoration from a clean backup"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: When does the Slate review start?",
+      "seed_episodes": [
+        {
+          "event_id": "slate-review-start",
+          "source_id": "slate-team-calendar",
+          "source_type": "meeting-note",
+          "content": "subject: Slate review\nstart time: June 20, 2026 at 15:30 UTC",
+          "valid_at": "2026-06-05T08:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["slate-review-start"]]],
+        "accepted_answers": ["June 20, 2026 at 15:30 UTC"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. If the memory supports an answer, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: How should a write be retried after a transient rate limit?",
+      "seed_episodes": [
+        {
+          "event_id": "retry-after-rate-limit-policy",
+          "source_id": "service-operations-runbook",
+          "source_type": "operations-note",
+          "content": "subject: transient rate limit retry\npolicy: wait for the backoff window, then retry only the failed write",
+          "valid_at": "2026-06-06T16:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["retry-after-rate-limit-policy"]]],
+        "accepted_answers": ["wait for the backoff window, then retry only the failed write"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

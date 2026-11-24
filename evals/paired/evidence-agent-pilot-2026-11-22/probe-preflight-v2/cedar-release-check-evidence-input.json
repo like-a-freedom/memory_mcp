@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What check remains before approving the Cedar release?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-04T14:00:00Z",
+  "known_revision": 2,
+  "context_budget": 5,
+  "history_sha256": "917228c2f0349548bedef023cd496ed8921855edef06754f1458be61beecd904",
+  "claim_rollout_stage": "evidence"
+}

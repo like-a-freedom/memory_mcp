@@ -1,0 +1,506 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "16797-1795366252193677000-0",
+  "identity_sha256": "24e2febc356a2119dbfa70bbee0925ee5bca4d0fc8c79c8c08241e9f191d6718",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "atlas-workshop-history",
+      "case_id": "atlas-workshop-current-rollback-manifest-prefix",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "cobalt-terrace-history",
+      "case_id": "cobalt-terrace-current-nightly-backup-region",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "moonlit-console-history",
+      "case_id": "moonlit-console-current-escalation-queue",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "quiet-compass-history",
+      "case_id": "quiet-compass-current-audit-export-channel",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "silver-bridge-history",
+      "case_id": "silver-bridge-current-release-signing-profile",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "velvet-library-history",
+      "case_id": "velvet-library-current-deployment-canary-group",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "willow-signal-history",
+      "case_id": "willow-signal-current-build-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "zephyr-quarry-history",
+      "case_id": "zephyr-quarry-current-archive-retention-tag",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "atlas-workshop-history",
+        "case_id": "atlas-workshop-current-rollback-manifest-prefix",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100713,
+        "output_tokens": 442,
+        "wall_time_ms": 40397
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "3f2fd39774455e5c30d338006eb481fe88a695b9b3c0b242cb86ac1e1c814e5b",
+        "response_sha256": "fd353a2b413dbbce39f1379c36a3c9d70c17e773b65b24e826efc25a9f50d00d",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cobalt-terrace-history",
+        "case_id": "cobalt-terrace-current-nightly-backup-region",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 102726,
+        "output_tokens": 463,
+        "wall_time_ms": 43417
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "580c54e6f2b806134f4cebbed17a07d7f997a6899b0915afcb737c1d0d203526",
+        "response_sha256": "3ef081aa1f4e41d771c5984cff8e0e589a5dd0ebe03047bfe6b2282a6dfdd54c",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "moonlit-console-history",
+        "case_id": "moonlit-console-current-escalation-queue",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 99856,
+        "output_tokens": 443,
+        "wall_time_ms": 39349
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "f21844516050eaa62d790434ca37e0b9d80dbb41d493ba211acb68204311f351",
+        "response_sha256": "69369aad3ca83820f4eacfb5ae69cd99ee7a2898bea07eecbd21369a1ca42c7f",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "quiet-compass-history",
+        "case_id": "quiet-compass-current-audit-export-channel",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 103035,
+        "output_tokens": 475,
+        "wall_time_ms": 36143
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "633521d6e041f0ab3d6582e5ad1962c0fb033af698697b7722d58e76801ba049",
+        "response_sha256": "7edf0a51f05bf1ddb0b4c23ea7a7943968ffc8a52636d60ed7e0fcac61952308",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "silver-bridge-history",
+        "case_id": "silver-bridge-current-release-signing-profile",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 101099,
+        "output_tokens": 446,
+        "wall_time_ms": 35297
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d2f23fb7c0b79cd7d64bd9a68956eff0fca06351ea74672d6ad1e0defb860404",
+        "response_sha256": "5529dc5d057c29017654826b365315735f7475b2ffe429eab58b74c664fa07cc",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "velvet-library-history",
+        "case_id": "velvet-library-current-deployment-canary-group",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100293,
+        "output_tokens": 467,
+        "wall_time_ms": 39297
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "327940f0a01e09a8eb460791951464c8acde1471396b7ce55ad5d1efcee29ae3",
+        "response_sha256": "f2d4285bf8dba16b5eb892e1dbba672cb133a62958e804e03121b5e61af3d90a",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "willow-signal-history",
+        "case_id": "willow-signal-current-build-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100001,
+        "output_tokens": 453,
+        "wall_time_ms": 39495
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ee56e3ed3fba257cb5ca76aebebc3ab87c360ca7decd571439c2e78d55d1aa20",
+        "response_sha256": "ad608af788b7f0f69314fa9a8a80c12d6e42940c6991bc3c7484de77349fd510",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "zephyr-quarry-history",
+        "case_id": "zephyr-quarry-current-archive-retention-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100046,
+        "output_tokens": 447,
+        "wall_time_ms": 36551
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "60753da77c63b68d9d09a8f9adae9040983e648c4f35416acbdfa687fbd5cb1b",
+        "response_sha256": "7ef769ae13c3d54f0f0f9140f2302e363bbc3f7aa21abacd64eb8fb695aae56c",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    }
+  ]
+}

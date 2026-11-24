@@ -346,15 +346,21 @@ impl KnowledgeGraphStore {
         to_id: &str,
         content: Value,
     ) -> Result<Value, MemoryError> {
-        let (sql, vars) =
-            crate::knowledge::queries::build_relate_edge_query(edge_id, from_id, to_id, content);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value
-                .as_array()
-                .and_then(|rows| rows.first().cloned())
-                .unwrap_or(Value::Null)),
-            Err(err) => Err(err),
-        }
+        let (sql, vars) = crate::knowledge::queries::build_relate_edge_query(
+            edge_id,
+            from_id,
+            to_id,
+            content.clone(),
+        );
+        crate::knowledge::revisions::create_with_query(
+            &self.db,
+            edge_id,
+            content,
+            sql,
+            vars,
+            crate::knowledge::revisions::KnowledgeRevisionKind::Edge,
+        )
+        .await
     }
 }
 

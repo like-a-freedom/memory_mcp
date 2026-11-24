@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "Where was the Alder workshop booked?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-02T10:00:00Z",
+  "known_revision": 2,
+  "context_budget": 5,
+  "history_sha256": "4ccea5e0402d7a4ba8617268d3def9ef8dd8a2fd9e962a42d5b42480f09f5620",
+  "claim_rollout_stage": "shadow"
+}

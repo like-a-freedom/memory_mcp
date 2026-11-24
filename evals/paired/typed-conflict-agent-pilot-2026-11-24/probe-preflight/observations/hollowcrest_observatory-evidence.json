@@ -1,0 +1,21 @@
+{
+  "input_sha256": "e67caf6cf661d339faf12ea8ab17116c38c5b61d7a4a91748d629ab59e71811c",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "hollowcrest_observatory-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "hollowcrest_observatory-record-b",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

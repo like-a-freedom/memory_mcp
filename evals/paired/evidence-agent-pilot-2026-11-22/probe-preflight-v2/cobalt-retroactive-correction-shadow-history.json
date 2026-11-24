@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "cobalt-initial",
+    "source_id": "cobalt-terminal-ledger",
+    "source_type": "owner-record",
+    "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026",
+    "valid_at": "2026-06-03T09:00:00Z"
+  },
+  {
+    "event_id": "cobalt-correction",
+    "source_id": "cobalt-terminal-ledger",
+    "source_type": "owner-correction",
+    "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026",
+    "valid_at": "2026-06-03T09:00:00Z"
+  }
+]

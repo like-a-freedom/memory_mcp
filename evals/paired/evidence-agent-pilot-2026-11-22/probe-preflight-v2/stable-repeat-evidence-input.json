@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "Where was Marsh Lab located?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-20T00:00:00Z",
+  "known_revision": 2,
+  "context_budget": 5,
+  "history_sha256": "405c517251221062b8e2e1a14072d5ff4b6115e83e736f4c5bec4e2a6bfe6cb5",
+  "claim_rollout_stage": "evidence"
+}

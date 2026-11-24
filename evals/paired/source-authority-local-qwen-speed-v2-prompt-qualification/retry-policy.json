@@ -1,0 +1,6 @@
+{
+  "schema_version": "memory-mcp-chat-completions-retry-policy/v1",
+  "runner_attempts_per_arm_per_case": 1,
+  "runner_retries": 0,
+  "provider_internal_retries": "provider behavior is outside the adapter and must be recorded when known"
+}

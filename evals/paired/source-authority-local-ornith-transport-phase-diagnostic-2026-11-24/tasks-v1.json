@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "wrenfrost_archive",
+        "case_id": "wrenfrost_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Wrenfrost Archive, the atlas binder is stored in Cobalt-62. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Wrenfrost Archive, where is the atlas binder stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Wrenfrost Archive, where is the atlas binder stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-transport-phase-2026-11-24-wrenfrost_archive-atlas-binder",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-transport-phase-2026-11-24-wrenfrost_archive-atlas-binder"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-62"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "heatherquay_register",
+        "case_id": "heatherquay_register-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Heatherquay Register, the customs map is stored in Maple-19. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Heatherquay Register, where is the customs map stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Heatherquay Register, where is the customs map stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-transport-phase-2026-11-24-heatherquay_register-customs-map",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-transport-phase-2026-11-24-heatherquay_register-customs-map"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Maple-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cedarmist_terminal",
+        "case_id": "cedarmist_terminal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Cedarmist Terminal, the berth schedule is stored in Copper-74. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Cedarmist Terminal, where is the berth schedule stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cedarmist Terminal, where is the berth schedule stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-transport-phase-2026-11-24-cedarmist_terminal-berth-schedule",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-transport-phase-2026-11-24-cedarmist_terminal-berth-schedule"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Copper-74"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Cedarmist Terminal before this phase. Use assemble_context to verify: At Cedarmist Terminal, where is the berth schedule stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "cedarmist_terminal",
+          "relative_path": "fixtures/cedarmist_terminal.txt",
+          "content": "Fact: At Cedarmist Terminal, the berth schedule is stored in Copper-74.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-transport-phase-2026-11-24-cedarmist_terminal-berth-schedule"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "ambercross_locker",
+        "case_id": "ambercross_locker-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Ambercross Locker, the safety index is stored in Quartz-38. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Ambercross Locker, where is the safety index stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Ambercross Locker, where is the safety index stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-transport-phase-2026-11-24-ambercross_locker-safety-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-transport-phase-2026-11-24-ambercross_locker-safety-index"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-38"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Ambercross Locker before this phase. Use assemble_context to verify: At Ambercross Locker, where is the safety index stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "ambercross_locker",
+          "relative_path": "fixtures/ambercross_locker.txt",
+          "content": "Fact: At Ambercross Locker, the safety index is stored in Quartz-38.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-transport-phase-2026-11-24-ambercross_locker-safety-index"
+        }
+      ]
+    }
+  ]
+}

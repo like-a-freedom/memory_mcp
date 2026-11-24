@@ -173,6 +173,7 @@ fn log_secondary_cleanup_failure(owner: &str, error: &crate::error::MemoryError)
         serde_json::json!("http.background_cleanup_secondary_failure"),
     );
     event.insert("owner".to_string(), serde_json::json!(owner));
+    event.insert("error_code".to_string(), serde_json::json!(error.code()));
     event.insert("error".to_string(), serde_json::json!(error.to_string()));
     crate::logging::emit(event, error.log_level());
 }
@@ -749,8 +750,8 @@ mod tests {
     }
 
     /// `MEMORY_CLAIM_ROLLOUT_STAGE` was applied only by the stdio bootstrap,
-    /// so an HTTP deployment that set it still ran every tenant on the default
-    /// `shadow` stage — silently, with the variable having no effect.
+    /// so an HTTP deployment that set it silently ran every tenant on the
+    /// product default instead of honoring the configured stage.
     #[test]
     fn the_claim_rollout_stage_reaches_the_deployment_policy_from_the_environment() {
         let policy = deployment_policy_for_env(&[("MEMORY_CLAIM_ROLLOUT_STAGE", Some("evidence"))]);
@@ -758,7 +759,29 @@ mod tests {
         assert_eq!(
             policy.claim_config.rollout_stage,
             crate::config::claims::ClaimRolloutStage::Evidence,
-            "MEMORY_CLAIM_ROLLOUT_STAGE must reach the policy, not the default shadow"
+            "MEMORY_CLAIM_ROLLOUT_STAGE must reach the policy instead of being ignored"
+        );
+    }
+
+    #[test]
+    fn evidence_is_the_deployment_default_when_no_rollout_stage_is_configured() {
+        let policy = deployment_policy_for_env(&[("MEMORY_CLAIM_ROLLOUT_STAGE", None)]);
+
+        assert_eq!(
+            policy.claim_config.rollout_stage,
+            crate::config::claims::ClaimRolloutStage::Evidence,
+            "stdio and HTTP must use evidence when the rollout variable is absent"
+        );
+    }
+
+    #[test]
+    fn shadow_remains_an_explicit_claim_rollout_rollback() {
+        let policy = deployment_policy_for_env(&[("MEMORY_CLAIM_ROLLOUT_STAGE", Some("shadow"))]);
+
+        assert_eq!(
+            policy.claim_config.rollout_stage,
+            crate::config::claims::ClaimRolloutStage::Shadow,
+            "operators must retain the explicit shadow rollback"
         );
     }
 
@@ -987,7 +1010,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.background_cleanup_secondary_failure")
                     && line.contains("ERROR")
-                    && line.contains("disk is gone")
+                    && line.contains("error_code=storage")
+                    && line.contains("error=[redacted]")
             }),
             "a storage failure must stay an error: {recorded:?}"
         );
@@ -995,7 +1019,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.background_cleanup_secondary_failure")
                     && line.contains("WARN")
-                    && line.contains("unknown namespace")
+                    && line.contains("error_code=validation")
+                    && line.contains("error=[redacted]")
             }),
             "a client mistake must not read as a storage outage: {recorded:?}"
         );

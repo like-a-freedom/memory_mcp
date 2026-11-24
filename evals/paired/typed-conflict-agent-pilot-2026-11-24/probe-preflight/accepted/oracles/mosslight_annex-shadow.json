@@ -1,0 +1,42 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "mosslight_annex-record-a"
+      ]
+    ],
+    [
+      [
+        "mosslight_annex-record-b"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [],
+  "required_claim_annotation_alternatives": [
+    [
+      {
+        "source_event_id": "mosslight_annex-record-a",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "source_event_id": "mosslight_annex-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ]
+  ]
+}

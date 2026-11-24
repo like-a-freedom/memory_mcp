@@ -1,0 +1,44 @@
+{
+  "schema_version": "memory-mcp-rollout-preregistration/v1",
+  "status": "frozen-before-current-binary-regression-replay",
+  "frozen_at": "2026-11-22",
+  "product_binary_sha256": "f37d4d59e21d2d668e077f577b1de1c0ddd4c3fe119e74156c59149f003697aa",
+  "evaluator_binary_sha256": "347c170386117c89b43478d7c219423f3eaf20792ae444ec85944aafcb3a62ea",
+  "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+  "acceptance_plan_sha256": "e0ec60b0131c656dafe72890bf8586bc7dd631131d67136b8b0dabd8374b9095",
+  "cohort": {
+    "cases": 8,
+    "independent_families": 8,
+    "repetitions_per_arm": 2,
+    "storage": "fresh embedded store for every case and capture",
+    "relationship_to_v6": "disjoint event ids, source ids, subjects, values and one corrected valid-time boundary; same eight scenario templates",
+    "scope_limit": "finite deterministic replication; not a new task-family sample or population estimate"
+  },
+  "arms": {
+    "incumbent": "explicit MEMORY_CLAIM_ROLLOUT_STAGE=shadow",
+    "candidate": "product default with MEMORY_CLAIM_ROLLOUT_STAGE absent"
+  },
+  "acceptance": {
+    "score_channel": "primary public observation",
+    "same_product_revision_and_binary": true,
+    "same_corpus_and_input_schema": true,
+    "distinct_raw_captures_and_exact_repeat_semantics": true,
+    "minimum_equal_family_decision_gain_basis_points": 2500,
+    "evidence_success_nonregression_per_case": true,
+    "ordinary_decision_nonregression_per_case": true,
+    "new_candidate_safety_findings": 0,
+    "maximum_returned_items": 5,
+    "all_cases_valid_and_covered": true,
+    "shared_incumbent_safety_findings": "reported separately and not misclassified as a candidate regression"
+  },
+  "agent_or_provider_required": false,
+  "preflight_amendments": [
+    {
+      "date": "2026-11-22",
+      "status": "pre-capture regression correction",
+      "reason": "After v8, the full product suite exposed conversation-neighborhood regressions when the original mixed-case question was also used to build general episode-admission evidence. The original question is needed only for declared structured-subject comparison; general semantic admission must retain the preprocessed query.",
+      "action": "Restored the preprocessed query for ordinary episode admission, limited the strict original-query check to structured records with an explicit subject field, and confirmed all 35 conversation-neighborhood tests pass. The disjoint v9 cohort keeps the shared-head-noun absent-subject case and exact temporal boundary."
+    }
+  ],
+  "replay_of": "claim-stage-v9 frozen finite synthetic cohort; this run checks regression on a new binary and makes no new population claim"
+}

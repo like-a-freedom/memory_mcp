@@ -143,6 +143,14 @@ source range that produced a claim, while remaining outside deterministic
 claim identity. This lets metadata improve traceability without changing
 whether two claims are considered the same claim.
 
+Successful `extract` responses include each fact's stored statement and source
+quote by default. The complete evidence addition is capped at 4 KiB; if any
+pair is unavailable or the cap is exceeded, all pairs are omitted and
+`fact_evidence_omitted` explains why. Callers that require the compact shape
+can pass `include_fact_evidence: false`; the CLI equivalent is `--compact`.
+Evidence is returned to the requesting caller and is not included in logs or
+telemetry.
+
 ### Read path: context assembly
 
 The read path fuses several retrieval strategies, then applies policy,
@@ -471,6 +479,44 @@ cargo run --quiet --bin memory_mcp
 a `surrealkv://` or `rocksdb://` URL selects the store unless
 `SURREALDB_DATA_DIR` is set; the explicit variable takes precedence. With
 neither set, the server uses a user-owned data directory.
+
+### Literal MCP content and explicit operator imports
+
+The MCP `ingest.content` field and inline `extract.content`/`text` are literal
+memory text. A filesystem path, URL, or connection string passed there is
+remembered as text; the server does not open or fetch it. This intentionally
+replaces the former local convenience behavior so content cannot implicitly
+grant filesystem or network access. Configured filesystem ingestion remains
+available through the operator-owned `MEMORY_INGESTION_INBOX` watcher below.
+
+For an explicit one-file import, choose a root and pass a relative path beneath
+it. Parent traversal, absolute paths, symlink escapes, and files over 4 MiB are
+refused:
+
+```bash
+memory_mcp import file \
+  --root "$HOME/Documents" \
+  --path "project/architecture.md" \
+  --source-type doc \
+  --t-ref "2026-11-22T12:00:00Z"
+```
+
+For a public HTTP(S) document, use the explicit URL command. It refuses
+credentials and credential-like query parameters, private or loopback
+destinations, and redirects; request and response sizes and durations are
+bounded:
+
+```bash
+memory_mcp import url \
+  --url "https://example.com/architecture" \
+  --source-type web \
+  --t-ref "2026-11-22T12:00:00Z"
+```
+
+These commands run with the current process user's permissions and are not a
+separate OS identity boundary. They import one item per invocation; recursive
+directory import is not supported. Keep the same database environment used by
+`serve` when invoking them.
 
 ### Filesystem ingestion (optional, inside `serve`)
 
@@ -1373,7 +1419,7 @@ The following settings are optional for power users. They are read by the same e
 | `GLINER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; `0` is a startup error. Increase only after workload-specific benchmarking |
 | `GLINER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch; `0` is a startup error |
 | `GLINER_DEVICE` | string enum | `cpu` | Device for the native Candle GLiNER backends: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU (with an event) |
-| `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `shadow` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence` |
+| `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `evidence` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence`. Set `shadow` explicitly to withhold relation evidence from `assemble_context` as a rollback/control mode. |
 | `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation. A non-numeric value is a startup error |
 | `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Candidate limit for the inline write-path reconciliation the `add_fact` path runs, separately from the durable reconciler's `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE`; the durable job continues from the last candidate the inline pass considered. A non-numeric value is a startup error |
 | `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Wall-clock budget, in milliseconds, for the inline write-path reconciliation. Once it is spent the inline pass stops and the durable reconciler finishes the slot, so a slow store bounds `add_fact` latency instead of extending it. A non-numeric value is a startup error |
@@ -2196,7 +2242,7 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 `memory_mcp` emits structured logs at the standard levels:
 
 - `info`: lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and per-revision outcomes, and community rebuild passes
-- `debug`: feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled; also cache hits, per-stage success timings (`embedding.generate.done`, `ner.extract.done`), background embedding enqueue/success, per-batch backfill progress, no-work artifact-refresh outcomes, and the one-shot startup memory and glibc tunable markers
+- `debug`: feature-path decisions such as explicit operator import, view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled; also cache hits, per-stage success timings (`embedding.generate.done`, `ner.extract.done`), background embedding enqueue/success, per-batch backfill progress, no-work artifact-refresh outcomes, and the one-shot startup memory and glibc tunable markers
 - `trace`: fine-grained diagnostics such as cache misses and sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
 - `warn`: recoverable issues such as unknown `view_mode` fallback, `fs_watch.degraded`, and failures still being retried; a site holding a `MemoryError` logs the class the error maps to, so a client refusal (validation, not-found, auth, quota) logs `warn` while a storage or transient failure at the same site logs `error` — background worker passes and lifecycle jobs follow that rule too
 - `error`: terminal failures such as process-level startup/serve failures, failed background jobs and fact rewrites, and any failure whose error class maps to `error`
@@ -2499,11 +2545,13 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md): Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md): evaluation architecture and design
 - [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md): compact tool responses design
-- [`docs/adr/`](docs/adr/): Architecture Decision Records (79 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
+- [`docs/adr/`](docs/adr/): Architecture Decision Records (including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
 - [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md): scope/namespace compatibility contract
 - [`docs/operations/`](docs/operations/): operator runbooks, including the [local administrator runbook](docs/operations/LOCAL_ADMIN.md), protocol conformance, credential rotation, known limitations, and the SurrealDB restore drill
 - [`docs/performance/`](docs/performance/): memory profile and NER performance measurements
-- [`docs/evals/`](docs/evals/): evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
+- [Evaluation guide](docs/evals/README.md) and [memory quality results](docs/evals/DETERMINISTIC_MEMORY_QUALITY.md)
+- [Temporal context compatibility](docs/compatibility/TEMPORAL_CONTEXT.md)
+- [Agent memory follow-up design](docs/superpowers/specs/2026-11-24-agent-memory-follow-up-design.md)
 - [`hooks/README.md`](hooks/README.md): lifecycle hooks contract and editor-by-editor configuration
 
 ## Contributing
@@ -2529,6 +2577,7 @@ Every memory tool can be invoked directly from the command line. The CLI and the
 | `reembed` | Rebuild all fact embeddings after a provider switch. Flags: `--max-failures N`, `--retry-failed` |
 | `lifecycle` | Inspect or run lifecycle maintenance: `dashboard`, `archive-candidates`, `restore-archived`, `recompute-decay`, `rebuild-communities` |
 | `ingest` | Store raw source material as an episode |
+| `import` | Explicit operator import of one root-confined local file or one public HTTP(S) URL |
 | `extract` | Extract entities, facts, and relationships |
 | `resolve` | Resolve entity aliases to a canonical entity id |
 | `invalidate` | Invalidate a fact while preserving history |
@@ -2542,6 +2591,17 @@ storage, edit files, or change environment variables. `admin` is the other
 command that runs outside a service, and a default build does not have it. See
 [Remote deployment](#remote-deployment).
 
+The `ingest` command and all MCP `ingest`/inline `extract` content are literal
+text; a path or URL is never an instruction to read or fetch. Use `import file`
+or `import url` when an operator intentionally wants to import a source. File
+imports read one file per invocation, require an absolute `--root` and a
+relative `--path` confined to that root, and are limited to 4 MiB; they do not
+scan directories recursively. URL imports reject userinfo and credential-like
+query parameters before DNS, then allow only public HTTP(S) targets with no
+redirects/proxy and a 4 MiB response limit. The CLI is an explicit workflow,
+not an OS-level identity boundary: a process running as the same user can invoke
+it.
+
 ### Examples
 
 ```bash
@@ -2550,6 +2610,19 @@ memory_mcp ingest \
   --source-type email \
   --source-id msg-001 \
   --content "I will finish the API by Friday." \
+  --t-ref 2026-06-30T10:00:00Z
+
+# Explicitly import one document beneath an operator-selected directory
+memory_mcp import file \
+  --root /absolute/path/to/source \
+  --path docs/decision.md \
+  --source-type doc \
+  --t-ref 2026-06-30T10:00:00Z
+
+# Explicitly import a public web page; credential-bearing URLs are refused
+memory_mcp import url \
+  --url https://example.org/decision \
+  --source-type web \
   --t-ref 2026-06-30T10:00:00Z
 
 # Extract entities and facts

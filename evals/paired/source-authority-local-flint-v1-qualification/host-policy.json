@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-chat-completions-host-policy/v1",
+  "agent_shell": false,
+  "memory_transport": "local stdio MCP child with one isolated store per trial",
+  "model_endpoint": "plain HTTP numeric loopback only; TLS, DNS names, redirects and ambient proxies are disabled",
+  "tool_execution": "only preregistered public MCP tools exposed for the current phase",
+  "operator_import": "evaluator-owned bounded CLI invocation before candidate agent access",
+  "runner_retries": 0,
+  "credentials": "optional bearer token read from process environment; never written to artifacts or logs",
+  "trace_content": "hashes, normalized tool names, usage and closed error classes only",
+  "provider_boundary": "the adapter restricts its own network destination; the model service must be independently verified as local"
+}

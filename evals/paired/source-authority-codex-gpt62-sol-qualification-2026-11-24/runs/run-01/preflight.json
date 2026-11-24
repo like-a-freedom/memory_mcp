@@ -1,0 +1,13 @@
+{
+  "schema_version": "memory-mcp-agent-run-preflight/v1",
+  "status": "invalid_preflight_excluded",
+  "plan_id": "source-authority-codex-gpt62-sol-2026-11-24-qualification",
+  "attempt": "run-01",
+  "failure": "paired temporary root must be an existing absolute directory",
+  "agent_trials_started": 0,
+  "codex_agent_invocations": 0,
+  "model_tokens": 0,
+  "memory_tool_calls": 0,
+  "receipt_rows": 0,
+  "qualification_capture_consumed": false
+}

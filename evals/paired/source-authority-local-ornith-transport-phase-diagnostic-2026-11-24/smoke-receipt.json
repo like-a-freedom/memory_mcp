@@ -1,0 +1,15 @@
+{
+  "schema_version": "memory-mcp-local-tool-roundtrip-smoke/v1",
+  "verified_at_utc": "2026-11-23T23:52:51Z",
+  "test": "local_chat_completions_smoke_executes_a_public_memory_tool",
+  "model_alias": "memory-local-eval-ornith-v2",
+  "endpoint": "http://127.0.0.1:1234/v1",
+  "provider_http_status_code": 200,
+  "tool_call_contract": "pass",
+  "tool_call_count": 1,
+  "tool_argument_schema_valid": true,
+  "synthetic_expected_argument_match": true,
+  "synthetic_source_episode_id_match": true,
+  "elapsed_seconds": 1.97,
+  "raw_response_retained": false
+}

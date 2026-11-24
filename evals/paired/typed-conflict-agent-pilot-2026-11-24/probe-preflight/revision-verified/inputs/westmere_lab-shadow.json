@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What review time was recorded for Westmere Field Lab on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 7,
+  "context_budget": 1,
+  "history_sha256": "94e17ec0bc85309d63a6c66cfd4287f96f000bac62f18b5bcb05d6347c5c6aa5",
+  "claim_rollout_stage": "shadow"
+}

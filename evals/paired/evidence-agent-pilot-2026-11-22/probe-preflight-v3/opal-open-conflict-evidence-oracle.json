@@ -1,0 +1,13 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "opal-initial"
+      ],
+      [
+        "opal-peer"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

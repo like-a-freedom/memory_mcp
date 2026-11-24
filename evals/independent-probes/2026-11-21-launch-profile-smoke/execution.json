@@ -1,0 +1,60 @@
+[
+  {
+    "label": "stdio-first",
+    "exit_code": 0,
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "evidence_success": true,
+    "error": ""
+  },
+  {
+    "label": "stdio-second",
+    "exit_code": 0,
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "evidence_success": true,
+    "error": ""
+  },
+  {
+    "label": "streamable-http-first",
+    "exit_code": 0,
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_CONTROL_DB": "control",
+      "SURREALDB_CONTROL_NAMESPACE": "control",
+      "SURREALDB_TENANT_DB": "tenant",
+      "SURREALDB_TENANT_NAMESPACE": "tenant"
+    },
+    "evidence_success": true,
+    "error": ""
+  },
+  {
+    "label": "streamable-http-second",
+    "exit_code": 0,
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_CONTROL_DB": "control",
+      "SURREALDB_CONTROL_NAMESPACE": "control",
+      "SURREALDB_TENANT_DB": "tenant",
+      "SURREALDB_TENANT_NAMESPACE": "tenant"
+    },
+    "evidence_success": true,
+    "error": ""
+  }
+]

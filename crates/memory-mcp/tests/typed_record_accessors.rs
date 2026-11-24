@@ -103,8 +103,8 @@ async fn the_episode_accessor_reads_episodes_and_refuses_a_fact() {
         .await
         .expect_err("a fact id is not an episode");
     assert!(
-        matches!(&error, MemoryError::Validation(message) if message.contains("fact:abc")),
-        "the refusal must name the offending id, got {error:?}"
+        matches!(&error, MemoryError::Validation(message) if !message.contains("fact:abc") && message.contains("episode:<id>")),
+        "the refusal must hide the submitted id and name the expected table, got {error:?}"
     );
 }
 
@@ -125,8 +125,8 @@ async fn the_fact_accessor_reads_facts_and_refuses_an_edge() {
         .await
         .expect_err("an edge id is not a fact");
     assert!(
-        matches!(&error, MemoryError::Validation(message) if message.contains("edge:abc")),
-        "the refusal must name the offending id, got {error:?}"
+        matches!(&error, MemoryError::Validation(message) if !message.contains("edge:abc") && message.contains("fact:<id>")),
+        "the refusal must hide the submitted id and name the expected table, got {error:?}"
     );
 }
 
@@ -177,8 +177,8 @@ async fn a_cross_kind_id_is_refused_without_reaching_the_database() {
         .await
         .expect_err("a fact id is not an episode");
     assert!(
-        matches!(&error, MemoryError::Validation(message) if message.contains("fact:exists-in-another-table")),
-        "the refusal must name the offending id, got {error:?}"
+        matches!(&error, MemoryError::Validation(message) if !message.contains("fact:exists-in-another-table") && message.contains("episode:<id>")),
+        "the refusal must hide the submitted id and name the expected table, got {error:?}"
     );
     assert!(
         !db.was_reached(),

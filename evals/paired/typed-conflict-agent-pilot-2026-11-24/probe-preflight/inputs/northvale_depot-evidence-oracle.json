@@ -1,0 +1,42 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "northvale_depot-record-a"
+      ]
+    ],
+    [
+      [
+        "northvale_depot-record-b"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [],
+  "required_claim_annotation_alternatives": [
+    [
+      {
+        "source_event_id": "northvale_depot-record-a",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "source_event_id": "northvale_depot-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ]
+  ]
+}

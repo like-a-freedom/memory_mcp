@@ -1,0 +1,35 @@
+{
+  "schema_version": "memory-mcp-rollout-preregistration/v1",
+  "status": "frozen-before-v6-capture",
+  "frozen_at": "2026-11-22",
+  "product_binary_sha256": "1a689b910481e569f2f1229859f73baa36900e2765bb88e89b050c10726e7e73",
+  "evaluator_binary_sha256": "320121ab0f6932de33c77813e040c94e9c05c4c47a22c8ae88a2efd935f61352",
+  "corpus_sha256": "fbe0c34e1e0ed6cea86f6ecd3470b5ef514be10040c54cb31c5f2da04e478735",
+  "acceptance_plan_sha256": "40a6fb1b0f555e787e1beb8cea2d84bda8eb5205b340a42c71a283aa1eb42ee5",
+  "cohort": {
+    "cases": 8,
+    "independent_families": 8,
+    "repetitions_per_arm": 2,
+    "storage": "fresh embedded store for every case and capture",
+    "relationship_to_v5": "disjoint event ids, source ids, subjects, values and valid date; same eight scenario templates",
+    "scope_limit": "finite deterministic replication; not a new task-family sample or population estimate"
+  },
+  "arms": {
+    "incumbent": "explicit MEMORY_CLAIM_ROLLOUT_STAGE=shadow",
+    "candidate": "product default with MEMORY_CLAIM_ROLLOUT_STAGE absent"
+  },
+  "acceptance": {
+    "score_channel": "primary public observation",
+    "same_product_revision_and_binary": true,
+    "same_corpus_and_input_schema": true,
+    "distinct_raw_captures_and_exact_repeat_semantics": true,
+    "minimum_equal_family_decision_gain_basis_points": 2500,
+    "evidence_success_nonregression_per_case": true,
+    "ordinary_decision_nonregression_per_case": true,
+    "new_candidate_safety_findings": 0,
+    "maximum_returned_items": 5,
+    "all_cases_valid_and_covered": true,
+    "shared_incumbent_safety_findings": "reported separately and not misclassified as a candidate regression"
+  },
+  "agent_or_provider_required": false
+}

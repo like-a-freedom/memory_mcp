@@ -1,0 +1,19 @@
+{
+  "schema_version": "memory-mcp-local-chat-completions-fingerprints/v1",
+  "chat_completions_endpoint_config_sha256": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+  "corpus_sha256": "f959acc038d6dafc07936d0d506feb39ac27eb07a96eda4cdefd3cf9e24312aa",
+  "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+  "independent_family_count": 16,
+  "oracle_sha256": "0d41ed75cc37542986cc4088fd840963da487ee551d98be833a41800503842e1",
+  "protocol_config_sha256": "6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490",
+  "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+  "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+  "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+  "task_count": 16,
+  "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+  "memory_eval_cli_sha256": "75b58649a757efa72e2a0b122b6f76a9d864fc64938fe66dbce0c9fa3b585fce",
+  "memory_binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "memory_product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+  "memory_tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "lmstudio_cli_sha256": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d"
+}

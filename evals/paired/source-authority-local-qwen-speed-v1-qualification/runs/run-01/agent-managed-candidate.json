@@ -1,0 +1,242 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "69156-1795467146086499000-0",
+  "identity_sha256": "f223e23d4ae0a9569e76fffea1b72e7736f3b9817e09b5ac302f43417093825d",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "bramblegate_station",
+      "case_id": "bramblegate_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "cloudtallow_archive",
+      "case_id": "cloudtallow_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "copperwick_foundry",
+      "case_id": "copperwick_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "larkspur_icehouse",
+      "case_id": "larkspur_icehouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "bramblegate_station",
+        "case_id": "bramblegate_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 6106,
+        "output_tokens": 771,
+        "wall_time_ms": 62833
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "6a33cb28ba30352d6bb477020ab81e91f9a96101f5278ada8e141befa523b2dd",
+        "response_sha256": "bfe3702cd1a66dc5a6cb59957d497ec79d0379ebe56b9dc14bc18691ec05107c",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-bramblegate_station-station-routing-card"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2126,
+          "maximum_wire_bytes": 2126
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "cloudtallow_archive",
+        "case_id": "cloudtallow_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 6068,
+        "output_tokens": 605,
+        "wall_time_ms": 48177
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "7b88b1b44f047ff46520c4896fc0467043d9b9c918a9dca5bc08e40ce9986452",
+        "response_sha256": "1e494da4af096700e3155b4f90fff13d82b93674e4b6257026253b39218f0624",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-cloudtallow_archive-archive-catalog-ledger"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2188,
+          "maximum_wire_bytes": 2188
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "copperwick_foundry",
+        "case_id": "copperwick_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d8654a0bd508382ca771de32c309d29ced156dcd2492475902e7394a91ceb8fc",
+        "response_sha256": "83b55e4763b0eca5972e22d544193a89b3bf785669b23758f05e0d8815d527bf",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-copperwick_foundry-foundry-inspection-code"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "copperwick_foundry",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 504
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "larkspur_icehouse",
+        "case_id": "larkspur_icehouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "f068a5b510e8ef8a8eb4f377b628407891f7f79c8470069feaaa3caa5555aeb0",
+        "response_sha256": "b31c60c9e78ac546f799e3314f56edb58cdb11094f12c71a8bb8ddaa25002bb6",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-qwen-speed-larkspur_icehouse-icehouse-shipment-schedule"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "larkspur_icehouse",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 495
+        }
+      ]
+    }
+  ]
+}

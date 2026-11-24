@@ -371,6 +371,116 @@ pub fn resembles_secret(content: &str) -> bool {
         .any(|line| secret_markers.iter().any(|marker| line.contains(marker)))
 }
 
+/// Returns `true` for high-confidence credential material suitable for
+/// rejecting at the durable memory write boundary.
+///
+/// Unlike [`resembles_secret`], this deliberately does not reject ordinary
+/// discussion that merely mentions a token, password, or API key. It requires
+/// an assignment/header carrying a value, URL userinfo with a password, a
+/// private-key delimiter, or a well-known credential prefix.
+#[must_use]
+pub fn contains_credential_material(content: &str) -> bool {
+    let lower = content.to_ascii_lowercase();
+    if lower.contains("-----begin ") && lower.contains("private key-----") {
+        return true;
+    }
+
+    if ["ghp_", "github_pat_", "akia", "asia", "sk-"]
+        .iter()
+        .any(|prefix| has_prefixed_credential(&lower, prefix, 16))
+    {
+        return true;
+    }
+
+    content.lines().any(|line| {
+        has_password_userinfo(line) || has_bearer_value(line) || has_credential_assignment(line)
+    })
+}
+
+fn has_prefixed_credential(content: &str, prefix: &str, minimum_suffix: usize) -> bool {
+    content.match_indices(prefix).any(|(start, _)| {
+        let suffix = &content[start + prefix.len()..];
+        let token_len = suffix
+            .chars()
+            .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+            .count();
+        token_len >= minimum_suffix
+    })
+}
+
+fn has_password_userinfo(line: &str) -> bool {
+    let Some(scheme_end) = line.find("://") else {
+        return false;
+    };
+    let authority = line[scheme_end + 3..]
+        .split(['/', '?', '#', ' ', '\t', '\"', '\''])
+        .next()
+        .unwrap_or_default();
+    authority
+        .split_once('@')
+        .is_some_and(|(userinfo, _)| userinfo.contains(':'))
+}
+
+fn has_bearer_value(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    let Some((_, value)) = lower.split_once("bearer ") else {
+        return false;
+    };
+    let token = value
+        .trim()
+        .trim_matches(|character: char| !character.is_ascii_alphanumeric());
+    token.len() >= 8
+}
+
+fn has_credential_assignment(line: &str) -> bool {
+    let Some(separator) = line.find(['=', ':']) else {
+        return false;
+    };
+    let key = line[..separator]
+        .trim()
+        .trim_matches(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .to_ascii_lowercase();
+    let normalized_key = key
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .collect::<String>();
+    let credential_key = [
+        "apikey",
+        "password",
+        "passwd",
+        "secret",
+        "privatekey",
+        "accesstoken",
+        "authtoken",
+        "clientsecret",
+    ]
+    .iter()
+    .any(|marker| normalized_key == *marker || normalized_key.ends_with(marker));
+    if !credential_key {
+        return false;
+    }
+
+    let value = line[separator + 1..].trim().trim_matches(['\"', '\'', '`']);
+    if value.is_empty() {
+        return false;
+    }
+    let normalized_value = value.to_ascii_lowercase();
+    ![
+        "redacted",
+        "placeholder",
+        "change_me",
+        "change-me",
+        "your_",
+        "your-",
+        "example",
+        "<",
+        "***",
+        "xxxxx",
+    ]
+    .iter()
+    .any(|placeholder| normalized_value.contains(placeholder))
+}
+
 /// Returns `true` if the content resembles an external instruction injection.
 ///
 /// External self-promotion must be quarantined or ignored; it must never become
@@ -707,6 +817,34 @@ mod tests {
         assert!(resembles_secret("Bearer abc123"));
         assert!(resembles_secret("-----BEGIN PRIVATE KEY-----"));
         assert!(!resembles_secret("the weather is nice today"));
+    }
+
+    #[test]
+    fn credential_material_detects_assignment_values() {
+        assert!(contains_credential_material(
+            "API_KEY=sensitive-canary-credential-value"
+        ));
+    }
+
+    #[test]
+    fn credential_material_detects_url_passwords() {
+        assert!(contains_credential_material(
+            "https://operator:secret-value@example.org/private"
+        ));
+    }
+
+    #[test]
+    fn credential_material_detects_private_key_blocks() {
+        assert!(contains_credential_material(
+            "-----BEGIN PRIVATE KEY-----\nkey bytes\n-----END PRIVATE KEY-----"
+        ));
+    }
+
+    #[test]
+    fn credential_material_allows_security_discussion_and_examples() {
+        assert!(!contains_credential_material(
+            "OAuth access tokens expire after one hour; set API_KEY=your_key_here."
+        ));
     }
 
     #[test]

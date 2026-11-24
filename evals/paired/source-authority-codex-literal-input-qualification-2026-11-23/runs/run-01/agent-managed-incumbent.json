@@ -1,0 +1,190 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "5756-1795448755783563000-0",
+  "identity_sha256": "d38af08ba3b805a4c04f3e93fd71790d6525cf068445d44111df7eb53636dc6b",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "juniper_arc_foundry",
+      "case_id": "juniper_arc_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "pewter_wave_relay",
+      "case_id": "pewter_wave_relay-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "quartz_lark_annex",
+      "case_id": "quartz_lark_annex-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "vermilion_halcyon_station",
+      "case_id": "vermilion_halcyon_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "juniper_arc_foundry",
+        "case_id": "juniper_arc_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 294
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "fbd23316278afd84521b3488c4ad0bc79370e14ae5502a617bd13e426b97211b",
+        "response_sha256": "d7c79b5419c1cc133bfa28808bb3da1b8a8787ca33ca813777a133929d4c1a10",
+        "known_revision": 0,
+        "retained_store_bytes": 34177100,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "pewter_wave_relay",
+        "case_id": "pewter_wave_relay-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 304
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "73e8abb9ab1362465f635b9193c85b3baac321b4d067aaa5c9bb78616a472cc5",
+        "response_sha256": "2d048c9660c24430407f23c692adb32ea10f132ee5af1b5d3600cab3493c1a12",
+        "known_revision": 0,
+        "retained_store_bytes": 34177100,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "quartz_lark_annex",
+        "case_id": "quartz_lark_annex-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 771
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b9851097480cb5a5757f96a62f9089793f9979d9f5b905459c60734241167e8d",
+        "response_sha256": "394ecf713f20c562a2ccd69abfcb6516f8a0ea03a44d45d9647531b9544d112e",
+        "known_revision": 0,
+        "retained_store_bytes": 34177100,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "vermilion_halcyon_station",
+        "case_id": "vermilion_halcyon_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 2329
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "9bdcfd5d495b32ec671ce6e270ca567d40ce2fb368d911e9fd141f63cca219c1",
+        "response_sha256": "62ffdd83d44588e6796e1327a7e374ff0f95440db7e44a1ee7b0b87e051aed4c",
+        "known_revision": 0,
+        "retained_store_bytes": 34177100,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

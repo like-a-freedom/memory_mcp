@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {"id":"north-initial","source_id":"north-depot-owner","source_type":"owner-record","content":"subject: North Depot\ndimension: location\nvalue: North City, location of North Depot on May 1, 2026","t_ref":"2026-05-01T10:00:00Z"},
+    {"id":"north-correction","source_id":"north-depot-owner","source_type":"owner-correction","content":"subject: North Depot\ndimension: location\nvalue: South City, retroactive correction to North Depot location effective May 1, 2026","t_ref":"2026-05-01T10:00:00Z","correction_of":"north-initial"},
+    {"id":"north-update","source_id":"north-depot-owner","source_type":"owner-record","content":"subject: North Depot\ndimension: location\nvalue: South City, North Depot location effective May 9, 2026","t_ref":"2026-05-09T10:00:00Z"},
+    {"id":"north-peer","source_id":"independent-depot-report","source_type":"owner-record","content":"subject: North Depot\ndimension: location\nvalue: South City, reported North Depot location on May 1, 2026","t_ref":"2026-05-01T10:00:00Z"},
+    {"id":"north-resolution","source_id":"north-depot-owner","source_type":"owner-correction","content":"subject: North Depot\ndimension: location\nvalue: South City, explicit correction of prior North Depot location effective May 1, 2026","t_ref":"2026-05-01T10:00:00Z","correction_of":"north-initial"},
+    {"id":"south-depot","source_id":"south-depot-owner","source_type":"owner-record","content":"subject: South Depot\ndimension: location\nvalue: East City, South Depot location on May 1, 2026","t_ref":"2026-05-01T10:00:00Z"},
+    {"id":"stable-depot","source_id":"stable-depot-owner","source_type":"owner-record","content":"subject: Stable Depot\ndimension: location\nvalue: West City, Stable Depot location on May 1, 2026","t_ref":"2026-05-01T10:00:00Z"}
+  ]
+}

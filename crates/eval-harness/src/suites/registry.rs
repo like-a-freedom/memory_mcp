@@ -29,6 +29,9 @@ pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
         "claim-reconciliation" => {
             Box::new(ClassificationReducer::new("claim-reconciliation", "claim"))
         }
+        "memory-decisions" => Box::new(
+            crate::suites::memory_decisions::MemoryDecisionsReducer::new("memory-decisions"),
+        ),
         "end-to-end" => Box::new(RatioReducer::new("end-to-end", E2E_SPECS)),
         "external-retrieval" => Box::new(crate::reducer::RatioReducer::new(
             "external-retrieval",
@@ -60,6 +63,9 @@ pub fn build_suite(decl: &SuiteDecl) -> Result<Option<Box<dyn EvalSuite>>, EvalE
         ))),
         "claim-reconciliation" => Ok(Some(Box::new(
             crate::suites::claims::ClaimReconciliationSuite::new()?,
+        ))),
+        "memory-decisions" => Ok(Some(Box::new(
+            crate::suites::memory_decisions::MemoryDecisionsSuite::from_decl(decl)?,
         ))),
         "end-to-end" => Ok(Some(Box::new(
             crate::suites::end_to_end::EndToEndSuite::new(),
@@ -117,9 +123,17 @@ mod tests {
         SuiteDecl {
             id: id.into(),
             mode: None,
-            corpus_root: None,
+            corpus_root: (id == "memory-decisions").then(memory_decisions_corpus_root),
+            claim_rollout_stage: None,
             expected_coverage: None,
         }
+    }
+
+    fn memory_decisions_corpus_root() -> String {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../evals/corpora/memory-decisions-v1")
+            .display()
+            .to_string()
     }
 
     /// Every id a profile can declare builds a suite and has a registered
@@ -131,6 +145,7 @@ mod tests {
             "local-retrieval",
             "extraction",
             "claim-reconciliation",
+            "memory-decisions",
             "end-to-end",
             "action-grounding",
             "capacity",
@@ -153,6 +168,18 @@ mod tests {
         assert_eq!(
             reducer_for("retrieval-quality").suite_id().as_str(),
             "retrieval-quality"
+        );
+        let memory_decl = SuiteDecl {
+            id: "memory-decisions".into(),
+            mode: None,
+            corpus_root: Some(memory_decisions_corpus_root()),
+            claim_rollout_stage: None,
+            expected_coverage: Some(crate::profile::ExpectedCoverage { exact_cases: 10 }),
+        };
+        assert!(build_suite(&memory_decl).unwrap().is_some());
+        assert_eq!(
+            reducer_for("memory-decisions").suite_id().as_str(),
+            "memory-decisions"
         );
         // external-retrieval needs a prepared corpus root to build.
         assert!(build_suite(&decl("external-retrieval")).is_err());
@@ -183,6 +210,7 @@ mod tests {
             "local-retrieval",
             "extraction",
             "claim-reconciliation",
+            "memory-decisions",
             "end-to-end",
             "action-grounding",
             "capacity",
@@ -204,6 +232,22 @@ mod tests {
     fn equivalence_outcomes(suite_id: &str) -> Vec<crate::domain::EvalCaseOutcome> {
         use crate::domain::*;
         match suite_id {
+            "memory-decisions" => {
+                let mut outcome = crate::domain::EvalCaseOutcome::new(
+                    "memory-decisions",
+                    "m1",
+                    EvalMode::EndToEnd,
+                    CorpusSplit::Development,
+                    LabelTrust::Reviewed,
+                    CaseStatus::Passed,
+                );
+                for key in ["evidence_success", "decision_success", "probe_success"] {
+                    outcome
+                        .evidence
+                        .insert(key.into(), MetricEvidence::ratio(1, 1));
+                }
+                vec![outcome]
+            }
             "end-to-end" => vec![ratio_outcome("end-to-end", "e1", "context_match", 2, 3)],
             "lifecycle" => vec![
                 ratio_outcome("lifecycle", "l1", "action_grounding", 2, 3),

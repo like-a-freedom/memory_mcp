@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "birch-initial",
+    "source_id": "birch-pump-operator",
+    "source_type": "owner-record",
+    "content": "subject: Birch Pump\ndimension: pressure\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026",
+    "valid_at": "2026-06-10T08:00:00Z"
+  },
+  {
+    "event_id": "birch-update",
+    "source_id": "birch-pump-operator",
+    "source_type": "owner-record",
+    "content": "subject: Birch Pump\ndimension: pressure\nvalue: 35 psi for the Birch Pump pressure effective June 15, 2026",
+    "valid_at": "2026-06-15T08:00:00Z"
+  }
+]

@@ -287,8 +287,8 @@ impl ClaimService {
 
         // Run inline reconciliation for each newly projected claim so that
         // `extract` sees relations synchronously after `add_fact` returns.
-        // Shadow stage evaluates relations for telemetry but does not persist
-        // ClaimRelation rows; Relations+ persists and may expose.
+        // Shadow, Relations and Evidence all persist reconciliation decisions.
+        // Only Evidence exposes those rows through the read path.
         // Failures here are non-fatal: facts remain retrievable, and the
         // background worker will retry the durable reconcile_job.
         if self.config.rollout_stage.evaluates_relations() {

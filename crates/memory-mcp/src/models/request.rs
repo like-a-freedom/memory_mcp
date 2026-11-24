@@ -13,6 +13,8 @@ pub struct IngestRequest {
     pub source_id: String,
     pub content: String,
     pub t_ref: DateTime<Utc>,
+    /// Legacy compatibility input. The memory server ignores this value and
+    /// stamps transaction time when the episode is committed.
     pub t_ingested: Option<DateTime<Utc>>,
     #[serde(default)]
     pub policy_tags: Vec<String>,
@@ -178,6 +180,74 @@ pub struct AssembleContextRequest {
     pub compact: bool,
 }
 
+/// Independent temporal axes accepted by the public context read.
+///
+/// `as_of` remains a compatibility alias for setting both timestamps. The
+/// protocol adapter validates combinations before constructing this value.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TemporalContextQuery {
+    pub valid_at: Option<DateTime<Utc>>,
+    pub known_at: Option<DateTime<Utc>>,
+    pub known_revision: Option<i64>,
+}
+
+impl TemporalContextQuery {
+    #[must_use]
+    pub fn is_explicit(self) -> bool {
+        self.valid_at.is_some() || self.known_at.is_some() || self.known_revision.is_some()
+    }
+}
+
+/// A database snapshot boundary attached to a historical context response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ContextSnapshot {
+    pub valid_at: DateTime<Utc>,
+    pub known_at: DateTime<Utc>,
+    pub known_revision: i64,
+}
+
+/// How much of the configured memory selector surface contributed to a read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextCompleteness {
+    Complete,
+    Partial,
+    Unknown,
+}
+
+/// Context-level temporal metadata. `omitted_channels` names selectors that
+/// were bypassed because their historical state is not yet revisioned.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ContextAssemblyMetadata {
+    pub snapshot: ContextSnapshot,
+    pub completeness: ContextCompleteness,
+    pub candidate_scan_truncated: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub omitted_channels: Vec<String>,
+}
+
+/// One assembly result keeps context-level metadata available even when no
+/// fact matched the query.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ContextAssemblyResult {
+    pub items: Vec<AssembledContextItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ContextAssemblyMetadata>,
+}
+
+impl ContextAssemblyResult {
+    #[must_use]
+    pub fn current(items: Vec<AssembledContextItem>) -> Self {
+        Self {
+            items,
+            metadata: None,
+        }
+    }
+}
+
 /// A compact extracted entity returned by the MCP `extract` tool.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedEntity {
@@ -193,6 +263,10 @@ pub struct ExtractedFact {
     pub fact_id: String,
     #[serde(rename = "type")]
     pub fact_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statement: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_quote: Option<String>,
 }
 
 /// A relationship link produced during extraction.
@@ -202,7 +276,16 @@ pub struct ExtractedLink {
     pub episode_id: String,
 }
 
+/// Maximum evidence contribution to one serialized `extract` response.
+///
+/// The cap includes JSON escaping and conservative per-field overhead.
+pub const MAX_EXTRACT_FACT_EVIDENCE_WIRE_BYTES: usize = 4 * 1024;
+
 /// Structured result returned by the MCP `extract` tool.
+///
+/// Fact evidence is included by default only if its complete serialized
+/// addition stays within [`MAX_EXTRACT_FACT_EVIDENCE_WIRE_BYTES`]. Callers can
+/// request a compact response through the `extract` input flag.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ExtractResult {
@@ -212,6 +295,10 @@ pub struct ExtractResult {
     pub links: Vec<ExtractedLink>,
     #[serde(default)]
     pub warnings: Vec<ContradictionWarning>,
+    /// Present when fact evidence is enabled. True means evidence for at least
+    /// one fact was unavailable or omitted to enforce the response cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fact_evidence_omitted: Option<bool>,
     /// Optional reconciliation metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciliation: Option<ReconciliationSummary>,
@@ -260,6 +347,20 @@ pub enum ReconciliationStatus {
     Failed,
     #[default]
     Unsupported,
+}
+
+/// Role of a fact relative to an exact historical knowledge snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SnapshotEvidenceStatus {
+    /// No visible relation changes this fact's role at the requested snapshot.
+    Current,
+    /// A visible directed relation names this fact as the predecessor.
+    Historical,
+    /// The fact participates in an unresolved contradiction at the snapshot.
+    Conflicting,
+    /// Evidence is unavailable, incomplete, or temporally ambiguous.
+    Unknown,
 }
 
 /// Reconciliation metadata for a single context item.
@@ -347,15 +448,18 @@ pub struct AssembledContextItem {
     pub rationale: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval_tier: Option<String>,
-    /// Claim relations of the source fact. Omitted under compact=true, like
-    /// `quote`, so the frozen compact budget does not grow a relation vector,
-    /// and omitted when there are none, so verbose output does not carry
-    /// `null` where every sibling `Option` omits the key.
+    /// Claim relations of the source fact. Compact responses retain a small
+    /// typed role summary; verbose responses retain the full reconciliation
+    /// evidence. Omitted when there are no relations.
     #[serde(
         default,
-        skip_serializing_if = "crate::tools::compact::skip_if_none_or_compact"
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::tools::compact::serialize_reconciliation"
     )]
     pub reconciliation: Option<ClaimReconciliationMetadata>,
+    /// Role of this item relative to an explicitly requested knowledge snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_status: Option<SnapshotEvidenceStatus>,
     /// Why this fact passed retrieval admission. Omitted in compact mode to
     /// preserve the response-size contract.
     #[serde(

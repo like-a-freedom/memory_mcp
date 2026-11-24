@@ -1,0 +1,36 @@
+{
+  "schema_version": "memory-mcp-agent-managed-maintenance-protocol/v2",
+  "transport": "stdio",
+  "maintenance": {
+    "enabled_tools": [
+      "assemble_context",
+      "ingest",
+      "extract",
+      "invalidate"
+    ],
+    "fresh_agent_session": true,
+    "max_ingest_calls": 1,
+    "max_extract_calls": 1,
+    "max_invalidation_calls": 1,
+    "correction_before_invalidation": true,
+    "wall_time_budget_seconds": 120
+  },
+  "recall": {
+    "enabled_tools": [
+      "assemble_context"
+    ],
+    "fresh_agent_session": true,
+    "same_trial_store": true,
+    "wall_time_budget_seconds": 120
+  },
+  "independent_probe": {
+    "enabled_tools": [
+      "assemble_context"
+    ],
+    "runs_after_recall": true,
+    "agent_session": false,
+    "same_trial_store": true
+  },
+  "tool_timeout_seconds": 120,
+  "context_output_token_limit": 2048
+}

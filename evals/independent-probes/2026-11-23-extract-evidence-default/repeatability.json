@@ -1,0 +1,47 @@
+{
+  "schema_version": "memory-mcp-response-default-repeatability/v1",
+  "purpose": "narrow fixed-query retrieval no-regression check; not an agent-utility or stored-memory-quality acceptance study",
+  "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+  "normalized_result_sha256": "ce075fc5ca05494a0a0757ffe130f3ea62688185e0647b1678a3f3baf262bd1d",
+  "expected_normalized_result_sha256_equal_across_all_captures": true,
+  "captures": {
+    "baseline_a": {
+      "product_sha256": "b69ff50678a05683e807dbadec0b9f829d8db492eed68b3a2527b4b081d684f5",
+      "tool_schema_sha256": "f90fc7e2c541e1243792f0ba12c4462e72bb1e1d0a5a57b2dfb31b6d1fa0c0d2",
+      "completed": true,
+      "source_event_ids": ["source-a"],
+      "budget_used": 1,
+      "normalized_result_sha256": "ce075fc5ca05494a0a0757ffe130f3ea62688185e0647b1678a3f3baf262bd1d"
+    },
+    "baseline_b": {
+      "product_sha256": "b69ff50678a05683e807dbadec0b9f829d8db492eed68b3a2527b4b081d684f5",
+      "tool_schema_sha256": "f90fc7e2c541e1243792f0ba12c4462e72bb1e1d0a5a57b2dfb31b6d1fa0c0d2",
+      "completed": true,
+      "source_event_ids": ["source-a"],
+      "budget_used": 1,
+      "normalized_result_sha256": "ce075fc5ca05494a0a0757ffe130f3ea62688185e0647b1678a3f3baf262bd1d"
+    },
+    "candidate_a": {
+      "product_sha256": "0c465a019c824602e1adc02c37b97f93ff3a6a5b98226d3007b7c3d93c990f25",
+      "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+      "completed": true,
+      "source_event_ids": ["source-a"],
+      "budget_used": 1,
+      "normalized_result_sha256": "ce075fc5ca05494a0a0757ffe130f3ea62688185e0647b1678a3f3baf262bd1d"
+    },
+    "candidate_b": {
+      "product_sha256": "0c465a019c824602e1adc02c37b97f93ff3a6a5b98226d3007b7c3d93c990f25",
+      "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+      "completed": true,
+      "source_event_ids": ["source-a"],
+      "budget_used": 1,
+      "normalized_result_sha256": "ce075fc5ca05494a0a0757ffe130f3ea62688185e0647b1678a3f3baf262bd1d"
+    }
+  },
+  "limitations": [
+    "one fixed history, query, and runtime profile",
+    "retrieval-only check; it does not test extract response fields",
+    "does not establish agent task success or broad caller compatibility",
+    "response default does not change persisted memory or retrieval ranking"
+  ]
+}

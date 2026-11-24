@@ -1,5 +1,12 @@
 # Memory quality as the product result — critical review and landing plan
 
+> **Historical rollout note (2026-11-21):** The rollout-stage descriptions in
+> this review refer to the configuration at its 2026-10-05 baseline. The
+> current product default is `evidence` after a later finite deterministic
+> public-MCP comparison; see
+> [the current rollout record](../../../evals/paired/claim-rollout-current-master-2026-11-21/README.md).
+> Downstream agent outcome and population-level claims remain unproven.
+
 **Date:** 2026-10-05
 **Status:** Partially implemented — Phase-0 shipped: `view_mode` and `superseded_by_fact_id` request fields plus ADR-0074/0075/0076; the remaining capability areas are not implemented
 **Baseline:** `f0618fb` (`v1.26.1`)

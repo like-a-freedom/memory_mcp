@@ -36,7 +36,10 @@ async fn resolve_inner<T: ToolContext>(
     let timer = Instant::now();
     ctx.record(ToolEvent {
         op: "resolve.start",
-        args: json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
+        args: json!({
+            "canonical_name_chars": candidate.canonical_name.chars().count(),
+            "alias_count": candidate.aliases.len()
+        }),
         result: json!({}),
         level: LogLevel::Info,
         duration: None,
@@ -62,7 +65,7 @@ async fn resolve_inner<T: ToolContext>(
             ctx.record(ToolEvent {
                 op: "resolve.error",
                 args: json!({}),
-                result: json!({"error": err.to_string()}),
+                result: json!({"error_code": err.code()}),
                 level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });

@@ -2,18 +2,27 @@
 
 mod common;
 
-use memory_mcp::models::{ExtractResult, IngestRequest};
+use memory_mcp::models::{AssembleContextRequest, ExtractResult, IngestRequest};
 use memory_mcp::service::MemoryService;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::storage::DbClient;
 
 async fn extract(service: &MemoryService, content: &str) -> ExtractResult {
+    extract_with_source_type(service, "conversation", content).await
+}
+
+async fn extract_with_source_type(
+    service: &MemoryService,
+    source_type: &str,
+    content: &str,
+) -> ExtractResult {
     let id = IngestCapability::ingest_from_service(
         service,
         IngestRequest {
             source_context: None,
-            source_type: "conversation".into(),
+            source_type: source_type.into(),
             source_id: "quality-corpus".into(),
             content: content.into(),
             t_ref: chrono::Utc::now(),
@@ -27,6 +36,85 @@ async fn extract(service: &MemoryService, content: &str) -> ExtractResult {
     ExtractCapability::extract_from_service(service, &id, None, None)
         .await
         .expect("extract")
+}
+
+async fn assert_literal_reference_is_recallable(reference: &str) {
+    let tm = common::TestMemory::new(false).await;
+    let extracted = extract_with_source_type(&tm.service, "agent_note", reference).await;
+    assert_eq!(
+        extracted.facts.len(),
+        1,
+        "a standalone literal reference should become one recallable note"
+    );
+    assert!(
+        extracted.entities.is_empty(),
+        "a standalone reference is a value, not an entity: {:?}",
+        extracted.entities
+    );
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &tm.service,
+        AssembleContextRequest {
+            query: format!("Which exact source reference did I give you to remember? {reference}"),
+            as_of: None,
+            budget: 5,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("assemble context");
+
+    assert!(
+        items.iter().any(|item| item.content == reference),
+        "ordinary context assembly should return the exact stored literal: {items:?}; extraction={extracted:?}"
+    );
+}
+
+#[tokio::test]
+async fn standalone_file_reference_is_recallable_without_importing_it() {
+    assert_literal_reference_is_recallable(
+        "evals/corpora/memory-decisions-source-authority-v1/source-content.txt",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn standalone_url_reference_is_recallable_without_fetching_it() {
+    assert_literal_reference_is_recallable("http://127.0.0.1:9/agent-reference").await;
+}
+
+#[tokio::test]
+async fn literal_url_alone_does_not_answer_a_topical_decision_question() {
+    let tm = common::TestMemory::new(false).await;
+    let reference = "http://127.0.0.1:9/agent-reference";
+    extract_with_source_type(&tm.service, "agent_note", reference).await;
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &tm.service,
+        AssembleContextRequest {
+            query: format!("What decision did I make about this URL? {reference}"),
+            as_of: None,
+            budget: 5,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("assemble context");
+
+    assert!(
+        items.is_empty(),
+        "an exact URL is not evidence for a decision about its target: {items:?}"
+    );
 }
 
 #[tokio::test]

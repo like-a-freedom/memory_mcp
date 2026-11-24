@@ -1,0 +1,605 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "coppermeadow_library",
+        "case_id": "coppermeadow_library-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Coppermeadow Library, the violet folio is kept in Morrow-41. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Coppermeadow Library, where is the violet folio kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Coppermeadow Library, where is the violet folio kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-coppermeadow_library",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-coppermeadow_library"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Morrow-41"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "rainbell_turbinehall",
+        "case_id": "rainbell_turbinehall-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Rainbell Turbine Hall, the spare relay key is kept in Tern-58. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Rainbell Turbine Hall, where is the spare relay key kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Rainbell Turbine Hall, where is the spare relay key kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-rainbell_turbinehall",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-rainbell_turbinehall"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Tern-58"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "silverfern_courthouse",
+        "case_id": "silverfern_courthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Silverfern Courthouse, the blue docket sleeve is kept in Plover-63. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Silverfern Courthouse, where is the blue docket sleeve kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Silverfern Courthouse, where is the blue docket sleeve kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-silverfern_courthouse",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-silverfern_courthouse"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Plover-63"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "cloudberry_foundry",
+        "case_id": "cloudberry_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Cloudberry Foundry, the copper gauge card is kept in Willow-29. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Cloudberry Foundry, where is the copper gauge card kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cloudberry Foundry, where is the copper gauge card kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-cloudberry_foundry",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-cloudberry_foundry"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Willow-29"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "northquartz_clinic",
+        "case_id": "northquartz_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Northquartz Clinic, the after-hours register is kept in Alder-84. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Northquartz Clinic, where is the after-hours register kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Northquartz Clinic, where is the after-hours register kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-northquartz_clinic",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-northquartz_clinic"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Alder-84"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "embercove_lighthouse",
+        "case_id": "embercove_lighthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Embercove Lighthouse, the fog bell diagram is kept in Citrine-17. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Embercove Lighthouse, where is the fog bell diagram kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Embercove Lighthouse, where is the fog bell diagram kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-embercove_lighthouse",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-embercove_lighthouse"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Citrine-17"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mossriver_bikeworks",
+        "case_id": "mossriver_bikeworks-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Mossriver Bike Works, the wheel tension chart is kept in Harbor-52. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Mossriver Bike Works, where is the wheel tension chart kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Mossriver Bike Works, where is the wheel tension chart kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-mossriver_bikeworks",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-mossriver_bikeworks"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Harbor-52"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "winterlark_canteen",
+        "case_id": "winterlark_canteen-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Winterlark Canteen, the tea allotment ledger is kept in Pebble-96. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Winterlark Canteen, where is the tea allotment ledger kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Winterlark Canteen, where is the tea allotment ledger kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-winterlark_canteen",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-winterlark_canteen"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Pebble-96"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opalcurrent_archive",
+        "case_id": "opalcurrent_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Opalcurrent Archive for a later session. It is in the source file fixtures/opalcurrent_archive.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Opalcurrent Archive, where is the restoration permit kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Opalcurrent Archive, where is the restoration permit kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-opalcurrent_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-opalcurrent_archive"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lumen-34"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Opalcurrent Archive before this phase. Use assemble_context to verify the memory fact: At Opalcurrent Archive, where is the restoration permit kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "opalcurrent_archive",
+          "relative_path": "fixtures/opalcurrent_archive.txt",
+          "content": "Fact: At Opalcurrent Archive, the restoration permit is kept in Lumen-34.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-opalcurrent_archive"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "foxglove_surveydepot",
+        "case_id": "foxglove_surveydepot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Foxglove Survey Depot for a later session. It is in the source file fixtures/foxglove_surveydepot.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Foxglove Survey Depot, where is the east-bank depth sheet kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Foxglove Survey Depot, where is the east-bank depth sheet kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-foxglove_surveydepot",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-foxglove_surveydepot"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Marble-68"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Foxglove Survey Depot before this phase. Use assemble_context to verify the memory fact: At Foxglove Survey Depot, where is the east-bank depth sheet kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "foxglove_surveydepot",
+          "relative_path": "fixtures/foxglove_surveydepot.txt",
+          "content": "Fact: At Foxglove Survey Depot, the east-bank depth sheet is kept in Marble-68.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-foxglove_surveydepot"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brightsilt_seedvault",
+        "case_id": "brightsilt_seedvault-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Brightsilt Seed Vault for a later session. It is in the source file fixtures/brightsilt_seedvault.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Brightsilt Seed Vault, where is the rye viability log kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Brightsilt Seed Vault, where is the rye viability log kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-brightsilt_seedvault",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-brightsilt_seedvault"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Junebug-22"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Brightsilt Seed Vault before this phase. Use assemble_context to verify the memory fact: At Brightsilt Seed Vault, where is the rye viability log kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "brightsilt_seedvault",
+          "relative_path": "fixtures/brightsilt_seedvault.txt",
+          "content": "Fact: At Brightsilt Seed Vault, the rye viability log is kept in Junebug-22.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-brightsilt_seedvault"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "gullwing_signalhouse",
+        "case_id": "gullwing_signalhouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Gullwing Signal House for a later session. It is in the source file fixtures/gullwing_signalhouse.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Gullwing Signal House, where is the backup beacon token kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Gullwing Signal House, where is the backup beacon token kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-gullwing_signalhouse",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-gullwing_signalhouse"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Fable-79"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Gullwing Signal House before this phase. Use assemble_context to verify the memory fact: At Gullwing Signal House, where is the backup beacon token kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "gullwing_signalhouse",
+          "relative_path": "fixtures/gullwing_signalhouse.txt",
+          "content": "Fact: At Gullwing Signal House, the backup beacon token is kept in Fable-79.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-gullwing_signalhouse"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cedarwake_weatherroom",
+        "case_id": "cedarwake_weatherroom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Cedarwake Weather Room for a later session. It is in the source file fixtures/cedarwake_weatherroom.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Cedarwake Weather Room, where is the rain gauge notebook kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cedarwake Weather Room, where is the rain gauge notebook kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-cedarwake_weatherroom",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-cedarwake_weatherroom"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-45"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Cedarwake Weather Room before this phase. Use assemble_context to verify the memory fact: At Cedarwake Weather Room, where is the rain gauge notebook kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "cedarwake_weatherroom",
+          "relative_path": "fixtures/cedarwake_weatherroom.txt",
+          "content": "Fact: At Cedarwake Weather Room, the rain gauge notebook is kept in Quartz-45.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-cedarwake_weatherroom"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "blueheron_cameralab",
+        "case_id": "blueheron_cameralab-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Blueheron Camera Lab for a later session. It is in the source file fixtures/blueheron_cameralab.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Blueheron Camera Lab, where is the lens calibration card kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Blueheron Camera Lab, where is the lens calibration card kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-blueheron_cameralab",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-blueheron_cameralab"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Nectar-83"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Blueheron Camera Lab before this phase. Use assemble_context to verify the memory fact: At Blueheron Camera Lab, where is the lens calibration card kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "blueheron_cameralab",
+          "relative_path": "fixtures/blueheron_cameralab.txt",
+          "content": "Fact: At Blueheron Camera Lab, the lens calibration card is kept in Nectar-83.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-blueheron_cameralab"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "sunmote_waterstation",
+        "case_id": "sunmote_waterstation-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Sunmote Water Station for a later session. It is in the source file fixtures/sunmote_waterstation.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Sunmote Water Station, where is the chlorine sample index kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Sunmote Water Station, where is the chlorine sample index kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-sunmote_waterstation",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-sunmote_waterstation"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-31"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Sunmote Water Station before this phase. Use assemble_context to verify the memory fact: At Sunmote Water Station, where is the chlorine sample index kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "sunmote_waterstation",
+          "relative_path": "fixtures/sunmote_waterstation.txt",
+          "content": "Fact: At Sunmote Water Station, the chlorine sample index is kept in Cobalt-31.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-sunmote_waterstation"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "thistleforge_maproom",
+        "case_id": "thistleforge_maproom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Thistleforge Map Room for a later session. It is in the source file fixtures/thistleforge_maproom.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Thistleforge Map Room, where is the ridge contour plate kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Thistleforge Map Room, where is the ridge contour plate kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v2-thistleforge_maproom",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v2-thistleforge_maproom"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lantern-57"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Thistleforge Map Room before this phase. Use assemble_context to verify the memory fact: At Thistleforge Map Room, where is the ridge contour plate kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "thistleforge_maproom",
+          "relative_path": "fixtures/thistleforge_maproom.txt",
+          "content": "Fact: At Thistleforge Map Room, the ridge contour plate is kept in Lantern-57.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v2-thistleforge_maproom"
+        }
+      ]
+    }
+  ]
+}

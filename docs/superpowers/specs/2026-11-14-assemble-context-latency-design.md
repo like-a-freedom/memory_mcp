@@ -2,6 +2,12 @@
 
 Status (November 16, 2026): the user approved a descriptive baseline and a second KISS/YAGNI simplification pass. Section B is the current v4 protocol. Calibration, confidence intervals, new-connection timing, and host/Engine monitoring are retired. Historical v1–v3 results remain INVALID under their original protocols; they are not reclassified. Raw experiment reports and diagnostics were removed during merge preparation; recorded summaries and SHA-256 identifiers remain in the runbook, but missing raw files cannot be independently rechecked. No new production deployment, retrieval request, or mutation is part of this work.
 
+## Completion and conditional follow-up — 2026-11-24
+
+The triple-projection correction and descriptive v4 baseline are complete. The [runbook](../../performance/ASSEMBLE_CONTEXT_LATENCY.md) owns the results and limitations. The measured `docker-default` mode completed. The 512 MiB mode was OOM-killed and remains unavailable. Raw experiment reports were removed during historical merge preparation, leaving narrative summaries and digest identifiers.
+
+The optional production guard was rejected because positive-case nonregression remained inconclusive. Stage instrumentation was also declined because no recurring application-level latency observation justified it. A future guard proposal must first reproduce a material cost on the current SDK/server, prove the positive/negative temporal contract, retain raw paired samples, and satisfy Section C. Stage metrics require a concrete recurring application-level question and the fixed-name/privacy rules of Section D. The historical Rust 1.99.0 / SurrealDB 3.3.5 experiment below does not establish performance for the current 4.0.1 SDK.
+
 ## Goal and scope
 
 Fix the confirmed positive triple-retrieval defect, measure the corrected unguarded query, and consider an empty-path guard only when the corrected baseline shows a material cost and the guard passes the compatibility checks below. Add stage metrics only when application-level measurements leave a recurring latency question that those metrics can answer.

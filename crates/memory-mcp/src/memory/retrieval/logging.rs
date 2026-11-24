@@ -142,7 +142,7 @@ pub(crate) async fn maybe_record_query_log(
                 "assemble_context.query_log_skipped",
                 json!({
                     "namespace": service.active_namespace,
-                    "query": request.query,
+                    "query_chars": request.query.chars().count(),
                     "cache_hit": cache_hit,
                 }),
                 json!({"reason": "disabled"}),
@@ -171,7 +171,7 @@ pub(crate) async fn maybe_record_query_log(
                     "assemble_context.query_log_recorded",
                     json!({
                         "namespace": service.active_namespace,
-                        "query": request.query,
+                        "query_chars": request.query.chars().count(),
                         "cache_hit": cache_hit,
                     }),
                     json!({
@@ -214,7 +214,7 @@ pub(crate) async fn maybe_record_query_log(
                                 "namespace": service.active_namespace,
                                 "retention_days": service.query_log_retention_days(),
                             }),
-                            json!({"error": err.to_string()}),
+                            json!({"error_code": err.code()}),
                             Some(access),
                             None,
                             None,
@@ -230,10 +230,10 @@ pub(crate) async fn maybe_record_query_log(
                     "assemble_context.query_log_error",
                     json!({
                         "namespace": service.active_namespace,
-                        "query": request.query,
+                        "query_chars": request.query.chars().count(),
                         "cache_hit": cache_hit,
                     }),
-                    json!({"error": err.to_string()}),
+                    json!({"error_code": err.code()}),
                     Some(access),
                     None,
                     None,
@@ -273,6 +273,7 @@ mod tests {
             rationale: rationale.into(),
             retrieval_tier: retrieval_tier.map(str::to_string),
             reconciliation: None,
+            evidence_status: None,
             retrieval_evidence: None,
         }
     }

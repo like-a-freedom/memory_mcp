@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-agent-managed-attempt-status/v1",
+  "status": "preflight_rejected_before_agent_invocation",
+  "failure": "paired temporary root must be an existing absolute directory",
+  "cause": "The requested temp root did not exist. The runner created empty incumbent-receipts.jsonl and candidate-receipts.jsonl files under the fresh output directory before rejecting the temp-root configuration; no Codex process or memory operation started. The empty output is preserved as run-01.",
+  "model_turns": 0,
+  "tool_calls": 0,
+  "writes": 0,
+  "counted_as_trial": false
+}

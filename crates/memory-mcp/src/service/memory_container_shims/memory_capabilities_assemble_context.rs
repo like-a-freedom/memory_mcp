@@ -25,4 +25,14 @@ impl AssembleContextCapability {
         let deps = AssembleContextDeps::from(service);
         crate::memory::retrieval::assemble_context(&deps, request).await
     }
+
+    /// Runs the bounded historical read through the same owner dependencies.
+    pub async fn assemble_context_temporal_from_service(
+        service: &crate::service::MemoryService,
+        request: AssembleContextRequest,
+        temporal: crate::models::TemporalContextQuery,
+    ) -> Result<crate::models::ContextAssemblyResult, MemoryError> {
+        let deps = AssembleContextDeps::from(service);
+        crate::memory::retrieval::assemble_context_temporal(&deps, request, temporal).await
+    }
 }

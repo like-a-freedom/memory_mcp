@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "absent-subject",
+      "family_id": "absent-subject-history",
+      "event_ids": [
+        "absent-entry"
+      ],
+      "query": "What capacity was recorded for Opal Hangar?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "similar-name",
+      "family_id": "similar-name-history",
+      "event_ids": [
+        "west-entry",
+        "east-entry"
+      ],
+      "query": "What capacity was recorded for Juniper Terminal East?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "single-current",
+      "family_id": "single-current-history",
+      "event_ids": [
+        "sole-entry"
+      ],
+      "query": "What capacity was recorded for Mossline Plant?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "peer-conflict",
+      "family_id": "peer-conflict-history",
+      "event_ids": [
+        "dispute-b",
+        "dispute-a"
+      ],
+      "query": "What capacity was recorded for Cedar Annex?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "unverified-correction",
+      "family_id": "unverified-correction-history",
+      "event_ids": [
+        "supported-entry",
+        "forum-entry"
+      ],
+      "query": "What capacity was recorded for Thistle Port?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "prior-knowledge",
+      "family_id": "prior-knowledge-history",
+      "event_ids": [
+        "pre-report",
+        "post-report"
+      ],
+      "query": "Before the later report, what capacity was recorded for Amber Quay?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "knowledge_before_event_id": "post-report",
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "valid-boundary",
+      "family_id": "valid-boundary-history",
+      "event_ids": [
+        "earlier-valid",
+        "later-valid"
+      ],
+      "query": "What capacity was recorded for Copper Wharf on August 1, 2026?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "office-entry",
+      "family_id": "ordinary-location-history",
+      "event_ids": [
+        "office-entry"
+      ],
+      "query": "Where was Mossline Office located?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "repeat_read": 2
+    }
+  ]
+}

@@ -63,7 +63,7 @@ impl std::ops::Deref for TenantAndProvisioning {
 /// constant via the release process; the runner copies the
 /// value out at compile time so the test path can compare
 /// against it without an env var.
-pub const CURRENT_SCHEMA_VERSION: u32 = 45;
+pub const CURRENT_SCHEMA_VERSION: u32 = 46;
 
 /// Inclusive range of schema versions this replica can
 /// serve. The lower bound is `CURRENT_SCHEMA_VERSION - 1`

@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "remote-drum",
+    "source_id": "remote-drum-maintenance",
+    "source_type": "maintenance-record",
+    "content": "subject: Remote Drum\ndimension: fill_level\nvalue: 70 percent for the Remote Drum fill level on June 6, 2026",
+    "valid_at": "2026-06-06T06:00:00Z"
+  }
+]

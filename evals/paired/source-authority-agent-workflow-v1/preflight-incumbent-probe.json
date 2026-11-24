@@ -1,0 +1,49 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {},
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "e45eaa8c527e726ac635ee2e4d525e1cedf43571e0923761a7a9fdd13e92f5bf",
+    "product_sha256": "4cc1c87ba52553db06fcbe2115b944f9e6a1320157439d2fbe3779baea7d189b",
+    "source_event_ids": [],
+    "budget_used": 0,
+    "completed": true
+  },
+  "request": {
+    "as_of": "2026-11-23T00:00:00+00:00",
+    "budget": 1024,
+    "compact": true,
+    "query": "What is stored in memory?"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"guidance\":\"No sufficient matching context was found. Refine the query or verify primary sources.\",\"result\":[],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "result": [],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+  "claim_rollout_stage": "evidence",
+  "api_profile": "legacy_as_of_v0"
+}

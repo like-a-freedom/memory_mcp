@@ -40,6 +40,317 @@ use crate::platform::context_cache_key::{CacheCutoff, CacheKey, CacheView};
 
 const DIRECT_RETRIEVAL_CANDIDATE_FLOOR: i32 = 5;
 
+/// Revision-safe context selection over canonical facts. Historical requests
+/// intentionally avoid selectors whose state is not revisioned yet.
+pub(super) async fn assemble_revision_bounded_context(
+    service: &RetrievalContext,
+    request: &AssembleContextRequest,
+    temporal: crate::models::TemporalContextQuery,
+) -> Result<crate::models::ContextAssemblyResult, MemoryError> {
+    if request.view_mode.as_deref().is_some_and(|mode| {
+        let mode = mode.trim();
+        !mode.is_empty() && !mode.eq_ignore_ascii_case("current")
+    }) {
+        return Err(MemoryError::Validation(
+            "revision-bounded context currently supports only the current view".into(),
+        ));
+    }
+
+    let captured_now = crate::shared::temporal::now();
+    let valid_at = temporal.valid_at.unwrap_or(captured_now);
+    let (known_at, known_revision) = match temporal.known_revision {
+        Some(revision) => {
+            let known_at = service
+                .knowledge_store()
+                .recorded_at_revision(revision, captured_now)
+                .await?;
+            (known_at, revision)
+        }
+        None => {
+            let known_at = temporal.known_at.unwrap_or(captured_now);
+            let revision = service.knowledge_store().revision_at(known_at).await?;
+            (known_at, revision)
+        }
+    };
+
+    let normalized_fact_types = request
+        .fact_types
+        .iter()
+        .map(|fact_type| fact_type.trim())
+        .filter(|fact_type| !fact_type.is_empty())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let cleaned_query = crate::shared::search::preprocess_search_query(&request.query);
+    let query_opt = (!cleaned_query.is_empty()).then_some(cleaned_query.as_str());
+    let query_terms = query_opt
+        .map(crate::shared::search::search_query_terms)
+        .unwrap_or_default();
+    let budget = request.budget.clamp(1, 250);
+    let (mut records, mut scan_truncated) = service
+        .knowledge_store()
+        .select_facts_at_revision(
+            valid_at,
+            known_revision,
+            query_opt,
+            &normalized_fact_types,
+            super::lexical::lexical_candidate_limit(budget),
+        )
+        .await?;
+    // Full-question FTS can miss a visible fact when question framing words
+    // are absent from its content. Add a bounded, immutable revision-visible
+    // pool; keep direct hits even when they fall outside this scan.
+    if query_opt.is_some() {
+        let (scanned, truncated) = service
+            .knowledge_store()
+            .select_facts_at_revision(valid_at, known_revision, None, &normalized_fact_types, 250)
+            .await?;
+        records.extend(scanned);
+        scan_truncated |= truncated;
+    }
+    let ranked_records = super::lexical::rank_lexical_records(records, &query_terms);
+    let access = request.access.clone().unwrap_or_default();
+    let mut facts = super::filtering::filter_facts_by_constraints(
+        ranked_records,
+        &access,
+        &normalized_fact_types,
+    );
+    let mut seen_fact_ids = HashSet::new();
+    facts.retain(|fact| {
+        seen_fact_ids.insert(fact.fact_id.clone())
+            && super::admission::candidate_matches_explicit_query_subject(
+                &request.query,
+                &fact.content,
+            )
+            && request
+                .window_start
+                .is_none_or(|start| fact.t_valid >= start)
+            && request.window_end.is_none_or(|end| fact.t_valid <= end)
+            && (query_terms.is_empty()
+                || super::lexical::lexical_query_overlap_for_fact(fact, &query_terms) > 0)
+    });
+    facts.truncate(budget as usize);
+
+    let valid_at_iso = crate::shared::temporal::normalize_dt(valid_at);
+    let mut items = facts
+        .into_iter()
+        .map(|fact| {
+            let overlap = super::lexical::lexical_query_overlap_for_fact(&fact, &query_terms);
+            let confidence = fact.decayed_confidence(valid_at);
+            let relevance = if query_terms.is_empty() {
+                1.0
+            } else {
+                overlap as f64 / query_terms.len() as f64
+            };
+            let mut provenance = fact.provenance.to_json_value();
+            if !provenance.is_object() {
+                provenance = json!({});
+            }
+            if let Some(object) = provenance.as_object_mut() {
+                object.insert("known_revision".into(), json!(known_revision));
+                object.insert("valid_at".into(), json!(valid_at_iso));
+            }
+            AssembledContextItem {
+                fact_id: fact.fact_id,
+                content: fact.content,
+                quote: fact.quote,
+                source_episode: fact.source_episode,
+                confidence,
+                relevance: Some(relevance.clamp(0.0, 1.0)),
+                grounding: Some(relevance.clamp(0.0, 1.0)),
+                semantic_available: Some(false),
+                provenance,
+                rationale: format!(
+                    "historical revision-safe fact selection; lexical_overlap={overlap}"
+                ),
+                retrieval_tier: Some("historical_direct".into()),
+                reconciliation: None,
+                evidence_status: None,
+                retrieval_evidence: Some(RetrievalEvidence {
+                    policy_version: "revision-safe-facts-v1".into(),
+                    admission_basis: "revision_visible_fact".into(),
+                    semantic_similarity: None,
+                    graph_anchor_origin: None,
+                    hop_count: None,
+                }),
+            }
+        })
+        .collect::<Vec<_>>();
+    if items.is_empty() {
+        let (episode_items, episode_scan_truncated) = historical_episode_fallback(
+            service,
+            request,
+            valid_at,
+            known_revision,
+            query_opt,
+            budget,
+        )
+        .await?;
+        scan_truncated |= episode_scan_truncated;
+        items = episode_items;
+    }
+    let relation_fact_ids = items
+        .iter()
+        .filter(|item| item.fact_id.starts_with("fact:"))
+        .map(|item| crate::models::FactId::from(item.fact_id.as_str()))
+        .collect::<Vec<_>>();
+    let relation_batch = if relation_fact_ids.is_empty() {
+        crate::knowledge::api::TemporalRelationsBatch::default()
+    } else {
+        crate::knowledge::api::temporal_relations(
+            &*service.relation_read,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: relation_fact_ids.clone(),
+                known_revision: Some(known_revision),
+                cutoff: valid_at,
+                policy_tags: request
+                    .access
+                    .as_ref()
+                    .and_then(|access| access.allowed_tags.clone())
+                    .unwrap_or_default(),
+                counterpart_limit: crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS,
+                max_relation_depth: crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH,
+            },
+        )
+        .await?
+    };
+    let visible_relations = crate::knowledge::api::visible_temporal_relations_for_facts(
+        &relation_batch,
+        &relation_fact_ids,
+    );
+    let reconciliation_by_fact =
+        crate::knowledge::api::reconciliation_metadata_by_fact(&visible_relations);
+    let evidence_status_by_fact = crate::knowledge::api::temporal_evidence_status_by_fact(
+        &relation_batch,
+        &relation_fact_ids,
+    );
+    for item in &mut items {
+        if let Some(reconciliation) = reconciliation_by_fact.get(&item.fact_id) {
+            item.reconciliation = Some(reconciliation.clone());
+        }
+        item.evidence_status = Some(
+            evidence_status_by_fact
+                .get(&item.fact_id)
+                .copied()
+                .unwrap_or(crate::models::SnapshotEvidenceStatus::Unknown),
+        );
+    }
+    scan_truncated |= relation_batch.truncated;
+
+    let mut omissions = vec![
+        "alias expansion",
+        "experience, source episode siblings and source context neighborhoods",
+        "triples, graph edges and community summaries",
+        "semantic ANN and mutable embeddings",
+        "mutable fact access heat",
+        "legacy facts and episodes without committed revision provenance",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+    if relation_fact_ids.is_empty() && !items.is_empty() {
+        omissions.push("claim relations cannot be attached to episode-only evidence".into());
+    } else if !relation_batch.evidence_available && !relation_fact_ids.is_empty() {
+        omissions.push(
+            "claim relations and conflict projection are not enabled for this rollout".into(),
+        );
+    } else if relation_batch.truncated {
+        omissions.push("claim relation traversal was truncated".into());
+    }
+    service.logger.log(
+        log_event(
+            "assemble_context.historical_partial",
+            json!({
+                "known_revision": known_revision,
+                "valid_at": valid_at_iso,
+                "candidate_scan_truncated": scan_truncated,
+            }),
+            json!({ "count": items.len() }),
+            request.access.as_ref(),
+            None,
+            None,
+        ),
+        LogLevel::Info,
+    );
+
+    Ok(crate::models::ContextAssemblyResult {
+        items,
+        metadata: Some(crate::models::ContextAssemblyMetadata {
+            snapshot: crate::models::ContextSnapshot {
+                valid_at,
+                known_at,
+                known_revision,
+            },
+            completeness: crate::models::ContextCompleteness::Partial,
+            candidate_scan_truncated: scan_truncated,
+            omitted_channels: omissions,
+        }),
+    })
+}
+
+async fn historical_episode_fallback(
+    service: &RetrievalContext,
+    request: &AssembleContextRequest,
+    valid_at: DateTime<Utc>,
+    known_revision: i64,
+    query: Option<&str>,
+    budget: i32,
+) -> Result<(Vec<AssembledContextItem>, bool), MemoryError> {
+    const HISTORICAL_EPISODE_SCAN_LIMIT: i32 = 250;
+
+    let valid_at_iso = crate::shared::temporal::normalize_dt(valid_at);
+    let (records, scan_truncated) = service
+        .episode_context_store()
+        .select_episodes_at_revision(
+            &valid_at_iso,
+            known_revision,
+            None,
+            HISTORICAL_EPISODE_SCAN_LIMIT,
+        )
+        .await?;
+    let access = request.access.clone().unwrap_or_default();
+    let mut episodes = super::filtering::filter_episodes_by_constraints(records, &access);
+    let query_terms = query
+        .map(crate::shared::search::search_query_terms)
+        .unwrap_or_default();
+    episodes.retain(|episode| {
+        super::admission::candidate_matches_explicit_query_subject(&request.query, &episode.content)
+            && request
+                .window_start
+                .is_none_or(|start| episode.t_ref >= start)
+            && request.window_end.is_none_or(|end| episode.t_ref <= end)
+            && (query_terms.is_empty()
+                || super::lexical::lexical_query_score_for_text(&episode.content, &query_terms) > 0)
+    });
+    episodes.sort_by(|left, right| {
+        super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
+            .cmp(&super::lexical::lexical_query_score_for_text(
+                &left.content,
+                &query_terms,
+            ))
+            .then_with(|| right.t_ref.cmp(&left.t_ref))
+            .then_with(|| left.episode_id.cmp(&right.episode_id))
+    });
+    let mut items =
+        super::views::build_episode_fallback_items(super::views::EpisodeFallbackParams {
+            episodes,
+            query_opt: query,
+            semantic_available: false,
+            cutoff: valid_at,
+            window_start: request.window_start,
+            window_end: request.window_end,
+            timeline_mode: false,
+            budget,
+            fallback_rationale_fn: super::ranking::default_episode_fallback_rationale,
+        });
+    for item in &mut items {
+        if let Some(provenance) = item.provenance.as_object_mut() {
+            provenance.insert("known_revision".into(), json!(known_revision));
+            provenance.insert("valid_at".into(), json!(valid_at_iso));
+        }
+    }
+    Ok((items, scan_truncated))
+}
+
 fn retrieval_candidate_limit(service: &RetrievalContext, response_budget: i32) -> i32 {
     super::reranking::candidate_pool_limit(
         response_budget.max(1) as usize,
@@ -177,7 +488,10 @@ pub(super) fn log_context_start(
     service.logger.log(
         log_event(
             "assemble_context.start",
-            json!({"query": request.query, "budget": request.budget}),
+            json!({
+                "query_chars": request.query.chars().count(),
+                "budget": request.budget
+            }),
             json!({}),
             access,
             None,
@@ -278,6 +592,27 @@ pub(super) async fn assemble_default_context(
         &channels.direct_facts,
     );
     let ranked = rank_fact_channels(service, &params, channels).await?;
+    let explicit_subject_scoped_query = !query_evidence.subject_terms.is_empty()
+        && query_evidence
+            .content_terms
+            .iter()
+            .any(|term| !query_evidence.subject_terms.contains(term));
+    let ranked = match (params.raw_query_opt, explicit_subject_scoped_query) {
+        (Some(query), true) => ranked
+            .into_iter()
+            .filter(|candidate| {
+                let relationship_neighbor = query_evidence.intent
+                    == super::admission::AdmissionIntent::Relationship
+                    && candidate.graph_trace.is_some();
+                relationship_neighbor
+                    || super::admission::candidate_matches_explicit_query_subject(
+                        query,
+                        &candidate.fact.content,
+                    )
+            })
+            .collect(),
+        _ => ranked,
+    };
     let admission_policy = super::admission::AdmissionPolicy::new(
         service.embedding_service.embedding_similarity_threshold(),
         params.cutoff,
@@ -1216,6 +1551,7 @@ async fn project_current_candidates(
         &*service.relation_read,
         crate::knowledge::api::TemporalRelationsQuery {
             fact_ids: fact_ids.clone(),
+            known_revision: None,
             cutoff: params.cutoff,
             policy_tags: params.access.allowed_tags.clone().unwrap_or_default(),
             counterpart_limit: crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS,
@@ -1736,7 +2072,10 @@ async fn select_context_facts(
         service.logger.log(
             log_event(
                 "assemble_context.episode_rescue",
-                json!({"namespace": params.namespace, "query": params.query_opt}),
+                json!({
+                    "namespace": params.namespace,
+                    "query_chars": params.query_opt.map(|query| query.chars().count())
+                }),
                 build_episode_rescue_log_result(
                     episode_fallback_items.len(),
                     selected_ranked.len(),

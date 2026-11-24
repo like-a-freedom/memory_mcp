@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "copperwind_quay-record-a",
+    "source_id": "copperwind_quay-operations-log-a",
+    "source_type": "owner-record",
+    "content": "subject: Copperwind Quay\ndimension: ferry_departure_slot\nvalue: 14:20 UTC effective July 15, 2026",
+    "valid_at": "2026-07-15T12:00:00Z"
+  },
+  {
+    "event_id": "copperwind_quay-record-b",
+    "source_id": "copperwind_quay-operations-log-b",
+    "source_type": "owner-record",
+    "content": "subject: Copperwind Quay\ndimension: ferry_departure_slot\nvalue: 14:50 UTC effective July 15, 2026",
+    "valid_at": "2026-07-15T12:00:00Z"
+  }
+]

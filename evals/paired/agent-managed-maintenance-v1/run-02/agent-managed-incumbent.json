@@ -1,0 +1,506 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "8979-1795360721049891000-0",
+  "identity_sha256": "fcdca48fbddc3459162f8ba6fbb6663f449448a8819ddb0a382d04b7a20ef6cf",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "autumn-meridian-history",
+      "case_id": "autumn-meridian-current-rollback-shelf-code",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "cobalt-garden-history",
+      "case_id": "cobalt-garden-current-nightly-snapshot-tag",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "crystal-tundra-history",
+      "case_id": "crystal-tundra-current-escalation-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "granite-lantern-history",
+      "case_id": "granite-lantern-current-release-audit-label",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "indigo-meadow-history",
+      "case_id": "indigo-meadow-current-recovery-queue-name",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "marble-harbor-history",
+      "case_id": "marble-harbor-current-archive-checksum-prefix",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "saffron-orbit-history",
+      "case_id": "saffron-orbit-current-weekly-export-bucket",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "velvet-circuit-history",
+      "case_id": "velvet-circuit-current-incident-handoff-alias",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "autumn-meridian-history",
+        "case_id": "autumn-meridian-current-rollback-shelf-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 103464,
+        "output_tokens": 443,
+        "wall_time_ms": 37053
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "7a635532cd229485eb2a958581f0cf871b0098312258d76d2eb3c051c94433c4",
+        "response_sha256": "cd7ba4734d0aa4aa6258ad1f6b326c44e116ee03cc28fa671f566401f4f82eac",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cobalt-garden-history",
+        "case_id": "cobalt-garden-current-nightly-snapshot-tag",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100158,
+        "output_tokens": 428,
+        "wall_time_ms": 41434
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5812fa3f76489c1e478795208b3bdce63f237f49ebe697f61674e3c6683683fe",
+        "response_sha256": "5e7284b17cc0e27604b6a17472cce059c5abedf0a235ba3d89cc864180a37044",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "crystal-tundra-history",
+        "case_id": "crystal-tundra-current-escalation-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 103115,
+        "output_tokens": 435,
+        "wall_time_ms": 39667
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "32ab71804c075325b92c11c50dd7b897f684ce5a0890848eb8085a13c0908c8b",
+        "response_sha256": "387b4f65259f9592e37149423ced49f60569b62b9d3310baa77f1daaef0d97c1",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "granite-lantern-history",
+        "case_id": "granite-lantern-current-release-audit-label",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 103197,
+        "output_tokens": 450,
+        "wall_time_ms": 40282
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5aa1660d1e5e9d5ecfec5848cece1e2e0a39087e0ba038d14f77c4ff4415db4c",
+        "response_sha256": "b32232c50efb9700a41f68a9f6ec12b5265a99c657a10adf94181b9b3f081ffe",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "indigo-meadow-history",
+        "case_id": "indigo-meadow-current-recovery-queue-name",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 98719,
+        "output_tokens": 428,
+        "wall_time_ms": 33715
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "cbcab2656f39f8d0085ed93a5edd1f5cdc2724d1c2aef648b06229a996b38cf7",
+        "response_sha256": "dd99c9e57ca713f86ec2defc35d4f3ad038be3a8cd0bcdb67c7723bec29cfabf",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "marble-harbor-history",
+        "case_id": "marble-harbor-current-archive-checksum-prefix",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100269,
+        "output_tokens": 447,
+        "wall_time_ms": 39630
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "e6fd4c586c07c93561a3b0a2dc88894db44b0ae1f4196e4556dc2d6a4bad3313",
+        "response_sha256": "822e6ba091bd2bb085899326a6764ec0c5b156ac0c427c2c304f49232aad220f",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "saffron-orbit-history",
+        "case_id": "saffron-orbit-current-weekly-export-bucket",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 103377,
+        "output_tokens": 448,
+        "wall_time_ms": 38002
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "4735b06a6ea2332d1bcaa2fc56ea52157985a3a34dd197a2f3f8acd9748990e8",
+        "response_sha256": "033dc5f8a4996b2f828303a76f5614182609352fcb2c0a71869f97350a5fd077",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "velvet-circuit-history",
+        "case_id": "velvet-circuit-current-incident-handoff-alias",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 100154,
+        "output_tokens": 433,
+        "wall_time_ms": 36002
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "e60fd047b787f4b796ec7f8dc2164f9f053a73a516334b44723c460474de9d38",
+        "response_sha256": "416b43944d56cc0bd4212e683779d716090a1d8a0e702d3d7e77923686713cf9",
+        "known_revision": 17,
+        "retained_store_bytes": 34308172,
+        "source_event_ids": [
+          "update-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    }
+  ]
+}

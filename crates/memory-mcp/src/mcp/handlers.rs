@@ -920,7 +920,7 @@ impl rmcp::ServerHandler for SubscriptionMcp {
 #[tool_router]
 impl MemoryMcp {
     #[tool(
-        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and optional `t_ingested` and `policy_tags`. Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
+        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and optional `policy_tags`. `t_ingested` is server-assigned and must be omitted. Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
     )]
     pub async fn ingest(
         &self,
@@ -946,7 +946,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
+        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `zero_shot_labels`, and `include_fact_evidence` (defaults to true; set false for a compact response). Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Complete statement/quote pairs are included only within a 4 KiB serialized evidence budget; if any pair is unavailable or the budget is exceeded, all evidence pairs are omitted and `fact_evidence_omitted` is true."
     )]
     pub async fn extract(
         &self,
@@ -1050,7 +1050,7 @@ impl MemoryMcp {
                         self.service.log_tool_event_with_duration(
                             "open_app.error",
                             json!({"app": app}),
-                            json!({"error": err.to_string()}),
+                            json!({"error_code": format!("{:?}", err.code)}),
                             error_data_log_level(&err),
                             timer.elapsed(),
                         );
@@ -1153,8 +1153,8 @@ impl MemoryMcp {
                     Err(err) => {
                         self.service.log_tool_event_with_duration(
                             "app_command.error",
-                            json!({"session_id": p.session_id, "action": p.action}),
-                            json!({"error": err.to_string()}),
+                            json!({"action_chars": p.action.chars().count()}),
+                            json!({"error_code": format!("{:?}", err.code)}),
                             error_data_log_level(&err),
                             timer.elapsed(),
                         );
@@ -1167,7 +1167,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments must be a flat snake_case object with `query`, `fact_types`, `as_of`, `budget`, `view_mode`, `window_start`, and `window_end`. Do not wrap arguments in `payload`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
+        description = "Assemble the most relevant memory context for a query. Use this tool to retrieve stored facts before answering or planning. Do not use this tool to ingest new content. Arguments are a flat snake_case object with `query`, `fact_types`, legacy `as_of`, independent `valid_at` and `known_at` timestamps, optional exact `known_revision`, `budget`, `view_mode`, `window_start`, and `window_end`. `as_of` cannot be combined with the new temporal fields; `known_at` and `known_revision` are mutually exclusive. Historical reads return snapshot and completeness metadata and can be partial while revision-unsafe selectors are withheld. Do not wrap arguments in `payload`. On error, fix the query parameters and retry."
     )]
     pub async fn assemble_context(
         &self,
@@ -1351,6 +1351,7 @@ mod tests {
                 source_id: None,
                 t_ref: None,
                 zero_shot_labels: Some(Vec::new()),
+                include_fact_evidence: false,
             }))
             .await
             .expect("MCP extract with empty GLiNER labels should succeed")
@@ -1393,6 +1394,57 @@ mod tests {
             "ExtractResult should expose warnings in the MCP schema"
         );
         assert_eq!(properties["warnings"]["type"], "array");
+    }
+
+    #[test]
+    fn extract_schema_defaults_to_bounded_fact_evidence_and_keeps_it_optional() {
+        let input = schema_json::<ExtractParams>();
+        let input_properties = input["properties"]
+            .as_object()
+            .expect("extract input properties");
+        assert_eq!(input_properties["include_fact_evidence"]["type"], "boolean");
+        assert_eq!(input_properties["include_fact_evidence"]["default"], true);
+        assert!(!input["required"].as_array().is_some_and(|required| {
+            required
+                .iter()
+                .any(|field| field == "include_fact_evidence")
+        }));
+
+        let output = schema_json::<ToolResponse<ExtractResult>>();
+        let defs = output
+            .get("$defs")
+            .or_else(|| output.get("definitions"))
+            .and_then(serde_json::Value::as_object)
+            .expect("response schema definitions");
+        let extract_result = defs.get("ExtractResult").expect("ExtractResult definition");
+        let result_properties = extract_result["properties"]
+            .as_object()
+            .expect("extract result properties");
+        assert!(result_properties.contains_key("fact_evidence_omitted"));
+        assert!(
+            !extract_result["required"]
+                .as_array()
+                .is_some_and(|required| {
+                    required
+                        .iter()
+                        .any(|field| field == "fact_evidence_omitted")
+                })
+        );
+        let extracted_fact = defs.get("ExtractedFact").expect("ExtractedFact definition");
+        let fact_properties = extracted_fact["properties"]
+            .as_object()
+            .expect("fact properties");
+        assert!(fact_properties.contains_key("statement"));
+        assert!(fact_properties.contains_key("source_quote"));
+        assert!(
+            !extracted_fact["required"]
+                .as_array()
+                .is_some_and(|required| {
+                    required
+                        .iter()
+                        .any(|field| field == "statement" || field == "source_quote")
+                })
+        );
     }
 
     #[test]

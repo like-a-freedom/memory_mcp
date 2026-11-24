@@ -1,0 +1,17 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "nightly",
+  "time_budget_seconds": 1800,
+  "suites": [
+    {
+      "id": "memory-decisions",
+      "mode": "end_to_end",
+      "corpus_root": "evals/corpora/memory-decisions-v8",
+      "claim_rollout_stage": "shadow",
+      "expected_coverage": {
+        "exact_cases": 8
+      }
+    }
+  ],
+  "gates": []
+}

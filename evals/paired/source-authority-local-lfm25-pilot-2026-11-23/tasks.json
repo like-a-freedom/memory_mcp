@@ -1,0 +1,131 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "opalfern_observatory",
+        "case_id": "opalfern_observatory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Opalfern Observatory, the calibration lens is kept in Foxglove-31. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Opalfern Observatory, where is the calibration lens kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Opalfern Observatory, where is the calibration lens kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-2026-11-23-opalfern_observatory",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-lfm25-2026-11-23-opalfern_observatory"]]
+        ],
+        "accepted_answers": ["Foxglove-31"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "wrenhaven_clinic",
+        "case_id": "wrenhaven_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Wrenhaven Clinic, the emergency chart is kept in Talon-82. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Wrenhaven Clinic, where is the emergency chart kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Wrenhaven Clinic, where is the emergency chart kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-2026-11-23-wrenhaven_clinic",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-lfm25-2026-11-23-wrenhaven_clinic"]]
+        ],
+        "accepted_answers": ["Talon-82"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "marblecrest_radio",
+        "case_id": "marblecrest_radio-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Marblecrest Radio for a later session. It is in the source file fixtures/marblecrest_radio.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "candidate_formation_prompt": "An operator import and extraction were completed for Marblecrest Radio before this phase. Use assemble_context to verify the memory fact: At Marblecrest Radio, where is the backup fuse kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "marblecrest_radio",
+          "relative_path": "fixtures/marblecrest_radio.txt",
+          "content": "Fact: At Marblecrest Radio, the backup fuse is kept in Linden-45.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-23T00:00:00Z",
+          "event_id": "local-source-authority-lfm25-2026-11-23-marblecrest_radio"
+        }
+      ],
+      "recall_prompt": "At Marblecrest Radio, where is the backup fuse kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Marblecrest Radio, where is the backup fuse kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-2026-11-23-marblecrest_radio",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-lfm25-2026-11-23-marblecrest_radio"]]
+        ],
+        "accepted_answers": ["Linden-45"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "briarwake_depot",
+        "case_id": "briarwake_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Briarwake Depot for a later session. It is in the source file fixtures/briarwake_depot.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "candidate_formation_prompt": "An operator import and extraction were completed for Briarwake Depot before this phase. Use assemble_context to verify the memory fact: At Briarwake Depot, where is the track ledger kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "briarwake_depot",
+          "relative_path": "fixtures/briarwake_depot.txt",
+          "content": "Fact: At Briarwake Depot, the track ledger is kept in Comet-67.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-23T00:00:00Z",
+          "event_id": "local-source-authority-lfm25-2026-11-23-briarwake_depot"
+        }
+      ],
+      "recall_prompt": "At Briarwake Depot, where is the track ledger kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Briarwake Depot, where is the track ledger kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-2026-11-23-briarwake_depot",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-lfm25-2026-11-23-briarwake_depot"]]
+        ],
+        "accepted_answers": ["Comet-67"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

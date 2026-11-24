@@ -1,0 +1,93 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:e5529ce74420376870a4d152": "retry-after-rate-limit-policy"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "35a7cb2021a1e49c18771a66c661a0143ff53517527ac1060d1ba0451adb04aa",
+    "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+    "source_event_ids": [
+      "retry-after-rate-limit-policy"
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 5,
+    "compact": true,
+    "known_revision": 1,
+    "query": "How should a write be retried after a transient rate limit?",
+    "valid_at": "2026-06-06T16:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:28:48.185423Z\",\"known_revision\":1,\"valid_at\":\"2026-06-06T16:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: transient rate limit retry\\npolicy: wait for the backoff window, then retry only the failed write\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:e5529ce74420376870a4d152\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":1,\"reference_time\":\"2026-06-06T16:00:00Z\",\"source_episode\":\"episode:e5529ce74420376870a4d152\",\"source_id\":\"service-operations-runbook\",\"source_type\":\"operations-note\",\"valid_at\":\"2026-06-06T16:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:e5529ce74420376870a4d152\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations cannot be attached to episode-only evidence"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-22T03:28:48.185423Z",
+            "known_revision": 1,
+            "valid_at": "2026-06-06T16:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.85,
+            "content": "subject: transient rate limit retry\npolicy: wait for the backoff window, then retry only the failed write",
+            "evidence_status": "unknown",
+            "fact_id": "episode_fallback:episode:e5529ce74420376870a4d152",
+            "grounding": 1.0,
+            "provenance": {
+              "episode_fallback": true,
+              "known_revision": 1,
+              "reference_time": "2026-06-06T16:00:00Z",
+              "source_episode": "episode:e5529ce74420376870a4d152",
+              "source_id": "service-operations-runbook",
+              "source_type": "operations-note",
+              "valid_at": "2026-06-06T16:00:00+00:00"
+            },
+            "rationale": "tier=fallback",
+            "relevance": 1.0,
+            "retrieval_tier": "fallback",
+            "semantic_available": false,
+            "source_episode": "episode:e5529ce74420376870a4d152"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "claim_rollout_stage": "shadow"
+}

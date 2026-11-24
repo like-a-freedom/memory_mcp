@@ -18,6 +18,9 @@ pub struct ToolResponse<T> {
     /// Offset for the next page when pagination is supported.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_offset: Option<usize>,
+    /// Snapshot and completeness metadata for revision-bounded context reads.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<crate::models::ContextAssemblyMetadata>,
 }
 
 impl<T> ToolResponse<T> {
@@ -29,10 +32,10 @@ impl<T> ToolResponse<T> {
             has_more: None,
             total_count: None,
             next_offset: None,
+            context: None,
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn partial_with_guidance(result: T, guidance: impl Into<String>) -> Self {
         Self {
             status: "partial".to_string(),
@@ -41,6 +44,7 @@ impl<T> ToolResponse<T> {
             has_more: None,
             total_count: None,
             next_offset: None,
+            context: None,
         }
     }
 
@@ -56,6 +60,7 @@ impl<T> ToolResponse<T> {
             has_more: Some(false),
             total_count: Some(total_count),
             next_offset: None,
+            context: None,
         }
     }
 
@@ -77,7 +82,30 @@ impl<T> ToolResponse<T> {
             has_more: None,
             total_count: None,
             next_offset: None,
+            context: None,
         }
+    }
+
+    pub(crate) fn complete_context_list(
+        result: T,
+        total_count: usize,
+        guidance: impl Into<String>,
+        context: Option<crate::models::ContextAssemblyMetadata>,
+    ) -> Self {
+        let mut response = Self::complete_list(result, total_count, guidance);
+        response.context = context;
+        response
+    }
+
+    pub(crate) fn complete_context_list_compact(
+        result: T,
+        total_count: usize,
+        guidance: impl Into<String>,
+        context: Option<crate::models::ContextAssemblyMetadata>,
+    ) -> Self {
+        let mut response = Self::complete_list_compact(result, total_count, guidance);
+        response.context = context;
+        response
     }
 }
 

@@ -1,0 +1,639 @@
+{
+  "schema_version": "memory-mcp-agent-managed-comparison/v1",
+  "plan_id": "agent-managed-maintenance-feasibility-2026-11-22-v3",
+  "plan_sha256": "f7e4e49c2c4162662963924f1086227806240134821f760838a498db9435781b",
+  "run_id": "27970-1795374096798974000-0",
+  "incumbent_artifact_sha256": "40cce87cd12e40acde9814c774da30b0ed4f577f7632e6e67c98de66c4c0c2d8",
+  "candidate_artifact_sha256": "abafb3d38825aaba2525d5efd48fd4e17b793dd1dace40bc27497d5bf234caba",
+  "incumbent_stage_sha256": "80c261157278bb66f8fb0d41697994c7b187ff234e521060e1073175e342e487",
+  "candidate_stage_sha256": "c50461824d1c8c35ba4873292136a1d2230437b523a4f73bf328e8c67f9b0571",
+  "paired_agent_comparison": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "27970-1795374096798974000-0",
+    "run_started_at": "2026-11-22T19:01:36.798995Z",
+    "run_completed_at": "2026-11-22T19:17:39.451709Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "agent-managed-maintenance-feasibility-2026-11-22-v3",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "marble-garden-history",
+          "case_id": "marble-garden-current-database-failover-zone",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "tundra-observatory-history",
+          "case_id": "tundra-observatory-current-export-encryption-profile",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "copper-lantern-history",
+          "case_id": "copper-lantern-current-artifact-signing-profile",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "willow-bridge-history",
+          "case_id": "willow-bridge-current-nightly-snapshot-region",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "velvet-compass-history",
+          "case_id": "velvet-compass-current-incident-routing-queue",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "granite-orchard-history",
+          "case_id": "granite-orchard-current-build-cache-namespace",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "silver-meadow-history",
+          "case_id": "silver-meadow-current-audit-export-channel",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "single_correction_invalidation",
+          "family_id": "quiet-citadel-history",
+          "case_id": "quiet-citadel-current-rollback-manifest-prefix",
+          "repetition": 1,
+          "incumbent_first": true
+        }
+      ],
+      "planned_independent_families": 8,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.171.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "1f608baad1673f98aa136c81d4081299b63b49faf841728de0a2e23ccfd2d8e7",
+        "task_prompt_sha256": "c6af451ce7616257af0dff18a8156206919463f9921c0b697ce6c988b01183ec",
+        "host_policy_sha256": "c7ee6bfcb59dccfd8f91f972373743e9fe9e4f09d27a2462cbbd36a861588e1e",
+        "transport": "stdio",
+        "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+        "reader_config_sha256": "1bbe675e6d3d217ee485e7d91daaf3a715cb801b750a9b0691727deb7dbe5555",
+        "judge_config_sha256": null,
+        "corpus_sha256": "62d2b77a8f3c7e7254cce707ac1c6d96187a3cc8852ca8ef3993e9b142dccfe6",
+        "oracle_sha256": "6df5a3520b0beb45e171acf169a94f5c0f504879f226704aae780c37142fbf80",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "a69954eb71dda1e77f8485cb27b36a63d8ca4c6018128a14baf8c60549b4e3a7",
+        "provider_fingerprints": {
+          "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+          "memory_eval_cli": "2eb8901c0c3ab574ddd983dd08088d6b3b65ffb685fb91ae8e6401fb8ba846e4"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-agent-maintenance-v3-2026-11-22",
+        "binary_sha256": "a06d3151ce1e854692e343cfcdbf829cfa26e46f283ca19fc37ae9ff2ff35273",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-agent-maintenance-v3-2026-11-22",
+        "binary_sha256": "a06d3151ce1e854692e343cfcdbf829cfa26e46f283ca19fc37ae9ff2ff35273",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112203,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "f7e4e49c2c4162662963924f1086227806240134821f760838a498db9435781b",
+    "manifest_sha256": "8ae6cb2414917b3f40bbb62102e1bec9e377f2f85c1f5fc5b5d20f2a9445c8d2",
+    "incumbent_artifact_sha256": "40cce87cd12e40acde9814c774da30b0ed4f577f7632e6e67c98de66c4c0c2d8",
+    "candidate_artifact_sha256": "abafb3d38825aaba2525d5efd48fd4e17b793dd1dace40bc27497d5bf234caba",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": -0.125,
+        "interval": {
+          "estimate": -0.125,
+          "lower": -0.625,
+          "upper": 0.375,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 1.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": 1.0,
+          "silver-meadow-history": -1.0,
+          "tundra-observatory-history": -1.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": -1.0
+        }
+      },
+      "task_success": {
+        "estimate": -0.125,
+        "interval": {
+          "estimate": -0.125,
+          "lower": -0.5,
+          "upper": 0.25,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 0.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": 1.0,
+          "silver-meadow-history": -1.0,
+          "tundra-observatory-history": 0.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": -1.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": -1.0,
+        "interval": {
+          "estimate": -1.0,
+          "lower": -4.0,
+          "upper": 2.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 0.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": 8.0,
+          "silver-meadow-history": -8.0,
+          "tundra-observatory-history": 0.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": -8.0
+        }
+      },
+      "turn_gain": {
+        "estimate": -0.875,
+        "interval": {
+          "estimate": -0.875,
+          "lower": -3.5,
+          "upper": 1.75,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 0.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": 7.0,
+          "silver-meadow-history": -7.0,
+          "tundra-observatory-history": 0.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": -7.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": -0.625,
+          "upper": 0.5,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 0.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": -2.0,
+          "silver-meadow-history": 1.0,
+          "tundra-observatory-history": 1.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 0.0,
+          "granite-orchard-history": 0.0,
+          "marble-garden-history": 0.0,
+          "quiet-citadel-history": 0.0,
+          "silver-meadow-history": 0.0,
+          "tundra-observatory-history": 0.0,
+          "velvet-compass-history": 0.0,
+          "willow-bridge-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 253.75,
+        "interval": {
+          "estimate": 253.75,
+          "lower": -6060.75,
+          "upper": 6639.75,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": -10507.0,
+          "granite-orchard-history": 11173.0,
+          "marble-garden-history": -615.0,
+          "quiet-citadel-history": -8618.0,
+          "silver-meadow-history": 10463.0,
+          "tundra-observatory-history": 10477.0,
+          "velvet-compass-history": -10644.0,
+          "willow-bridge-history": 301.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 38.5,
+        "interval": {
+          "estimate": 38.5,
+          "lower": -13.75,
+          "upper": 85.375,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 136.0,
+          "granite-orchard-history": 58.0,
+          "marble-garden-history": 92.0,
+          "quiet-citadel-history": -76.0,
+          "silver-meadow-history": 78.0,
+          "tundra-observatory-history": 90.0,
+          "velvet-compass-history": -7.0,
+          "willow-bridge-history": -63.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 2818.375,
+        "interval": {
+          "estimate": 2818.375,
+          "lower": -876.125,
+          "upper": 6812.125,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112203,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "copper-lantern-history": 4208.0,
+          "granite-orchard-history": 5199.0,
+          "marble-garden-history": 1599.0,
+          "quiet-citadel-history": -6605.0,
+          "silver-meadow-history": 2708.0,
+          "tundra-observatory-history": 14575.0,
+          "velvet-compass-history": 592.0,
+          "willow-bridge-history": 271.0
+        }
+      }
+    },
+    "by_stratum": {
+      "single_correction_invalidation": {
+        "direct_memory_success": {
+          "estimate": -0.125,
+          "interval": {
+            "estimate": -0.125,
+            "lower": -0.625,
+            "upper": 0.375,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 1.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": 1.0,
+            "silver-meadow-history": -1.0,
+            "tundra-observatory-history": -1.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": -1.0
+          }
+        },
+        "task_success": {
+          "estimate": -0.125,
+          "interval": {
+            "estimate": -0.125,
+            "lower": -0.5,
+            "upper": 0.25,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 0.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": 1.0,
+            "silver-meadow-history": -1.0,
+            "tundra-observatory-history": 0.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": -1.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": -1.0,
+          "interval": {
+            "estimate": -1.0,
+            "lower": -4.0,
+            "upper": 2.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 0.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": 8.0,
+            "silver-meadow-history": -8.0,
+            "tundra-observatory-history": 0.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": -8.0
+          }
+        },
+        "turn_gain": {
+          "estimate": -0.875,
+          "interval": {
+            "estimate": -0.875,
+            "lower": -3.5,
+            "upper": 1.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 0.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": 7.0,
+            "silver-meadow-history": -7.0,
+            "tundra-observatory-history": 0.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": -7.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": -0.625,
+            "upper": 0.5,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 0.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": -2.0,
+            "silver-meadow-history": 1.0,
+            "tundra-observatory-history": 1.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 0.0,
+            "granite-orchard-history": 0.0,
+            "marble-garden-history": 0.0,
+            "quiet-citadel-history": 0.0,
+            "silver-meadow-history": 0.0,
+            "tundra-observatory-history": 0.0,
+            "velvet-compass-history": 0.0,
+            "willow-bridge-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 253.75,
+          "interval": {
+            "estimate": 253.75,
+            "lower": -6060.75,
+            "upper": 6639.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": -10507.0,
+            "granite-orchard-history": 11173.0,
+            "marble-garden-history": -615.0,
+            "quiet-citadel-history": -8618.0,
+            "silver-meadow-history": 10463.0,
+            "tundra-observatory-history": 10477.0,
+            "velvet-compass-history": -10644.0,
+            "willow-bridge-history": 301.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 38.5,
+          "interval": {
+            "estimate": 38.5,
+            "lower": -13.75,
+            "upper": 85.375,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 136.0,
+            "granite-orchard-history": 58.0,
+            "marble-garden-history": 92.0,
+            "quiet-citadel-history": -76.0,
+            "silver-meadow-history": 78.0,
+            "tundra-observatory-history": 90.0,
+            "velvet-compass-history": -7.0,
+            "willow-bridge-history": -63.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 2818.375,
+          "interval": {
+            "estimate": 2818.375,
+            "lower": -876.125,
+            "upper": 6812.125,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112203,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "copper-lantern-history": 4208.0,
+            "granite-orchard-history": 5199.0,
+            "marble-garden-history": 1599.0,
+            "quiet-citadel-history": -6605.0,
+            "silver-meadow-history": 2708.0,
+            "tundra-observatory-history": 14575.0,
+            "velvet-compass-history": 592.0,
+            "willow-bridge-history": 271.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 8,
+    "independent_family_count": 8,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "single_correction_invalidation": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "incumbent": {
+    "expected_trials": 8,
+    "formation_status_counts": {
+      "budgetexceeded": 8
+    },
+    "formation_turns_total": 8,
+    "formation_tool_calls_total": 32,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 560553,
+    "formation_output_tokens_total": 3288,
+    "formation_wall_time_ms_total": 263592,
+    "retained_store_bytes_total": 274465384,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 8,
+        "succeeded": 8,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 8,
+        "succeeded": 8,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 8,
+    "independent_probe_trials": 8,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0
+  },
+  "candidate": {
+    "expected_trials": 8,
+    "formation_status_counts": {
+      "budgetexceeded": 8
+    },
+    "formation_turns_total": 8,
+    "formation_tool_calls_total": 32,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 560707,
+    "formation_output_tokens_total": 3226,
+    "formation_wall_time_ms_total": 255735,
+    "retained_store_bytes_total": 274465384,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 8,
+        "succeeded": 8,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 8,
+        "succeeded": 8,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 8,
+    "independent_probe_trials": 8,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0
+  },
+  "independent_probe_pairs": {
+    "paired_trials": 8,
+    "both_succeeded": 8,
+    "incumbent_only_succeeded": 0,
+    "candidate_only_succeeded": 0,
+    "neither_succeeded": 0
+  }
+}

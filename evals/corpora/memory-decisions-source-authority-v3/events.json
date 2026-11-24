@@ -1,0 +1,33 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "literal-source-reference",
+      "source_id": "operator-source-id-must-stay",
+      "source_type": "agent_note",
+      "content": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt",
+      "t_ref": "2026-11-22T12:00:00Z"
+    },
+    {
+      "id": "literal-url-reference",
+      "source_id": "caller-url-source-id",
+      "source_type": "agent_note",
+      "content": "http://127.0.0.1:9/agent-reference",
+      "t_ref": "2026-11-22T12:00:00Z"
+    },
+    {
+      "id": "ordinary-fact",
+      "source_id": "office-entry-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "unknown-history",
+      "source_id": "unknown-history-source-id",
+      "source_type": "conversation",
+      "content": "The weekly roadmap review happens on Friday.",
+      "t_ref": "2026-11-22T12:00:00Z"
+    }
+  ]
+}

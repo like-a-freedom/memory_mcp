@@ -1,0 +1,15 @@
+{
+  "input_sha256": "579699913d8beea6752ebd14da02c2157e4bd2a4871f11a04584d661fd36c293",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "westmere_lab-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "westmere_lab-record-a",
+      "evidence_status": "current"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

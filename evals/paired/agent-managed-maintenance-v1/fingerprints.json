@@ -1,0 +1,13 @@
+{
+  "schema_version": "memory-mcp-agent-managed-fingerprints/v1",
+  "corpus_sha256": "cd1f6efb0176f23350c48b060809e06362d8a1bddc412da9bd8dddea5333fc64",
+  "oracle_sha256": "7597dc37585ecf58bd00638cc251c44086f9f00a561274c7ac5bbc93dd1d27e6",
+  "system_prompt_sha256": "1f608baad1673f98aa136c81d4081299b63b49faf841728de0a2e23ccfd2d8e7",
+  "task_prompt_sha256": "718b19c17519217c005d7d3530d237987a8d12ec492de900ccdc6d2551017686",
+  "host_policy_sha256": "86988029049185099728eeb49c7f2a2fdbfcdb2b9d369c870ac04e0fed9449c2",
+  "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+  "simulator_sha256": "d07c8f30bed5d191079a3fce7a7e2520cd2f09085b15686fb5ba7c52c4a7b77c",
+  "protocol_config_sha256": "c089ee4bd9609453f635bb5aa5d03db75a1d391e045ad86700c4170c5d3b4538",
+  "task_count": 8,
+  "independent_family_count": 8
+}

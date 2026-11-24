@@ -1,0 +1,279 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "2026-11-22-source-authority-v4-final",
+    "product_binary_sha256": "9e1191c0f7b10dbe058c0070bdad9ef98adb97c345126de092678460463f4a47",
+    "corpus_sha256": "f79ccf052b959f443b1d2213f3b258ce674149acae0ebb0fb615aec8ecd229b5",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61"
+  },
+  "cases": [
+    {
+      "case_id": "literal-path-preservation",
+      "source_order": [
+        "literal-source-reference"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-source-reference",
+            "role": "unknown",
+            "text": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-source-reference",
+            "role": "current",
+            "text": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-source-reference",
+            "role": "current",
+            "text": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-literal-path-preservation.json",
+      "receipt_sha256": "6813cbd8e3d23be8c9ec47007fda99ea366a31adcc1faadab49d0258088b6986"
+    },
+    {
+      "case_id": "literal-url-preservation",
+      "source_order": [
+        "literal-url-reference"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-url-reference",
+            "role": "unknown",
+            "text": "http://127.0.0.1:9/agent-reference"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-url-reference",
+            "role": "current",
+            "text": "http://127.0.0.1:9/agent-reference"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-url-reference",
+            "role": "current",
+            "text": "http://127.0.0.1:9/agent-reference"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-literal-url-preservation.json",
+      "receipt_sha256": "fd839c96e34b8787a484f0fa504d73e73f97350d0863f45a5d264a15ad92ec16"
+    },
+    {
+      "case_id": "ordinary-fact-control",
+      "source_order": [
+        "ordinary-fact"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "ordinary-fact",
+            "role": "unknown",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "ordinary-fact",
+            "role": "current",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "ordinary-fact",
+            "role": "current",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-ordinary-fact-control.json",
+      "receipt_sha256": "de4aa4130ffc24f6e56a9a2eddd7765dd00cdd8c46cee8a420de254c9411ae45"
+    },
+    {
+      "case_id": "unknown-reference-control",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-unknown-reference-control.json",
+      "receipt_sha256": "d30fea3726d56a0c417d25dc84799e252cc7d12af8003fa31c4a6fd25aa90f37"
+    }
+  ]
+}

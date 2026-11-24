@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "opal-initial",
+    "source_id": "opal-cabin-inspector",
+    "source_type": "inspection-record",
+    "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026",
+    "valid_at": "2026-06-07T11:00:00Z"
+  },
+  {
+    "event_id": "opal-peer",
+    "source_id": "opal-cabin-visitor-log",
+    "source_type": "inspection-record",
+    "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026",
+    "valid_at": "2026-06-07T11:00:00Z"
+  }
+]

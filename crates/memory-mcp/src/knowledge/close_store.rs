@@ -20,7 +20,9 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use serde_json::{Map, Value, json};
+#[cfg(test)]
+use serde_json::json;
+use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
 use crate::shared::temporal::normalize_dt;
@@ -159,16 +161,15 @@ impl CloseStoreClient {
         timestamps: &CloseTimestamps,
         reason: Option<&str>,
     ) -> Result<(), MemoryError> {
-        let (sql, vars) = build_close_query(record_id, timestamps, reason)?;
+        let (sql, vars, revision) =
+            crate::knowledge::revisions::prepare_record_close(record_id, timestamps, reason)?;
         #[cfg(feature = "streamable-http")]
         if self.outbox_enabled {
-            let close_sql = sql.replace("RETURN NONE", "RETURN BEFORE");
-            let mutation_sql = format!(
-                "LET $closed = ({close_sql}); IF array::len($closed) = 0 {{ THROW 'record to invalidate was not found'; }}"
-            );
-            let mutation =
-                crate::platform::persistence::outbox::TenantMutation::new(mutation_sql, vars)?;
-            return crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
+            let mutation = crate::platform::persistence::outbox::TenantMutation::new(
+                sql.clone(),
+                vars.clone(),
+            )?;
+            return crate::platform::persistence::outbox::commit_revisioned_tenant_mutation_with_event(
                 &self.db,
                 mutation,
                 crate::platform::persistence::outbox::TenantChangeEvent {
@@ -178,30 +179,17 @@ impl CloseStoreClient {
                     change_kind: "record_invalidated".into(),
                     created_at: chrono::Utc::now(),
                 },
+                revision,
                 &self.db.fault_injector,
             )
             .await;
         }
-        self.db.query(&sql, Some(vars)).await?;
-        Ok(())
-    }
-
-    /// Closes the claim and claim_relation rows derived from a fact.
-    ///
-    /// These are transaction-time-only tables: only `t_invalid_ingested` is
-    /// set, guarded so an already-closed row is never re-closed.
-    pub(crate) async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError> {
-        let claim_sql = "UPDATE claim SET t_invalid_ingested = time::now() \
-            WHERE source_fact_id = $fact_id \
-            AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
-        let vars = json!({ "fact_id": fact_id });
-        self.db.query(claim_sql, Some(vars.clone())).await?;
-
-        let relation_sql = "UPDATE claim_relation SET t_invalid_ingested = time::now() \
-            WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) \
-            AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
-        self.db.query(relation_sql, Some(vars)).await?;
-        Ok(())
+        let script = crate::knowledge::revisions::revision_transaction_script_with_affected_ids(
+            &sql,
+            "",
+            &revision.affected_record_ids_sql,
+        );
+        self.db.transaction_query(&script, Some(vars)).await
     }
 
     /// Retracts a fact and closes its derived claims in one intent.
@@ -213,10 +201,48 @@ impl CloseStoreClient {
         fact_id: &str,
         reason: &str,
     ) -> Result<(), MemoryError> {
-        self.close_record(fact_id, &CloseTimestamps::now(), Some(reason))
-            .await?;
-        self.close_claims_for_fact(fact_id).await?;
-        Ok(())
+        self.retract_fact_and_claims_at(fact_id, Utc::now(), reason)
+            .await
+    }
+
+    /// Closes a fact and its derived claim projections in one revisioned
+    /// transaction. The caller supplies valid time; transaction provenance and
+    /// the revision token are assigned by the database transaction.
+    pub(crate) async fn retract_fact_and_claims_at(
+        &self,
+        fact_id: &str,
+        t_invalid: DateTime<Utc>,
+        reason: &str,
+    ) -> Result<(), MemoryError> {
+        let (mutation_sql, vars, revision) =
+            crate::knowledge::revisions::prepare_fact_invalidation(fact_id, t_invalid, reason)?;
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            let mutation = crate::platform::persistence::outbox::TenantMutation::new(
+                mutation_sql.clone(),
+                vars.clone(),
+            )?;
+            return crate::platform::persistence::outbox::commit_revisioned_tenant_mutation_with_event(
+                &self.db,
+                mutation,
+                crate::platform::persistence::outbox::TenantChangeEvent {
+                    sequence: 0,
+                    resource_id: "ui://memory/apps/inspector".into(),
+                    revision: 1,
+                    change_kind: "record_invalidated".into(),
+                    created_at: Utc::now(),
+                },
+                revision,
+                &self.db.fault_injector,
+            )
+            .await;
+        }
+        let script = crate::knowledge::revisions::revision_transaction_script_with_affected_ids(
+            &mutation_sql,
+            "",
+            &revision.affected_record_ids_sql,
+        );
+        self.db.transaction_query(&script, Some(vars)).await
     }
 }
 

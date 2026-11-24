@@ -1,0 +1,15 @@
+{
+  "input_sha256": "ac325b5708c3e6de0cc6eaa298364730de8a470ac85a13506d6a665d21fcab9a",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "brackenridge_depot-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "brackenridge_depot-record-a",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

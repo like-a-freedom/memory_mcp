@@ -1,0 +1,24 @@
+{
+  "schema_version": "memory-mcp-agent-managed-attempt-status/v1",
+  "plan_id": "agent-managed-maintenance-feasibility-2026-11-22-v3",
+  "run_id": "run-01",
+  "status": "incomplete_external_interruption",
+  "termination_evidence": "The Codex desktop turn was interrupted while the local runner was active. The original exec session handle is no longer available and a direct host process check found no surviving memory-eval process.",
+  "paired_receipts": {
+    "incumbent": {
+      "completed_count": 4,
+      "task_oracle_passed_count": 3
+    },
+    "candidate": {
+      "completed_count": 5,
+      "task_oracle_passed_count": 5
+    }
+  },
+  "required_outputs_missing": [
+    "complete eight-case coverage for both paired arms",
+    "agent-managed stage supplements with formation and write accounting",
+    "persisted independent-probe receipts for the managed evaluation",
+    "deterministic run comparison"
+  ],
+  "preregistered_denominator_policy": "The interrupted attempt is retained as an incomplete failure. Its observed receipts are not deleted, excluded, or replaced in run-01. No feasibility claim is made from this partial run."
+}

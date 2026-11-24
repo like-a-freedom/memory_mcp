@@ -33,6 +33,30 @@ fn request(query: &str) -> AssembleContextRequest {
 }
 
 #[tokio::test]
+async fn episode_fallback_does_not_answer_a_different_named_subject_with_a_shared_noun() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+    common::ingest_episode(
+        &service,
+        "similar-hangar-source",
+        "subject: Quartz Hangar\ndimension: capacity\nvalue: 61 crates for Quartz Hangar",
+    )
+    .await;
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        request("What capacity was recorded for Opal Hangar?"),
+    )
+    .await
+    .expect("context should assemble");
+
+    assert!(
+        items.is_empty(),
+        "a shared noun is not evidence for a different declared subject: {items:?}"
+    );
+}
+
+#[tokio::test]
 async fn exposes_supersession_on_the_predecessor_item() {
     let tm = common::TestMemory::new(false).await;
     let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
@@ -205,6 +229,255 @@ async fn exposes_supersession_on_the_predecessor_item() {
             })
         }),
         "a relation invalidated after as_of must remain visible in that historical pack"
+    );
+}
+
+#[tokio::test]
+async fn historical_context_projects_only_relations_visible_at_its_revision() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:temporal-sup-1",
+        "fs:docs/temporal.md:aaaa",
+        "fs:docs/temporal.md",
+        "subject: ARR; dimension: ARR; value: legacy",
+        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    let before_successor_revision = latest_revision(tm.db_client.as_ref()).await;
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:temporal-sup-2",
+        "fs:docs/temporal.md:bbbb",
+        "fs:docs/temporal.md",
+        "subject: ARR; dimension: ARR; value: supersedes",
+        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+    )
+    .await;
+    assert!(common::wait_for_supersessions(&tm.db_client, 1).await);
+    let relation_revision = latest_revision(tm.db_client.as_ref()).await;
+    assert!(relation_revision > before_successor_revision);
+
+    let temporal = |known_revision| memory_mcp::models::TemporalContextQuery {
+        valid_at: Some(Utc.with_ymd_and_hms(2026, 6, 3, 0, 0, 0).unwrap()),
+        known_at: None,
+        known_revision: Some(known_revision),
+    };
+    let before = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("ARR"),
+        temporal(before_successor_revision),
+    )
+    .await
+    .expect("pre-successor historical context");
+    assert!(
+        before
+            .items
+            .iter()
+            .all(|item| item.reconciliation.is_none())
+    );
+    assert!(before.items.iter().any(|item| {
+        item.source_episode == "episode:temporal-sup-1"
+            && item.evidence_status == Some(memory_mcp::models::SnapshotEvidenceStatus::Current)
+    }));
+
+    let after = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("ARR"),
+        temporal(relation_revision),
+    )
+    .await
+    .expect("post-relation historical context");
+    assert!(after.items.iter().any(|item| {
+        item.reconciliation.as_ref().is_some_and(|metadata| {
+            metadata.relations.iter().any(|relation| {
+                relation.outcome == memory_mcp::models::claim::ClaimRelationOutcome::Supersession
+            })
+        })
+    }));
+    assert_eq!(
+        after.metadata.unwrap().snapshot.known_revision,
+        relation_revision
+    );
+
+    let compact = memory_mcp::tools::assemble_context::assemble_context(
+        &service,
+        memory_mcp::tools::params::AssembleContextParams {
+            query: "ARR".into(),
+            fact_types: Vec::new(),
+            as_of: String::new(),
+            valid_at: Some("2026-06-03T00:00:00Z".into()),
+            known_at: None,
+            known_revision: Some(relation_revision),
+            budget: 8,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            compact: true,
+        },
+    )
+    .await
+    .expect("compact temporal MCP response");
+    assert!(compact.result.as_array().is_some_and(|items| {
+        items.iter().any(|item| {
+            item["reconciliation"]["relations"]
+                .as_array()
+                .is_some_and(|relations| {
+                    relations.iter().any(|relation| {
+                        relation["outcome"] == "supersession"
+                            && relation["role"] == "superseded"
+                            && relation["superseded_by_fact_id"].is_string()
+                    })
+                })
+        })
+    }));
+    assert!(
+        compact.result.as_array().is_some_and(|items| {
+            items.iter().any(|item| {
+                item["source_episode"] == "episode:temporal-sup-1"
+                    && item["evidence_status"] == "historical"
+            }) && items.iter().any(|item| {
+                item["source_episode"] == "episode:temporal-sup-2"
+                    && item["evidence_status"] == "current"
+            })
+        }),
+        "the compact historical response must state each selected fact's snapshot-relative role"
+    );
+
+    let predecessor_fact_id = tm
+        .db_client
+        .query(
+            "SELECT fact_id FROM fact WHERE source_episode = $episode_id LIMIT 1",
+            Some(serde_json::json!({ "episode_id": "episode:temporal-sup-1" })),
+            "org",
+        )
+        .await
+        .expect("lookup predecessor fact")
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|row| row["fact_id"].as_str())
+        .expect("predecessor fact id")
+        .to_string();
+    memory_mcp::tools::invalidate(
+        &service,
+        memory_mcp::tools::params::InvalidateParams {
+            fact_id: predecessor_fact_id,
+            reason: "valid-time test closure".into(),
+            t_invalid: "2026-06-04T00:00:00Z".into(),
+        },
+    )
+    .await
+    .expect("close predecessor after the requested valid time");
+    let current_knowledge_revision = latest_revision(tm.db_client.as_ref()).await;
+    let earlier_valid_time = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("ARR"),
+        temporal(current_knowledge_revision),
+    )
+    .await
+    .expect("read current knowledge about an earlier valid time");
+    assert!(earlier_valid_time.items.iter().any(|item| {
+        item.reconciliation.as_ref().is_some_and(|metadata| {
+            metadata.relations.iter().any(|relation| {
+                relation.outcome == memory_mcp::models::claim::ClaimRelationOutcome::Supersession
+            })
+        })
+    }));
+}
+
+async fn latest_revision(db: &impl DbClient) -> i64 {
+    db.query(
+        "SELECT latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+        None,
+        "org",
+    )
+    .await
+    .expect("read revision clock")
+    .as_array()
+    .and_then(|rows| rows.first())
+    .and_then(|row| row["latest_revision"].as_i64())
+    .expect("revision clock row")
+}
+
+#[tokio::test]
+async fn historical_context_ignores_relations_from_facts_not_valid_at_the_requested_time() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:location-before-update",
+        "fs:docs/location.md:before",
+        "fs:docs/location.md",
+        "subject: North Depot; dimension: location; value: North City, location on May 1, 2026",
+        Utc.with_ymd_and_hms(2026, 5, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:location-after-update",
+        "fs:docs/location.md:after",
+        "fs:docs/location.md",
+        "subject: North Depot; dimension: location; value: South City, ordinary location update effective May 9, 2026",
+        Utc.with_ymd_and_hms(2026, 5, 9, 10, 0, 0).unwrap(),
+    )
+    .await;
+
+    let has_relation = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let rows = tm
+                .db_client
+                .query(
+                    "SELECT claim_relation_id FROM claim_relation WHERE (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL) LIMIT 1",
+                    None,
+                    "org",
+                )
+                .await
+                .expect("read relation frontier");
+            if rows.as_array().is_some_and(|rows| !rows.is_empty()) {
+                break true;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("reconciliation should complete within the test deadline");
+    assert!(has_relation);
+
+    let items = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        request("North Depot location"),
+        memory_mcp::models::TemporalContextQuery {
+            valid_at: Some(Utc.with_ymd_and_hms(2026, 5, 1, 10, 0, 0).unwrap()),
+            known_at: None,
+            known_revision: Some(latest_revision(tm.db_client.as_ref()).await),
+        },
+    )
+    .await
+    .expect("historical context should assemble");
+
+    let initial = items
+        .items
+        .iter()
+        .find(|item| item.source_episode == "episode:location-before-update")
+        .expect("the fact valid on May 1 should be selected");
+    assert_eq!(
+        initial.evidence_status,
+        Some(memory_mcp::models::SnapshotEvidenceStatus::Current),
+        "a relation to a fact effective May 9 must not mark the May 1 evidence as conflicting"
+    );
+    assert!(
+        initial.reconciliation.as_ref().is_none_or(|metadata| {
+            metadata.relations.iter().all(|relation| {
+                relation.outcome != memory_mcp::models::claim::ClaimRelationOutcome::Contradiction
+            })
+        }),
+        "a future-valid contradiction must not be exposed in the May 1 context"
     );
 }
 
@@ -473,6 +746,53 @@ async fn withholds_relations_below_the_evidence_stage() {
             "{stage} withholds relation evidence, so currentness is unknown and no candidate may be presented as current"
         );
     }
+}
+
+#[tokio::test]
+async fn a_named_place_query_does_not_return_a_similarly_named_places_fact() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:juniper-west",
+        "inspection:juniper-west",
+        "inspection:juniper-west",
+        "subject: Juniper Terminal West; dimension: capacity; value: 26 crates for Juniper Terminal West",
+        Utc.with_ymd_and_hms(2026, 8, 1, 9, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:juniper-east",
+        "inspection:juniper-east",
+        "inspection:juniper-east",
+        "subject: Juniper Terminal East; dimension: capacity; value: 42 crates for Juniper Terminal East",
+        Utc.with_ymd_and_hms(2026, 8, 1, 9, 0, 0).unwrap(),
+    )
+    .await;
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        request("What capacity was recorded for Juniper Terminal East?"),
+    )
+    .await
+    .expect("context should assemble");
+
+    assert!(
+        items
+            .iter()
+            .any(|item| item.content.contains("Juniper Terminal East")),
+        "the exact named subject should remain retrievable"
+    );
+    assert!(
+        items
+            .iter()
+            .all(|item| !item.content.contains("Juniper Terminal West")),
+        "a lexical match on shared words must not disclose the similarly named West record: {items:#?}"
+    );
 }
 
 /// The relation must change a response, not merely appear in one.

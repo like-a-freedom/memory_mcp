@@ -87,9 +87,10 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-/// Integration scenario: ingestion persists the supplied episode.
+/// Ingestion preserves source content/valid time and owns transaction time.
 #[tokio::test]
-async fn ingest_persists_the_supplied_episode() -> Result<(), Box<dyn std::error::Error>> {
+async fn ingest_persists_source_fields_with_server_transaction_time()
+-> Result<(), Box<dyn std::error::Error>> {
     let (service, _) = common::make_service_with_client_result().await?;
     let t_ref = Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap();
     let t_ingested = Utc.with_ymd_and_hms(2026, 10, 3, 10, 1, 0).unwrap();
@@ -103,7 +104,9 @@ async fn ingest_persists_the_supplied_episode() -> Result<(), Box<dyn std::error
         policy_tags: vec!["reviewed".to_owned()],
     };
 
+    let before = Utc::now();
     let episode_id = IngestCapability::ingest_from_service(&service, request(), None).await?;
+    let after = Utc::now();
     let before_retry = episode_scan(&service).await?;
     assert_eq!(before_retry.len(), 1, "one episode was persisted");
     assert_eq!(before_retry[0]["episode_id"], episode_id);
@@ -111,8 +114,169 @@ async fn ingest_persists_the_supplied_episode() -> Result<(), Box<dyn std::error
     assert_eq!(before_retry[0]["source_id"], "source-a01");
     assert_eq!(before_retry[0]["content"], "exact original episode content");
     assert_eq!(before_retry[0]["t_ref"], "2026-10-03T10:00:00Z");
-    assert_eq!(before_retry[0]["t_ingested"], "2026-10-03T10:01:00Z");
+    let recorded = chrono::DateTime::parse_from_rfc3339(
+        before_retry[0]["t_ingested"]
+            .as_str()
+            .expect("stored transaction timestamp"),
+    )?
+    .with_timezone(&Utc);
+    assert!(
+        recorded >= before && recorded <= after,
+        "transaction time must come from the server, not the supplied timestamp"
+    );
     assert_eq!(before_retry[0]["policy_tags"], json!(["reviewed"]));
+    Ok(())
+}
+
+/// Agent-provided content is data, even when it names an existing local file.
+#[tokio::test]
+async fn ingest_treats_existing_file_path_as_literal_content()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let source = tempfile::tempdir()?;
+    let file_path = source.path().join("private-notes.txt");
+    std::fs::write(&file_path, "unrequested private file contents")?;
+    let literal_path = file_path.to_string_lossy().into_owned();
+
+    let response = memory_mcp::tools::ingest(
+        &service,
+        memory_mcp::tools::params::IngestParams {
+            source_type: "agent_note".into(),
+            source_id: "caller-selected-source".into(),
+            content: literal_path.clone(),
+            t_ref: Utc
+                .with_ymd_and_hms(2026, 11, 22, 12, 0, 0)
+                .unwrap()
+                .to_rfc3339(),
+            t_ingested: None,
+            policy_tags: vec![],
+            source_group: None,
+            source_position: None,
+        },
+    )
+    .await?;
+    let episodes = episode_scan(&service).await?;
+    let episode = episodes
+        .iter()
+        .find(|episode| episode["episode_id"] == response.result)
+        .expect("ingested episode is visible through the owner read");
+
+    assert_eq!(episode["content"], literal_path);
+    assert_eq!(episode["source_id"], "caller-selected-source");
+    Ok(())
+}
+
+/// Agent-provided URL text is data and must not trigger an HTTP import.
+#[tokio::test]
+async fn ingest_treats_loopback_url_as_literal_content() -> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let literal_url = "http://127.0.0.1:9/agent-reference";
+
+    let response = memory_mcp::tools::ingest(
+        &service,
+        memory_mcp::tools::params::IngestParams {
+            source_type: "agent_note".into(),
+            source_id: "caller-selected-url-source".into(),
+            content: literal_url.into(),
+            t_ref: Utc
+                .with_ymd_and_hms(2026, 11, 22, 12, 1, 0)
+                .unwrap()
+                .to_rfc3339(),
+            t_ingested: None,
+            policy_tags: vec![],
+            source_group: None,
+            source_position: None,
+        },
+    )
+    .await?;
+    let episodes = episode_scan(&service).await?;
+    let episode = episodes
+        .iter()
+        .find(|episode| episode["episode_id"] == response.result)
+        .expect("ingested episode is visible through the owner read");
+
+    assert_eq!(episode["content"], literal_url);
+    assert_eq!(episode["source_id"], "caller-selected-url-source");
+    Ok(())
+}
+
+/// High-confidence credentials are refused before an episode is committed,
+/// and the validation error does not echo the supplied value.
+#[tokio::test]
+async fn ingest_rejects_credential_material_without_persisting_or_echoing_it()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let secret = "sensitive-canary-credential-value";
+    let error = memory_mcp::tools::ingest(
+        &service,
+        memory_mcp::tools::params::IngestParams {
+            source_type: "note".into(),
+            source_id: "credential-test".into(),
+            content: format!("API_KEY={secret}"),
+            t_ref: "2026-11-22T12:02:00Z".into(),
+            t_ingested: None,
+            policy_tags: vec![],
+            source_group: None,
+            source_position: None,
+        },
+    )
+    .await
+    .expect_err("credential-bearing episode must be rejected");
+
+    assert!(
+        !error.to_string().contains(secret),
+        "validation errors must not reflect credential material"
+    );
+    assert_eq!(episode_count(&service).await?, 0);
+    Ok(())
+}
+
+/// Ordinary discussion of credential concepts remains ingestible.
+#[tokio::test]
+async fn ingest_accepts_non_secret_security_discussion() -> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let response = memory_mcp::tools::ingest(
+        &service,
+        memory_mcp::tools::params::IngestParams {
+            source_type: "note".into(),
+            source_id: "security-discussion".into(),
+            content: "OAuth access tokens expire after one hour; rotate API keys regularly.".into(),
+            t_ref: "2026-11-22T12:03:00Z".into(),
+            t_ingested: None,
+            policy_tags: vec![],
+            source_group: None,
+            source_position: None,
+        },
+    )
+    .await?;
+
+    assert_eq!(episode_count(&service).await?, 1);
+    assert!(!response.result.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn ingest_rejects_credential_material_in_source_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let error = memory_mcp::tools::ingest(
+        &service,
+        memory_mcp::tools::params::IngestParams {
+            source_type: "note".into(),
+            source_id: "api_key=sensitive-metadata-canary".into(),
+            content: "ordinary meeting notes".into(),
+            t_ref: "2026-11-22T12:04:00Z".into(),
+            t_ingested: None,
+            policy_tags: vec![],
+            source_group: None,
+            source_position: None,
+        },
+    )
+    .await
+    .expect_err("credential-bearing source identity must be rejected");
+
+    assert!(!error.to_string().contains("sensitive-metadata-canary"));
+    assert_eq!(episode_count(&service).await?, 0);
     Ok(())
 }
 
@@ -220,6 +384,7 @@ async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing()
         result,
         Err(MemoryError::Conflict(message))
             if message.contains("ambiguous legacy episode identity")
+                && !message.contains("ambiguous-source")
     ));
     assert_eq!(episode_count(&service).await?, 2);
     Ok(())

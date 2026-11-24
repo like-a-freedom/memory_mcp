@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "absent-v8-entry",
+      "source_id": "absent-v8-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Cobalt Hangar\ndimension: capacity\nvalue: 161 crates for Cobalt Hangar",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "east-v8-entry",
+      "source_id": "east-v8-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Juniper Terminal East\ndimension: capacity\nvalue: 147 crates for Juniper Terminal East",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "west-v8-entry",
+      "source_id": "west-v8-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Juniper Terminal West\ndimension: capacity\nvalue: 129 crates for Juniper Terminal West",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "sole-v8-entry",
+      "source_id": "sole-v8-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Tern Works\ndimension: capacity\nvalue: 158 crates for Tern Works",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v8-a",
+      "source_id": "dispute-v8-a-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Cedar Annex\ndimension: capacity\nvalue: 141 crates for Cedar Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v8-b",
+      "source_id": "dispute-v8-b-peer",
+      "source_type": "inspection-record",
+      "content": "subject: Cedar Annex\ndimension: capacity\nvalue: 143 crates for Cedar Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "supported-v8-entry",
+      "source_id": "supported-v8-entry-ledger",
+      "source_type": "maintenance-record",
+      "content": "subject: Copper Port\ndimension: capacity\nvalue: 127 crates for Copper Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "forum-v8-entry",
+      "source_id": "forum-v8-entry-ledger",
+      "source_type": "forum-report",
+      "content": "subject: Copper Port\ndimension: capacity\nvalue: 132 crates, unverified correction reported on a forum for Copper Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "pre-v8-report",
+      "source_id": "pre-v8-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Indigo Quay\ndimension: capacity\nvalue: 113 crates for Indigo Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "post-v8-report",
+      "source_id": "post-v8-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Indigo Quay\ndimension: capacity\nvalue: 119 crates, correction claimed by another inspector for Indigo Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "earlier-v8-valid",
+      "source_id": "earlier-v8-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Granite Wharf\ndimension: capacity\nvalue: 116 crates for Granite Wharf",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "later-v8-valid",
+      "source_id": "later-v8-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Granite Wharf\ndimension: capacity\nvalue: 121 crates for Granite Wharf",
+      "t_ref": "2026-08-01T09:01:00Z"
+    },
+    {
+      "id": "office-v8-entry",
+      "source_id": "office-v8-entry-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Tern Office\ndimension: location\nvalue: Sparrow Lane for Tern Office",
+      "t_ref": "2026-08-01T09:00:00Z"
+    }
+  ]
+}

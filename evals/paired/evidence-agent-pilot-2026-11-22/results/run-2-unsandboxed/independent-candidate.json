@@ -1,0 +1,3023 @@
+{
+  "schema_version": "memory-mcp-independent-paired/v1",
+  "agent_observed": {
+    "schema_version": "memory-mcp-agent-paired/v2",
+    "arm": "candidate",
+    "run_id": "83584-1795320508603342000-1",
+    "run_started_at": "2026-11-22T04:08:28.603343Z",
+    "run_completed_at": "2026-11-22T04:21:33.003313Z",
+    "identity": {
+      "shared": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "fad8adc3beaf27f582eb9c0adfb0061605de82d47e9c78511adb4a428757e99c",
+        "oracle_sha256": "1c4391c5d037210227d71b319491c89ccf3de97861535ab7b42d4294de5517c4",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "c8f65767e70e4d0fa4ae073b7ddd7529f10dc25d05a52c440f0faad7f8cff650",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      }
+    },
+    "expected_trials": [
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      }
+    ],
+    "receipts": [
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "alder-workshop-booking-history",
+          "case_id": "alder-workshop-location",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 16844,
+        "output_tokens": 121,
+        "wall_time_ms": 12826,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e900d9b61bbc7558d4c14b0d05b28077a54b7e25f5d8ad5e525fea101e82eabe",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "07092e6ebac2adaed770045ac6c69ae3a6c49359ae9ed7f340740fea05f3fba7",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "473f5dcf7cecc082c147e4eba27930744a7f2a979cc4b24c3adeb88bac06cb64",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 16844,
+            "output_tokens": 121
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "beacon-export-decision-history",
+          "case_id": "beacon-export-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26563,
+        "output_tokens": 116,
+        "wall_time_ms": 12560,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "87c7c9ffb89ca159a02972006fe2ba4256fb3694a853154dfeaa4667a7159b2c",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e65c194547dabdfe1a93f80c314894da5a76d40f5e28cd808a6c1750366b07ce",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "f78000e13897c2b8fdb7bfdd956df2d96c034a860f829a14a8b4fef97ace7228",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26563,
+            "output_tokens": 116
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "cedar-release-readiness-history",
+          "case_id": "cedar-release-check",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26575,
+        "output_tokens": 133,
+        "wall_time_ms": 13225,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "6b493ad443c168dc81d99c52ae8ff343bb81f04ed8c47617502eadb1d842a056",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "91436e99259890cf75f6a28037112b0497f498aa97b4cf5009c1b00c378a3915",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "2b5ef368ef8aeca0170ee937fc9144fbfbe485b5525f416e6e937579905daed5",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26575,
+            "output_tokens": 133
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "mara-status-preference-history",
+          "case_id": "mara-status-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 16846,
+        "output_tokens": 108,
+        "wall_time_ms": 10270,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "79f3360d3f89dd2a016f362a8c59f528d57bb1b812cf53e5628cf3d02605801b",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "5b10ad9c32518bc7a3184326e51219b02ccdbe450e88f1b5b79d00f35d3f4cea",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "ccd98f7dbca282f2a2dcbd2139040203a08e72afda264d4eaebcae864b0c3f20",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 16846,
+            "output_tokens": 108
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "slate-review-schedule-history",
+          "case_id": "slate-review-start-time",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 16842,
+        "output_tokens": 113,
+        "wall_time_ms": 10960,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "8ccf9c4276716fbd2afa8f710f6fb84e30207e3854ed00973763cec97515e801",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "094740ce7b39f2d92d7da1b48012f44f5bfc4526b42c9a78d5338a7bfb77ef8a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "2717a4eaf14ede9d938096dac6c078106b9e788f4aab7b7eceab382dc49820ef",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 16842,
+            "output_tokens": 113
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "transient-retry-policy-history",
+          "case_id": "retry-after-rate-limit",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26566,
+        "output_tokens": 132,
+        "wall_time_ms": 13148,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "d8a9c82c55d40a8378864de189333f2a6a6b3cab51791996f9bc147ff4ec7ffb",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "fa6834abb3a068b331d0bdf8e1d8c1e2c1f83bd4284c8ff37e2cfdf5da35de0a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "a037714093f7f71d810583b6e2ecf76d23af8f1a75a80c50b79080d3aee8d7e9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26566,
+            "output_tokens": 132
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 27005,
+        "output_tokens": 133,
+        "wall_time_ms": 12526,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "c3225f1ed748074863b618dd9eefddf865b89240bd2760cf1ba59259886877f4",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "a8cf6ee1aa06c3844fc70e7689fd721f5dca04d261cfdb621d43069655f1b094",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "8bed789a11e742f57ed160864680da61dd80cdef7a913e17781cfc683ec13aca",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27005,
+            "output_tokens": 133
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 27619,
+        "output_tokens": 162,
+        "wall_time_ms": 14116,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "0ea97dc63a42bcb1c7d0f0911105069df23cd7bd6eba0184092f2c6c5bc7558f",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "2c4d3c73b21cd019632255fd2b22962fead252a78a602b58922ad3ebb26231af",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "fead51fdd25dfb88b5ff302da3fca6a787d893e5bb874e0e0e3714353f65b3c0",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27619,
+            "output_tokens": 162
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 2,
+        "repair_turns": 1,
+        "user_clarifications": 1,
+        "input_tokens": 26499,
+        "output_tokens": 233,
+        "wall_time_ms": 17435,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "c5a6570dfa16cefa844741c16363ffd4173fae423fec7e264936d5c52a1a9c46",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_error",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": "invalid_arguments",
+            "payload_sha256": "7a3541c35f214cf426047c58e910fc90b96a3ee78b4747717be20deb2d417187",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "b6ed2ba3a835d23b3be03c69656737a6badddc87010036d297c1734f7249f0c1",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "428b2a7fa00f6e8fcd4a9f85dbfb44e72c55dceedaeea52b4b60afac670c54cb",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 7,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "1cd5e7de29cac6c3dc53e0578d64c69bf47d6cfb260e224e6e1707887b2e5a4d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 8,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26499,
+            "output_tokens": 233
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 27654,
+        "output_tokens": 174,
+        "wall_time_ms": 12029,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "2d5633ea57a5da67d864303afedda6845de32f211ca18d0b323adfa0c06a9553",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "59bb9ae6298d5a1b289c368a3bacd161550c66b33ba7a2c3dda1a0373afa422d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "c8a19416e661ad7cf6a8a8463b1463306b3e064d7771a209cf21cf1fba1831e9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27654,
+            "output_tokens": 174
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 27585,
+        "output_tokens": 157,
+        "wall_time_ms": 12925,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "af349d46b7e1ad269d059d29d8bafdfd2149ba17a675dc14b19417d2b8135245",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "1af743922eb9aeb9363ea8c782ee1213fc39f5f5872aa1eca856d7191695e1c0",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "971c0a8547e83fdfdff8f0f8ae2a9c6456e2b60b4d59f931490ad61c920c7cc1",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27585,
+            "output_tokens": 157
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 26995,
+        "output_tokens": 126,
+        "wall_time_ms": 11296,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "17bf7b39c39db9fbff0018e4e579366dbb7299eb4ebfad10acf037d8b1b93d6e",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "f64882fa9962cf40c5c3fca2446f1d16e3960560079bd5edf677eff676517c35",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "204e3d4cc2035470234438f07618aa477304cf1d2a01ea1acdbdb3171072722d",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 26995,
+            "output_tokens": 126
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        "arm_order": 2,
+        "status": "completed",
+        "direct_memory_success": false,
+        "task_oracle_passed": false,
+        "turns_used": 1,
+        "tool_calls": 2,
+        "repair_turns": 0,
+        "user_clarifications": 1,
+        "input_tokens": 36711,
+        "output_tokens": 164,
+        "wall_time_ms": 17165,
+        "hard_violations": [
+          "prohibited_evidence"
+        ],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "96942be8b64b8045cedbe8895fa6b0440c377b427a91e1b5e70fe5492f12c94a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "e61a3b804ab323d23924b8d489fac65f65d6090d7ae9680ebff72bfcac5efd4e",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "1872c7c258dc8d5dafd0d5044644e940018cb5132d06459288cee46fb2854802",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_1",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "2938bdf35cc608a265eb0fbef06b60568da07b7cd6cdb8d6fc5f9262d271f4b5",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 6,
+            "turn": 1,
+            "kind": "clarification",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 7,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "ddf8440d898b510a97a75744d51e47303ea28a8a33d41ccefb92532d08bd03d9",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 8,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 36711,
+            "output_tokens": 164
+          }
+        ]
+      },
+      {
+        "key": {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        "arm_order": 1,
+        "status": "completed",
+        "direct_memory_success": true,
+        "task_oracle_passed": true,
+        "turns_used": 1,
+        "tool_calls": 1,
+        "repair_turns": 0,
+        "user_clarifications": 0,
+        "input_tokens": 27170,
+        "output_tokens": 139,
+        "wall_time_ms": 12566,
+        "hard_violations": [],
+        "trace": [
+          {
+            "sequence": 1,
+            "turn": 1,
+            "kind": "agent_turn_started",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 2,
+            "turn": 1,
+            "kind": "memory_read",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "0c21be864484df365a28fbcca9de5ffb15532ff675d2387634353ed8a37d5a1a",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 3,
+            "turn": 1,
+            "kind": "tool_response",
+            "call_id": "item_0",
+            "tool_name": "memory_decisions/assemble_context",
+            "error_class": null,
+            "payload_sha256": "85be03e07b80deaaa77557958946bc24d793e614678befa5ffc463355ef74777",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 4,
+            "turn": 1,
+            "kind": "final_answer",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": "f2b6549cfada27a3b00c8eaf4769f4eaf53f1962ea78635e47bf3ea5e8cb85ac",
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          {
+            "sequence": 5,
+            "turn": 1,
+            "kind": "agent_turn",
+            "call_id": null,
+            "tool_name": null,
+            "error_class": null,
+            "payload_sha256": null,
+            "input_tokens": 27170,
+            "output_tokens": 139
+          }
+        ]
+      }
+    ]
+  },
+  "probes_sha256": "b031f1118f22eb3d7904d69bb314f50673ea42e263da9e547553452b183f89c3",
+  "independent_memory": [
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:6c5a213a6c874120baae2875": "alder-workshop-location"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "e0c3ba99df2f5a4f7caed08c1ebe6bc730bdd77e2a9aaeebdb50a78651255732",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "alder-workshop-location"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 4,
+          "query": "Where was the Alder workshop booked?",
+          "valid_at": "2026-06-02T10:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:09:00.307556Z\",\"known_revision\":4,\"valid_at\":\"2026-06-02T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Alder workshop\\nlocation: Room 4B at North Campus\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:6c5a213a6c874120baae2875\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":4,\"reference_time\":\"2026-06-02T10:00:00Z\",\"source_episode\":\"episode:6c5a213a6c874120baae2875\",\"source_id\":\"alder-event-planning\",\"source_type\":\"project-note\",\"valid_at\":\"2026-06-02T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:6c5a213a6c874120baae2875\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:09:00.307556Z",
+                  "known_revision": 4,
+                  "valid_at": "2026-06-02T10:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Alder workshop\nlocation: Room 4B at North Campus",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:6c5a213a6c874120baae2875",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 4,
+                    "reference_time": "2026-06-02T10:00:00Z",
+                    "source_episode": "episode:6c5a213a6c874120baae2875",
+                    "source_id": "alder-event-planning",
+                    "source_type": "project-note",
+                    "valid_at": "2026-06-02T10:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:6c5a213a6c874120baae2875"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "e0c3ba99df2f5a4f7caed08c1ebe6bc730bdd77e2a9aaeebdb50a78651255732",
+        "oracle_sha256": "1197307fe0462e2da96291e731c88b9dc1a228e734aeff220917a7f850fbb567",
+        "observation_sha256": "f256ec081541f39477217db2cf71f142e43a54724c8b0308f593aa9f96d6f5f3",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:da1eede41c5c13b43bacc4e7": "beacon-export-format-decision"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "4d6ee53f652f3d2e6796761a4733294659c5032d2664a0fa51a33ecef3a19b9e",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "beacon-export-format-decision"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 7,
+          "query": "Which serialization format was selected for the Beacon export?",
+          "valid_at": "2026-06-03T11:30:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:09:29.087070Z\",\"known_revision\":7,\"valid_at\":\"2026-06-03T11:30:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.75,\"content\":\"subject: Beacon export\\ndecision: use JSON Lines, one JSON object per line\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:da1eede41c5c13b43bacc4e7\",\"grounding\":0.8,\"provenance\":{\"episode_fallback\":true,\"known_revision\":7,\"reference_time\":\"2026-06-03T11:30:00Z\",\"source_episode\":\"episode:da1eede41c5c13b43bacc4e7\",\"source_id\":\"beacon-design-review\",\"source_type\":\"decision-record\",\"valid_at\":\"2026-06-03T11:30:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":0.8,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:da1eede41c5c13b43bacc4e7\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:09:29.087070Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-06-03T11:30:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.75,
+                  "content": "subject: Beacon export\ndecision: use JSON Lines, one JSON object per line",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:da1eede41c5c13b43bacc4e7",
+                  "grounding": 0.8,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 7,
+                    "reference_time": "2026-06-03T11:30:00Z",
+                    "source_episode": "episode:da1eede41c5c13b43bacc4e7",
+                    "source_id": "beacon-design-review",
+                    "source_type": "decision-record",
+                    "valid_at": "2026-06-03T11:30:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 0.8,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:da1eede41c5c13b43bacc4e7"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "4d6ee53f652f3d2e6796761a4733294659c5032d2664a0fa51a33ecef3a19b9e",
+        "oracle_sha256": "f31225a27648bc6c8a349936f0ef7c42b57527eca0de9716699a6b460d3190ec",
+        "observation_sha256": "8c7256ca6cea28103d5ddca0cdb9c662c25aa92df35b83c6c33be2bca7aea7bf",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:8577bc81425d9b5fb2c4dca2": "cedar-release-check"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "02f1a0897979d94e72e20aa9aa6a2712060849cc38edf2e64a1d9ac707be1bbf",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "cedar-release-check"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 2,
+          "query": "What check remains before approving the Cedar release?",
+          "valid_at": "2026-06-04T14:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:10:48.839736Z\",\"known_revision\":2,\"valid_at\":\"2026-06-04T14:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.68,\"content\":\"subject: Cedar release\\nremaining check: verify restoration from a clean backup before approval\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:8577bc81425d9b5fb2c4dca2\",\"grounding\":0.67,\"provenance\":{\"episode_fallback\":true,\"known_revision\":2,\"reference_time\":\"2026-06-04T14:00:00Z\",\"source_episode\":\"episode:8577bc81425d9b5fb2c4dca2\",\"source_id\":\"cedar-release-review\",\"source_type\":\"release-note\",\"valid_at\":\"2026-06-04T14:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":0.67,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:8577bc81425d9b5fb2c4dca2\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:10:48.839736Z",
+                  "known_revision": 2,
+                  "valid_at": "2026-06-04T14:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.68,
+                  "content": "subject: Cedar release\nremaining check: verify restoration from a clean backup before approval",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:8577bc81425d9b5fb2c4dca2",
+                  "grounding": 0.67,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 2,
+                    "reference_time": "2026-06-04T14:00:00Z",
+                    "source_episode": "episode:8577bc81425d9b5fb2c4dca2",
+                    "source_id": "cedar-release-review",
+                    "source_type": "release-note",
+                    "valid_at": "2026-06-04T14:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 0.67,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:8577bc81425d9b5fb2c4dca2"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "02f1a0897979d94e72e20aa9aa6a2712060849cc38edf2e64a1d9ac707be1bbf",
+        "oracle_sha256": "2f5a137d3e7d9fe373ae06141dac2cbeaee2b4357583c5389a2de56a121a2580",
+        "observation_sha256": "9496657a2f8085248d43d1ff7686231a1f1fd7557a04e98ab718c7b2abfdf19f",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:bb6d33a44ee7952462f691d3": "mara-status-format-note"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "5635dd5a7e6501a56a3a69dc0e2b7a8719e12a4aec5876fca9be747f872f0be2",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "mara-status-format-note"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 2,
+          "query": "What response format does Mara prefer for weekly status updates?",
+          "valid_at": "2026-06-01T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:11:16.488579Z\",\"known_revision\":2,\"valid_at\":\"2026-06-01T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Mara\\npreference: weekly status updates should be concise bullet lists\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:bb6d33a44ee7952462f691d3\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":2,\"reference_time\":\"2026-06-01T09:00:00Z\",\"source_episode\":\"episode:bb6d33a44ee7952462f691d3\",\"source_id\":\"mara-project-brief\",\"source_type\":\"user-preference\",\"valid_at\":\"2026-06-01T09:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:bb6d33a44ee7952462f691d3\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:11:16.488579Z",
+                  "known_revision": 2,
+                  "valid_at": "2026-06-01T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Mara\npreference: weekly status updates should be concise bullet lists",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:bb6d33a44ee7952462f691d3",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 2,
+                    "reference_time": "2026-06-01T09:00:00Z",
+                    "source_episode": "episode:bb6d33a44ee7952462f691d3",
+                    "source_id": "mara-project-brief",
+                    "source_type": "user-preference",
+                    "valid_at": "2026-06-01T09:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:bb6d33a44ee7952462f691d3"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "5635dd5a7e6501a56a3a69dc0e2b7a8719e12a4aec5876fca9be747f872f0be2",
+        "oracle_sha256": "3728b2508b6aa51e9d4527c180ea50e6371fbf61a2f558ef29bc653cd38914a7",
+        "observation_sha256": "559ab260fd737b66a3c840f9101129ab15af483c62346642cc4c59ed9787b5f7",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:73c025aee018d3d64fc7bbc8": "slate-review-start"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "e3419717ef8b02e8a8f31b4c83a779dd92feb6789393092ec3276d46b5ecbf24",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "slate-review-start"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 4,
+          "query": "When does the Slate review start?",
+          "valid_at": "2026-06-05T08:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:12:31.463824Z\",\"known_revision\":4,\"valid_at\":\"2026-06-05T08:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Slate review\\nstart time: June 20, 2026 at 15:30 UTC\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:73c025aee018d3d64fc7bbc8\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":4,\"reference_time\":\"2026-06-05T08:00:00Z\",\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\",\"source_id\":\"slate-team-calendar\",\"source_type\":\"meeting-note\",\"valid_at\":\"2026-06-05T08:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:12:31.463824Z",
+                  "known_revision": 4,
+                  "valid_at": "2026-06-05T08:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: Slate review\nstart time: June 20, 2026 at 15:30 UTC",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:73c025aee018d3d64fc7bbc8",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 4,
+                    "reference_time": "2026-06-05T08:00:00Z",
+                    "source_episode": "episode:73c025aee018d3d64fc7bbc8",
+                    "source_id": "slate-team-calendar",
+                    "source_type": "meeting-note",
+                    "valid_at": "2026-06-05T08:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:73c025aee018d3d64fc7bbc8"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "e3419717ef8b02e8a8f31b4c83a779dd92feb6789393092ec3276d46b5ecbf24",
+        "oracle_sha256": "76ad33d23e06ef033abc0072f23d9622ecbfd2add4e139bd91c626a44f4d7735",
+        "observation_sha256": "286f890dfdb9f7a7a613dea2e319f568933e012afb94e33ec3dde3d82e1f2c1d",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:e5529ce74420376870a4d152": "retry-after-rate-limit-policy"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "16eb0b2360e013ec5f72cc1c7475093da5e3c0a64cc23ed341e0ecfdb90f18a1",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "retry-after-rate-limit-policy"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 1,
+          "query": "How should a write be retried after a transient rate limit?",
+          "valid_at": "2026-06-06T16:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:12:56.612497Z\",\"known_revision\":1,\"valid_at\":\"2026-06-06T16:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: transient rate limit retry\\npolicy: wait for the backoff window, then retry only the failed write\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:e5529ce74420376870a4d152\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":1,\"reference_time\":\"2026-06-06T16:00:00Z\",\"source_episode\":\"episode:e5529ce74420376870a4d152\",\"source_id\":\"service-operations-runbook\",\"source_type\":\"operations-note\",\"valid_at\":\"2026-06-06T16:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:e5529ce74420376870a4d152\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance",
+                  "claim relations cannot be attached to episode-only evidence"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:12:56.612497Z",
+                  "known_revision": 1,
+                  "valid_at": "2026-06-06T16:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.85,
+                  "content": "subject: transient rate limit retry\npolicy: wait for the backoff window, then retry only the failed write",
+                  "evidence_status": "unknown",
+                  "fact_id": "episode_fallback:episode:e5529ce74420376870a4d152",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "known_revision": 1,
+                    "reference_time": "2026-06-06T16:00:00Z",
+                    "source_episode": "episode:e5529ce74420376870a4d152",
+                    "source_id": "service-operations-runbook",
+                    "source_type": "operations-note",
+                    "valid_at": "2026-06-06T16:00:00+00:00"
+                  },
+                  "rationale": "tier=fallback",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:e5529ce74420376870a4d152"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "16eb0b2360e013ec5f72cc1c7475093da5e3c0a64cc23ed341e0ecfdb90f18a1",
+        "oracle_sha256": "2cbfb5e4d17967a4dc1253b575bac007a11300cd0762a6d4514b3d67577904c6",
+        "observation_sha256": "877ba6dfaa130e78f995fdc9249977566c9e5139600667f02cde616190dbe065",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:4347f47605f2246a6ba83ece": "birch-initial",
+          "episode:831718fc5d9ccc40dc9d0ebc": "birch-update"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "3f7a243cb9b3601f97a741a101a8e6e14f546593844732851480fc5af508ef6c",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "birch-initial"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What pressure applied to Birch Pump on June 11, 2026?",
+          "valid_at": "2026-06-11T08:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:14:17.914788Z\",\"known_revision\":15,\"valid_at\":\"2026-06-11T08:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Birch Pump\\ndimension: pressure\\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026\",\"evidence_status\":\"current\",\"fact_id\":\"fact:dfa374a5b56b61c6f928fd59\",\"grounding\":0.71,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:4347f47605f2246a6ba83ece\",\"source_id\":\"birch-pump-operator\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-06-11T08:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.71,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:4347f47605f2246a6ba83ece\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:14:17.914788Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-11T08:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Birch Pump\ndimension: pressure\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026",
+                  "evidence_status": "current",
+                  "fact_id": "fact:dfa374a5b56b61c6f928fd59",
+                  "grounding": 0.71,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:4347f47605f2246a6ba83ece",
+                    "source_id": "birch-pump-operator",
+                    "source_type": "owner-record",
+                    "valid_at": "2026-06-11T08:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.71,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:4347f47605f2246a6ba83ece"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "3f7a243cb9b3601f97a741a101a8e6e14f546593844732851480fc5af508ef6c",
+        "oracle_sha256": "e1e38bb5362ccd6fadde163bf79a0a047769213f62c737108a12de5d6fd314a7",
+        "observation_sha256": "8e888bf252b0227d98c430050f9e62a392ada5f0042c78e37b4f09f7ceffa6ee",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:8831ff7c8c85bc95c5bee296": "cobalt-correction",
+          "episode:8a66d876b12d13360468a096": "cobalt-initial"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "5b719e9343b14c70627e88d1336bb15eedc97500c8b1308ea9333780b5783012",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "cobalt-correction",
+            "cobalt-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What lift capacity was recorded for Cobalt Terminal on June 3, 2026?",
+          "valid_at": "2026-06-03T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:14:44.775886Z\",\"known_revision\":15,\"valid_at\":\"2026-06-03T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Cobalt Terminal\\ndimension: lift_capacity\\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:876bbfd66c832f84e17e47aa\",\"grounding\":1.0,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:8831ff7c8c85bc95c5bee296\",\"source_id\":\"cobalt-terminal-ledger\",\"source_type\":\"owner-correction\",\"valid_at\":\"2026-06-03T09:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:8a66d876b12d13360468a096\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":1.0,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:8831ff7c8c85bc95c5bee296\"},{\"confidence\":0.7,\"content\":\"subject: Cobalt Terminal\\ndimension: lift_capacity\\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:333c561b78d806a54edddb6a\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:8a66d876b12d13360468a096\",\"source_id\":\"cobalt-terminal-ledger\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-06-03T09:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:8831ff7c8c85bc95c5bee296\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:8a66d876b12d13360468a096\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:14:44.775886Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-03T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:876bbfd66c832f84e17e47aa",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:8831ff7c8c85bc95c5bee296",
+                    "source_id": "cobalt-terminal-ledger",
+                    "source_type": "owner-correction",
+                    "valid_at": "2026-06-03T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:8a66d876b12d13360468a096",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 1.0,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:8831ff7c8c85bc95c5bee296"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:333c561b78d806a54edddb6a",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:8a66d876b12d13360468a096",
+                    "source_id": "cobalt-terminal-ledger",
+                    "source_type": "owner-record",
+                    "valid_at": "2026-06-03T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:8831ff7c8c85bc95c5bee296",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:8a66d876b12d13360468a096"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "5b719e9343b14c70627e88d1336bb15eedc97500c8b1308ea9333780b5783012",
+        "oracle_sha256": "71f6dfcaeaf48577c320574d25f2abe5568aea9b442984c56f85b8dfdd98db28",
+        "observation_sha256": "2f6fb313599d974dfdbe9c78a12dc33273bd3047268ce4205a93dacb893f2f68",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:33ce80cd97f4b3ae710607c4": "juniper-initial",
+          "episode:dc91e0a5f0ccbb0f5abbcc7c": "juniper-forum-correction"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "ff19801ded24d67a276f57622d8747fdb61565c0c6b22237226c9daf79888e8a",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "juniper-forum-correction",
+            "juniper-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What valve dwell was verified for Juniper Station on June 9, 2026?",
+          "valid_at": "2026-06-09T07:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:16:08.975875Z\",\"known_revision\":15,\"valid_at\":\"2026-06-09T07:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Juniper Station\\ndimension: valve_dwell\\nvalue: 45 seconds, an unverified forum post calls this a correction to the Juniper Station valve dwell effective June 9, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:69adbbd045e750e028184a34\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:dc91e0a5f0ccbb0f5abbcc7c\",\"source_id\":\"unverified-forum-post-17\",\"source_type\":\"forum-report\",\"valid_at\":\"2026-06-09T07:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:33ce80cd97f4b3ae710607c4\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:dc91e0a5f0ccbb0f5abbcc7c\"},{\"confidence\":0.7,\"content\":\"subject: Juniper Station\\ndimension: valve_dwell\\nvalue: 30 seconds for the Juniper Station valve dwell effective June 9, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:a4202e2d62e2dc3043db11b5\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:33ce80cd97f4b3ae710607c4\",\"source_id\":\"juniper-station-maintenance\",\"source_type\":\"maintenance-record\",\"valid_at\":\"2026-06-09T07:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:dc91e0a5f0ccbb0f5abbcc7c\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:33ce80cd97f4b3ae710607c4\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:16:08.975875Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-09T07:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 45 seconds, an unverified forum post calls this a correction to the Juniper Station valve dwell effective June 9, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:69adbbd045e750e028184a34",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:dc91e0a5f0ccbb0f5abbcc7c",
+                    "source_id": "unverified-forum-post-17",
+                    "source_type": "forum-report",
+                    "valid_at": "2026-06-09T07:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:33ce80cd97f4b3ae710607c4",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:dc91e0a5f0ccbb0f5abbcc7c"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 30 seconds for the Juniper Station valve dwell effective June 9, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:a4202e2d62e2dc3043db11b5",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:33ce80cd97f4b3ae710607c4",
+                    "source_id": "juniper-station-maintenance",
+                    "source_type": "maintenance-record",
+                    "valid_at": "2026-06-09T07:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:dc91e0a5f0ccbb0f5abbcc7c",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:33ce80cd97f4b3ae710607c4"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "ff19801ded24d67a276f57622d8747fdb61565c0c6b22237226c9daf79888e8a",
+        "oracle_sha256": "bf91744c0c5883eea032ad4ae60ee4e741c8f55986b7d14b51c13e69c1db3cb1",
+        "observation_sha256": "611d25b4baa99f461e4abd8884a47a5eed8990b3c24ccb3324e8830259ef3806",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:0e8b3d10a5d0b9f4a8990ee3": "maple-initial",
+          "episode:42b87986f5a5cbf28ba4cac3": "maple-peer"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "6d729725be12a7ed18051b96953a100ee32b7d5bd6ff5fc01122c2fa3ffd7381",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "maple-peer",
+            "maple-initial"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What humidity limit was recorded for Maple Vault on June 8, 2026?",
+          "valid_at": "2026-06-08T12:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:16:41.032063Z\",\"known_revision\":15,\"valid_at\":\"2026-06-08T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Maple Vault\\ndimension: humidity_limit\\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:0c941fe8d947642c177d491b\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:42b87986f5a5cbf28ba4cac3\",\"source_id\":\"maple-vault-sensor\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-08T12:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:0e8b3d10a5d0b9f4a8990ee3\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:42b87986f5a5cbf28ba4cac3\"},{\"confidence\":0.7,\"content\":\"subject: Maple Vault\\ndimension: humidity_limit\\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:e59caf8eafb4730007f3c8ea\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:0e8b3d10a5d0b9f4a8990ee3\",\"source_id\":\"maple-vault-engineer\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-08T12:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:42b87986f5a5cbf28ba4cac3\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:0e8b3d10a5d0b9f4a8990ee3\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:16:41.032063Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-08T12:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:0c941fe8d947642c177d491b",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:42b87986f5a5cbf28ba4cac3",
+                    "source_id": "maple-vault-sensor",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-08T12:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:0e8b3d10a5d0b9f4a8990ee3",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:42b87986f5a5cbf28ba4cac3"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:e59caf8eafb4730007f3c8ea",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:0e8b3d10a5d0b9f4a8990ee3",
+                    "source_id": "maple-vault-engineer",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-08T12:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:42b87986f5a5cbf28ba4cac3",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:0e8b3d10a5d0b9f4a8990ee3"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "6d729725be12a7ed18051b96953a100ee32b7d5bd6ff5fc01122c2fa3ffd7381",
+        "oracle_sha256": "fb783dd0f909b465de19c366f5409e6211f412c455631f345ec66f056db03696",
+        "observation_sha256": "ab6bc8c54cfd7c918d724f31d886f98ba5a4ecc44dc70a6c985c73d3f62a78c3",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:03fbad000e3426188fb49264": "opal-initial",
+          "episode:e9a91391887dac6914faadaf": "opal-peer"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "8b58965611d1020c23d8bb94066a1374ca78c61a5ef2c8dee9e71b15a4af0267",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "opal-initial",
+            "opal-peer"
+          ],
+          "budget_used": 2,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 15,
+          "query": "What occupancy limit was recorded for Opal Cabin on June 7, 2026?",
+          "valid_at": "2026-06-07T11:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:18:08.939115Z\",\"known_revision\":15,\"valid_at\":\"2026-06-07T11:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Opal Cabin\\ndimension: occupancy_limit\\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:846bb832e23a4eed72c99c82\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:03fbad000e3426188fb49264\",\"source_id\":\"opal-cabin-inspector\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-07T11:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:e9a91391887dac6914faadaf\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:03fbad000e3426188fb49264\"},{\"confidence\":0.7,\"content\":\"subject: Opal Cabin\\ndimension: occupancy_limit\\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:be1b6acdfc0d239f82dad66a\",\"grounding\":0.86,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:e9a91391887dac6914faadaf\",\"source_id\":\"opal-cabin-visitor-log\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-07T11:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"counterpart_source_episode_id\":\"episode:03fbad000e3426188fb49264\",\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.86,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:e9a91391887dac6914faadaf\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:18:08.939115Z",
+                  "known_revision": 15,
+                  "valid_at": "2026-06-07T11:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:846bb832e23a4eed72c99c82",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:03fbad000e3426188fb49264",
+                    "source_id": "opal-cabin-inspector",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-07T11:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:e9a91391887dac6914faadaf",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:03fbad000e3426188fb49264"
+                },
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026",
+                  "evidence_status": "conflicting",
+                  "fact_id": "fact:be1b6acdfc0d239f82dad66a",
+                  "grounding": 0.86,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 15,
+                    "source_episode_id": "episode:e9a91391887dac6914faadaf",
+                    "source_id": "opal-cabin-visitor-log",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-07T11:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "reconciliation": {
+                    "relations": [
+                      {
+                        "counterpart_source_episode_id": "episode:03fbad000e3426188fb49264",
+                        "outcome": "contradiction",
+                        "role": "conflict"
+                      }
+                    ]
+                  },
+                  "relevance": 0.86,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:e9a91391887dac6914faadaf"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "8b58965611d1020c23d8bb94066a1374ca78c61a5ef2c8dee9e71b15a4af0267",
+        "oracle_sha256": "3464c605246413222f760c6a9e541cf7365bbd87e72af2e0127de9d7bcd29b70",
+        "observation_sha256": "3abc09d4c6e7d2491bbfb3fbcd31d50659b2f1b3a4504d271d2b8493d97e81dd",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:81c008e084bd3d07e6db0452": "stable-marsh-lab"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "b427413aecfaad3ae76e015863b13530726e02fe6df4e072d612030780f1bdb5",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "stable-marsh-lab"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 9,
+          "query": "Where was Marsh Lab located?",
+          "valid_at": "2026-06-20T00:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:18:36.475539Z\",\"known_revision\":9,\"valid_at\":\"2026-06-20T00:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.65,\"content\":\"subject: Marsh Lab\\ndimension: location\\nvalue: West Annex for the Marsh Lab location on June 1, 2026\",\"evidence_status\":\"current\",\"fact_id\":\"fact:73e2e9614869275f6f270abd\",\"grounding\":0.67,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":9,\"source_episode_id\":\"episode:81c008e084bd3d07e6db0452\",\"source_id\":\"marsh-lab-inventory\",\"source_type\":\"inventory-record\",\"valid_at\":\"2026-06-20T00:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.67,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:81c008e084bd3d07e6db0452\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:18:36.475539Z",
+                  "known_revision": 9,
+                  "valid_at": "2026-06-20T00:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.65,
+                  "content": "subject: Marsh Lab\ndimension: location\nvalue: West Annex for the Marsh Lab location on June 1, 2026",
+                  "evidence_status": "current",
+                  "fact_id": "fact:73e2e9614869275f6f270abd",
+                  "grounding": 0.67,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 9,
+                    "source_episode_id": "episode:81c008e084bd3d07e6db0452",
+                    "source_id": "marsh-lab-inventory",
+                    "source_type": "inventory-record",
+                    "valid_at": "2026-06-20T00:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.67,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:81c008e084bd3d07e6db0452"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "b427413aecfaad3ae76e015863b13530726e02fe6df4e072d612030780f1bdb5",
+        "oracle_sha256": "e24f4772a82fe89e4b4f21563fc9ec3ef4df3a702709e48330aaad389a2f391f",
+        "observation_sha256": "47798a557801a3e40067887cc51a6b205fe29afc63cfe4f1179e636e3b9f97d6",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:d4e2465d3f8861a73a6bf5af": "remote-drum"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "ac2a8697e9a12e1d83a1e779d79a4a681d71e00d8529983f8893502fa39cc02e",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [],
+          "budget_used": 0,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 7,
+          "query": "What fill level was recorded for Cedar Sluice on June 6, 2026?",
+          "valid_at": "2026-06-06T06:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:20:10.862068Z\",\"known_revision\":7,\"valid_at\":\"2026-06-06T06:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:20:10.862068Z",
+                  "known_revision": 7,
+                  "valid_at": "2026-06-06T06:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "ac2a8697e9a12e1d83a1e779d79a4a681d71e00d8529983f8893502fa39cc02e",
+        "oracle_sha256": "ccb0903a387a19eed0ab51bc9e0fc93ea602657a993eb9f9234c5d01dd1b430c",
+        "observation_sha256": "772ecc83636ff985d7904a8545e221832281703ee1f09d3e10cbfca9ac0e0c1b",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "capture": {
+        "schema_version": "memory-mcp-independent-probe-capture/v1",
+        "launch_profile": {
+          "EMBEDDINGS_ENABLED": "false",
+          "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+          "NER_EXTRACTOR": "regex",
+          "SURREALDB_DB_NAME": "memory_decisions",
+          "SURREALDB_EMBEDDED": "true",
+          "SURREALDB_NAMESPACE": "main"
+        },
+        "episode_id_to_event_id": {
+          "episode:71afa1108096f2979dc520f7": "willow-distractor",
+          "episode:a8e50b3321c83d3386b1524b": "willow-target"
+        },
+        "transport": "stdio",
+        "extractor": "regex",
+        "embeddings_enabled": false,
+        "observation": {
+          "input_sha256": "db74c72b05ae8af6851eecb7186284da3565a854ba7889e0da8c36898ecad003",
+          "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+          "source_event_ids": [
+            "willow-target"
+          ],
+          "budget_used": 1,
+          "completed": true
+        },
+        "request": {
+          "budget": 5,
+          "compact": true,
+          "known_revision": 14,
+          "query": "What cycle limit applied to Willow Gate on June 12, 2026?",
+          "valid_at": "2026-06-12T09:00:00+00:00"
+        },
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T04:20:42.227802Z\",\"known_revision\":14,\"valid_at\":\"2026-06-12T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Willow Gate\\ndimension: cycle_limit\\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026\",\"evidence_status\":\"current\",\"fact_id\":\"fact:d9123f364c5ae88cee98149e\",\"grounding\":0.88,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":14,\"source_episode_id\":\"episode:a8e50b3321c83d3386b1524b\",\"source_id\":\"willow-gate-log\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-12T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.88,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:a8e50b3321c83d3386b1524b\"}],\"status\":\"success\"}",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "context": {
+                "candidate_scan_truncated": false,
+                "completeness": "partial",
+                "omitted_channels": [
+                  "alias expansion",
+                  "experience, source episode siblings and source context neighborhoods",
+                  "triples, graph edges and community summaries",
+                  "semantic ANN and mutable embeddings",
+                  "mutable fact access heat",
+                  "legacy facts and episodes without committed revision provenance"
+                ],
+                "snapshot": {
+                  "known_at": "2026-11-22T04:20:42.227802Z",
+                  "known_revision": 14,
+                  "valid_at": "2026-06-12T09:00:00Z"
+                }
+              },
+              "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+              "result": [
+                {
+                  "confidence": 0.7,
+                  "content": "subject: Willow Gate\ndimension: cycle_limit\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026",
+                  "evidence_status": "current",
+                  "fact_id": "fact:d9123f364c5ae88cee98149e",
+                  "grounding": 0.88,
+                  "provenance": {
+                    "extraction_strategy": "explicit_schema_record",
+                    "ingestion_method": "extraction",
+                    "known_revision": 14,
+                    "source_episode_id": "episode:a8e50b3321c83d3386b1524b",
+                    "source_id": "willow-gate-log",
+                    "source_type": "inspection-record",
+                    "valid_at": "2026-06-12T09:00:00+00:00"
+                  },
+                  "rationale": "historical",
+                  "relevance": 0.88,
+                  "retrieval_tier": "historical_direct",
+                  "semantic_available": false,
+                  "source_episode": "episode:a8e50b3321c83d3386b1524b"
+                }
+              ],
+              "status": "success"
+            }
+          }
+        },
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "claim_rollout_stage": "evidence"
+      },
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "db74c72b05ae8af6851eecb7186284da3565a854ba7889e0da8c36898ecad003",
+        "oracle_sha256": "d4c2f6414eb0dd924c09f607f04eab7bffb449a5d5a805cb04501a7d4dc70327",
+        "observation_sha256": "024aa8e4ade7694d1f58b0f31b8907e83430153a57159d29c159806dd69861f8",
+        "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "evidence_success": true
+      }
+    }
+  ]
+}

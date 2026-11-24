@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "stormpetal_index",
+        "case_id": "stormpetal_index-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Stormpetal Index, the survey ledger is stored in Indigo-41. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Stormpetal Index, where is the survey ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Stormpetal Index, where is the survey ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-stormpetal_index-survey-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-clarification-trace-fix-2026-11-24-stormpetal_index-survey-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Indigo-41"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "ironwillow_registry",
+        "case_id": "ironwillow_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Ironwillow Registry, the harbor chart is stored in Birch-26. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Ironwillow Registry, where is the harbor chart stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Ironwillow Registry, where is the harbor chart stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-ironwillow_registry-harbor-chart",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-clarification-trace-fix-2026-11-24-ironwillow_registry-harbor-chart"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Birch-26"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "glassharbor_depot",
+        "case_id": "glassharbor_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Glassharbor Depot, the freight schedule is stored in Copper-83. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Glassharbor Depot, where is the freight schedule stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Glassharbor Depot, where is the freight schedule stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-glassharbor_depot-freight-schedule",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-clarification-trace-fix-2026-11-24-glassharbor_depot-freight-schedule"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Copper-83"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Glassharbor Depot before this phase. Use assemble_context to verify: At Glassharbor Depot, where is the freight schedule stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "glassharbor_depot",
+          "relative_path": "fixtures/glassharbor_depot.txt",
+          "content": "Fact: At Glassharbor Depot, the freight schedule is stored in Copper-83.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-glassharbor_depot-freight-schedule"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "bluecinder_lockbox",
+        "case_id": "bluecinder_lockbox-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Bluecinder Lockbox, the incident index is stored in Quartz-57. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Bluecinder Lockbox, where is the incident index stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Bluecinder Lockbox, where is the incident index stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-bluecinder_lockbox-incident-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-clarification-trace-fix-2026-11-24-bluecinder_lockbox-incident-index"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-57"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Bluecinder Lockbox before this phase. Use assemble_context to verify: At Bluecinder Lockbox, where is the incident index stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "bluecinder_lockbox",
+          "relative_path": "fixtures/bluecinder_lockbox.txt",
+          "content": "Fact: At Bluecinder Lockbox, the incident index is stored in Quartz-57.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-clarification-trace-fix-2026-11-24-bluecinder_lockbox-incident-index"
+        }
+      ]
+    }
+  ]
+}

@@ -11,8 +11,8 @@ use chrono::Utc;
 use memory_mcp::MemoryError;
 use memory_mcp::embedding::providers::EmbeddingProvider;
 use memory_mcp::eval_support::retrieval::{EvalRetrievalConfig, new_eval_retrieval_service};
-use memory_mcp::models::AssembleContextRequest;
 use memory_mcp::models::Provenance;
+use memory_mcp::models::{AssembleContextRequest, TemporalContextQuery};
 use memory_mcp::service::MemoryService;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
@@ -231,6 +231,9 @@ fn verbose_tool_params(query: &str) -> AssembleContextParams {
         query: query.to_string(),
         fact_types: Vec::new(),
         as_of: String::new(),
+        valid_at: None,
+        known_at: None,
+        known_revision: None,
         budget: 5,
         view_mode: None,
         window_start: None,
@@ -637,6 +640,103 @@ async fn high_level_semantic_paraphrase_survives_zero_lexical_grounding() {
     assert!(
         (similarity - 0.9).abs() < 0.01,
         "observed raw cosine {similarity} must match the mapped provider/index input"
+    );
+}
+
+#[tokio::test]
+async fn historical_read_does_not_use_a_mutated_embedding_for_ann_candidate_selection() {
+    let db = test_db().await;
+    let fact_content = "HNSW vectors retrieve stored facts by cosine similarity.";
+    let query = "How does the service find conceptually related recollections?";
+    let mut original_vector = vec![0.0; 1536];
+    original_vector[1] = 1.0;
+    let mut query_vector = vec![0.0; 1536];
+    query_vector[0] = 1.0;
+    let service = new_eval_retrieval_service(
+        db.clone() as Arc<dyn DbClient>,
+        "main".to_string(),
+        eval_config(
+            Arc::new(MappedProvider {
+                calls: Arc::new(AtomicUsize::new(0)),
+                embeddings: HashMap::from([
+                    (
+                        format!("note\n{fact_content}\n{fact_content}"),
+                        original_vector,
+                    ),
+                    (query.to_string(), query_vector.clone()),
+                ]),
+            }),
+            0.7,
+        ),
+    )
+    .await
+    .expect("deterministic embedding service");
+    let fact_id = service
+        .add_fact(
+            "note",
+            fact_content,
+            fact_content,
+            "episode:embedding-history",
+            Utc::now(),
+            0.9,
+            Vec::new(),
+            Vec::new(),
+            Provenance::agent_observation("episode:embedding-history"),
+        )
+        .await
+        .expect("persist the fact before the historical snapshot");
+    let revision_rows = db
+        .query(
+            "SELECT latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+            None,
+            "main",
+        )
+        .await
+        .expect("read snapshot revision");
+    let revision = revision_rows
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|row| row["latest_revision"].as_i64())
+        .expect("knowledge revision clock is initialized");
+
+    db.update(
+        &fact_id,
+        serde_json::json!({"embedding": query_vector}),
+        "main",
+        &[],
+    )
+    .await
+    .expect("simulate an in-place embedding refresh after the snapshot");
+
+    let current =
+        AssembleContextCapability::assemble_context_from_service(&service, assemble_request(query))
+            .await
+            .expect("current semantic read");
+    assert!(
+        current.iter().any(|item| item.fact_id == fact_id),
+        "the current vector projection should select the semantically matching fact"
+    );
+
+    let historical = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        assemble_request(query),
+        TemporalContextQuery {
+            valid_at: Some(Utc::now() + chrono::Duration::days(1)),
+            known_at: None,
+            known_revision: Some(revision),
+        },
+    )
+    .await
+    .expect("exact historical read");
+    let metadata = historical.metadata.expect("historical read metadata");
+    assert_eq!(metadata.snapshot.known_revision, revision);
+    assert_eq!(
+        metadata.completeness,
+        memory_mcp::models::ContextCompleteness::Partial
+    );
+    assert!(
+        historical.items.iter().all(|item| item.fact_id != fact_id),
+        "an embedding replaced after the snapshot must not change historical candidate membership"
     );
 }
 

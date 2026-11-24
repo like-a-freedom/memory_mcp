@@ -197,8 +197,8 @@ impl ExplanationService {
                 self.logger.log(
                     log_event(
                         "explain.access_track_error",
-                        json!({"fact_id": fact_id}),
-                        json!({"error": err.to_string()}),
+                        json!({}),
+                        json!({"error_code": err.code()}),
                         access.as_ref(),
                         None,
                         None,

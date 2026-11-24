@@ -13,6 +13,7 @@ pub async fn run(service: &MemoryService, args: ExtractArgs) -> Result<(), Memor
         source_id: args.source_id,
         t_ref: args.t_ref,
         zero_shot_labels: args.zero_shot_labels,
+        include_fact_evidence: !args.compact,
     };
     let response = crate::tools::extract(service, params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;

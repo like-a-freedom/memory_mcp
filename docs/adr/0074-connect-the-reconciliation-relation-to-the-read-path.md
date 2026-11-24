@@ -1,5 +1,11 @@
 # ADR-0074: Connect the reconciliation relation to the read path
 
+> **Rollout update (2026-11-21):** This ADR's rollout paragraph records the
+> original gated adoption. Following the later deterministic same-binary
+> comparison, `evidence` is now the product default and `shadow` is the
+> explicit rollback/control stage. See
+> [the current rollout record](../../evals/paired/claim-rollout-current-master-2026-11-21/README.md).
+
 - Status: accepted — 2026-10-05
 - Implements: the read-path requirement of the landing plan in
   [`docs/superpowers/specs/2026-10-05-memory-quality-evidence-review.md`](../superpowers/specs/2026-10-05-memory-quality-evidence-review.md)

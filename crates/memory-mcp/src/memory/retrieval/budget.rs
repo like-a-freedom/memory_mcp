@@ -156,23 +156,28 @@ pub(super) async fn collect_episode_fallback_items(
     .await?;
 
     let query_terms = crate::shared::search::search_query_terms(query);
+    let raw_query = params.raw_query_opt.unwrap_or(query);
     let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
     let reranker_available = service.embedding_provider.reranking_signature().is_some();
     let mut episodes = filtering::filter_episodes_by_constraints(episode_records, params.access);
     episodes.retain(|episode| {
-        if reranker_available {
-            super::admission::episode_candidate_is_rerankable_at_reference_time(
-                &query_evidence,
-                &episode.content,
-                Some(episode.t_ref),
-            )
-        } else {
-            episode_candidate_is_admitted_at_reference_time(
-                &query_evidence,
-                &episode.content,
-                Some(episode.t_ref),
-            )
-        }
+        // Episode fallback bypasses fact reconciliation, so preserve the
+        // declared-subject boundary for structured records. Free-form
+        // conversation turns keep the discourse-neighborhood policy below.
+        super::admission::candidate_matches_declared_query_subject(raw_query, &episode.content)
+            && if reranker_available {
+                super::admission::episode_candidate_is_rerankable_at_reference_time(
+                    &query_evidence,
+                    &episode.content,
+                    Some(episode.t_ref),
+                )
+            } else {
+                episode_candidate_is_admitted_at_reference_time(
+                    &query_evidence,
+                    &episode.content,
+                    Some(episode.t_ref),
+                )
+            }
     });
 
     episodes.sort_by(|left, right| {
@@ -260,6 +265,7 @@ mod tests {
             rationale: String::new(),
             retrieval_tier: None,
             reconciliation: None,
+            evidence_status: None,
             retrieval_evidence: None,
         }
     }

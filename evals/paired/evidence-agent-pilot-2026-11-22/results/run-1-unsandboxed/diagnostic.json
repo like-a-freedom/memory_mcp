@@ -1,0 +1,850 @@
+{
+  "schema_version": "memory-mcp-agent-comparison/v2",
+  "run_id": "80725-1795319559715864000-1",
+  "run_started_at": "2026-11-22T03:52:39.715864Z",
+  "run_completed_at": "2026-11-22T04:06:07.584277Z",
+  "plan": {
+    "schema_version": "memory-mcp-agent-plan/v2",
+    "plan_id": "evidence-default-agent-usability-development-pilot-2026-11-22-v1",
+    "stage": "exploratory_comparison",
+    "expected_trials": [
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "alder-workshop-booking-history",
+        "case_id": "alder-workshop-location",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "beacon-export-decision-history",
+        "case_id": "beacon-export-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "cedar-release-readiness-history",
+        "case_id": "cedar-release-check",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "mara-status-preference-history",
+        "case_id": "mara-status-format",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "slate-review-schedule-history",
+        "case_id": "slate-review-start-time",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "ordinary_workflows",
+        "family_id": "transient-retry-policy-history",
+        "case_id": "retry-after-rate-limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      }
+    ],
+    "planned_independent_families": 14,
+    "shared_identity": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.169.0",
+      "model": "gpt-6.1-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+      "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+      "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+      "transport": "stdio",
+      "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+      "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+      "judge_config_sha256": null,
+      "corpus_sha256": "fad8adc3beaf27f582eb9c0adfb0061605de82d47e9c78511adb4a428757e99c",
+      "oracle_sha256": "1c4391c5d037210227d71b319491c89ccf3de97861535ab7b42d4294de5517c4",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+      "provider_fingerprints": {
+        "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 2048,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "incumbent_product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+      "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+      "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+      "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "shadow"
+    },
+    "candidate_product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+      "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+      "product_config_sha256": "c8f65767e70e4d0fa4ae073b7ddd7529f10dc25d05a52c440f0faad7f8cff650",
+      "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    },
+    "declared_tool_schema_change": null,
+    "bootstrap": {
+      "seed": 2026112201,
+      "draws": 10000,
+      "confidence_level_basis_points": 9500
+    }
+  },
+  "plan_sha256": "6d5600c21d60445207c6187b8e5f0509d3b91aec1f9228c8cd16c4bf25e08670",
+  "manifest_sha256": "937283b4705eda4f989a04f509fedb6d6ce0aa3e76e4fe9acf0ea2303a09b55d",
+  "incumbent_artifact_sha256": "e97b97de87dc30b06b384f500a1ec93c43e0ee7d65e73ad85d68061d495bb56f",
+  "candidate_artifact_sha256": "008e00ac07d9438d927dc79f33ab930901bc202838096f84d5d5f6bbe50384be",
+  "overall": {
+    "direct_memory_success": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      }
+    },
+    "task_success": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      }
+    },
+    "repair_turn_gain": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": -0.2857142857142857,
+        "upper": 0.2857142857142857,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      }
+    },
+    "turn_gain": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      }
+    },
+    "tool_call_gain": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": -0.2857142857142857,
+        "upper": 0.2857142857142857,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      }
+    },
+    "clarification_gain": {
+      "estimate": 0.0,
+      "interval": {
+        "estimate": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      }
+    },
+    "input_token_gain": {
+      "estimate": 574.5,
+      "interval": {
+        "estimate": 574.5,
+        "lower": -2414.0714285714284,
+        "upper": 3560.6428571428573,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": -9893.0,
+        "beacon-export-decision-history": 7.0,
+        "birch-valid-time-history": 370.0,
+        "cedar-release-readiness-history": 9701.0,
+        "cobalt-retroactive-history": -735.0,
+        "juniper-unverified-correction-history": -174.0,
+        "maple-reversed-arrival-history": -1359.0,
+        "mara-status-preference-history": 9710.0,
+        "opal-open-conflict-history": -1338.0,
+        "slate-review-schedule-history": 9697.0,
+        "stable-repeat-history": 1209.0,
+        "transient-retry-policy-history": -9705.0,
+        "unknown-abstention-history": -625.0,
+        "unrelated-distractor-history": 1178.0
+      }
+    },
+    "output_token_gain": {
+      "estimate": 2.357142857142857,
+      "interval": {
+        "estimate": 2.357142857142857,
+        "lower": -21.142857142857142,
+        "upper": 23.214285714285715,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 7.0,
+        "beacon-export-decision-history": 6.0,
+        "birch-valid-time-history": -20.0,
+        "cedar-release-readiness-history": 9.0,
+        "cobalt-retroactive-history": 21.0,
+        "juniper-unverified-correction-history": -1.0,
+        "maple-reversed-arrival-history": 59.0,
+        "mara-status-preference-history": 16.0,
+        "opal-open-conflict-history": 56.0,
+        "slate-review-schedule-history": 7.0,
+        "stable-repeat-history": -99.0,
+        "transient-retry-policy-history": -8.0,
+        "unknown-abstention-history": 51.0,
+        "unrelated-distractor-history": -71.0
+      }
+    },
+    "wall_time_gain_ms": {
+      "estimate": 701.4285714285714,
+      "interval": {
+        "estimate": 701.4285714285714,
+        "lower": -979.9285714285714,
+        "upper": 2272.8571428571427,
+        "independent_clusters": 14,
+        "draws": 10000,
+        "seed": 2026112201,
+        "confidence_level_basis_points": 9500,
+        "algorithm": "splitmix64-v1"
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 1083.0,
+        "beacon-export-decision-history": -102.0,
+        "birch-valid-time-history": 7148.0,
+        "cedar-release-readiness-history": 2684.0,
+        "cobalt-retroactive-history": 1898.0,
+        "juniper-unverified-correction-history": 836.0,
+        "maple-reversed-arrival-history": 2465.0,
+        "mara-status-preference-history": 516.0,
+        "opal-open-conflict-history": 3293.0,
+        "slate-review-schedule-history": 821.0,
+        "stable-repeat-history": -6749.0,
+        "transient-retry-policy-history": -2221.0,
+        "unknown-abstention-history": 1720.0,
+        "unrelated-distractor-history": -3572.0
+      }
+    }
+  },
+  "by_stratum": {
+    "ordinary_workflows": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "transient-retry-policy-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 1586.1666666666667,
+        "interval": {
+          "estimate": 1586.1666666666667,
+          "lower": -4946.666666666667,
+          "upper": 8088.333333333333,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": -9893.0,
+          "beacon-export-decision-history": 7.0,
+          "cedar-release-readiness-history": 9701.0,
+          "mara-status-preference-history": 9710.0,
+          "slate-review-schedule-history": 9697.0,
+          "transient-retry-policy-history": -9705.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 6.166666666666667,
+        "interval": {
+          "estimate": 6.166666666666667,
+          "lower": -0.16666666666666666,
+          "upper": 11.5,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 7.0,
+          "beacon-export-decision-history": 6.0,
+          "cedar-release-readiness-history": 9.0,
+          "mara-status-preference-history": 16.0,
+          "slate-review-schedule-history": 7.0,
+          "transient-retry-policy-history": -8.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 463.5,
+        "interval": {
+          "estimate": 463.5,
+          "lower": -766.5,
+          "upper": 1598.6666666666667,
+          "independent_clusters": 6,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 1083.0,
+          "beacon-export-decision-history": -102.0,
+          "cedar-release-readiness-history": 2684.0,
+          "mara-status-preference-history": 516.0,
+          "slate-review-schedule-history": 821.0,
+          "transient-retry-policy-history": -2221.0
+        }
+      }
+    },
+    "temporal_decisions": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": -0.5,
+          "upper": 0.5,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 1.0,
+          "opal-open-conflict-history": 1.0,
+          "stable-repeat-history": -1.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": -1.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": -0.5,
+          "upper": 0.5,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 1.0,
+          "opal-open-conflict-history": 1.0,
+          "stable-repeat-history": -1.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": -1.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": -184.25,
+        "interval": {
+          "estimate": -184.25,
+          "lower": -820.25,
+          "upper": 493.75,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 370.0,
+          "cobalt-retroactive-history": -735.0,
+          "juniper-unverified-correction-history": -174.0,
+          "maple-reversed-arrival-history": -1359.0,
+          "opal-open-conflict-history": -1338.0,
+          "stable-repeat-history": 1209.0,
+          "unknown-abstention-history": -625.0,
+          "unrelated-distractor-history": 1178.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": -0.5,
+        "interval": {
+          "estimate": -0.5,
+          "lower": -41.0,
+          "upper": 36.125,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": -20.0,
+          "cobalt-retroactive-history": 21.0,
+          "juniper-unverified-correction-history": -1.0,
+          "maple-reversed-arrival-history": 59.0,
+          "opal-open-conflict-history": 56.0,
+          "stable-repeat-history": -99.0,
+          "unknown-abstention-history": 51.0,
+          "unrelated-distractor-history": -71.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 879.875,
+        "interval": {
+          "estimate": 879.875,
+          "lower": -2069.75,
+          "upper": 3514.75,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 7148.0,
+          "cobalt-retroactive-history": 1898.0,
+          "juniper-unverified-correction-history": 836.0,
+          "maple-reversed-arrival-history": 2465.0,
+          "opal-open-conflict-history": 3293.0,
+          "stable-repeat-history": -6749.0,
+          "unknown-abstention-history": 1720.0,
+          "unrelated-distractor-history": -3572.0
+        }
+      }
+    }
+  },
+  "paired_trial_count": 14,
+  "independent_family_count": 14,
+  "hard_violation_count": 2,
+  "budget_exceeded_trial_count": 0,
+  "arm_order_counts": {
+    "ordinary_workflows": {
+      "incumbent_first": 3,
+      "candidate_first": 3
+    },
+    "temporal_decisions": {
+      "incumbent_first": 4,
+      "candidate_first": 4
+    }
+  }
+}

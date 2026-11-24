@@ -1,0 +1,9 @@
+{
+  "input_sha256": "9a28a9e850e24ae0ebe6fb5616cc4f96c2c8d270004a73d1fc8e4c9ba1add150",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "birch-initial"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

@@ -1,0 +1,16 @@
+a3642aa9373b5584887de6d5af8dbc53426e86c22d9acf5cc308758069fc7fda  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/README.md
+5367b7e868f9214d167a4dd079f9b2a59eb7b0e7315ad1605c9d773770e1e0d0  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/host-policy.json
+393a34d2c48a880f7c9b5411372d0158d27f5ed01b567c82c9309efd2711217c  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/plan.json
+f73d3d1bc9520df18acf3310391e3277384afeb3a7d55d15a9d4a4e2b2b56dd9  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/prompts/memory-recall-task-rules-v1.txt
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/protocol-config.json
+25d6a8c0239b801345e3d053e42435a9343528909e985b6cdac09f50a3f35876  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/provider-inventory.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/retry-policy.json
+4847b5155bf327ea8b105a03689cb25ff3b3fb68fe42e7f2507be90dcbb47ea1  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/sampling-config.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/simulator.json
+f43a107d3cbbc3144dc4cd9c2ef42e5a52032c1aca86e08622abfd69947d4fdf  evals/paired/source-authority-local-chat-completions-v6-runner-fix-qualification/tasks-v6.json

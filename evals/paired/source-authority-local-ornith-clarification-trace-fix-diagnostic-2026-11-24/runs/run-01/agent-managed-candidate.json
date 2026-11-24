@@ -1,0 +1,226 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "candidate",
+  "run_id": "3607-1795478909008772000-0",
+  "identity_sha256": "ca5f86878a4c1b8b27841a2ce8ddd9aeb13c615e29b1f36464c92510423280cc",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "ironwillow_registry",
+      "case_id": "ironwillow_registry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "stormpetal_index",
+      "case_id": "stormpetal_index-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "bluecinder_lockbox",
+      "case_id": "bluecinder_lockbox-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "glassharbor_depot",
+      "case_id": "glassharbor_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "ironwillow_registry",
+        "case_id": "ironwillow_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5840,
+        "output_tokens": 616,
+        "wall_time_ms": 8732
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "aae66e45839607ee6ea8a0e9489d3d3fecf26fbb1edfe41e648524c212e2b064",
+        "response_sha256": "66748023b0927bf6d825ff54a84b4820627a9c35468d1d0753c495b78926689b",
+        "known_revision": 3,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [
+          "local-source-authority-ornith-clarification-trace-fix-2026-11-24-ironwillow_registry-harbor-chart"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2188,
+          "maximum_wire_bytes": 2188
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "stormpetal_index",
+        "case_id": "stormpetal_index-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "f4e9c579ae93c50cb1aa54ff86c6d9cdf6d5ac171fe2a8ddb8c2ff5b413d9116",
+        "response_sha256": "e5de5896414254021f4a0d6315511385ce56f9bcaa1fec6c1cb719de8db47f6b",
+        "known_revision": 0,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "bluecinder_lockbox",
+        "case_id": "bluecinder_lockbox-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "443c2cba3dd68d356642e57b53e2bb2b3719bb012de6d9427861fd5719c7a116",
+        "response_sha256": "8eb05c6535000392cd102acdcc61c6bf37bc623571cd715469946c637516c0a2",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "local-source-authority-ornith-clarification-trace-fix-2026-11-24-bluecinder_lockbox-incident-index"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "bluecinder_lockbox",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 482
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "glassharbor_depot",
+        "case_id": "glassharbor_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "3e405899316d00f6301bc7d7f98637a4d0ff2ac2d94ce6d74810f6f13d063a5c",
+        "response_sha256": "95be2c77d7ca95bfc70fd497a242f7e1b2f1efd57c8e0aedbfc8603091bbf428",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "local-source-authority-ornith-clarification-trace-fix-2026-11-24-glassharbor_depot-freight-schedule"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "glassharbor_depot",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 491
+        }
+      ]
+    }
+  ]
+}

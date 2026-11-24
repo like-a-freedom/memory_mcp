@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-paired-reader-config/v1",
+  "transport": "stdio",
+  "mcp_server": "memory_decisions",
+  "required": true,
+  "enabled_tools": [
+    "assemble_context"
+  ],
+  "context_output_token_limit": 8192,
+  "startup_timeout_seconds": 30,
+  "tool_timeout_seconds": 120
+}

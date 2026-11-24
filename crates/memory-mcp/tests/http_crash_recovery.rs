@@ -768,6 +768,7 @@ async fn run_task_recovery(registry: RegistryHandle, name: &str, fault: FaultPoi
                 source_id: Some(format!("src_{name}")),
                 t_ref: Some("2026-09-02T00:00:00Z".into()),
                 zero_shot_labels: Some(Vec::new()),
+                include_fact_evidence: false,
             })
             .expect("serialize ExtractParams"),
         )

@@ -120,14 +120,12 @@ pub fn require_record_kind(record_id: &str, table: &str) -> Result<(), crate::er
     let trimmed = record_id.trim();
 
     // A missing table prefix is a distinct, recoverable mistake from a
-    // malformed id, and it is the one an agent makes routinely when it
-    // re-types an id a tool returned. Naming the exact string to send
-    // back is the whole point: the caller must be able to correct the
-    // call without inferring the table from the field name.
+    // malformed id. Name the expected table and shape, but do not reflect the
+    // submitted id: caller-provided identifiers may themselves be sensitive.
     if !trimmed.is_empty() && !trimmed.contains(':') {
         return Err(crate::error::MemoryError::Validation(format!(
-            "record_id '{trimmed}' is missing its table prefix; pass '{table}:{trimmed}' \
-             exactly as returned, without stripping the prefix"
+            "record_id is missing its table prefix; expected '{table}:<id>' with the prefix \
+             returned by the tool"
         )));
     }
 
@@ -138,21 +136,11 @@ pub fn require_record_kind(record_id: &str, table: &str) -> Result<(), crate::er
         .unwrap_or_default();
     if actual != table {
         return Err(crate::error::MemoryError::Validation(format!(
-            "record_id '{record_id}' names a {actual}, not {} {table}; \
-             this accessor only accepts '{table}:<id>'",
-            indefinite_article(table)
+            "record_id has a table prefix that does not match this operation; \
+             this accessor expects '{table}:<id>'"
         )));
     }
     Ok(())
-}
-
-/// "a" or "an" for the table name, so the wrong-kind message reads as
-/// English instead of "not a episode".
-fn indefinite_article(table: &str) -> &'static str {
-    match table.chars().next() {
-        Some(first) if "aeiou".contains(first) => "an",
-        _ => "a",
-    }
 }
 
 /// Reconstructs a `table:key` record-id string from a serialized SurrealDB
@@ -261,51 +249,36 @@ mod tests {
     }
 
     #[test]
-    fn require_record_kind_names_the_exact_id_to_pass_back_for_a_stripped_prefix() {
-        // A caller that strips the table prefix is the most common
-        // record-id mistake, and the message is the only thing that can
-        // get them to retry correctly. It must name the exact id to use.
-        let bare = "d1a2438bcfb3380ffb913ec4";
+    fn require_record_kind_explains_a_stripped_prefix_without_echoing_the_id() {
+        let bare = "private-record-id-canary";
         let err = require_record_kind(bare, "episode").unwrap_err();
         match err {
             MemoryError::Validation(msg) => {
                 assert!(
-                    msg.contains(&format!("episode:{bare}")),
-                    "message must name the exact id to pass back, got: {msg}"
+                    msg.contains("episode:<id>"),
+                    "message must name the expected identifier shape, got: {msg}"
                 );
                 assert!(
                     msg.contains("episode:") && msg.contains("prefix"),
                     "message must explain the missing prefix, got: {msg}"
                 );
-                assert!(
-                    msg.contains(bare),
-                    "message must echo the bad input, got: {msg}"
-                );
+                assert!(!msg.contains(bare), "message echoed caller input: {msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }
     }
 
     #[test]
-    fn require_record_kind_names_the_expected_table_for_a_wrong_kind() {
-        // Cross-kind refusal must say which kind was expected, so the
-        // caller can correct the prefix without guessing. This is the
-        // `fact:`-prefixed-episode-id case.
-        let err = require_record_kind("fact:52f9d92d20d829840f24294f", "episode").unwrap_err();
+    fn require_record_kind_names_the_expected_table_without_echoing_input() {
+        let invalid = "fact:private-record-id-canary";
+        let err = require_record_kind(invalid, "episode").unwrap_err();
         match err {
             MemoryError::Validation(msg) => {
                 assert!(
-                    msg.contains("fact") && msg.contains("episode"),
-                    "message must name both the actual and expected kind, got: {msg}"
+                    msg.contains("episode:<id>"),
+                    "message must name the expected kind, got: {msg}"
                 );
-                assert!(
-                    !msg.contains("not a episode"),
-                    "message must not use the 'a episode' article, got: {msg}"
-                );
-                assert!(
-                    msg.contains("52f9d92d20d829840f24294f"),
-                    "message must echo the bad input, got: {msg}"
-                );
+                assert!(!msg.contains(invalid), "message echoed caller input: {msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }

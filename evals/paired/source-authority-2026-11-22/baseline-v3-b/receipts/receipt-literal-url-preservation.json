@@ -1,0 +1,33 @@
+{
+  "case_id": "literal-url-preservation",
+  "desired_goal": {
+    "knowledge_before_event_id": null,
+    "oracle": {
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "literal-url-reference"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "literal-url-reference": "http://127.0.0.1:9/agent-reference"
+      },
+      "expected_roles": {},
+      "forbidden_event_ids": [],
+      "probe_id": "literal-url-preservation",
+      "relation_outcome": null
+    },
+    "valid_at": "2026-11-22T12:00:00Z"
+  },
+  "failure": {
+    "reason": "evaluation suite failed: MCP tools/call returned JSON-RPC error: {\"code\":-32602,\"data\":{\"explanation\":\"ingest url resolves to a non-public address: http://127.0.0.1:9/agent-reference\",\"guidance\":\"Review the input arguments, fix any invalid values, and retry.\"},\"message\":\"validation error: ingest url resolves to a non-public address: http://127.0.0.1:9/agent-reference\"}",
+    "stage": "ingest"
+  },
+  "product_binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "product_revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+  "provider_configuration": "storage=embedded-surreal-local;namespace=main;embeddings=disabled;retrieval=lexical-fallback;ner=regex-builtin;primary_claim_rollout=product_default;evidence_diagnostic_claim_rollout=evidence;transaction_time=server-assigned;scoring_protocol=temporal-cutoff-v2",
+  "schema_version": "memory-decisions-receipt/v4",
+  "score": null
+}

@@ -1,0 +1,10 @@
+{
+  "input_sha256": "6d729725be12a7ed18051b96953a100ee32b7d5bd6ff5fc01122c2fa3ffd7381",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "maple-peer",
+    "maple-initial"
+  ],
+  "budget_used": 2,
+  "completed": true
+}

@@ -1,0 +1,131 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "hollowmere_glassworks",
+        "case_id": "hollowmere_glassworks-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Hollowmere Glassworks, the blueprints are stored in Fable-36. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Hollowmere Glassworks, where are the blueprints stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Hollowmere Glassworks, where are the blueprints stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v5-hollowmere_glassworks",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-v5-hollowmere_glassworks"]]
+        ],
+        "accepted_answers": ["Fable-36"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "vesperwick_orchard",
+        "case_id": "vesperwick_orchard-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Vesperwick Orchard, the irrigation map is stored in Morrow-48. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Vesperwick Orchard, where is the irrigation map stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Vesperwick Orchard, where is the irrigation map stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v5-vesperwick_orchard",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-v5-vesperwick_orchard"]]
+        ],
+        "accepted_answers": ["Morrow-48"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cairnlight_archive",
+        "case_id": "cairnlight_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Cairnlight Archive for a later session. It is in the source file fixtures/cairnlight_archive.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Cairnlight Archive, where is the brass catalog stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cairnlight Archive, where is the brass catalog stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v5-cairnlight_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-v5-cairnlight_archive"]]
+        ],
+        "accepted_answers": ["Dovetail-91"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Cairnlight Archive before this phase. Use assemble_context to verify the memory fact: At Cairnlight Archive, where is the brass catalog stored? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "cairnlight_archive",
+          "relative_path": "fixtures/cairnlight_archive.txt",
+          "content": "Fact: At Cairnlight Archive, the brass catalog is stored in Dovetail-91.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v5-cairnlight_archive"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "sablecross_station",
+        "case_id": "sablecross_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Sablecross Station for a later session. It is in the source file fixtures/sablecross_station.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Sablecross Station, where is the weather log stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Sablecross Station, where is the weather log stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v5-sablecross_station",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["local-source-authority-v5-sablecross_station"]]
+        ],
+        "accepted_answers": ["Inkwell-73"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Sablecross Station before this phase. Use assemble_context to verify the memory fact: At Sablecross Station, where is the weather log stored? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "sablecross_station",
+          "relative_path": "fixtures/sablecross_station.txt",
+          "content": "Fact: At Sablecross Station, the weather log is stored in Inkwell-73.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v5-sablecross_station"
+        }
+      ]
+    }
+  ]
+}

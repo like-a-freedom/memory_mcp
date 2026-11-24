@@ -1,0 +1,21 @@
+{
+  "input_sha256": "a8d79e53a7b00741fb4cbaca614991630675b025ee03a36b4353cd37b71d5ea3",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "copperwind_quay-record-a"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "copperwind_quay-record-a",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

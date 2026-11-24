@@ -1,0 +1,24 @@
+{
+  "schema_version": "memory-mcp-paired-baseline-build/v1",
+  "source_revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+  "source_tree": "git archive of the source revision; no working-tree edits",
+  "build_profile": "release",
+  "build_command": "cargo build -p memory_mcp --locked --release",
+  "features": [
+    "fs-watch"
+  ],
+  "binary_relative_path": "target/evals/paired/temporal-pilot/memory_mcp-baseline",
+  "binary_sha256": "b8183356a88586763ecaf476504856520e86232417333dd03c424bea4436ac49",
+  "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+  "tool_count": 8,
+  "tool_names": [
+    "app_command",
+    "assemble_context",
+    "explain",
+    "extract",
+    "ingest",
+    "invalidate",
+    "open_app",
+    "resolve"
+  ]
+}

@@ -130,6 +130,59 @@ async fn successful_processing_persists_episode_with_lineage_and_facts() {
 }
 
 #[tokio::test]
+async fn watched_snapshot_that_looks_like_loopback_url_is_stored_literally() {
+    let (service, db, store) = make_pipeline().await;
+    let t_ref = Utc::now();
+    let content = "http://127.0.0.1:9/watcher-reference";
+    let record = make_record("fs:refs/watcher.md", "refs/watcher.md", content, t_ref);
+    store.discover_prepared(&record).await.expect("discover");
+
+    let outcome = process_first_claim(&service, &store).await;
+    assert_eq!(outcome, ProcessOutcome::Processed);
+
+    let episode = db
+        .select_one(&record.expected_episode_id, "org")
+        .await
+        .expect("select episode")
+        .expect("episode exists");
+    assert_eq!(
+        episode.get("content").and_then(|value| value.as_str()),
+        Some(content),
+        "a watcher snapshot is already authorized and parsed; generic ingestion must not fetch it again"
+    );
+}
+
+#[tokio::test]
+async fn watched_snapshot_that_looks_like_file_path_is_not_read_again() {
+    let (service, db, store) = make_pipeline().await;
+    let outside = tempfile::tempdir().expect("temporary source directory");
+    let source_path = outside.path().join("outside.md");
+    std::fs::write(
+        &source_path,
+        "outside file contents must stay outside this episode",
+    )
+    .expect("write source file");
+    let content = source_path.to_string_lossy().into_owned();
+    let t_ref = Utc::now();
+    let record = make_record("fs:refs/path.md", "refs/path.md", &content, t_ref);
+    store.discover_prepared(&record).await.expect("discover");
+
+    let outcome = process_first_claim(&service, &store).await;
+    assert_eq!(outcome, ProcessOutcome::Processed);
+
+    let episode = db
+        .select_one(&record.expected_episode_id, "org")
+        .await
+        .expect("select episode")
+        .expect("episode exists");
+    assert_eq!(
+        episode.get("content").and_then(|value| value.as_str()),
+        Some(content.as_str()),
+        "generic ingestion must persist the prepared snapshot without reopening paths inside it"
+    );
+}
+
+#[tokio::test]
 async fn rediscovery_of_same_bytes_does_not_create_second_episode() {
     let (service, db, store) = make_pipeline().await;
     let t_ref = Utc::now();

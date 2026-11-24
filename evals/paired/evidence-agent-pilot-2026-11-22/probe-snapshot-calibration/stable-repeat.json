@@ -1,0 +1,31 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "stable-repeat",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "405c517251221062b8e2e1a14072d5ff4b6115e83e736f4c5bec4e2a6bfe6cb5",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-20T00:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:35.761011Z",
+    "known_revision": 9,
+    "valid_at": "2026-06-20T00:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "stable-marsh-lab",
+      "episode_id": "episode:81c008e084bd3d07e6db0452",
+      "fact_ids": [
+        "fact:73e2e9614869275f6f270abd"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

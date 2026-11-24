@@ -47,6 +47,7 @@ fn log_version_probe_failure(logger: &crate::logging::StdoutLogger, err: &Memory
         "op".to_string(),
         serde_json::json!("main.version_probe_failed"),
     );
+    event.insert("error_code".to_string(), serde_json::json!(err.code()));
     event.insert("error".to_string(), serde_json::json!(err.to_string()));
     logger.log(event, err.log_level());
 }
@@ -450,7 +451,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=main.version_probe_failed")
                     && line.contains("ERROR")
-                    && line.contains("disk is gone")
+                    && line.contains("error_code=storage")
+                    && line.contains("error=[redacted]")
             }),
             "a storage failure must stay an error: {recorded:?}"
         );
@@ -458,7 +460,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=main.version_probe_failed")
                     && line.contains("WARN")
-                    && line.contains("unknown namespace")
+                    && line.contains("error_code=validation")
+                    && line.contains("error=[redacted]")
             }),
             "a client mistake must not read as a storage outage: {recorded:?}"
         );

@@ -1,0 +1,21 @@
+{
+  "input_sha256": "d28ea4f072f015adfa6aef16d20fa12687be5441b8a18683d9963443a518fa78",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "tidemark_archive-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "tidemark_archive-record-b",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

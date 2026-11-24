@@ -23,8 +23,63 @@ pub struct SuiteDecl {
     pub mode: Option<String>,
     #[serde(default)]
     pub corpus_root: Option<String>,
+    /// Optional claim rollout stage for the memory-decision integration suite.
+    /// `default` omits the override and exercises the product's own default.
+    #[serde(default)]
+    pub claim_rollout_stage: Option<String>,
     #[serde(default)]
     pub expected_coverage: Option<ExpectedCoverage>,
+}
+
+impl SuiteDecl {
+    /// Returns the selected claim rollout stage, using the product's default
+    /// when a memory-decision suite does not declare an override.
+    pub(crate) fn effective_memory_decision_claim_rollout_stage(&self) -> &str {
+        self.claim_rollout_stage.as_deref().unwrap_or("default")
+    }
+}
+
+#[cfg(test)]
+mod claim_stage_tests {
+    use super::ProfileManifest;
+
+    #[test]
+    fn omitted_memory_decision_stage_means_the_product_default() {
+        let manifest = ProfileManifest::parse(
+            r#"{
+                "schema_version":"memory-mcp-eval-profile/v1",
+                "profile":"nightly",
+                "time_budget_seconds":60,
+                "suites":[{"id":"memory-decisions"}],
+                "gates":[]
+            }"#,
+        )
+        .expect("valid profile");
+
+        assert_eq!(
+            manifest.suites[0].effective_memory_decision_claim_rollout_stage(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn explicit_shadow_stage_remains_available_as_a_control() {
+        let manifest = ProfileManifest::parse(
+            r#"{
+                "schema_version":"memory-mcp-eval-profile/v1",
+                "profile":"nightly",
+                "time_budget_seconds":60,
+                "suites":[{"id":"memory-decisions","claim_rollout_stage":"shadow"}],
+                "gates":[]
+            }"#,
+        )
+        .expect("valid profile");
+
+        assert_eq!(
+            manifest.suites[0].effective_memory_decision_claim_rollout_stage(),
+            "shadow"
+        );
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -101,6 +156,15 @@ impl ProfileManifest {
             if suite.expected_coverage.is_none() && self.profile != EvalProfile::Nightly {
                 return Err(EvalError::InvalidConfig(format!(
                     "suite {} must declare expected_coverage for non-nightly profiles",
+                    suite.id
+                )));
+            }
+            if let Some(stage) = &suite.claim_rollout_stage
+                && (suite.id != "memory-decisions"
+                    || !matches!(stage.as_str(), "default" | "shadow"))
+            {
+                return Err(EvalError::InvalidConfig(format!(
+                    "unsupported claim_rollout_stage `{stage}` for suite {}",
                     suite.id
                 )));
             }
@@ -297,6 +361,41 @@ mod tests {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"nightly",
             "time_budget_seconds":3600,"suites":[{"id":"e2e"}],"gates":[]}"#;
         assert!(ProfileManifest::parse(raw).is_ok());
+    }
+
+    #[test]
+    fn memory_decisions_profile_can_select_the_product_default_rollout() {
+        let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"nightly",
+            "time_budget_seconds":600,"suites":[{"id":"memory-decisions",
+            "claim_rollout_stage":"default","expected_coverage":{"exact_cases":8}}],"gates":[]}"#;
+
+        let manifest = ProfileManifest::parse(raw).expect("registered default rollout profile");
+
+        assert_eq!(
+            manifest.suites[0].claim_rollout_stage.as_deref(),
+            Some("default")
+        );
+    }
+
+    #[test]
+    fn frozen_v4_candidate_profile_pins_its_historical_shadow_stage() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../evals/profiles/memory_decisions_v4.json");
+        let manifest = ProfileManifest::load(&path).expect("frozen v4 profile must load");
+
+        assert_eq!(
+            manifest.suites[0].effective_memory_decision_claim_rollout_stage(),
+            "shadow"
+        );
+    }
+
+    #[test]
+    fn unsupported_memory_decision_primary_stages_are_rejected() {
+        let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"nightly",
+            "time_budget_seconds":600,"suites":[{"id":"memory-decisions",
+            "claim_rollout_stage":"evidence","expected_coverage":{"exact_cases":8}}],"gates":[]}"#;
+
+        assert!(ProfileManifest::parse(raw).is_err());
     }
 
     #[test]

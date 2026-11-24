@@ -45,27 +45,29 @@ pub fn validate_record_id(record_id: &str) -> Result<(), crate::error::MemoryErr
         let id = &record_id[idx + 1..];
 
         if table.is_empty() {
-            return Err(MemoryError::Validation(format!(
-                "record_id has empty table part; expected '<table>:<id>', got ':{id}'"
-            )));
+            return Err(MemoryError::Validation(
+                "record_id has an empty table part; expected '<table>:<id>'".to_string(),
+            ));
         }
         if id.is_empty() {
-            return Err(MemoryError::Validation(format!(
-                "record_id has empty id part; expected '<table>:<id>', got '{table}:'"
-            )));
+            return Err(MemoryError::Validation(
+                "record_id has an empty id part; expected '<table>:<id>'".to_string(),
+            ));
         }
         if !is_valid_table_name(table) {
-            return Err(MemoryError::Validation(format!(
-                "record_id table must be lowercase ascii or underscore, got '{table}:{id}'; expected '<table>:<id>'"
-            )));
+            return Err(MemoryError::Validation(
+                "record_id table must be lowercase ascii or underscore; expected '<table>:<id>'"
+                    .to_string(),
+            ));
         }
         Ok(())
     } else if is_valid_table_name(record_id) {
         Ok(())
     } else {
-        Err(MemoryError::Validation(format!(
-            "record_id '{record_id}' is not a valid table name (no ':' separator); expected '<table>:<id>'"
-        )))
+        Err(MemoryError::Validation(
+            "record_id is not a valid table name (no ':' separator); expected '<table>:<id>'"
+                .to_string(),
+        ))
     }
 }
 
@@ -281,17 +283,15 @@ mod platform_tests {
 
     #[test]
     fn validate_record_id_rejects_bare_hex() {
-        let err = validate_record_id("474b2d8b81b3feabf832ef08").unwrap_err();
+        let invalid = "private-record-id-canary";
+        let err = validate_record_id(invalid).unwrap_err();
         match err {
             MemoryError::Validation(msg) => {
                 assert!(
                     msg.contains("'<table>:<id>'"),
                     "message should name the expected form, got: {msg}"
                 );
-                assert!(
-                    msg.contains("474b2d8b81b3feabf832ef08"),
-                    "message should echo the bad input, got: {msg}"
-                );
+                assert!(!msg.contains(invalid), "message echoed caller input: {msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }
@@ -333,10 +333,12 @@ mod platform_tests {
     #[test]
     fn validate_record_id_rejects_empty_table_part() {
         // ":abc123" — id present but table empty.
-        let err = validate_record_id(":abc123").unwrap_err();
+        let invalid = ":private-record-id-canary";
+        let err = validate_record_id(invalid).unwrap_err();
         match err {
             MemoryError::Validation(msg) => {
                 assert!(msg.contains("empty table"), "got: {msg}");
+                assert!(!msg.contains("private-record-id-canary"), "{msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }
@@ -346,8 +348,15 @@ mod platform_tests {
     fn validate_record_id_rejects_uppercase_table() {
         // is_valid_table_name requires lowercase; uppercase should be rejected
         // when it appears in a full "Table:id" record id.
-        let err = validate_record_id("Episode:abc").unwrap_err();
-        assert!(matches!(err, MemoryError::Validation(_)));
+        let invalid = "Episode:private-record-id-canary";
+        let err = validate_record_id(invalid).unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => {
+                assert!(!msg.contains("Episode"), "{msg}");
+                assert!(!msg.contains("private-record-id-canary"), "{msg}");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
     }
 
     #[test]

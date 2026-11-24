@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "amberwick_beacon",
+        "case_id": "amberwick_beacon-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Amberwick Beacon, the maintenance journal is stored in Lattice-42. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Amberwick Beacon, where is the maintenance journal stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Amberwick Beacon, where is the maintenance journal stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-flint-v1-amberwick_beacon-journal",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-flint-v1-amberwick_beacon-journal"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lattice-42"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "fernhollow_orchard",
+        "case_id": "fernhollow_orchard-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Fernhollow Orchard, the seed ledger is stored in Topaz-63. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Fernhollow Orchard, where is the seed ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Fernhollow Orchard, where is the seed ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-flint-v1-fernhollow_orchard-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-flint-v1-fernhollow_orchard-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Topaz-63"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "pikeglass_archive",
+        "case_id": "pikeglass_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Pikeglass Archive, the weather atlas is stored in Opaline-18. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Pikeglass Archive, where is the weather atlas stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Pikeglass Archive, where is the weather atlas stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-flint-v1-pikeglass_archive-atlas",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-flint-v1-pikeglass_archive-atlas"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Opaline-18"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Pikeglass Archive before this phase. Use assemble_context to verify: At Pikeglass Archive, where is the weather atlas stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "pikeglass_archive",
+          "relative_path": "fixtures/pikeglass_archive.txt",
+          "content": "Fact: At Pikeglass Archive, the weather atlas is stored in Opaline-18.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-flint-v1-pikeglass_archive-atlas"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brindle_terminal",
+        "case_id": "brindle_terminal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Brindle Terminal, the dispatch chart is stored in Lantern-75. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Brindle Terminal, where is the dispatch chart stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Brindle Terminal, where is the dispatch chart stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-flint-v1-brindle_terminal-chart",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-flint-v1-brindle_terminal-chart"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lantern-75"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Brindle Terminal before this phase. Use assemble_context to verify: At Brindle Terminal, where is the dispatch chart stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "brindle_terminal",
+          "relative_path": "fixtures/brindle_terminal.txt",
+          "content": "Fact: At Brindle Terminal, the dispatch chart is stored in Lantern-75.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-flint-v1-brindle_terminal-chart"
+        }
+      ]
+    }
+  ]
+}

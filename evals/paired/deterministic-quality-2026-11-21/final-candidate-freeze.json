@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-candidate-freeze/v1",
+  "binary_sha256": "131240df129f78fd152215316a6186b6ce8d9629054f1b22c0cc2f3b224935d4",
+  "revision": "1ae1da4a+grounding-fact-pool-explicit-identity",
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/retrieval/admission.rs": "cf0361c8738a438a2f95f3472e066667b7b621b400109790cf758f8aa1012b83",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "0abfa21952e6f2497f9d28ac5cff4c66de7dbd47e6612cd3d1dffc82a3b862c6",
+    "crates/memory-mcp/src/memory/episode/entity_extraction.rs": "826062119a8aa38dd85477b50e7982ea45e51f4f7df6b9dafd1129f137e77cdd",
+    "crates/memory-mcp/src/knowledge/entity_resolution.rs": "1d8ff5d283a80f78b42f7281d6873b1886e555ea0ee6385ca2205477928b0df3"
+  },
+  "confirmation_outcomes_not_inspected": true
+}

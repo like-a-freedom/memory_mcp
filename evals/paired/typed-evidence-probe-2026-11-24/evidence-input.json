@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What gantry capacity was recorded for Asterline Freight Yard on June 3, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-03T09:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "7766ae9793d14d95e5273ae120d121795950bc010ae6e5588881f79d74d7335e",
+  "claim_rollout_stage": "evidence"
+}

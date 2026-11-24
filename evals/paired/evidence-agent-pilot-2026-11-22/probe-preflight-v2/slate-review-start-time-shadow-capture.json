@@ -1,0 +1,93 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:73c025aee018d3d64fc7bbc8": "slate-review-start"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "3ca1d6eec6dc1fc1677b3aca681d3c2a7e66ba42bc72856639de6f975a15a6ee",
+    "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+    "source_event_ids": [
+      "slate-review-start"
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 5,
+    "compact": true,
+    "known_revision": 2,
+    "query": "When does the Slate review start?",
+    "valid_at": "2026-06-05T08:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:28:33.555949Z\",\"known_revision\":2,\"valid_at\":\"2026-06-05T08:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"subject: Slate review\\nstart time: June 20, 2026 at 15:30 UTC\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:73c025aee018d3d64fc7bbc8\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":2,\"reference_time\":\"2026-06-05T08:00:00Z\",\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\",\"source_id\":\"slate-team-calendar\",\"source_type\":\"meeting-note\",\"valid_at\":\"2026-06-05T08:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:73c025aee018d3d64fc7bbc8\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations cannot be attached to episode-only evidence"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-22T03:28:33.555949Z",
+            "known_revision": 2,
+            "valid_at": "2026-06-05T08:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.85,
+            "content": "subject: Slate review\nstart time: June 20, 2026 at 15:30 UTC",
+            "evidence_status": "unknown",
+            "fact_id": "episode_fallback:episode:73c025aee018d3d64fc7bbc8",
+            "grounding": 1.0,
+            "provenance": {
+              "episode_fallback": true,
+              "known_revision": 2,
+              "reference_time": "2026-06-05T08:00:00Z",
+              "source_episode": "episode:73c025aee018d3d64fc7bbc8",
+              "source_id": "slate-team-calendar",
+              "source_type": "meeting-note",
+              "valid_at": "2026-06-05T08:00:00+00:00"
+            },
+            "rationale": "tier=fallback",
+            "relevance": 1.0,
+            "retrieval_tier": "fallback",
+            "semantic_available": false,
+            "source_episode": "episode:73c025aee018d3d64fc7bbc8"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "claim_rollout_stage": "shadow"
+}

@@ -387,6 +387,7 @@ fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, err: &
         "target_signature".to_string(),
         serde_json::json!(target_signature),
     );
+    event.insert("error_code".to_string(), serde_json::json!(err.code()));
     event.insert("error".to_string(), serde_json::json!(err.to_string()));
     crate::logging::emit(event, err.log_level());
 }
@@ -797,6 +798,7 @@ fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, 
         serde_json::json!(existing),
     );
     event.insert("target_dimension".to_string(), serde_json::json!(target));
+    event.insert("error_code".to_string(), serde_json::json!(err.code()));
     event.insert("error".to_string(), serde_json::json!(err.to_string()));
     crate::logging::emit(event, err.log_level());
 }
@@ -856,7 +858,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.tenant_embedding_read_failed")
                     && line.contains("ERROR")
-                    && line.contains("disk is gone")
+                    && line.contains("error_code=storage")
+                    && line.contains("error=[redacted]")
             }),
             "a storage failure must stay an error: {recorded:?}"
         );
@@ -864,7 +867,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.tenant_embedding_read_failed")
                     && line.contains("WARN")
-                    && line.contains("unknown namespace")
+                    && line.contains("error_code=validation")
+                    && line.contains("error=[redacted]")
             }),
             "a client mistake must not read as a storage outage: {recorded:?}"
         );
@@ -897,7 +901,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.tenant_embedding_index_reconcile_failed")
                     && line.contains("ERROR")
-                    && line.contains("disk is gone")
+                    && line.contains("error_code=storage")
+                    && line.contains("error=[redacted]")
             }),
             "a storage failure must stay an error: {recorded:?}"
         );
@@ -905,7 +910,8 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains("op=http.tenant_embedding_index_reconcile_failed")
                     && line.contains("WARN")
-                    && line.contains("namespace is not ready")
+                    && line.contains("error_code=validation")
+                    && line.contains("error=[redacted]")
             }),
             "a client mistake must not read as a storage outage: {recorded:?}"
         );

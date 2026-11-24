@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What ferry departure slot was recorded for Copperwind Quay on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "522374cd1a54d6331a329cbb10086a48ed9aa3f59b7e89384f0cbab977999c85",
+  "claim_rollout_stage": "evidence"
+}

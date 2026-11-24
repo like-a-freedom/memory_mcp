@@ -54,7 +54,7 @@ impl ExtractCapability {
         deps.logger.log(
             log_event(
                 "extract",
-                json!({"episode_id": episode_id}),
+                json!({}),
                 build_extract_log_result(
                     episode.as_ref(),
                     payload.entities.len(),

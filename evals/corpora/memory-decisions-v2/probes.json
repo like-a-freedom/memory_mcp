@@ -1,0 +1,15 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {"id":"late-before","event_ids":["north-initial"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5},
+    {"id":"late-after","event_ids":["north-initial","north-correction"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","temporal_diagnostic_as_of":"2026-05-01T00:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"late-retrospective","event_ids":["north-initial","north-correction"],"knowledge_before_event_id":"north-correction","query":"Before the correction arrived, where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","temporal_diagnostic_as_of":"2026-05-01T00:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"ordinary-update","event_ids":["north-initial","north-update"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","temporal_diagnostic_as_of":"2026-05-01T00:00:00Z","requires_separate_time_cutoffs":true,"budget":5},
+    {"id":"conflict-open","event_ids":["north-initial","north-peer"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5},
+    {"id":"conflict-reversed","event_ids":["north-peer","north-initial"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5},
+    {"id":"conflict-resolved","event_ids":["north-initial","north-peer","north-resolution"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5},
+    {"id":"unknown","event_ids":["south-depot"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5},
+    {"id":"stable-repeat","event_ids":["stable-depot"],"query":"Where is Stable Depot located?","valid_at":"2026-05-01T10:00:00Z","budget":5,"repeat_read":2},
+    {"id":"unrelated","event_ids":["north-initial","south-depot"],"query":"Where was North Depot located on May 1, 2026?","valid_at":"2026-05-01T10:00:00Z","budget":5}
+  ]
+}

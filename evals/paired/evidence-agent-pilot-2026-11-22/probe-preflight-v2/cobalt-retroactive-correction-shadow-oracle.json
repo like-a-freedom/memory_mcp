@@ -1,0 +1,13 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "cobalt-initial"
+      ],
+      [
+        "cobalt-correction"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

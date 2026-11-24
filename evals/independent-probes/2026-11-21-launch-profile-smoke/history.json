@@ -1,0 +1,1 @@
+[{"event_id":"source-a","source_id":"depot-plan","source_type":"conversation","content":"North Depot is located in Oslo.","valid_at":"2026-05-01T10:00:00Z"},{"event_id":"source-b","source_id":"depot-correction","source_type":"conversation","content":"Correction: North Depot is located in Bergen.","valid_at":"2026-05-01T10:00:00Z"}]

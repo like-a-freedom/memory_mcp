@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "unknown-record",
+      "source_id": "unknown-record-log",
+      "source_type": "inspection-record",
+      "content": "subject: Quartz Depot\ndimension: capacity\nvalue: 63 crates for Quartz Depot",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "target",
+      "source_id": "target-log",
+      "source_type": "inspection-record",
+      "content": "subject: Larch Depot East\ndimension: capacity\nvalue: 18 crates for Larch Depot East",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "distractor",
+      "source_id": "distractor-log",
+      "source_type": "inspection-record",
+      "content": "subject: Larch Depot West\ndimension: capacity\nvalue: 81 crates for Larch Depot West",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "single",
+      "source_id": "single-log",
+      "source_type": "inspection-record",
+      "content": "subject: Onyx Plant\ndimension: capacity\nvalue: 47 crates for Onyx Plant",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "conflict-a",
+      "source_id": "conflict-a-log",
+      "source_type": "inspection-record",
+      "content": "subject: Raven Terminal\ndimension: capacity\nvalue: 29 crates for Raven Terminal",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "conflict-b",
+      "source_id": "conflict-b-peer",
+      "source_type": "inspection-record",
+      "content": "subject: Raven Terminal\ndimension: capacity\nvalue: 34 crates for Raven Terminal",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "verified",
+      "source_id": "verified-log",
+      "source_type": "maintenance-record",
+      "content": "subject: Topaz Mill\ndimension: capacity\nvalue: 22 crates for Topaz Mill",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "unverified",
+      "source_id": "unverified-log",
+      "source_type": "forum-report",
+      "content": "subject: Topaz Mill\ndimension: capacity\nvalue: 31 crates, unverified correction reported on a forum for Topaz Mill",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "prior",
+      "source_id": "prior-log",
+      "source_type": "inspection-record",
+      "content": "subject: Zircon Dock\ndimension: capacity\nvalue: 15 crates for Zircon Dock",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "later",
+      "source_id": "later-log",
+      "source_type": "inspection-record",
+      "content": "subject: Zircon Dock\ndimension: capacity\nvalue: 25 crates, correction claimed by another inspector for Zircon Dock",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "old-valid",
+      "source_id": "old-valid-log",
+      "source_type": "inspection-record",
+      "content": "subject: Ash Store\ndimension: capacity\nvalue: 12 crates for Ash Store",
+      "t_ref": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "future-valid",
+      "source_id": "future-valid-log",
+      "source_type": "inspection-record",
+      "content": "subject: Ash Store\ndimension: capacity\nvalue: 19 crates for Ash Store",
+      "t_ref": "2026-07-05T09:00:00Z"
+    },
+    {
+      "id": "ordinary-location",
+      "source_id": "ordinary-location-log",
+      "source_type": "inventory-record",
+      "content": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office",
+      "t_ref": "2026-07-01T09:00:00Z"
+    }
+  ]
+}

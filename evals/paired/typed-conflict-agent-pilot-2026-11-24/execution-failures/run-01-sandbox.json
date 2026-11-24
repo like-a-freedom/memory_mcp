@@ -1,0 +1,16 @@
+{
+  "schema_version": "paired-codex-execution-failure/v1",
+  "run_id": "run-01-sandbox",
+  "status": "invalid_infrastructure_failure_before_model_turn",
+  "summary": "The paired runner launched 12 trials per arm, but every receipt ended as model_failure with zero turns, zero tool calls, and no model JSONL events.",
+  "paired_receipt_status_counts": {
+    "incumbent_model_failure": 12,
+    "candidate_model_failure": 12,
+    "turns_used": 0,
+    "tool_calls": 0
+  },
+  "diagnosis": "A separate synthetic-only Codex CLI smoke reproduced `failed to initialize in-process app-server client: Operation not permitted` inside the managed workspace sandbox. The same smoke succeeded outside the sandbox.",
+  "model_task_invoked": false,
+  "treatment_or_quality_inference_allowed": false,
+  "recovery": "Preserve this attempt and perform the two registered paired captures outside the managed sandbox, on the laptop, using only frozen synthetic task data as explicitly authorized by the user."
+}

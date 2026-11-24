@@ -1,0 +1,83 @@
+{
+  "schema_version": "memory-decisions-oracle/v2",
+  "oracles": [
+    {
+      "probe_id": "v10-absent-target",
+      "disposition": "unknown",
+      "evidence_alternatives": [],
+      "expected_assertions": {},
+      "expected_roles": {},
+      "forbidden_event_ids": ["v10-absence-distractor"]
+    },
+    {
+      "probe_id": "v10-similar-name",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["v10-mica-east"]]],
+      "expected_assertions": {"v10-mica-east": "1174 crates"},
+      "expected_roles": {"v10-mica-east": "current"},
+      "forbidden_event_ids": ["v10-mica-west"]
+    },
+    {
+      "probe_id": "v10-current-snapshot",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["v10-fern-current"]]],
+      "expected_assertions": {"v10-fern-current": "1168 crates"},
+      "expected_roles": {"v10-fern-current": "current"},
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "v10-peer-conflict",
+      "disposition": "conflict",
+      "evidence_alternatives": [[["v10-orchid-a"], ["v10-orchid-b"]]],
+      "expected_assertions": {
+        "v10-orchid-a": "1281 kPa",
+        "v10-orchid-b": "1287 kPa"
+      },
+      "expected_roles": {
+        "v10-orchid-a": "conflicting",
+        "v10-orchid-b": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "v10-unverified-correction",
+      "disposition": "conflict",
+      "evidence_alternatives": [[["v10-larch-ledger"], ["v10-larch-forum"]]],
+      "expected_assertions": {
+        "v10-larch-ledger": "14 seconds",
+        "v10-larch-forum": "19 seconds"
+      },
+      "expected_roles": {
+        "v10-larch-ledger": "conflicting",
+        "v10-larch-forum": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "v10-prior-knowledge",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["v10-pumice-before"]]],
+      "expected_assertions": {"v10-pumice-before": "1097 tonnes"},
+      "expected_roles": {"v10-pumice-before": "current"},
+      "forbidden_event_ids": ["v10-pumice-after"]
+    },
+    {
+      "probe_id": "v10-valid-boundary",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["v10-topaz-earlier"]]],
+      "expected_assertions": {"v10-topaz-earlier": "1362 kPa"},
+      "expected_roles": {"v10-topaz-earlier": "current"},
+      "forbidden_event_ids": ["v10-topaz-later"]
+    },
+    {
+      "probe_id": "v10-ordinary-location",
+      "disposition": "answerable",
+      "evidence_alternatives": [[["v10-wren-office"]]],
+      "expected_assertions": {"v10-wren-office": "Alder Walk"},
+      "expected_roles": {},
+      "forbidden_event_ids": []
+    }
+  ]
+}

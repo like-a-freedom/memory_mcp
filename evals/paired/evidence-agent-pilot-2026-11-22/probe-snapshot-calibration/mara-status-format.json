@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "mara-status-format",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "af4309973882a9c85d47db1f8bde1252703a22e5b18dbf0456bb39e662f794f4",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-01T09:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:37:40.421012Z",
+    "known_revision": 2,
+    "valid_at": "2026-06-01T09:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "mara-status-format-note",
+      "episode_id": "episode:bb6d33a44ee7952462f691d3",
+      "fact_ids": [],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

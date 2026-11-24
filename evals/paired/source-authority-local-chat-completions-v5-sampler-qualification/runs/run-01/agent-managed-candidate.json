@@ -1,0 +1,220 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "35931-1795455307941654000-0",
+  "identity_sha256": "b723fedf256021c6b03a8926f8b71ed7dcdecfcfe0658e87167e590245095cfd",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "hollowmere_glassworks",
+      "case_id": "hollowmere_glassworks-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "vesperwick_orchard",
+      "case_id": "vesperwick_orchard-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cairnlight_archive",
+      "case_id": "cairnlight_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "sablecross_station",
+      "case_id": "sablecross_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "hollowmere_glassworks",
+        "case_id": "hollowmere_glassworks-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5535,
+        "output_tokens": 817,
+        "wall_time_ms": 53046
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d54d66e811d3048cdf2a8925a2fb45bb080fc898474a2f5c7f7af0e131f047a5",
+        "response_sha256": "7633ab4091e9427a72587f62b150ce5ac95a4656216aad2ce9888557b3fcfde3",
+        "known_revision": 3,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "local-source-authority-v5-hollowmere_glassworks"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2192,
+          "maximum_wire_bytes": 2192
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "vesperwick_orchard",
+        "case_id": "vesperwick_orchard-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "062fa4e9703d1938f9c85f60189642c86bdf5bcdb8fd848bec0172f00b0f3ecf",
+        "response_sha256": "675afe9aed9276f1db8bfcd979db7461653655c65bf9219fc66376d3bb09e006",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cairnlight_archive",
+        "case_id": "cairnlight_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5722,
+        "output_tokens": 351,
+        "wall_time_ms": 27616
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d516b015906b4c29b5e573e62d588bd7779294c76d3b48ced147690f5e706d30",
+        "response_sha256": "5ee75698b736bb9cef3eebfbf793ac3f5ff210da585fa90b910d2bc1c792bb7d",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v5-cairnlight_archive"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "cairnlight_archive",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 489
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "sablecross_station",
+        "case_id": "sablecross_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "71e95b856cd0c70904f0a864a782a6e31832de666bcfae0426e991f60f56b645",
+        "response_sha256": "2b55ec47b531bd3a927a2867fcc44cac67ab1117bf7a3993a8d575dc1060ac33",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v5-sablecross_station"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "sablecross_station",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 494
+        }
+      ]
+    }
+  ]
+}

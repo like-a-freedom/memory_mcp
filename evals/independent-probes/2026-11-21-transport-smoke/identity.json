@@ -1,0 +1,15 @@
+{
+  "schema_version": "memory-mcp-independent-transport-smoke/v1",
+  "source_label": "1ae1da4a+authorized-dirty-master",
+  "purpose": "repeated protocol/capture control; observed synthetic family; not acceptance or memory gain",
+  "products": {
+    "stdio": {
+      "binary": "/Users/solovey/Documents/dev/memory_mcp/target/debug/memory_mcp",
+      "binary_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751"
+    },
+    "streamable-http": {
+      "binary": "/Users/solovey/Documents/dev/memory_mcp/target/debug/memory_mcp_http",
+      "binary_sha256": "0996b4f9d96ff8e23baed803408a982b65bbc2eb02bd61f3bdf165d67fbf5009"
+    }
+  }
+}

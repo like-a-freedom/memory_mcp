@@ -1,0 +1,15 @@
+36ab1f919d63871f406053b15c0717e6d9dec6e9c505d75291b0912c2c77d540  evals/paired/source-authority-local-chat-completions-v3/README.md
+12c0d22c2504b8544d02385b53e95aeabdd1e34a5f1648d61f2876aff4b86af0  evals/paired/source-authority-local-chat-completions-v3/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-chat-completions-v3/host-policy.json
+7e3f092435faf49d02474cbf7816c268f6c43c5fc0b4d3d4785005fd6644710f  evals/paired/source-authority-local-chat-completions-v3/plan.json
+66d98729c0e575e13f0a69fdee76581596d733eff2314c5dc49a54b5bcb256bd  evals/paired/source-authority-local-chat-completions-v3/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-chat-completions-v3/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-chat-completions-v3/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-chat-completions-v3/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-chat-completions-v3/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-chat-completions-v3/prompts/memory-recall-task-rules-v1.txt
+6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490  evals/paired/source-authority-local-chat-completions-v3/protocol-config.json
+f8e40bf76ee2f1ad8613ed9f8233485cd128aaf8523c1cad2064afb8201ce48d  evals/paired/source-authority-local-chat-completions-v3/provider-inventory.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-chat-completions-v3/retry-policy.json
+8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708  evals/paired/source-authority-local-chat-completions-v3/simulator.json
+f02537533380e86745c4db070a99eaaf1af23e76236e42da769b2b8eab09b9e3  evals/paired/source-authority-local-chat-completions-v3/tasks-v3.json

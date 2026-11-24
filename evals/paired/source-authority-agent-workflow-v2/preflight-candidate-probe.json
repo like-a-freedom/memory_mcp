@@ -1,0 +1,66 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {},
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "e45eaa8c527e726ac635ee2e4d525e1cedf43571e0923761a7a9fdd13e92f5bf",
+    "product_sha256": "0c465a019c824602e1adc02c37b97f93ff3a6a5b98226d3007b7c3d93c990f25",
+    "source_event_ids": [],
+    "budget_used": 0,
+    "completed": true
+  },
+  "request": {
+    "budget": 1024,
+    "compact": true,
+    "known_revision": 0,
+    "query": "What is stored in memory?",
+    "valid_at": "2026-11-23T00:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-23T03:42:15.683565Z\",\"known_revision\":0,\"valid_at\":\"2026-11-23T00:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-23T03:42:15.683565Z",
+            "known_revision": 0,
+            "valid_at": "2026-11-23T00:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "claim_rollout_stage": "evidence"
+}

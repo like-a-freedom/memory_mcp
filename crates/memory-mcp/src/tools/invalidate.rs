@@ -45,10 +45,9 @@ async fn invalidate_inner<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let fact_id = request.fact_id.clone();
     ctx.record(ToolEvent {
         op: "invalidate.start",
-        args: json!({"fact_id": &fact_id}),
+        args: json!({}),
         result: json!({}),
         level: LogLevel::Info,
         duration: None,
@@ -60,7 +59,7 @@ async fn invalidate_inner<T: ToolContext>(
             operation_metrics.success();
             ctx.record(ToolEvent {
                 op: "invalidate.done",
-                args: json!({"fact_id": &fact_id}),
+                args: json!({}),
                 result: json!({"status": "invalidated"}),
                 level: LogLevel::Info,
                 duration: Some(timer.elapsed()),
@@ -73,8 +72,8 @@ async fn invalidate_inner<T: ToolContext>(
         Err(err) => {
             ctx.record(ToolEvent {
                 op: "invalidate.error",
-                args: json!({"fact_id": &fact_id}),
-                result: json!({"error": err.to_string()}),
+                args: json!({}),
+                result: json!({"error_code": err.code()}),
                 level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });

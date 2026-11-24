@@ -1,0 +1,13 @@
+{
+  "schema_version": "memory-mcp-source-authority-simulator/literal-input-v1",
+  "trial_workspace": "unique per arm and trial",
+  "incumbent_source": "literal source text is included in the frozen formation prompt; no file read is attempted",
+  "candidate_source": "same literal bytes are imported by the evaluator before the agent session",
+  "seed_history": "identical within each paired family",
+  "incumbent_source_content_in_model_context": true,
+  "candidate_source_content_in_model_context": false,
+  "candidate_operator_setup": ["import file", "extract episode"],
+  "agent_recall": "fresh process after formation or operator setup",
+  "post_write_probe": "fixed evaluator-owned query after the agent session",
+  "url_import": "excluded because network state is not deterministic"
+}

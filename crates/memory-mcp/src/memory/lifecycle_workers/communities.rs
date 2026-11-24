@@ -77,8 +77,8 @@ pub(crate) fn spawn_community_worker(
                         serde_json::Value::String("lifecycle.communities.error".to_string()),
                     );
                     event.insert(
-                        "error".to_string(),
-                        serde_json::Value::String(err.to_string()),
+                        "error_code".to_string(),
+                        serde_json::Value::String(err.code().to_string()),
                     );
                     logger.log(event, err.log_level());
                 }

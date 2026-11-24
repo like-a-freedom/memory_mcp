@@ -55,6 +55,15 @@ impl EntityService {
             .await
     }
 
+    pub(crate) async fn find_entity_id_by_canonical_name(
+        &self,
+        normalized_name: &str,
+    ) -> Result<Option<String>, MemoryError> {
+        self.entity_store
+            .find_entity_id_by_canonical_name(normalized_name)
+            .await
+    }
+
     /// Find an entity ID by searching aliases.
     /// Returns `None` if no entity matches.
     pub async fn find_entity_id_by_alias(

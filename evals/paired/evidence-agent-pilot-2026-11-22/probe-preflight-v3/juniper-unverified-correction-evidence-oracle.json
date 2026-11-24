@@ -1,0 +1,13 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "juniper-initial"
+      ],
+      [
+        "juniper-forum-correction"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

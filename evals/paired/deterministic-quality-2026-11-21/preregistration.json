@@ -1,0 +1,21 @@
+{
+  "schema_version": "memory-mcp-deterministic-preregistration/v1",
+  "base_revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+  "incumbent_binary_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+  "status": "frozen-before-memory-edits",
+  "development": "v4",
+  "confirmation": "v5",
+  "minimum_family_gain_basis_points": 2500,
+  "limit": "Synthetic scalar histories test mechanism transfer, not population or agent utility; confirmation names and values differ but templates overlap.",
+  "files": {
+    "evals/corpora/memory-decisions-v4/events.json": "3591851ff0c48f5b4885bbd61cdc249fceee92d74546092be02ac30c9e55a4ce",
+    "evals/corpora/memory-decisions-v4/probes.json": "59e1bf8652ab259ac452db3890ee16d6b6ce7043ed198d2711cfbb7f5ee261a8",
+    "evals/corpora/memory-decisions-v4/oracle.json": "3212e42c21a32c000e449f273d4164635a44c50ed85f24882e9b45cc28787728",
+    "evals/corpora/memory-decisions-v5/events.json": "0d6352fafec37866b2f0f81eb3ee147b9c3e90a8fdc7055ae996ba9db1818707",
+    "evals/corpora/memory-decisions-v5/probes.json": "aec77c975c8e1fef4aaf3f420cd354da6881fbf06462588fb5e5b10c585e43cb",
+    "evals/corpora/memory-decisions-v5/oracle.json": "3212e42c21a32c000e449f273d4164635a44c50ed85f24882e9b45cc28787728",
+    "evals/paired/deterministic-quality-2026-11-21/v4-acceptance.json": "07f14f05cd5f15787e9b52c7050e1d1328e9dfd4f85fbf2803e1cbb7f2e639a1",
+    "evals/paired/deterministic-quality-2026-11-21/v5-acceptance.json": "2e063f5b3d4676bfdef1e1eb9ad73ef0e681473e70c9e3b4af80aa12339d2e62"
+  },
+  "preflight_correction": "Added required one-cutoff diagnostic before any successful baseline or memory edits; first v4 launch rejected corpus validation and produced no observations."
+}

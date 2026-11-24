@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "cedar-release-check",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "917228c2f0349548bedef023cd496ed8921855edef06754f1458be61beecd904",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-04T14:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:37:33.609151Z",
+    "known_revision": 2,
+    "valid_at": "2026-06-04T14:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "cedar-release-check",
+      "episode_id": "episode:8577bc81425d9b5fb2c4dca2",
+      "fact_ids": [],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

@@ -1,0 +1,139 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "amberdune_metrology",
+        "case_id": "amberdune_metrology-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Amberdune Metrology, the copper lens is kept in Vela-62. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Amberdune Metrology, where is the copper lens kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Amberdune Metrology, where is the copper lens kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v4-amberdune_metrology",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            ["local-source-authority-v4-amberdune_metrology"]
+          ]
+        ],
+        "accepted_answers": ["Vela-62"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "copperleaf_orchard",
+        "case_id": "copperleaf_orchard-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Copperleaf Orchard, the irrigation ledger is kept in Rook-85. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Copperleaf Orchard, where is the irrigation ledger kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Copperleaf Orchard, where is the irrigation ledger kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v4-copperleaf_orchard",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            ["local-source-authority-v4-copperleaf_orchard"]
+          ]
+        ],
+        "accepted_answers": ["Rook-85"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "harborfog_maproom",
+        "case_id": "harborfog_maproom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Harborfog Maproom for a later session. It is in the source file fixtures/harborfog_maproom.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Harborfog Maproom, where is the tide chart kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Harborfog Maproom, where is the tide chart kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v4-harborfog_maproom",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            ["local-source-authority-v4-harborfog_maproom"]
+          ]
+        ],
+        "accepted_answers": ["Jetty-44"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Harborfog Maproom before this phase. Use assemble_context to verify the memory fact: At Harborfog Maproom, where is the tide chart kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "harborfog_maproom",
+          "relative_path": "fixtures/harborfog_maproom.txt",
+          "content": "Fact: At Harborfog Maproom, the tide chart is kept in Jetty-44.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v4-harborfog_maproom"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opalridge_station",
+        "case_id": "opalridge_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Opalridge Station for a later session. It is in the source file fixtures/opalridge_station.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "recall_prompt": "At Opalridge Station, where is the brass key log kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Opalridge Station, where is the brass key log kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v4-opalridge_station",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            ["local-source-authority-v4-opalridge_station"]
+          ]
+        ],
+        "accepted_answers": ["Moss-21"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator import and extraction were completed for Opalridge Station before this phase. Use assemble_context to verify the memory fact: At Opalridge Station, where is the brass key log kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "opalridge_station",
+          "relative_path": "fixtures/opalridge_station.txt",
+          "content": "Fact: At Opalridge Station, the brass key log is kept in Moss-21.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "local-source-authority-v4-opalridge_station"
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ pub mod adapters;
 pub mod artifact;
 pub mod benchmark;
 pub mod cli;
+pub mod codex_agent;
 pub mod corpus;
 pub mod domain;
 pub mod error;
@@ -10,6 +11,11 @@ pub mod merge;
 pub mod metrics;
 pub mod model_preparation;
 pub mod ner_fixtures;
+pub mod paired;
+pub mod paired_agent;
+pub mod paired_http;
+pub mod paired_power;
+pub mod paired_reliability;
 pub mod perf;
 pub mod profile;
 pub mod reducer;
@@ -32,3 +38,7 @@ pub use reducer::*;
 pub use report::render_markdown;
 pub use runner::*;
 pub use suites::*;
+
+pub mod independent_probe;
+
+mod memory_fixture;

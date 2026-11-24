@@ -1,0 +1,43 @@
+{
+  "schema_version": "memory-mcp-rollout-preregistration/v1",
+  "status": "frozen-before-v8-capture",
+  "frozen_at": "2026-11-22",
+  "product_binary_sha256": "f669effa27ef6c6a315e498d191a2fa4ecd387414c89773e2fc5b8ee0c6e5f29",
+  "evaluator_binary_sha256": "ff52242d8cac9efc6be004e97ebc695ec370548f6ba20ac33b3a1e76eb623996",
+  "corpus_sha256": "2a815affebbcfbfdf697c77dad722b9d12a84ddffd758c4957f15b2ab20a8722",
+  "acceptance_plan_sha256": "4f10db002be8341d83f77f659f00ea6375cf815cdc10260a8beefee41a5f093f",
+  "cohort": {
+    "cases": 8,
+    "independent_families": 8,
+    "repetitions_per_arm": 2,
+    "storage": "fresh embedded store for every case and capture",
+    "relationship_to_v6": "disjoint event ids, source ids, subjects, values and one corrected valid-time boundary; same eight scenario templates",
+    "scope_limit": "finite deterministic replication; not a new task-family sample or population estimate"
+  },
+  "arms": {
+    "incumbent": "explicit MEMORY_CLAIM_ROLLOUT_STAGE=shadow",
+    "candidate": "product default with MEMORY_CLAIM_ROLLOUT_STAGE absent"
+  },
+  "acceptance": {
+    "score_channel": "primary public observation",
+    "same_product_revision_and_binary": true,
+    "same_corpus_and_input_schema": true,
+    "distinct_raw_captures_and_exact_repeat_semantics": true,
+    "minimum_equal_family_decision_gain_basis_points": 2500,
+    "evidence_success_nonregression_per_case": true,
+    "ordinary_decision_nonregression_per_case": true,
+    "new_candidate_safety_findings": 0,
+    "maximum_returned_items": 5,
+    "all_cases_valid_and_covered": true,
+    "shared_incumbent_safety_findings": "reported separately and not misclassified as a candidate regression"
+  },
+  "agent_or_provider_required": false,
+  "preflight_amendments": [
+    {
+      "date": "2026-11-22",
+      "status": "pre-capture safety correction",
+      "reason": "The v7 repeated default capture exposed a candidate safety finding: a query for Onyx Hangar returned a Quartz Hangar episode because both shared the noun Hangar. The v7 gate was stopped and archived as a partial safety failure before acceptance.",
+      "action": "Added a public retrieval regression requiring an absent explicit named subject to return no similarly named episode. Episode fallback now checks the original query against the stored episode subject. The v8 corpus uses disjoint subjects and values, retains the shared-head-noun adversarial case, and guards exact valid-time boundary and source-grounded oracle assertions."
+    }
+  ]
+}

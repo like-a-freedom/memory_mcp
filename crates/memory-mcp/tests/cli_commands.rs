@@ -14,13 +14,17 @@ use memory_mcp::cli::args::{
     AssembleContextArgs, ExplainArgs, ExtractArgs, IngestArgs, InvalidateArgs, ResolveArgs,
 };
 use memory_mcp::cli::commands;
-use memory_mcp::storage::SurrealDbClient;
+use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 /// A `MemoryService` over a fresh in-memory database.
 async fn service() -> MemoryService {
     let client = SurrealDbClient::connect_in_memory("cli_commands", "org", "warn")
         .await
         .expect("in-memory client");
+    client
+        .apply_migrations("org")
+        .await
+        .expect("base migrations");
     MemoryService::new(
         std::sync::Arc::new(client),
         "org".to_string(),
@@ -47,6 +51,9 @@ fn assemble_context_args(query: &str) -> AssembleContextArgs {
         query: query.to_string(),
         fact_types: Vec::new(),
         as_of: String::new(),
+        valid_at: None,
+        known_at: None,
+        known_revision: None,
         budget: 5,
         view_mode: None,
         window_start: None,
@@ -85,6 +92,7 @@ async fn extract_rejects_a_call_with_no_input_source() {
         source_id: None,
         t_ref: None,
         zero_shot_labels: None,
+        compact: false,
     };
 
     let observed = commands::run_extract(&service, args).await;
@@ -106,6 +114,7 @@ async fn extract_rejects_content_and_text_together() {
         source_id: None,
         t_ref: None,
         zero_shot_labels: None,
+        compact: false,
     };
 
     let observed = commands::run_extract(&service, args).await;

@@ -1,0 +1,242 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "63483-1795464793093458000-0",
+  "identity_sha256": "06a01a5c2ab641444be1a2cd68f2477b6230d251392bb20e15667d3f990cd08d",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "marrowfield_clinic",
+      "case_id": "marrowfield_clinic-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "thornwick_lighthouse",
+      "case_id": "thornwick_lighthouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "amberley_greenhouse",
+      "case_id": "amberley_greenhouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "blueheath_foundry",
+      "case_id": "blueheath_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "marrowfield_clinic",
+        "case_id": "marrowfield_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 4,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 10309,
+        "output_tokens": 1024,
+        "wall_time_ms": 58980
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b3f3e9df6a7fbf093b3e4e49e767a0bb8fdb332dbe11b7aa5541e7e149b087be",
+        "response_sha256": "69cc5fd892b9c2285962465388379d5b2354be6863f798b926ad637cdec9ffd9",
+        "known_revision": 3,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "underdog-saluki-v2-marrowfield-night-rota"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 2,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 2,
+          "total_wire_bytes": 4252,
+          "maximum_wire_bytes": 2126
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "thornwick_lighthouse",
+        "case_id": "thornwick_lighthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 6691,
+        "output_tokens": 1024,
+        "wall_time_ms": 55800
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "72ba3e84eddaad57e8ba82e57c305bd0628851bb08d2d51de580eb18ba69ed3e",
+        "response_sha256": "f1719d366e1a2fdc6242a3781088fafade835d6362911749ee4302b6bbc54fcc",
+        "known_revision": 3,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "underdog-saluki-v2-thornwick-signal-register"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2190,
+          "maximum_wire_bytes": 2190
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "amberley_greenhouse",
+        "case_id": "amberley_greenhouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "e5ff869f5fa023b719fd76c6f309e7afdac679064eea22ffa439a87dbf9c6a15",
+        "response_sha256": "47731b17baa93d79f1a09ed03dc20ce140f36c4444060f7b81cd2ed23b947ed1",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "underdog-saluki-v2-amberley-irrigation-log"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "amberley_greenhouse",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 493
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "blueheath_foundry",
+        "case_id": "blueheath_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 8,
+        "tool_calls": 8,
+        "user_clarifications": 0,
+        "input_tokens": 34745,
+        "output_tokens": 970,
+        "wall_time_ms": 67583
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b6d4ac2133bbaf710432527d2bb9cd90be25767c35ec1c8c94800402bacd37ec",
+        "response_sha256": "6aeda97395585cbabff0c2135b7941b062df0d72c611ebaf2a803c49b6e1fd23",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "underdog-saluki-v2-blueheath-valve-diagrams"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "blueheath_foundry",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 490
+        }
+      ]
+    }
+  ]
+}

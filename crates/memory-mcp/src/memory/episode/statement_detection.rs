@@ -74,6 +74,23 @@ pub fn is_summary_like_note_candidate(content: &str) -> bool {
     normalized_terms.len() >= 6 && !is_low_value_summary_candidate(content)
 }
 
+/// Recognizes a single path or URI whose complete value is useful as a note.
+///
+/// This only affects extraction into a literal Note fact. It never opens the
+/// referenced resource; imports require the separate operator-authorized CLI.
+#[must_use]
+pub fn is_standalone_reference_candidate(content: &str) -> bool {
+    let reference = content.trim();
+    if reference.is_empty()
+        || reference.chars().any(char::is_whitespace)
+        || reference.chars().any(char::is_control)
+    {
+        return false;
+    }
+
+    reference.contains("://") || reference.contains('/') || reference.contains('\\')
+}
+
 /// Detects low-signal header/roster-style content that should not become a
 /// standalone summary fact.
 #[must_use]

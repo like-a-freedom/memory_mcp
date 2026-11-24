@@ -1,0 +1,17 @@
+32514725991013c22b568563d59da8ce61cd6d3041d182f52ecf1e75bd0a0a80  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/README.md
+96150314f39b9624b6e105a36a3445975170e17c5c6b430db0fb7b2e9c47efaa  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/pre-capture-audit.md
+e2eaf9d7f47b6d539c68c4edd3e0f7bd1a2d3743b3d21296f251962066394d6c  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/preregistration.md
+76ee23fd105d9e4466c0bb870d291256a3b8bd1677a9a0414c1b14789504799a  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/fingerprints.json
+1f067c9e414ddbb62c35b1b2b15721afe54eace6a0af1aa3cd695839afd5d0e8  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/plan.json
+df9c5757ea7c452c1d5365ba3172c69d2e4745e976085890cc74e08f2a79534b  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/tasks-v1.json
+4847b5155bf327ea8b105a03689cb25ff3b3fb68fe42e7f2507be90dcbb47ea1  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/sampling-config.json
+9920d244aed2738eafe8d304b73cef1926efcd6e1627f6ef8beb06199b8831b6  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/provider-inventory.json
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/product-config.json
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/protocol-config.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/host-policy.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/retry-policy.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/simulator.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/prompts/memory-recall-system-v1.txt
+39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab  evals/paired/source-authority-local-qwen-speed-v2-prompt-qualification/prompts/memory-recall-task-rules-v2.txt

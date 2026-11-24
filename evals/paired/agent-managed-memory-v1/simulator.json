@@ -1,0 +1,8 @@
+{
+  "schema_version": "memory-mcp-agent-managed-simulator/v1",
+  "simulator": "none",
+  "history": "agent forms one durable synthetic fact into an empty per-trial store",
+  "trial_store": "isolated per trial; shared only across formation, fresh recall session, and independent probe",
+  "between_arm_sharing": false,
+  "external_state_mutations": false
+}

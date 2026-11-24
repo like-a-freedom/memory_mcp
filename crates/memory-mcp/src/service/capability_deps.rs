@@ -43,7 +43,6 @@ impl From<&crate::service::MemoryService> for InvalidateDeps {
             db_client: ctx.db_client.clone(),
             active_namespace: ctx.active_namespace.clone(),
             rate_limiter: ctx.rate_limiter.clone(),
-            claim_store: ctx.claim_store(),
             context_cache: ctx.context_cache.clone(),
             #[cfg(feature = "streamable-http")]
             outbox_enabled: ctx.outbox_enabled,

@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-evaluator-regression/v1",
+  "scope": "evaluator correctness only",
+  "test": "unrelated_forbidden_source_fails_without_claiming_temporal_leakage",
+  "seam": "run_paired_agent_evaluation",
+  "before": {
+    "command_exit": 101,
+    "observed": "temporal_mismatch",
+    "failure": "assertion forbidding an unsupported temporal attribution"
+  },
+  "after": {
+    "command_exit": 0,
+    "observed": "prohibited_evidence",
+    "direct_memory_success": false,
+    "task_oracle_passed": false
+  },
+  "verification": {
+    "eval_harness_passed": 560,
+    "ignored": 19,
+    "strict_workspace_clippy": "passed",
+    "fmt": "passed",
+    "diff_check": "passed"
+  },
+  "source_sha256": {
+    "crates/eval-harness/src/paired.rs": "79eedd99708f293b0aefc97c77bd1de19bbce26d5653e8aebc8646da2e94e873",
+    "crates/eval-harness/src/paired_agent.rs": "30a4669cf18fe724dd3e8149434b1581ff3374a2620e3bbdd3c5a2310518ad01"
+  },
+  "memory_improvement_claim": false
+}

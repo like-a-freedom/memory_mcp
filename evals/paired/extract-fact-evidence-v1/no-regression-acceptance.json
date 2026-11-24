@@ -1,0 +1,164 @@
+{
+  "acceptance": {
+    "agent_usability_or_population_benefit_claim": false,
+    "candidate_repeats_match_on_scored_outcomes": true,
+    "registered_cases_valid": true,
+    "status": "accepted_no_regression",
+    "zero_new_safety_findings": true,
+    "zero_per_case_score_regressions": true
+  },
+  "candidate_product_binary_sha256": "4d029b407f798dab5e50cf5f531d898d0d99bb4d8f02e88be1bef7d745c12fb1",
+  "candidate_repeats": {
+    "default": {
+      "case_scores": "8/8 evidence; 5/8 decision and probe",
+      "comparison": "memory-eval compare-decision-replays: passed"
+    },
+    "shadow": {
+      "case_scores": "8/8 evidence; 1/8 decision and probe",
+      "comparison": "memory-eval compare-decision-replays: passed"
+    },
+    "source_authority_v4": {
+      "case_scores": "4/4 evidence, decision and probe",
+      "comparison": "memory-eval compare-decision-replays: passed"
+    }
+  },
+  "candidate_tool_schema_sha256": "9ecfa559499e708eb95b7d2fba953218029a970a6ecb1b9edc533b79bb36c0a9",
+  "controls": {
+    "claim_reconciliation": {
+      "budget": "passed",
+      "cases": 41,
+      "invalid": 0,
+      "metrics": {
+        "claim_f1": 1.0,
+        "claim_precision": 1.0,
+        "claim_recall": 1.0
+      },
+      "passed": 41,
+      "path": "evals/paired/extract-fact-evidence-v1/claims-41.json",
+      "sha256": "81865635d2e11fea109450f6bb0a05969a4e4f3c11f0ed39a8062d8b88bc5946"
+    },
+    "retrieval_metric_floors": {
+      "answerable_non_abstention_rate": 1.0,
+      "duplicate_free_rate": 1.0,
+      "precision_macro": 1.0,
+      "prohibited_free_rate": 1.0,
+      "required_group_recall": 1.0,
+      "unknown_abstention_rate": 1.0
+    },
+    "retrieval_quality": {
+      "budget": "passed",
+      "cases": 37,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "answerable_non_abstention_rate_applicable_count": 32.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 37.0,
+        "precision_macro": 1.0,
+        "precision_macro_applicable_count": 32.0,
+        "prohibited_free_rate": 1.0,
+        "prohibited_free_rate_applicable_count": 37.0,
+        "required_group_recall": 1.0,
+        "required_group_recall_applicable_count": 46.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 5.0
+      },
+      "passed": 37,
+      "path": "evals/paired/extract-fact-evidence-v1/retrieval-37.json",
+      "sha256": "5577d6c9e4e9084183bb33844373eba7dfe91840164339e91231b471f55bceb0"
+    }
+  },
+  "interpretation": "Decision profiles contain the same expected diagnostic failures as the pinned reference; they have no blocking gates. This report accepts compatibility/no-regression, not a memory-quality uplift or population/agent utility claim.",
+  "preregistration": {
+    "path": "evals/paired/extract-fact-evidence-v1/no-regression-preregistration.json",
+    "sha256": "66266b12525894456109b58cb04bbaee88933401db7ca75d59074a753d54a228"
+  },
+  "registered_decision_comparisons": [
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/decision-default-a.json",
+        "sha256": "6de81936f993f57920df1581981d6da53c2c039d9d6a50b35d56c3437641320c"
+      },
+      "comparison": "v9-default-a",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/claim-rollout-current-master-2026-11-22/ci-gate-v9-final-post-clippy/rollout-v9-default-first/run.json",
+        "sha256": "125c1335b84327e0d575fc451527dc75118d39df42c0eb46a1aa0056e35062de"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    },
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/decision-default-b.json",
+        "sha256": "c4e5679e087df5495fb5f9264ca018cdcd532bdc1bdce9a58d07b452e3cd910c"
+      },
+      "comparison": "v9-default-b",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/claim-rollout-current-master-2026-11-22/ci-gate-v9-final-post-clippy/rollout-v9-default-second/run.json",
+        "sha256": "6dd121de6d6e6a74e43540694edab03801d779bcb1a9f74de4fa04d80dfb6927"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    },
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/decision-shadow-a.json",
+        "sha256": "8be83bfbe344fb16a368d756002ed85eee35ff204d3561452696552296ce1c10"
+      },
+      "comparison": "v9-shadow-a",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/claim-rollout-current-master-2026-11-22/ci-gate-v9-final-post-clippy/rollout-v9-shadow-first/run.json",
+        "sha256": "d9b34bb870ac5567c55b5b1212520f419533a68d6087717a2a6c243d25bfc329"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    },
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/decision-shadow-b.json",
+        "sha256": "ab5f9e4e620d09f5027a4b4bd8ec0cccbd8f9ed6dfe1b2ebd91dd52a5f59f077"
+      },
+      "comparison": "v9-shadow-b",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/claim-rollout-current-master-2026-11-22/ci-gate-v9-final-post-clippy/rollout-v9-shadow-second/run.json",
+        "sha256": "1ddd5c254f06c6601cf7498dfd6803213fcc7a33c7ab1d9514d5e54a26a9596d"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    },
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/source-authority-a.json",
+        "sha256": "caf7dd7f235f459009427e5883d42720c2613547cb5aeb4e45a0070fa19ffa45"
+      },
+      "comparison": "source-authority-a",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/source-authority-v4-2026-11-22/final-redaction-a.json",
+        "sha256": "30d780a51057c5b85f8bf27900c8cf6a19d027b96a1f3ee7af3093fe254b53cd"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    },
+    {
+      "budget": "passed",
+      "candidate": {
+        "path": "evals/paired/extract-fact-evidence-v1/source-authority-b.json",
+        "sha256": "78a2481c4b60d19d05804402ff0d4f9573c7608d1be0f54ae760656f373d33b6"
+      },
+      "comparison": "source-authority-b",
+      "invalid": 0,
+      "reference": {
+        "path": "evals/paired/source-authority-v4-2026-11-22/final-redaction-b.json",
+        "sha256": "c7915a579ab2f3b5e49cffb332cdb329bf48bb1648de6a6b1ae363c952986708"
+      },
+      "same_per_case_status_metrics_evidence_failures": true
+    }
+  ],
+  "schema_version": "memory-mcp-deterministic-no-regression-report/v1",
+  "scope": "additive opt-in extract response evidence only; no retrieval or claim decision behavior change intended"
+}

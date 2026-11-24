@@ -1,0 +1,15 @@
+{
+  "chat_completions_endpoint_config_sha256": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+  "chat_completions_sampling_config_sha256": "8b9927f12596f28eeea135bf513fa886c5f50a64b7de09ccc7cea67078f48df8",
+  "corpus_sha256": "c278b53e12e2575b54c81a2a38a9b5ede4015d526ef957b24c3d8d73c2367186",
+  "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+  "independent_family_count": 4,
+  "oracle_sha256": "3b7da7523db5eae931ee6467caf4d3ca73460bf2b7805606dfd0584990ce3ff4",
+  "protocol_config_sha256": "5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a",
+  "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+  "schema_version": "memory-mcp-agent-managed-fingerprints/v1",
+  "simulator_sha256": "acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34",
+  "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+  "task_count": 4,
+  "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75"
+}

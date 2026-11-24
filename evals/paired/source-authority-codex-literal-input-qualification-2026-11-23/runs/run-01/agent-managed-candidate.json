@@ -1,0 +1,234 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "5756-1795448755783563000-0",
+  "identity_sha256": "d38af08ba3b805a4c04f3e93fd71790d6525cf068445d44111df7eb53636dc6b",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "juniper_arc_foundry",
+      "case_id": "juniper_arc_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "pewter_wave_relay",
+      "case_id": "pewter_wave_relay-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "quartz_lark_annex",
+      "case_id": "quartz_lark_annex-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "vermilion_halcyon_station",
+      "case_id": "vermilion_halcyon_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "juniper_arc_foundry",
+        "case_id": "juniper_arc_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 293
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "fbd23316278afd84521b3488c4ad0bc79370e14ae5502a617bd13e426b97211b",
+        "response_sha256": "1f5cd2199e0d1facc4c709fdec66759914990adf15222ddee57f750f65fd158c",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-juniper_arc_foundry"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "juniper_arc_foundry",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 427
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "pewter_wave_relay",
+        "case_id": "pewter_wave_relay-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 278
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "73e8abb9ab1362465f635b9193c85b3baac321b4d067aaa5c9bb78616a472cc5",
+        "response_sha256": "97fa973a7d12c4f7e2771a5e257803267b54340622dfa7eb87673a9dc3c00b88",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-pewter_wave_relay"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "pewter_wave_relay",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 430
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "quartz_lark_annex",
+        "case_id": "quartz_lark_annex-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 290
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b9851097480cb5a5757f96a62f9089793f9979d9f5b905459c60734241167e8d",
+        "response_sha256": "80e8273b4663fea02decbd5efad15346db8e1165f00de701b24947e85ec931fa",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-quartz_lark_annex"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "quartz_lark_annex",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 443
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "vermilion_halcyon_station",
+        "case_id": "vermilion_halcyon_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 314
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "9bdcfd5d495b32ec671ce6e270ca567d40ce2fb368d911e9fd141f63cca219c1",
+        "response_sha256": "dded5974bd1ef717b3179ca39036f89c5cb3bbd2c83e5be975f73be715eaeb54",
+        "known_revision": 7,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-vermilion_halcyon_station"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "vermilion_halcyon_station",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 435
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

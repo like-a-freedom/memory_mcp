@@ -107,6 +107,7 @@ where
                 ),
                 retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
                 reconciliation: None,
+                evidence_status: None,
                 retrieval_evidence: None,
             }
         })

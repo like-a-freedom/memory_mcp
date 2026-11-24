@@ -80,6 +80,28 @@ impl EpisodeContextStore {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Selects committed episode content at an exact knowledge revision.
+    /// The extra row indicates that the bounded candidate scan was truncated.
+    pub(crate) async fn select_episodes_at_revision(
+        &self,
+        valid_at: &str,
+        known_revision: i64,
+        query: Option<&str>,
+        limit: i32,
+    ) -> Result<(Vec<Value>, bool), MemoryError> {
+        let requested_limit = limit.clamp(1, 250);
+        let (sql, vars) = crate::memory::queries::build_select_episodes_at_revision_query(
+            valid_at,
+            known_revision,
+            query,
+            requested_limit + 1,
+        );
+        let mut rows = self.db.query_rows(&sql, Some(vars)).await?;
+        let truncated = rows.len() > requested_limit as usize;
+        rows.truncate(requested_limit as usize);
+        Ok((rows, truncated))
+    }
+
     /// Selects one independently limited literal-substring result group for
     /// each lexical fallback term, preserving the order used by retrieval.
     pub async fn select_episodes_for_terms(

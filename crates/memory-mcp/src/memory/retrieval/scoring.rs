@@ -127,6 +127,7 @@ pub(super) fn ranked_fact_to_item(
         rationale,
         retrieval_tier: Some(retrieval_tier.as_str().to_string()),
         reconciliation: None,
+        evidence_status: None,
         retrieval_evidence,
     }
 }

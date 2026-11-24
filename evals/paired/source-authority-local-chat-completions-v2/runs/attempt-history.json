@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-local-chat-completions-attempt-history/v1",
+  "plan_id": "source-authority-local-chat-completions-2026-11-23-v2",
+  "attempt_id": "preflight-01-corpus-oracle-fingerprint-mismatch",
+  "recorded_at_utc": "2026-11-23T08:10:00Z",
+  "status": "preflight_rejected_before_provider_request",
+  "failure": "The plan still carried the v1 corpus and oracle fingerprints; the task-manifest CLI produced different v2 fingerprints.",
+  "model_calls_occurred": false,
+  "trial_processes_started": false,
+  "task_or_prompt_changed": false,
+  "correction": "Updated only the plan corpus_sha256 and oracle_sha256 to the CLI-generated v2 values; then regenerated and re-verified the freeze manifest."
+}

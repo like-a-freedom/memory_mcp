@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 
 use super::statement_detection::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
-    is_summary_like_note_candidate,
+    is_standalone_reference_candidate, is_summary_like_note_candidate,
 };
 use crate::error::MemoryError;
 use crate::knowledge::fact_parsing::fact_from_value_or_wrapper;
@@ -36,6 +36,7 @@ fn source_type_supports_summary_fallback(source_type: &str) -> bool {
         source_type,
         "requirement"
             | "task_tracking"
+            | "agent_note"
             | "stakeholder_mapping"
             | "customer_engagement"
             | "email"
@@ -70,7 +71,10 @@ pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact
         }
     }
 
-    supported_source_type && is_summary_like_note_candidate(&episode.content)
+    supported_source_type
+        && (is_summary_like_note_candidate(&episode.content)
+            || (episode.source_type == "agent_note"
+                && is_standalone_reference_candidate(&episode.content)))
 }
 
 pub(super) async fn add_extracted_fact(
@@ -82,9 +86,9 @@ pub(super) async fn add_extracted_fact(
     entity_links: &[String],
     extraction_strategy: &str,
 ) -> Result<ExtractedFact, MemoryError> {
-    let fact_id = service
+    let persisted = service
         .fact_service
-        .add_fact(
+        .add_fact_with_evidence(
             service,
             fact_type,
             content,
@@ -104,8 +108,10 @@ pub(super) async fn add_extracted_fact(
         .await?;
 
     Ok(ExtractedFact {
-        fact_id,
+        fact_id: persisted.fact_id,
         fact_type: fact_type.to_string(),
+        statement: persisted.content,
+        source_quote: persisted.quote,
     })
 }
 
@@ -504,7 +510,7 @@ pub async fn extract_from_episode(
     service.logger.log(
         log_event(
             "extract.from_episode.start",
-            json!({"episode_id": episode_id}),
+            json!({}),
             json!({}),
             None,
             None,
@@ -562,7 +568,7 @@ pub async fn extract_from_episode(
     service.logger.log(
         log_event(
             "extract.from_episode.done",
-            json!({"episode_id": episode_id}),
+            json!({}),
             build_extract_log_result_with_metadata(
                 Some(&episode),
                 entities.len(),
@@ -593,25 +599,45 @@ pub async fn extract_from_episode(
             .iter()
             .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
             .collect();
-        let relations = claim_relations_for_facts(service, &fact_ids)
-            .await
-            .unwrap_or_default();
-        let active_relations = relations
-            .iter()
-            .filter(|r| r.t_invalid_ingested.is_none())
-            .count();
-        let reason_codes: Vec<String> = relations
-            .iter()
-            .map(|r| r.reason_code.clone())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-        Some(crate::models::ReconciliationSummary {
-            status: crate::models::ReconciliationStatus::Complete,
-            claims_projected: facts.len(),
-            active_relations,
-            reason_codes,
-        })
+        match claim_relations_for_facts(service, &fact_ids).await {
+            Ok(relations) => {
+                let active_relations = relations
+                    .iter()
+                    .filter(|r| r.t_invalid_ingested.is_none())
+                    .count();
+                let reason_codes: Vec<String> = relations
+                    .iter()
+                    .map(|r| r.reason_code.clone())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
+                Some(crate::models::ReconciliationSummary {
+                    status: crate::models::ReconciliationStatus::Complete,
+                    claims_projected: facts.len(),
+                    active_relations,
+                    reason_codes,
+                })
+            }
+            Err(_error) => {
+                service.logger.log(
+                    log_event(
+                        "extract.reconciliation.read_failed",
+                        json!({}),
+                        json!({"reason_code": "relation_read_failed"}),
+                        None,
+                        None,
+                        None,
+                    ),
+                    LogLevel::Warn,
+                );
+                Some(crate::models::ReconciliationSummary {
+                    status: crate::models::ReconciliationStatus::Partial,
+                    claims_projected: facts.len(),
+                    active_relations: 0,
+                    reason_codes: vec!["relation_read_failed".to_string()],
+                })
+            }
+        }
     } else {
         None
     };
@@ -633,6 +659,7 @@ pub async fn extract_from_episode(
         facts,
         links,
         warnings,
+        fact_evidence_omitted: None,
         reconciliation,
     })
 }
@@ -658,7 +685,9 @@ pub(crate) fn build_extract_log_result(
                 .iter()
                 .all(|fact| fact.fact_type == FactType::Note.as_str())
             && source_type_supports_summary_fallback(&episode.source_type)
-            && is_summary_like_note_candidate(&episode.content)
+            && (is_summary_like_note_candidate(&episode.content)
+                || (episode.source_type == "agent_note"
+                    && is_standalone_reference_candidate(&episode.content)))
     });
 
     let structured_line_fact_count = episode
@@ -752,6 +781,8 @@ mod tests {
             &[ExtractedFact {
                 fact_id: "fact:test".to_string(),
                 fact_type: "promise".to_string(),
+                statement: None,
+                source_quote: None,
             }]
         ));
     }
@@ -778,6 +809,8 @@ mod tests {
             &[ExtractedFact {
                 fact_id: "fact:test".to_string(),
                 fact_type: "note".to_string(),
+                statement: None,
+                source_quote: None,
             }],
             3,
             1,

@@ -1,0 +1,216 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "3607-1795478909008772000-0",
+  "identity_sha256": "ca5f86878a4c1b8b27841a2ce8ddd9aeb13c615e29b1f36464c92510423280cc",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "ironwillow_registry",
+      "case_id": "ironwillow_registry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "stormpetal_index",
+      "case_id": "stormpetal_index-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "bluecinder_lockbox",
+      "case_id": "bluecinder_lockbox-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "glassharbor_depot",
+      "case_id": "glassharbor_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "ironwillow_registry",
+        "case_id": "ironwillow_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 5,
+        "tool_calls": 4,
+        "user_clarifications": 0,
+        "input_tokens": 12441,
+        "output_tokens": 896,
+        "wall_time_ms": 12596
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 2,
+      "independent_probe": {
+        "request_sha256": "aae66e45839607ee6ea8a0e9489d3d3fecf26fbb1edfe41e648524c212e2b064",
+        "response_sha256": "52c508e93190ce451805f6fa1c2e52713273972e72cab348e2923e452841c660",
+        "known_revision": 9,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 2,
+        "evidence_requests": 2,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 2,
+          "total_wire_bytes": 4304,
+          "maximum_wire_bytes": 2188
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "stormpetal_index",
+        "case_id": "stormpetal_index-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "f4e9c579ae93c50cb1aa54ff86c6d9cdf6d5ac171fe2a8ddb8c2ff5b413d9116",
+        "response_sha256": "2d09725163b436c170d45e4808e88cac56cc10c536a37879a72b299d82134a08",
+        "known_revision": 0,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "bluecinder_lockbox",
+        "case_id": "bluecinder_lockbox-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "443c2cba3dd68d356642e57b53e2bb2b3719bb012de6d9427861fd5719c7a116",
+        "response_sha256": "d0841cd4432947b630683313e3b9215bcb9eb31c7d33b0b2e45aff846c162904",
+        "known_revision": 0,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "glassharbor_depot",
+        "case_id": "glassharbor_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "terminal_transport_stage": "request_send",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "3e405899316d00f6301bc7d7f98637a4d0ff2ac2d94ce6d74810f6f13d063a5c",
+        "response_sha256": "bf2cd70dd6a563b21a6ecf62f77688333301e0a3b3493a68b4f2c9d05a2970d6",
+        "known_revision": 0,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,341 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "emberline-studio-history",
+        "case_id": "emberline-studio-current-render-staging-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Emberline Studio uses Basin-42 as its render staging bucket. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/emberline-studio/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Emberline Studio's current render staging bucket? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Emberline Studio's current render staging bucket? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-01",
+          "source_id": "conversation://maintenance-v6/emberline-studio/original-01",
+          "source_type": "conversation",
+          "content": "Emberline Studio uses Drift-18 as its render staging bucket.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Basin-42"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "quartzpoint-archive-history",
+        "case_id": "quartzpoint-archive-current-cold-backup-region",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Quartzpoint Archive uses Cobalt-73 as its cold backup region. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/quartzpoint-archive/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Quartzpoint Archive's current cold backup region? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Quartzpoint Archive's current cold backup region? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-02",
+          "source_id": "conversation://maintenance-v6/quartzpoint-archive/original-01",
+          "source_type": "conversation",
+          "content": "Quartzpoint Archive uses Larch-05 as its cold backup region.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-02",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-02"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-73"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-02"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "mariner-bio-history",
+        "case_id": "mariner-bio-current-sequencing-snapshot-namespace",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Mariner Bio uses Juniper-61 as its sequencing snapshot namespace. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/mariner-bio/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Mariner Bio's current sequencing snapshot namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Mariner Bio's current sequencing snapshot namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-03",
+          "source_id": "conversation://maintenance-v6/mariner-bio/original-01",
+          "source_type": "conversation",
+          "content": "Mariner Bio uses Cinder-24 as its sequencing snapshot namespace.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-03",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-03"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Juniper-61"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-03"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "bluepeak-robotics-history",
+        "case_id": "bluepeak-robotics-current-firmware-signing-alias",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Bluepeak Robotics uses Mica-85 as its firmware signing alias. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/bluepeak-robotics/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Bluepeak Robotics's current firmware signing alias? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Bluepeak Robotics's current firmware signing alias? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-04",
+          "source_id": "conversation://maintenance-v6/bluepeak-robotics/original-01",
+          "source_type": "conversation",
+          "content": "Bluepeak Robotics uses Slate-12 as its firmware signing alias.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-04",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-04"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Mica-85"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-04"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "northwind-transit-history",
+        "case_id": "northwind-transit-current-schedule-export-prefix",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Northwind Transit uses Tundra-36 as its schedule export prefix. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/northwind-transit/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Northwind Transit's current schedule export prefix? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Northwind Transit's current schedule export prefix? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-05",
+          "source_id": "conversation://maintenance-v6/northwind-transit/original-01",
+          "source_type": "conversation",
+          "content": "Northwind Transit uses Glacier-90 as its schedule export prefix.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-05",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-05"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Tundra-36"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-05"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "sunlark-foundry-history",
+        "case_id": "sunlark-foundry-current-CAD-release-archive-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Sunlark Foundry uses Dawn-57 as its CAD release archive key. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/sunlark-foundry/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Sunlark Foundry's current CAD release archive key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Sunlark Foundry's current CAD release archive key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-06",
+          "source_id": "conversation://maintenance-v6/sunlark-foundry/original-01",
+          "source_type": "conversation",
+          "content": "Sunlark Foundry uses Dusk-11 as its CAD release archive key.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-06",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-06"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Dawn-57"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-06"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "redfern-research-history",
+        "case_id": "redfern-research-current-sample-cold-storage-tier",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Redfern Research uses Spruce-68 as its sample cold-storage tier. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/redfern-research/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Redfern Research's current sample cold-storage tier? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Redfern Research's current sample cold-storage tier? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-07",
+          "source_id": "conversation://maintenance-v6/redfern-research/original-01",
+          "source_type": "conversation",
+          "content": "Redfern Research uses Willow-27 as its sample cold-storage tier.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-07",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-07"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Spruce-68"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-07"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "coralpath-mapping-history",
+        "case_id": "coralpath-mapping-current-map-tile-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-22T14:00:00Z: Coralpath Mapping uses Lagoon-49 as its map tile cache namespace. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://maintenance-v6/coralpath-mapping/update-01, and t_ref=2026-11-22T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-22T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T16:00:00Z, what is Coralpath Mapping's current map tile cache namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T16:00:00Z, what is Coralpath Mapping's current map tile cache namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-22T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "v6-old-08",
+          "source_id": "conversation://maintenance-v6/coralpath-mapping/original-01",
+          "source_type": "conversation",
+          "content": "Coralpath Mapping uses Reef-03 as its map tile cache namespace.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "v6-update-08",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "v6-update-08"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lagoon-49"
+        ],
+        "forbidden_event_ids": [
+          "v6-old-08"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

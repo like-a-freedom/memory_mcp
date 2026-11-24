@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What backup runtime was recorded for Mosslight Battery Annex on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "e945e1308c4f9a29862df2ec6570883b1aeaebfd872ef99d7c542802b741d11b",
+  "claim_rollout_stage": "evidence"
+}

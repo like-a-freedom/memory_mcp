@@ -21,6 +21,7 @@ use crate::storage::table_scope::ReleaseOwnedTable;
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;
 type SelectTableFn = dyn Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync;
 type QueryResponderFn = dyn Fn(&str, Option<&Value>) -> Result<Value, MemoryError> + Send + Sync;
+type TransactionResponderFn = dyn Fn(&str, Option<&Value>) -> Result<(), MemoryError> + Send + Sync;
 
 /// One scripted answer to a `query`.
 ///
@@ -33,6 +34,11 @@ type QueryResponderFn = dyn Fn(&str, Option<&Value>) -> Result<Value, MemoryErro
 struct QueryRule {
     matches: Box<dyn Fn(&str) -> bool + Send + Sync>,
     respond: Box<QueryResponderFn>,
+}
+
+struct TransactionRule {
+    matches: Box<dyn Fn(&str) -> bool + Send + Sync>,
+    respond: Box<TransactionResponderFn>,
 }
 
 type CreateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
@@ -52,6 +58,7 @@ pub struct MockDbClient {
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
 
     query_rules: Mutex<Vec<QueryRule>>,
+    transaction_rules: Mutex<Vec<TransactionRule>>,
     no_query: Mutex<bool>,
     fallback_select_one: Mutex<Option<Box<SelectOneFn>>>,
     fallback_select_table: Mutex<Option<Box<SelectTableFn>>>,
@@ -75,6 +82,7 @@ impl MockDbClient {
             update_responses: Mutex::new(HashMap::new()),
 
             query_rules: Mutex::new(Vec::new()),
+            transaction_rules: Mutex::new(Vec::new()),
             no_query: Mutex::new(false),
             fallback_select_one: Mutex::new(None),
             fallback_select_table: Mutex::new(None),
@@ -175,6 +183,24 @@ impl MockDbClient {
             move |actual| actual == expected,
             move |_, _| Ok(result.clone()),
         )
+    }
+
+    /// Script one atomic transaction call. The responder sees the complete
+    /// script and bound variables; transaction support is never inferred from
+    /// ordinary query expectations.
+    pub fn expect_transaction_with(
+        self,
+        matches: impl Fn(&str) -> bool + Send + Sync + 'static,
+        respond: impl Fn(&str, Option<&Value>) -> Result<(), MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.transaction_rules
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push(TransactionRule {
+                matches: Box::new(matches),
+                respond: Box::new(respond),
+            });
+        self
     }
 
     /// Panic if any query reaches `query`, naming the SQL.
@@ -350,6 +376,27 @@ impl DbClient for MockDbClient {
             ));
         }
         Ok(Value::Null)
+    }
+
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        self.record_namespace(namespace);
+        let rules = self
+            .transaction_rules
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        for rule in rules.iter() {
+            if (rule.matches)(sql) {
+                return (rule.respond)(sql, vars.as_ref());
+            }
+        }
+        Err(MemoryError::Unavailable(
+            "mock has no matching atomic transaction expectation".into(),
+        ))
     }
 
     /// Always succeeds. `expect_migration_result` was cut in the 2026-09-30

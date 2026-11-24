@@ -1,0 +1,901 @@
+//! Provider-neutral paired source-authority runner for loopback Chat Completions.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
+
+use super::chat_completions::{
+    ChatCompletionBudgets, ChatCompletionsAgent, ChatCompletionsConfig, ChatCompletionsSampling,
+    ChatCompletionsToolProfile, endpoint_config_sha256, request_parameters_config_sha256,
+    response_format_config_sha256,
+};
+use super::codex::{
+    TrialDirectory, directory_size, hash_file, run_operator_file_setup,
+    stage_operator_import_fixtures, validate_product_binary,
+};
+use super::managed::{
+    AgentManagedOperatorImportReceipt, AgentManagedProbeObservation, AgentManagedProbeRequest,
+    AgentManagedTaskInput, AgentManagedTaskManifest, AgentManagedTrialBackend,
+};
+use super::prompts;
+use super::{AgentObservation, SeedMemoryOutput, sha256};
+use crate::EvalError;
+use crate::paired::{ModelIdentityProtocol, PairedEvaluationPlan, RunArm};
+use crate::suites::memory_decisions::stdio::StdioSession;
+
+pub const CHAT_COMPLETIONS_AGENT_RUNNER: &str = "openai-compatible-chat-completions";
+
+/// One arm's product binary and loopback model endpoint. Both arms must share
+/// the plan-pinned model alias and endpoint so only the memory product differs.
+pub struct ChatCompletionsArmRuntime {
+    pub memory_server_binary: PathBuf,
+    pub endpoint: String,
+    pub bearer_token: Option<String>,
+    pub temp_root: Option<PathBuf>,
+    pub claim_rollout_stage: String,
+}
+
+pub struct ChatCompletionsPairedBackend {
+    shared: crate::paired::SharedRunIdentity,
+    incumbent: ArmRuntime,
+    candidate: ArmRuntime,
+}
+
+struct ArmRuntime {
+    memory_server_binary: PathBuf,
+    temp_root: Option<PathBuf>,
+    claim_rollout_stage: String,
+    expected_product_sha256: String,
+    expected_tool_schema_sha256: String,
+    agent: ChatCompletionsAgent,
+}
+
+pub struct ChatCompletionsTrialState {
+    _trial_directory: TrialDirectory,
+    database_path: PathBuf,
+    source_root: PathBuf,
+    arm: RunArm,
+    tool_schema_sha256: String,
+    operator_imports: Vec<AgentManagedOperatorImportReceipt>,
+}
+
+impl ChatCompletionsPairedBackend {
+    pub fn new(
+        plan: &PairedEvaluationPlan,
+        manifest: &AgentManagedTaskManifest,
+        incumbent: ChatCompletionsArmRuntime,
+        candidate: ChatCompletionsArmRuntime,
+        sampling: ChatCompletionsSampling,
+    ) -> Result<Self, EvalError> {
+        Self::new_with_response_format(plan, manifest, incumbent, candidate, sampling, None)
+    }
+
+    pub fn new_with_response_format(
+        plan: &PairedEvaluationPlan,
+        manifest: &AgentManagedTaskManifest,
+        incumbent: ChatCompletionsArmRuntime,
+        candidate: ChatCompletionsArmRuntime,
+        sampling: ChatCompletionsSampling,
+        response_format: Option<serde_json::Value>,
+    ) -> Result<Self, EvalError> {
+        Self::new_with_request_parameters(
+            plan,
+            manifest,
+            incumbent,
+            candidate,
+            sampling,
+            response_format,
+            None,
+        )
+    }
+
+    pub fn new_with_request_parameters(
+        plan: &PairedEvaluationPlan,
+        manifest: &AgentManagedTaskManifest,
+        incumbent: ChatCompletionsArmRuntime,
+        candidate: ChatCompletionsArmRuntime,
+        sampling: ChatCompletionsSampling,
+        response_format: Option<serde_json::Value>,
+        request_parameters: Option<serde_json::Value>,
+    ) -> Result<Self, EvalError> {
+        plan.validate()?;
+        manifest.validate(plan)?;
+        let fingerprints = manifest.fingerprints_for_chat_completions()?;
+        let shared = &plan.shared_identity;
+        if shared.agent_runner != CHAT_COMPLETIONS_AGENT_RUNNER
+            || shared.transport != "stdio"
+            || shared.model.trim().is_empty()
+        {
+            return Err(EvalError::InvalidConfig(
+                "paired plan must pin the loopback Chat Completions runner and stdio memory transport".into(),
+            ));
+        }
+        if shared.system_prompt_sha256 != fingerprints.system_prompt_sha256
+            || shared.task_prompt_sha256 != fingerprints.task_prompt_sha256
+            || shared.host_policy_sha256 != fingerprints.host_policy_sha256
+            || shared.retry_policy_sha256 != fingerprints.retry_policy_sha256
+            || shared.reader_config_sha256 != fingerprints.protocol_config_sha256
+            || shared.simulator_sha256 != fingerprints.simulator_sha256
+        {
+            return Err(EvalError::InvalidConfig(
+                "paired plan prompt and runner-policy hashes do not match the registered Chat Completions protocol".into(),
+            ));
+        }
+        let runner_binary = std::env::current_exe().map_err(|_| {
+            EvalError::InvalidConfig("could not resolve the active memory-eval executable".into())
+        })?;
+        if shared.provider_fingerprints.get("memory_eval_cli") != Some(&hash_file(&runner_binary)?)
+        {
+            return Err(EvalError::InvalidConfig(
+                "paired plan must pin the active memory-eval executable SHA-256".into(),
+            ));
+        }
+        let endpoint_config_sha256 = endpoint_config_sha256(&incumbent.endpoint)?;
+        if shared
+            .provider_fingerprints
+            .get("chat_completions_endpoint_config")
+            != Some(&endpoint_config_sha256)
+        {
+            return Err(EvalError::InvalidConfig(
+                "paired plan must pin the active Chat Completions endpoint configuration SHA-256"
+                    .into(),
+            ));
+        }
+        let sampling_fingerprint = sampling.fingerprint_sha256()?;
+        match shared
+            .provider_fingerprints
+            .get("chat_completions_sampling_config")
+        {
+            Some(expected) if expected == &sampling_fingerprint => {}
+            Some(_) => {
+                return Err(EvalError::InvalidConfig(
+                    "paired plan sampling-configuration fingerprint does not match the active sampler".into(),
+                ));
+            }
+            None if sampling == ChatCompletionsSampling::default() => {}
+            None => {
+                return Err(EvalError::InvalidConfig(
+                    "non-default Chat Completions sampling must be hash-pinned in the paired plan"
+                        .into(),
+                ));
+            }
+        }
+        let active_response_format_fingerprint = response_format
+            .as_ref()
+            .map(response_format_config_sha256)
+            .transpose()?;
+        match (
+            active_response_format_fingerprint.as_ref(),
+            shared
+                .provider_fingerprints
+                .get("chat_completions_response_format_config"),
+        ) {
+            (None, None) => {}
+            (Some(active), Some(expected)) if active == expected => {}
+            (None, Some(_)) => {
+                return Err(EvalError::InvalidConfig(
+                    "paired plan pins a Chat Completions response format but none is active".into(),
+                ));
+            }
+            (Some(_), None) => {
+                return Err(EvalError::InvalidConfig(
+                    "Chat Completions response format must be hash-pinned in the paired plan"
+                        .into(),
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(EvalError::InvalidConfig(
+                    "paired plan response-format fingerprint does not match the active response format".into(),
+                ));
+            }
+        }
+        let active_request_parameters_fingerprint = request_parameters
+            .as_ref()
+            .map(request_parameters_config_sha256)
+            .transpose()?;
+        match (
+            active_request_parameters_fingerprint.as_ref(),
+            shared
+                .provider_fingerprints
+                .get("chat_completions_request_parameters_config"),
+        ) {
+            (None, None) => {}
+            (Some(active), Some(expected)) if active == expected => {}
+            (None, Some(_)) => {
+                return Err(EvalError::InvalidConfig(
+                    "paired plan pins Chat Completions request parameters but none are active"
+                        .into(),
+                ));
+            }
+            (Some(_), None) => {
+                return Err(EvalError::InvalidConfig(
+                    "Chat Completions request parameters must be hash-pinned in the paired plan"
+                        .into(),
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(EvalError::InvalidConfig(
+                    "paired plan request-parameters fingerprint does not match the active configuration"
+                        .into(),
+                ));
+            }
+        }
+        if incumbent.endpoint != candidate.endpoint
+            || incumbent.bearer_token != candidate.bearer_token
+            || incumbent.claim_rollout_stage != plan.claim_rollout_stages(None)?.0
+            || candidate.claim_rollout_stage != plan.claim_rollout_stages(None)?.1
+        {
+            return Err(EvalError::InvalidConfig(
+                "paired Chat Completions arms must share one model endpoint and use their pinned claim stages".into(),
+            ));
+        }
+        if let ModelIdentityProtocol::ProviderRevision { revision } =
+            &shared.model_identity_protocol
+            && revision != &shared.model
+        {
+            return Err(EvalError::InvalidConfig(
+                "Chat Completions model identity must pin the exact provider model identifier"
+                    .into(),
+            ));
+        }
+
+        let expected_model = shared.model.clone();
+        let make_arm = |runtime: ChatCompletionsArmRuntime,
+                        product: &crate::paired::ProductRunIdentity|
+         -> Result<ArmRuntime, EvalError> {
+            validate_product_binary(&runtime.memory_server_binary, &product.binary_sha256)?;
+            let agent = ChatCompletionsAgent::new(
+                ChatCompletionsConfig::new(&runtime.endpoint, expected_model.clone())
+                    .with_bearer_token(runtime.bearer_token.clone())
+                    .with_sampling(sampling)
+                    .with_response_format(response_format.clone())
+                    .with_request_parameters(request_parameters.clone()),
+            )?;
+            Ok(ArmRuntime {
+                memory_server_binary: runtime.memory_server_binary,
+                temp_root: runtime.temp_root,
+                claim_rollout_stage: runtime.claim_rollout_stage,
+                expected_product_sha256: product.binary_sha256.clone(),
+                expected_tool_schema_sha256: product.tool_schema_sha256.clone(),
+                agent,
+            })
+        };
+        Ok(Self {
+            shared: shared.clone(),
+            incumbent: make_arm(incumbent, &plan.incumbent_product)?,
+            candidate: make_arm(candidate, &plan.candidate_product)?,
+        })
+    }
+
+    fn arm(&self, arm: RunArm) -> &ArmRuntime {
+        match arm {
+            RunArm::Incumbent => &self.incumbent,
+            RunArm::Candidate => &self.candidate,
+        }
+    }
+
+    fn open_session(&self, state: &ChatCompletionsTrialState) -> Result<StdioSession, EvalError> {
+        let runtime = self.arm(state.arm);
+        let session = StdioSession::spawn_with_claim_stage_and_cwd(
+            &runtime.memory_server_binary,
+            &state.database_path,
+            &runtime.claim_rollout_stage,
+            &state.source_root,
+        )?;
+        let schema_sha256 = sha256(&serde_json::to_vec(session.tool_schemas())?);
+        if schema_sha256 != state.tool_schema_sha256
+            || schema_sha256 != runtime.expected_tool_schema_sha256
+        {
+            return Err(EvalError::InvalidConfig(
+                "memory MCP tool schema changed during the local paired trial".into(),
+            ));
+        }
+        if hash_file(&runtime.memory_server_binary)? != runtime.expected_product_sha256 {
+            return Err(EvalError::InvalidConfig(
+                "memory product binary changed during the local paired trial".into(),
+            ));
+        }
+        Ok(session)
+    }
+
+    fn run_phase(
+        &self,
+        state: &ChatCompletionsTrialState,
+        session: &mut StdioSession,
+        prompt: &str,
+        profile: ChatCompletionsToolProfile,
+    ) -> Result<AgentObservation, EvalError> {
+        let budgets = ChatCompletionBudgets {
+            context_tokens: self.shared.context_budget_tokens,
+            tool_calls: self.shared.tool_call_budget,
+            turns: self.shared.turn_budget,
+            output_tokens: self.shared.output_token_budget,
+            wall_time: Duration::from_millis(self.shared.wall_time_budget_ms),
+        };
+        let (system_instructions, task_rules) = match profile {
+            ChatCompletionsToolProfile::SourceAuthorityFormation => (
+                prompts::FORMATION_SYSTEM_INSTRUCTIONS,
+                prompts::FORMATION_TASK_RULES,
+            ),
+            ChatCompletionsToolProfile::RecallOnly => (
+                prompts::RECALL_SYSTEM_INSTRUCTIONS,
+                prompts::RECALL_TASK_RULES,
+            ),
+        };
+        let observation = self.arm(state.arm).agent.run_phase(
+            session,
+            prompt,
+            system_instructions,
+            task_rules,
+            profile,
+            budgets,
+        )?;
+        session.shutdown()?;
+        Ok(observation)
+    }
+}
+
+impl AgentManagedTrialBackend for ChatCompletionsPairedBackend {
+    type State = ChatCompletionsTrialState;
+
+    fn start_trial(
+        &mut self,
+        arm: RunArm,
+        task: &AgentManagedTaskInput,
+    ) -> Result<(Self::State, BTreeMap<String, String>), EvalError> {
+        let runtime = self.arm(arm);
+        let trial_directory = TrialDirectory::create(runtime.temp_root.as_deref())?;
+        let database_path = trial_directory.path.join("database");
+        fs::create_dir_all(&database_path).map_err(|source| EvalError::Io {
+            path: database_path.clone(),
+            source,
+        })?;
+        let source_root = trial_directory.path.join("source-root");
+        fs::create_dir_all(&source_root).map_err(|source| EvalError::Io {
+            path: source_root.clone(),
+            source,
+        })?;
+        stage_operator_import_fixtures(&source_root, &task.candidate_operator_imports)?;
+
+        let seeded = crate::memory_fixture::seed_memory(
+            &runtime.memory_server_binary,
+            &database_path,
+            &runtime.claim_rollout_stage,
+            &task.seed_episodes,
+            None,
+        )?;
+        let SeedMemoryOutput {
+            episode_id_to_event_id: mut bindings,
+            tool_schemas,
+            ..
+        } = seeded;
+        let tool_schema_sha256 = sha256(&serde_json::to_vec(&tool_schemas)?);
+        if tool_schema_sha256 != runtime.expected_tool_schema_sha256 {
+            return Err(EvalError::InvalidConfig(
+                "memory MCP tool schema does not match the paired plan".into(),
+            ));
+        }
+
+        let mut operator_imports = Vec::new();
+        if arm == RunArm::Candidate {
+            for fixture in &task.candidate_operator_imports {
+                let (
+                    import_succeeded,
+                    extraction_attempted,
+                    extraction_succeeded,
+                    episode_id,
+                    elapsed_ms,
+                ) = run_operator_file_setup(
+                    &runtime.memory_server_binary,
+                    &database_path,
+                    &runtime.claim_rollout_stage,
+                    &source_root,
+                    fixture,
+                );
+                if let Some(episode_id) = &episode_id
+                    && bindings
+                        .insert(episode_id.clone(), fixture.event_id.clone())
+                        .is_some()
+                {
+                    return Err(EvalError::InvalidInput(
+                        "operator import reused an existing episode identity".into(),
+                    ));
+                }
+                operator_imports.push(AgentManagedOperatorImportReceipt {
+                    fixture_id: fixture.fixture_id.clone(),
+                    import_succeeded,
+                    extraction_attempted,
+                    extraction_succeeded,
+                    elapsed_ms,
+                });
+            }
+        }
+        Ok((
+            ChatCompletionsTrialState {
+                _trial_directory: trial_directory,
+                database_path,
+                source_root,
+                arm,
+                tool_schema_sha256,
+                operator_imports,
+            },
+            bindings,
+        ))
+    }
+
+    fn operator_import_receipts(
+        &self,
+        state: &Self::State,
+    ) -> Vec<AgentManagedOperatorImportReceipt> {
+        state.operator_imports.clone()
+    }
+
+    fn form_memory(
+        &mut self,
+        state: &mut Self::State,
+        prompt: &str,
+    ) -> Result<AgentObservation, EvalError> {
+        let profile = ChatCompletionsToolProfile::source_authority_formation_for_arm(
+            state.arm,
+            !state.operator_imports.is_empty(),
+        );
+        let mut session = self.open_session(state)?;
+        self.run_phase(state, &mut session, prompt, profile)
+    }
+
+    fn recall_in_fresh_session(
+        &mut self,
+        state: &mut Self::State,
+        prompt: &str,
+    ) -> Result<AgentObservation, EvalError> {
+        let mut session = self.open_session(state)?;
+        self.run_phase(
+            state,
+            &mut session,
+            prompt,
+            ChatCompletionsToolProfile::RecallOnly,
+        )
+    }
+
+    fn independent_probe(
+        &mut self,
+        state: &mut Self::State,
+        probe: &AgentManagedProbeRequest,
+    ) -> Result<AgentManagedProbeObservation, EvalError> {
+        let mut session = self.open_session(state)?;
+        let read = crate::independent_probe::read_public_probe(
+            &mut session,
+            &probe.query,
+            probe.valid_at,
+            probe.context_budget,
+            None,
+        )?;
+        session.shutdown()?;
+        Ok(AgentManagedProbeObservation {
+            source_episode_ids: read.source_episode_ids,
+            known_revision: read.known_revision,
+            retained_store_bytes: directory_size(&state.database_path)?,
+            request_sha256: sha256(&serde_json::to_vec(&read.request)?),
+            response_sha256: sha256(&serde_json::to_vec(&read.response)?),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::paired::PairedEvaluationPlan;
+
+    fn preregistered_inputs() -> (PairedEvaluationPlan, AgentManagedTaskManifest, PathBuf) {
+        let mut plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
+            "../../../../evals/paired/source-authority-agent-workflow-v2/plan.json"
+        ))
+        .expect("checked-in source-authority plan parses");
+        let manifest: AgentManagedTaskManifest = serde_json::from_str(include_str!(
+            "../../../../evals/paired/source-authority-agent-workflow-v2/tasks-v1.json"
+        ))
+        .expect("checked-in source-authority tasks parse");
+        let fingerprint = manifest
+            .fingerprints_for_chat_completions()
+            .expect("checked-in source-authority tasks match the local runner protocol");
+        let executable = std::env::current_exe().expect("resolve test executable");
+        let executable_sha256 = hash_file(&executable).expect("hash test executable");
+        plan.shared_identity.agent_runner = CHAT_COMPLETIONS_AGENT_RUNNER.into();
+        plan.shared_identity.agent_version = "v1-test".into();
+        plan.shared_identity.model = "test-model".into();
+        plan.shared_identity.model_identity_protocol = ModelIdentityProtocol::ProviderRevision {
+            revision: "test-model".into(),
+        };
+        plan.shared_identity.system_prompt_sha256 = fingerprint.system_prompt_sha256;
+        plan.shared_identity.task_prompt_sha256 = fingerprint.task_prompt_sha256;
+        plan.shared_identity.host_policy_sha256 = fingerprint.host_policy_sha256;
+        plan.shared_identity.retry_policy_sha256 = fingerprint.retry_policy_sha256;
+        plan.shared_identity.reader_config_sha256 = fingerprint.protocol_config_sha256;
+        plan.shared_identity.simulator_sha256 = fingerprint.simulator_sha256;
+        plan.shared_identity
+            .provider_fingerprints
+            .insert("memory_eval_cli".into(), executable_sha256.clone());
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_endpoint_config".into(),
+            "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08".into(),
+        );
+        plan.incumbent_product.binary_sha256 = executable_sha256.clone();
+        plan.candidate_product.binary_sha256 = executable_sha256;
+        (plan, manifest, executable)
+    }
+
+    fn runtime(
+        binary: &Path,
+        endpoint: &str,
+        claim_rollout_stage: String,
+    ) -> ChatCompletionsArmRuntime {
+        ChatCompletionsArmRuntime {
+            memory_server_binary: binary.to_path_buf(),
+            endpoint: endpoint.into(),
+            bearer_token: None,
+            temp_root: None,
+            claim_rollout_stage,
+        }
+    }
+
+    #[test]
+    fn runner_preflight_accepts_a_hash_pinned_provider_neutral_local_plan() {
+        let (plan, manifest, binary) = preregistered_inputs();
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let backend = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+        );
+
+        assert!(backend.is_ok());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_an_endpoint_that_differs_from_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        plan.shared_identity
+            .provider_fingerprints
+            .insert("chat_completions_endpoint_config".into(), "0".repeat(64));
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_sampler_settings_missing_from_the_frozen_plan() {
+        let (plan, manifest, binary) = preregistered_inputs();
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            crate::paired_agent::chat_completions::ChatCompletionsSampling {
+                temperature: 1.0,
+                top_p: Some(0.95),
+                top_k: Some(20),
+                ..ChatCompletionsSampling::default()
+            },
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_accepts_sampler_settings_pinned_by_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let sampling = ChatCompletionsSampling {
+            temperature: 1.0,
+            top_p: Some(0.95),
+            top_k: Some(20),
+            ..ChatCompletionsSampling::default()
+        };
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_sampling_config".into(),
+            sampling.fingerprint_sha256().unwrap(),
+        );
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            sampling,
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_a_response_format_missing_from_the_frozen_plan() {
+        let (plan, manifest, binary) = preregistered_inputs();
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+        let response_format = serde_json::json!({"type":"json_object"});
+
+        let result = ChatCompletionsPairedBackend::new_with_response_format(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            Some(response_format),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_accepts_only_the_response_format_registered_by_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let response_format = serde_json::json!({"type":"json_object"});
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_response_format_config".into(),
+            response_format_config_sha256(&response_format).unwrap(),
+        );
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new_with_response_format(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            Some(response_format),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn runner_preflight_accepts_only_request_parameters_registered_by_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let request_parameters = serde_json::json!({
+            "chat_template_kwargs": {"enable_thinking": false}
+        });
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_request_parameters_config".into(),
+            request_parameters_config_sha256(&request_parameters).unwrap(),
+        );
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new_with_request_parameters(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            None,
+            Some(request_parameters),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_request_parameters_that_differ_from_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let registered = serde_json::json!({
+            "chat_template_kwargs": {"enable_thinking": false}
+        });
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_request_parameters_config".into(),
+            request_parameters_config_sha256(&registered).unwrap(),
+        );
+        let active = serde_json::json!({
+            "chat_template_kwargs": {"enable_thinking": true}
+        });
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new_with_request_parameters(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            None,
+            Some(active),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_a_plan_response_format_when_the_active_config_is_missing() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let response_format = serde_json::json!({"type":"json_object"});
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_response_format_config".into(),
+            response_format_config_sha256(&response_format).unwrap(),
+        );
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new_with_response_format(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            None,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_a_response_format_that_differs_from_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let registered = serde_json::json!({"type":"json_object"});
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_response_format_config".into(),
+            response_format_config_sha256(&registered).unwrap(),
+        );
+        let active = serde_json::json!({
+            "type":"json_schema",
+            "json_schema":{"name":"answer","schema":{"type":"object"}}
+        });
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new_with_response_format(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+            Some(active),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_sampler_settings_that_differ_from_the_frozen_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        let registered = ChatCompletionsSampling {
+            temperature: 1.0,
+            top_p: Some(0.95),
+            top_k: Some(20),
+            ..ChatCompletionsSampling::default()
+        };
+        plan.shared_identity.provider_fingerprints.insert(
+            "chat_completions_sampling_config".into(),
+            registered.fingerprint_sha256().unwrap(),
+        );
+        let active = ChatCompletionsSampling {
+            top_k: Some(21),
+            ..registered
+        };
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            active,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_a_plan_without_an_endpoint_fingerprint() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        plan.shared_identity
+            .provider_fingerprints
+            .remove("chat_completions_endpoint_config");
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn runner_preflight_rejects_a_codex_pinned_plan() {
+        let (mut plan, manifest, binary) = preregistered_inputs();
+        plan.shared_identity.agent_runner = "codex-cli".into();
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn frozen_v1_local_pilot_is_rejected_after_the_recall_prompt_fingerprint_changes() {
+        let mut plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
+            "../../../../evals/paired/source-authority-local-chat-completions-v1/plan.json"
+        ))
+        .expect("registered local pilot plan parses");
+        let manifest: AgentManagedTaskManifest = serde_json::from_str(include_str!(
+            "../../../../evals/paired/source-authority-local-chat-completions-v1/tasks-v1.json"
+        ))
+        .expect("registered local pilot tasks parse");
+        let protocol = manifest
+            .fingerprints_for_chat_completions()
+            .expect("registered local pilot follows the provider-neutral protocol");
+        assert_eq!(
+            plan.shared_identity.system_prompt_sha256,
+            protocol.system_prompt_sha256
+        );
+        assert_ne!(
+            plan.shared_identity.task_prompt_sha256,
+            protocol.task_prompt_sha256
+        );
+        assert_eq!(
+            plan.shared_identity.host_policy_sha256,
+            protocol.host_policy_sha256
+        );
+        assert_eq!(
+            plan.shared_identity.retry_policy_sha256,
+            protocol.retry_policy_sha256
+        );
+        assert_eq!(
+            plan.shared_identity.reader_config_sha256,
+            protocol.protocol_config_sha256
+        );
+        assert_eq!(
+            plan.shared_identity.simulator_sha256,
+            protocol.simulator_sha256
+        );
+        let binary = std::env::current_exe().expect("resolve test executable");
+        let binary_sha256 = hash_file(&binary).expect("hash test executable");
+        plan.shared_identity
+            .provider_fingerprints
+            .insert("memory_eval_cli".into(), binary_sha256.clone());
+        plan.incumbent_product
+            .binary_sha256
+            .clone_from(&binary_sha256);
+        plan.candidate_product
+            .binary_sha256
+            .clone_from(&binary_sha256);
+        let (incumbent_stage, candidate_stage) = plan.claim_rollout_stages(None).unwrap();
+
+        let result = ChatCompletionsPairedBackend::new(
+            &plan,
+            &manifest,
+            runtime(&binary, "http://127.0.0.1:1234/v1", incumbent_stage),
+            runtime(&binary, "http://127.0.0.1:1234/v1", candidate_stage),
+            ChatCompletionsSampling::default(),
+        );
+
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => panic!("v1 plan must not run with the v2 prompt"),
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("prompt and runner-policy hashes")
+        );
+    }
+}

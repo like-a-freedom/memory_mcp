@@ -16,7 +16,9 @@ use chrono::{DateTime, Utc};
 
 use crate::error::MemoryError;
 use crate::memory::lifecycle_workers::LifecycleHandles;
-use crate::models::{AssembledContextItem, ExtractResult};
+use crate::models::{
+    AssembledContextItem, ContextAssemblyResult, ExtractResult, TemporalContextQuery,
+};
 
 /// Episode ingestion dependency.
 #[async_trait::async_trait]
@@ -115,6 +117,36 @@ pub async fn recall_context(
     retrieval.retrieve(command).await
 }
 
+/// Revision-bounded recall dependency.
+#[async_trait::async_trait]
+pub trait TemporalContextRetrievalPort: Send + Sync {
+    async fn retrieve_temporal(
+        &self,
+        request: &crate::models::AssembleContextRequest,
+        temporal: TemporalContextQuery,
+    ) -> Result<ContextAssemblyResult, MemoryError>;
+}
+
+/// Recall input that preserves the independent validity and knowledge axes.
+pub struct TemporalRecallCommand {
+    pub request: crate::models::AssembleContextRequest,
+    pub temporal: TemporalContextQuery,
+}
+
+/// Enters historical recall after charging the same caller rate limit as the
+/// current retrieval path.
+pub async fn recall_temporal_context(
+    retrieval: &(impl TemporalContextRetrievalPort + ?Sized),
+    rate_limit: &(impl RateLimitPort + ?Sized),
+    command: &TemporalRecallCommand,
+) -> Result<ContextAssemblyResult, MemoryError> {
+    let access = crate::models::AccessPayload::from_payload(command.request.access.clone());
+    rate_limit.check(access.and_then(|payload| payload.caller_id).as_deref())?;
+    retrieval
+        .retrieve_temporal(&command.request, command.temporal)
+        .await
+}
+
 /// Extraction dependency: entities, facts and relationships from
 /// a stored episode.
 #[async_trait::async_trait]
@@ -160,10 +192,7 @@ pub async fn extract_from_episode(
     rate_limit.check(command.caller_id.as_deref())?;
 
     if !extraction.episode_exists(&command.episode_id).await? {
-        return Err(MemoryError::NotFound(format!(
-            "episode_id not found: {}",
-            command.episode_id
-        )));
+        return Err(MemoryError::NotFound("episode_id not found".into()));
     }
 
     extraction.extract(command).await
@@ -223,26 +252,15 @@ pub trait InvalidationPort: Send + Sync {
     /// Look up a record to verify it exists.
     async fn find_record(&self, record_id: &str) -> Result<StoredRecord, MemoryError>;
 
-    /// Close both bi-temporal fields on a record.
-    ///
-    /// `t_invalid_ingested` is the server-owned transaction
-    /// time; the caller supplies only valid time. A `None`
-    /// transaction time means the owner stamps server-side
-    /// now, which is the only correct default.
-    async fn close_record(
+    /// Close a fact and all derived claim projections in one visibility
+    /// boundary. The caller supplies valid time; the storage owner assigns
+    /// transaction time and the knowledge revision.
+    async fn close_fact_and_claims(
         &self,
-        record_id: &str,
+        fact_id: &str,
         t_invalid: DateTime<Utc>,
-        t_invalid_ingested: Option<DateTime<Utc>>,
         reason: &str,
     ) -> Result<(), MemoryError>;
-
-    /// Close the claims derived from a fact.
-    async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError>;
-
-    /// Whether a claim projection pipeline is wired for this
-    /// runtime.
-    fn claim_pipeline_is_wired(&self) -> bool;
 
     /// Drop the assembled-context cache.
     async fn invalidate_assembled_context(&self) -> Result<(), MemoryError>;
@@ -251,7 +269,7 @@ pub trait InvalidationPort: Send + Sync {
 /// Invalidate one fact.
 ///
 /// Order is deliberate and observable: rate limit, target kind,
-/// record-id shape, existence check, close, derived-claim close,
+/// record-id shape, existence check, atomic fact-and-claim close,
 /// cache invalidation.
 ///
 /// The target kind is checked here rather than in a store: this
@@ -267,32 +285,14 @@ pub async fn invalidate_fact(
 ) -> Result<(), MemoryError> {
     rate_limit.check(request.caller_id.as_deref())?;
 
-    if !request.fact_id.starts_with("fact:") {
-        return Err(MemoryError::Validation(format!(
-            "record_id '{}' is not a fact record id; expected the canonical 'fact:<id>' form",
-            request.fact_id
-        )));
-    }
-    crate::storage::validate_record_id(&request.fact_id)?;
+    crate::storage::require_record_kind(&request.fact_id, "fact")?;
 
     if port.find_record(&request.fact_id).await? == StoredRecord::Absent {
         return Err(MemoryError::NotFound("fact_id not found".into()));
     }
 
-    port.close_record(
-        &request.fact_id,
-        request.t_invalid,
-        // Transaction time is server-owned: the caller never
-        // supplies it, so a stale client cannot backdate the
-        // fact into the live view.
-        None,
-        &request.reason,
-    )
-    .await?;
-
-    if port.claim_pipeline_is_wired() {
-        port.close_claims_for_fact(&request.fact_id).await?;
-    }
+    port.close_fact_and_claims(&request.fact_id, request.t_invalid, &request.reason)
+        .await?;
     port.invalidate_assembled_context().await?;
     Ok(())
 }

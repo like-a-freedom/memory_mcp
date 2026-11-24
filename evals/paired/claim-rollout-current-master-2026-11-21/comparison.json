@@ -1,0 +1,41 @@
+{
+  "schema_version": "memory-mcp-claim-rollout-replication/v1",
+  "preregistration": "preregistration.json",
+  "acceptance_plan": "acceptance-plan.json",
+  "product_revision": "current-checkout-worktree",
+  "product_binary_sha256": "320707567b63d8d816326d42fc4e07321fa93ae46efca4a33cad2673dc05702e",
+  "corpus_sha256": "fbe0c34e1e0ed6cea86f6ecd3470b5ef514be10040c54cb31c5f2da04e478735",
+  "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "repeats_per_stage": 2,
+  "repeat_semantics_match": true,
+  "case_coverage": 8,
+  "scores": {
+    "shadow": {
+      "primary_evidence_success": 6,
+      "primary_decision_success": 1,
+      "primary_probe_success": 1,
+      "temporal_evidence_success": 7,
+      "temporal_decision_success": 0,
+      "temporal_probe_success": 0
+    },
+    "evidence_default": {
+      "primary_evidence_success": 6,
+      "primary_decision_success": 4,
+      "primary_probe_success": 4,
+      "temporal_evidence_success": 7,
+      "temporal_decision_success": 6,
+      "temporal_probe_success": 6
+    }
+  },
+  "decision_gains": ["peer-conflict", "prior-knowledge", "unverified-correction"],
+  "decision_losses": [],
+  "primary_evidence_regressions": [],
+  "new_candidate_safety_findings": [],
+  "shared_baseline_safety_findings": [
+    "similar-name:forbidden_source",
+    "valid-boundary:forbidden_source"
+  ],
+  "acceptance_report": "acceptance.json",
+  "accepted": true,
+  "scope_limit": "Finite deterministic replication on the same eight v6 scenario templates previously observed. Not an independent family sample, population estimate, model-agent outcome, or proof of general agent usability."
+}

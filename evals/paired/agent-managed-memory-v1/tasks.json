@@ -1,0 +1,261 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "mauve-harbor-history",
+        "case_id": "mauve-harbor-backup-cabinet-label",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Mauve Harbor uses Willow-38 as its backup cabinet label. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Mauve Harbor, what is the backup cabinet label? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Mauve Harbor, what is the backup cabinet label?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Willow-38"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "cinder-atlas-history",
+        "case_id": "cinder-atlas-export-marker",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Cinder Atlas uses Rook-26 as its export marker. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Cinder Atlas, what is the export marker? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Cinder Atlas, what is the export marker?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-02",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-02"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Rook-26"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "pollen-circuit-history",
+        "case_id": "pollen-circuit-nightly-handoff-queue",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Pollen Circuit uses Amber-51 as its nightly handoff queue. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Pollen Circuit, what is the nightly handoff queue? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Pollen Circuit, what is the nightly handoff queue?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-03",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-03"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Amber-51"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "quiet-juniper-history",
+        "case_id": "quiet-juniper-review-packet-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Quiet Juniper uses Dune-73 as its review packet code. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Quiet Juniper, what is the review packet code? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Quiet Juniper, what is the review packet code?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-04",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-04"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Dune-73"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "orchid-relay-history",
+        "case_id": "orchid-relay-release-ledger-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Orchid Relay uses Slate-19 as its release ledger tag. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Orchid Relay, what is the release ledger tag? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Orchid Relay, what is the release ledger tag?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-05",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-05"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Slate-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "velvet-comet-history",
+        "case_id": "velvet-comet-rotation-shelf-label",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Velvet Comet uses Thistle-44 as its rotation shelf label. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Velvet Comet, what is the rotation shelf label? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Velvet Comet, what is the rotation shelf label?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-06",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-06"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Thistle-44"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "tidal-archive-history",
+        "case_id": "tidal-archive-restore-shorthand",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Tidal Archive uses Coral-62 as its restore shorthand. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Tidal Archive, what is the restore shorthand? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Tidal Archive, what is the restore shorthand?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-07",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-07"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Coral-62"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "brass-orchard-history",
+        "case_id": "brass-orchard-escalation-mailbox",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please retain this durable project fact for a later session: Brass Orchard uses Marble-85 as its escalation mailbox. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Brass Orchard, what is the escalation mailbox? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "For Brass Orchard, what is the escalation mailbox?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "formation-08",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "formation-08"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Marble-85"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

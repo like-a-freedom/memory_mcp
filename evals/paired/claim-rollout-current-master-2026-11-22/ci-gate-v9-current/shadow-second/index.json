@@ -1,0 +1,629 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "security-hardening-current-2026-11-22",
+    "product_binary_sha256": "f37d4d59e21d2d668e077f577b1de1c0ddd4c3fe119e74156c59149f003697aa",
+    "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+    "config_sha256": "d52b1ccd6308b544317bb2b9ca8b10ca5fcfe9f6d3a39c59419db0a5ee42755a",
+    "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61"
+  },
+  "cases": [
+    {
+      "case_id": "absent-subject",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-absent-subject.json",
+      "receipt_sha256": "94b5be3e324371310aa902bc9090c6cdeb043e4435cd6681f78aad7745f957f6"
+    },
+    {
+      "case_id": "similar-name",
+      "source_order": [
+        "east-v9-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-v9-entry",
+            "role": "unknown",
+            "text": "subject: Myrtle Terminal East\ndimension: capacity\nvalue: 1147 crates for Myrtle Terminal East"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-v9-entry",
+            "role": "unknown",
+            "text": "subject: Myrtle Terminal East\ndimension: capacity\nvalue: 1147 crates for Myrtle Terminal East"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-v9-entry",
+            "role": "current",
+            "text": "subject: Myrtle Terminal East\ndimension: capacity\nvalue: 1147 crates for Myrtle Terminal East"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-similar-name.json",
+      "receipt_sha256": "17edcd374d7a25815eeeaae35023d1febd3c5843c2a571dad419c674402cb649"
+    },
+    {
+      "case_id": "single-current",
+      "source_order": [
+        "sole-v9-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-v9-entry",
+            "role": "unknown",
+            "text": "subject: Pine Works\ndimension: capacity\nvalue: 1158 crates for Pine Works"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-v9-entry",
+            "role": "unknown",
+            "text": "subject: Pine Works\ndimension: capacity\nvalue: 1158 crates for Pine Works"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-v9-entry",
+            "role": "current",
+            "text": "subject: Pine Works\ndimension: capacity\nvalue: 1158 crates for Pine Works"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-single-current.json",
+      "receipt_sha256": "9ff4c403d72b24f940824815210d46da7ccccdc473320984db53e3c3cd5db543"
+    },
+    {
+      "case_id": "peer-conflict",
+      "source_order": [
+        "dispute-v9-a",
+        "dispute-v9-b"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "dispute-v9-a",
+            "role": "unknown",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1141 crates for Slate Annex"
+          },
+          {
+            "event_id": "dispute-v9-b",
+            "role": "unknown",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1143 crates for Slate Annex"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "dispute-v9-a",
+            "role": "unknown",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1141 crates for Slate Annex"
+          },
+          {
+            "event_id": "dispute-v9-b",
+            "role": "unknown",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1143 crates for Slate Annex"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "dispute-v9-a",
+            "role": "conflicting",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1141 crates for Slate Annex"
+          },
+          {
+            "event_id": "dispute-v9-b",
+            "role": "conflicting",
+            "text": "subject: Slate Annex\ndimension: capacity\nvalue: 1143 crates for Slate Annex"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-peer-conflict.json",
+      "receipt_sha256": "5d8b246d7df3ca86526df3fe789b5bb24df7485d54920e4d554d3325072837c2"
+    },
+    {
+      "case_id": "unverified-correction",
+      "source_order": [
+        "supported-v9-entry",
+        "forum-v9-entry"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "supported-v9-entry",
+            "role": "unknown",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1127 crates for Silver Port"
+          },
+          {
+            "event_id": "forum-v9-entry",
+            "role": "unknown",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1132 crates, unverified correction reported on a forum for Silver Port"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "supported-v9-entry",
+            "role": "unknown",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1127 crates for Silver Port"
+          },
+          {
+            "event_id": "forum-v9-entry",
+            "role": "unknown",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1132 crates, unverified correction reported on a forum for Silver Port"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "supported-v9-entry",
+            "role": "conflicting",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1127 crates for Silver Port"
+          },
+          {
+            "event_id": "forum-v9-entry",
+            "role": "conflicting",
+            "text": "subject: Silver Port\ndimension: capacity\nvalue: 1132 crates, unverified correction reported on a forum for Silver Port"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-unverified-correction.json",
+      "receipt_sha256": "fd9fb68016da912e68aa5af765d92065e41c7ba483f9faeed7e6644ae09153c6"
+    },
+    {
+      "case_id": "prior-knowledge",
+      "source_order": [
+        "pre-v9-report"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-v9-report",
+            "role": "unknown",
+            "text": "subject: Violet Quay\ndimension: capacity\nvalue: 1113 crates for Violet Quay"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-v9-report",
+            "role": "unknown",
+            "text": "subject: Violet Quay\ndimension: capacity\nvalue: 1113 crates for Violet Quay"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-v9-report",
+            "role": "current",
+            "text": "subject: Violet Quay\ndimension: capacity\nvalue: 1113 crates for Violet Quay"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-prior-knowledge.json",
+      "receipt_sha256": "59e3cb4ec20583df918cf29258408267b45d96309ca860a4dfdd641aa481bc41"
+    },
+    {
+      "case_id": "valid-boundary",
+      "source_order": [
+        "earlier-v9-valid"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "earlier-v9-valid",
+            "role": "unknown",
+            "text": "subject: Basalt Wharf\ndimension: capacity\nvalue: 1116 crates for Basalt Wharf"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "earlier-v9-valid",
+            "role": "unknown",
+            "text": "subject: Basalt Wharf\ndimension: capacity\nvalue: 1116 crates for Basalt Wharf"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "earlier-v9-valid",
+            "role": "current",
+            "text": "subject: Basalt Wharf\ndimension: capacity\nvalue: 1116 crates for Basalt Wharf"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-valid-boundary.json",
+      "receipt_sha256": "ab8286ead57f668488dba2f61cc20aded44d02261126f097792bb2ba1cd479be"
+    },
+    {
+      "case_id": "office-entry",
+      "source_order": [
+        "office-v9-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-v9-entry",
+            "role": "unknown",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-v9-entry",
+            "role": "unknown",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-v9-entry",
+            "role": "current",
+            "text": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-office-entry.json",
+      "receipt_sha256": "ba43a5e339294868ae6baf65c9684700d25879e4a002c8c7b2e1e80ee57fbe3d"
+    }
+  ]
+}

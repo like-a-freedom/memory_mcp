@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "absent-subject",
+      "family_id": "absent-subject-v9-history",
+      "event_ids": [
+        "absent-v9-entry"
+      ],
+      "query": "What capacity was recorded for Ivory Hangar?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "similar-name",
+      "family_id": "similar-name-v9-history",
+      "event_ids": [
+        "west-v9-entry",
+        "east-v9-entry"
+      ],
+      "query": "What capacity was recorded for Myrtle Terminal East?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "single-current",
+      "family_id": "single-current-v9-history",
+      "event_ids": [
+        "sole-v9-entry"
+      ],
+      "query": "What capacity was recorded for Pine Works?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "peer-conflict",
+      "family_id": "peer-conflict-v9-history",
+      "event_ids": [
+        "dispute-v9-b",
+        "dispute-v9-a"
+      ],
+      "query": "What capacity was recorded for Slate Annex?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "unverified-correction",
+      "family_id": "unverified-correction-v9-history",
+      "event_ids": [
+        "supported-v9-entry",
+        "forum-v9-entry"
+      ],
+      "query": "What capacity was recorded for Silver Port?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "prior-knowledge",
+      "family_id": "prior-knowledge-v9-history",
+      "event_ids": [
+        "pre-v9-report",
+        "post-v9-report"
+      ],
+      "query": "Before the later report, what capacity was recorded for Violet Quay?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "knowledge_before_event_id": "post-v9-report",
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "valid-boundary",
+      "family_id": "valid-boundary-v9-history",
+      "event_ids": [
+        "earlier-v9-valid",
+        "later-v9-valid"
+      ],
+      "query": "What capacity was recorded for Basalt Wharf on August 1, 2026?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "office-entry",
+      "family_id": "ordinary-location-v9-history",
+      "event_ids": [
+        "office-v9-entry"
+      ],
+      "query": "Where was Pine Office located?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "repeat_read": 2
+    }
+  ]
+}

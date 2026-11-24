@@ -1,0 +1,497 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "northvale_depot",
+        "case_id": "northvale_depot-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What maintenance-window duration should I report? Subject: Northvale Orbital Depot.",
+      "seed_episodes": [
+        {
+          "event_id": "northvale_depot-record-a",
+          "source_id": "northvale_depot-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Northvale Orbital Depot\ndimension: maintenance_window\nvalue: 35 minutes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "northvale_depot-record-b",
+          "source_id": "northvale_depot-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Northvale Orbital Depot\ndimension: maintenance_window\nvalue: 45 minutes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "northvale_depot-record-a"
+            ]
+          ],
+          [
+            [
+              "northvale_depot-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "cindergate_hub",
+        "case_id": "cindergate_hub-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What crane safe-load value should I report? Subject: Cindergate Fabrication Hub.",
+      "seed_episodes": [
+        {
+          "event_id": "cindergate_hub-record-a",
+          "source_id": "cindergate_hub-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Cindergate Fabrication Hub\ndimension: crane_safe_load\nvalue: 31 tonnes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "cindergate_hub-record-b",
+          "source_id": "cindergate_hub-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Cindergate Fabrication Hub\ndimension: crane_safe_load\nvalue: 27 tonnes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "cindergate_hub-record-a"
+            ]
+          ],
+          [
+            [
+              "cindergate_hub-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "mosslight_annex",
+        "case_id": "mosslight_annex-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What backup runtime should I report? Subject: Mosslight Battery Annex.",
+      "seed_episodes": [
+        {
+          "event_id": "mosslight_annex-record-a",
+          "source_id": "mosslight_annex-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Mosslight Battery Annex\ndimension: backup_runtime\nvalue: 9.5 hours effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "mosslight_annex-record-b",
+          "source_id": "mosslight_annex-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Mosslight Battery Annex\ndimension: backup_runtime\nvalue: 11 hours effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "mosslight_annex-record-a"
+            ]
+          ],
+          [
+            [
+              "mosslight_annex-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "tidemark_archive",
+        "case_id": "tidemark_archive-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What retention period should I report? Subject: Tidemark Archive.",
+      "seed_episodes": [
+        {
+          "event_id": "tidemark_archive-record-a",
+          "source_id": "tidemark_archive-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Tidemark Archive\ndimension: retention_period\nvalue: 120 days effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "tidemark_archive-record-b",
+          "source_id": "tidemark_archive-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Tidemark Archive\ndimension: retention_period\nvalue: 90 days effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "tidemark_archive-record-a"
+            ]
+          ],
+          [
+            [
+              "tidemark_archive-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "ivory_lantern_clinic",
+        "case_id": "ivory_lantern_clinic-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What night-shift staffing level should I report? Subject: Ivory Lantern Research Clinic.",
+      "seed_episodes": [
+        {
+          "event_id": "ivory_lantern_clinic-record-a",
+          "source_id": "ivory_lantern_clinic-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Ivory Lantern Research Clinic\ndimension: night_shift_staffing\nvalue: 6 technicians effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "ivory_lantern_clinic-record-b",
+          "source_id": "ivory_lantern_clinic-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Ivory Lantern Research Clinic\ndimension: night_shift_staffing\nvalue: 5 technicians effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "ivory_lantern_clinic-record-a"
+            ]
+          ],
+          [
+            [
+              "ivory_lantern_clinic-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "copperwind_quay",
+        "case_id": "copperwind_quay-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What ferry departure slot should I report? Subject: Copperwind Quay.",
+      "seed_episodes": [
+        {
+          "event_id": "copperwind_quay-record-a",
+          "source_id": "copperwind_quay-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Copperwind Quay\ndimension: ferry_departure_slot\nvalue: 14:20 UTC effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "copperwind_quay-record-b",
+          "source_id": "copperwind_quay-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Copperwind Quay\ndimension: ferry_departure_slot\nvalue: 14:50 UTC effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "copperwind_quay-record-a"
+            ]
+          ],
+          [
+            [
+              "copperwind_quay-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "hollowcrest_observatory",
+        "case_id": "hollowcrest_observatory-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What mirror-cleaning deadline should I report? Subject: Hollowcrest Observatory.",
+      "seed_episodes": [
+        {
+          "event_id": "hollowcrest_observatory-record-a",
+          "source_id": "hollowcrest_observatory-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Hollowcrest Observatory\ndimension: mirror_cleaning_deadline\nvalue: February 2, 2026 effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "hollowcrest_observatory-record-b",
+          "source_id": "hollowcrest_observatory-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Hollowcrest Observatory\ndimension: mirror_cleaning_deadline\nvalue: February 4, 2026 effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "hollowcrest_observatory-record-a"
+            ]
+          ],
+          [
+            [
+              "hollowcrest_observatory-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conflict_decisions",
+        "family_id": "junebrook_foundry",
+        "case_id": "junebrook_foundry-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What temperature alert threshold should I report? Subject: Junebrook Foundry.",
+      "seed_episodes": [
+        {
+          "event_id": "junebrook_foundry-record-a",
+          "source_id": "junebrook_foundry-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Junebrook Foundry\ndimension: temperature_alert_threshold\nvalue: 68 degrees C effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "junebrook_foundry-record-b",
+          "source_id": "junebrook_foundry-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Junebrook Foundry\ndimension: temperature_alert_threshold\nvalue: 73 degrees C effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "junebrook_foundry-record-a"
+            ]
+          ],
+          [
+            [
+              "junebrook_foundry-record-b"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Conflicting records; ask the owner to confirm."
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_recall",
+        "family_id": "veloran_station",
+        "case_id": "veloran_station-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What calibration interval should I report? Subject: Veloran Signal Station.",
+      "seed_episodes": [
+        {
+          "event_id": "veloran_station-record-a",
+          "source_id": "veloran_station-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Veloran Signal Station\ndimension: calibration_interval\nvalue: 28 days effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "veloran_station-record-a"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "28 days"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_recall",
+        "family_id": "opaline_workshop",
+        "case_id": "opaline_workshop-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What packaging code should I report? Subject: Opaline Workshop.",
+      "seed_episodes": [
+        {
+          "event_id": "opaline_workshop-record-a",
+          "source_id": "opaline_workshop-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Opaline Workshop\ndimension: packaging_code\nvalue: RQ-17 effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "opaline_workshop-record-a"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "RQ-17"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_recall",
+        "family_id": "westmere_lab",
+        "case_id": "westmere_lab-decision",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What review time should I report? Subject: Westmere Field Lab.",
+      "seed_episodes": [
+        {
+          "event_id": "westmere_lab-record-a",
+          "source_id": "westmere_lab-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Westmere Field Lab\ndimension: review_time\nvalue: 09:40 UTC effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "westmere_lab-record-a"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "09:40 UTC"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary_recall",
+        "family_id": "brackenridge_depot",
+        "case_id": "brackenridge_depot-decision",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If its evidence_status is \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What inventory shelf should I report? Subject: Brackenridge Depot.",
+      "seed_episodes": [
+        {
+          "event_id": "brackenridge_depot-record-a",
+          "source_id": "brackenridge_depot-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Brackenridge Depot\ndimension: inventory_shelf\nvalue: C-12 effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "brackenridge_depot-record-a"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "C-12"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

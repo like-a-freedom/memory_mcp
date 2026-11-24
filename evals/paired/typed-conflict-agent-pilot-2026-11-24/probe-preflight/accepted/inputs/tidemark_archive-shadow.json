@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What retention period was recorded for Tidemark Archive on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "a318e893523562a12f1d4e8261f89c7d52d8b22615e286de68245f30e4bc1f8b",
+  "claim_rollout_stage": "shadow"
+}

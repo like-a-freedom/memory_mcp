@@ -96,6 +96,8 @@ impl TableOwner for KnowledgeTables {
         "event_projection_job",
         "procedure_candidate",
         "memory_capture_audit",
+        "knowledge_revision",
+        "knowledge_revision_clock",
     ];
 }
 

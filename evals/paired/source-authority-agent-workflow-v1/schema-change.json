@@ -1,0 +1,21 @@
+{
+  "schema_version": "memory-mcp-tool-schema-migration/v1",
+  "tool": "assemble_context",
+  "incumbent": {
+    "api_profile": "legacy_as_of_v0",
+    "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+    "temporal_request": "as_of"
+  },
+  "candidate": {
+    "api_profile": "revision_bound_v1",
+    "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+    "temporal_request": ["valid_at", "known_revision"],
+    "legacy_as_of_alias_retained": true
+  },
+  "probe_semantics": {
+    "incumbent": "Source coverage only; legacy as_of does not establish a revision snapshot.",
+    "candidate": "Uses the fixed revision-bound request and validates the returned snapshot.",
+    "comparison_limit": "This source-authority cohort measures workflow/task outcomes and source support. It does not compare temporal selector quality."
+  },
+  "reviewed_contract": "docs/compatibility/TEMPORAL_CONTEXT.md"
+}

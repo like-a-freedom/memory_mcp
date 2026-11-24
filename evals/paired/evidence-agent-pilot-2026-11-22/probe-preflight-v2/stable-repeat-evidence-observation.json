@@ -1,0 +1,9 @@
+{
+  "input_sha256": "92da625167f8f3d2f6896fc9b7a80a7c9e7fa55d4900185eb36969aec9e199f8",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "stable-marsh-lab"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

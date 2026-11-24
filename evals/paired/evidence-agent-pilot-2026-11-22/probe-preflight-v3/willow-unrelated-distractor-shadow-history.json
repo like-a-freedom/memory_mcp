@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "willow-target",
+    "source_id": "willow-gate-log",
+    "source_type": "inspection-record",
+    "content": "subject: Willow Gate\ndimension: cycle_limit\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026",
+    "valid_at": "2026-06-12T09:00:00Z"
+  },
+  {
+    "event_id": "willow-distractor",
+    "source_id": "willow-shed-log",
+    "source_type": "inspection-record",
+    "content": "subject: Willow Shed\ndimension: cycle_limit\nvalue: 240 cycles for the Willow Shed cycle limit on June 12, 2026",
+    "valid_at": "2026-06-12T09:00:00Z"
+  }
+]

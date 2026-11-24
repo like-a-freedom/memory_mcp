@@ -55,12 +55,17 @@ async fn resolve_persists_aliases_and_logs_correlated_public_events() {
     let log = std::fs::read_to_string(log_path).expect("read captured public log output");
     let start = log
         .lines()
-        .find(|line| line.contains("op=resolve.start") && line.contains("Ada Lovelace"))
+        .find(|line| line.contains("op=resolve.start"))
         .expect("canonical resolution start is logged");
     let done = log
         .lines()
-        .find(|line| line.contains("op=resolve.done") && line.contains(&canonical.result))
+        .find(|line| line.contains("op=resolve.done") && request_id(line) == request_id(start))
         .expect("canonical resolution completion is logged");
+    assert!(!log.contains("Ada Lovelace"), "entity names are not logged");
+    assert!(
+        !log.contains(&canonical.result),
+        "opaque entity IDs are not logged"
+    );
     assert!(
         log.find(start).expect("start position") < log.find(done).expect("done position"),
         "resolution must start before completion"

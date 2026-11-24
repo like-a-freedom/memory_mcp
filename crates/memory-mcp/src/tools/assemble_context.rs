@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::models::AssembleContextRequest;
+use crate::models::{AssembleContextRequest, ContextAssemblyResult, TemporalContextQuery};
 use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::AssembleContextParams;
 use crate::tools::parsers::parse_datetime;
@@ -19,6 +19,52 @@ fn context_guidance(has_items: bool) -> &'static str {
     } else {
         "No sufficient matching context was found. Refine the query or verify primary sources."
     }
+}
+
+fn parse_temporal_query(
+    params: &AssembleContextParams,
+) -> Result<Option<TemporalContextQuery>, MemoryError> {
+    let as_of_text = (!params.as_of.trim().is_empty()).then_some(params.as_of.as_str());
+    let has_new_axis =
+        params.valid_at.is_some() || params.known_at.is_some() || params.known_revision.is_some();
+    if as_of_text.is_some() && has_new_axis {
+        return Err(MemoryError::Validation(
+            "as_of cannot be combined with valid_at, known_at, or known_revision".into(),
+        ));
+    }
+    if params.known_at.is_some() && params.known_revision.is_some() {
+        return Err(MemoryError::Validation(
+            "known_at and known_revision are mutually exclusive".into(),
+        ));
+    }
+    if params.known_revision.is_some_and(|revision| revision < 0) {
+        return Err(MemoryError::Validation(
+            "known_revision must be zero or greater".into(),
+        ));
+    }
+
+    let parse = |name: &str,
+                 value: Option<&str>|
+     -> Result<Option<chrono::DateTime<chrono::Utc>>, MemoryError> {
+        value
+            .map(|value| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .map(|date| date.with_timezone(&chrono::Utc))
+                    .map_err(|_| {
+                        MemoryError::Validation(format!(
+                            "{name} must be a valid RFC 3339 timestamp"
+                        ))
+                    })
+            })
+            .transpose()
+    };
+    let as_of = parse("as_of", as_of_text)?;
+    let temporal = TemporalContextQuery {
+        valid_at: parse("valid_at", params.valid_at.as_deref())?.or(as_of),
+        known_at: parse("known_at", params.known_at.as_deref())?.or(as_of),
+        known_revision: params.known_revision,
+    };
+    Ok(temporal.is_explicit().then_some(temporal))
 }
 
 /// Assemble the most relevant active memory context for a query.
@@ -41,19 +87,13 @@ async fn assemble_context_inner<T: ToolContext>(
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("assemble_context");
     let compact = params.compact;
-    let as_of = if params.as_of.trim().is_empty() {
-        None
-    } else {
-        chrono::DateTime::parse_from_rfc3339(&params.as_of)
-            .ok()
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-    };
+    let temporal = parse_temporal_query(&params)?;
     let window_start = params.window_start.as_deref().and_then(parse_datetime);
     let window_end = params.window_end.as_deref().and_then(parse_datetime);
     let request = AssembleContextRequest {
         query: params.query,
         fact_types: params.fact_types,
-        as_of,
+        as_of: None,
         budget: params.budget,
         view_mode: params.view_mode,
         window_start,
@@ -65,14 +105,22 @@ async fn assemble_context_inner<T: ToolContext>(
     let timer = Instant::now();
     ctx.record(ToolEvent {
         op: "assemble_context.start",
-        args: json!({"query": request.query}),
+        args: json!({"query_chars": request.query.chars().count()}),
         result: json!({}),
         level: LogLevel::Info,
         duration: None,
     });
 
-    match ctx.assemble_context(request).await {
-        Ok(results) => {
+    let assembly = match temporal {
+        Some(temporal) => ctx.assemble_context_temporal(request, temporal).await,
+        None => ctx
+            .assemble_context(request)
+            .await
+            .map(ContextAssemblyResult::current),
+    };
+    match assembly {
+        Ok(assembly) => {
+            let results = assembly.items;
             ctx.record(ToolEvent {
                 op: "assemble_context.done",
                 args: json!({}),
@@ -81,7 +129,19 @@ async fn assemble_context_inner<T: ToolContext>(
                 duration: Some(timer.elapsed()),
             });
             let count = results.len();
-            let guidance = context_guidance(count > 0);
+            let guidance = if let Some(metadata) = assembly.metadata.as_ref() {
+                if metadata
+                    .omitted_channels
+                    .iter()
+                    .any(|channel| channel.starts_with("claim relations"))
+                {
+                    "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result."
+                } else {
+                    "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result."
+                }
+            } else {
+                context_guidance(count > 0)
+            };
             operation_metrics.record_result("items", count);
             // Under compact mode, omit `quote` and slim `rationale` via the
             // serde adapters reading the thread-local CompactGuard. The guard
@@ -93,20 +153,159 @@ async fn assemble_context_inner<T: ToolContext>(
             };
             operation_metrics.success();
             if compact {
-                Ok(ToolResponse::complete_list_compact(value, count, guidance))
+                Ok(ToolResponse::complete_context_list_compact(
+                    value,
+                    count,
+                    guidance,
+                    assembly.metadata,
+                ))
             } else {
-                Ok(ToolResponse::complete_list(value, count, guidance))
+                Ok(ToolResponse::complete_context_list(
+                    value,
+                    count,
+                    guidance,
+                    assembly.metadata,
+                ))
             }
         }
         Err(err) => {
             ctx.record(ToolEvent {
                 op: "assemble_context.error",
                 args: json!({}),
-                result: json!({"error": err.to_string()}),
+                result: json!({"error_code": err.code()}),
                 level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn params() -> AssembleContextParams {
+        AssembleContextParams {
+            query: "q".into(),
+            fact_types: Vec::new(),
+            as_of: String::new(),
+            valid_at: None,
+            known_at: None,
+            known_revision: None,
+            budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            compact: true,
+        }
+    }
+
+    fn timestamp(value: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(value)
+            .expect("test timestamp")
+            .with_timezone(&chrono::Utc)
+    }
+
+    #[test]
+    fn temporal_query_defaults_to_current_retrieval() {
+        assert_eq!(parse_temporal_query(&params()).unwrap(), None);
+    }
+
+    #[test]
+    fn as_of_maps_to_both_temporal_axes() {
+        let mut params = params();
+        params.as_of = "2026-11-01T00:00:00Z".into();
+
+        let temporal = parse_temporal_query(&params).unwrap().unwrap();
+
+        assert_eq!(temporal.valid_at, Some(timestamp("2026-11-01T00:00:00Z")));
+        assert_eq!(temporal.known_at, Some(timestamp("2026-11-01T00:00:00Z")));
+        assert_eq!(temporal.known_revision, None);
+    }
+
+    #[test]
+    fn valid_at_only_leaves_knowledge_time_at_request_default() {
+        let mut params = params();
+        params.valid_at = Some("2026-11-01T00:00:00Z".into());
+
+        let temporal = parse_temporal_query(&params).unwrap().unwrap();
+
+        assert_eq!(temporal.valid_at, Some(timestamp("2026-11-01T00:00:00Z")));
+        assert_eq!(temporal.known_at, None);
+        assert_eq!(temporal.known_revision, None);
+    }
+
+    #[test]
+    fn known_at_only_leaves_valid_time_at_request_default() {
+        let mut params = params();
+        params.known_at = Some("2026-11-15T00:00:00Z".into());
+
+        let temporal = parse_temporal_query(&params).unwrap().unwrap();
+
+        assert_eq!(temporal.valid_at, None);
+        assert_eq!(temporal.known_at, Some(timestamp("2026-11-15T00:00:00Z")));
+        assert_eq!(temporal.known_revision, None);
+    }
+
+    #[test]
+    fn temporal_query_rejects_malformed_timestamp() {
+        let mut params = params();
+        params.valid_at = Some("not a timestamp".into());
+
+        assert!(matches!(
+            parse_temporal_query(&params),
+            Err(MemoryError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn temporal_query_rejects_ambiguous_as_of_and_new_axes() {
+        let mut params = params();
+        params.as_of = "2026-11-01T00:00:00Z".into();
+        params.valid_at = Some("2026-11-01T00:00:00Z".into());
+
+        assert!(matches!(
+            parse_temporal_query(&params),
+            Err(MemoryError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn temporal_query_accepts_each_independent_axis_and_exact_revision() {
+        let mut params = params();
+        params.valid_at = Some("2026-11-01T00:00:00Z".into());
+        params.known_at = Some("2026-11-15T00:00:00Z".into());
+        let both = parse_temporal_query(&params).unwrap().unwrap();
+        assert_eq!(both.valid_at, Some(timestamp("2026-11-01T00:00:00Z")));
+        assert_eq!(both.known_at, Some(timestamp("2026-11-15T00:00:00Z")));
+
+        params.known_at = None;
+        params.known_revision = Some(12);
+        let exact = parse_temporal_query(&params).unwrap().unwrap();
+        assert_eq!(exact.known_revision, Some(12));
+    }
+
+    #[test]
+    fn temporal_query_rejects_timestamp_and_exact_revision_for_same_axis() {
+        let mut params = params();
+        params.known_at = Some("2026-11-15T00:00:00Z".into());
+        params.known_revision = Some(12);
+
+        assert!(matches!(
+            parse_temporal_query(&params),
+            Err(MemoryError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn temporal_query_rejects_negative_exact_revision() {
+        let mut params = params();
+        params.known_revision = Some(-1);
+
+        assert!(matches!(
+            parse_temporal_query(&params),
+            Err(MemoryError::Validation(_))
+        ));
     }
 }

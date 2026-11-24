@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "asterline-initial",
+    "source_id": "asterline-operations-log",
+    "source_type": "owner-record",
+    "content": "subject: Asterline Freight Yard\ndimension: gantry_capacity\nvalue: 18 tonnes for the gantry capacity of Asterline Freight Yard effective June 3, 2026",
+    "valid_at": "2026-06-03T09:00:00Z"
+  },
+  {
+    "event_id": "asterline-correction",
+    "source_id": "asterline-operations-log",
+    "source_type": "owner-correction",
+    "content": "subject: Asterline Freight Yard\ndimension: gantry_capacity\nvalue: 12 tonnes, explicit retroactive correction to the recorded Asterline Freight Yard gantry capacity effective June 3, 2026",
+    "valid_at": "2026-06-03T09:00:00Z"
+  }
+]

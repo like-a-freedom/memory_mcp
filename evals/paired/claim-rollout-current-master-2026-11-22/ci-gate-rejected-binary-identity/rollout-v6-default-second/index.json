@@ -1,0 +1,650 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "ci-current",
+    "product_binary_sha256": "3c85eb4da8874b8c6f967fe350ab649ab1b9a2c69b3bfd901ad4c5091931d7a3",
+    "corpus_sha256": "fbe0c34e1e0ed6cea86f6ecd3470b5ef514be10040c54cb31c5f2da04e478735",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61"
+  },
+  "cases": [
+    {
+      "case_id": "absent-subject",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unobservable",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-absent-subject.json",
+      "receipt_sha256": "8bd2f46fe8967a0f7f272f6cddb9d8e9e2c09ac17d7c34b4a19cc3c0c3493349"
+    },
+    {
+      "case_id": "similar-name",
+      "source_order": [
+        "east-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-entry",
+            "role": "unknown",
+            "text": "subject: Juniper Terminal East\ndimension: capacity\nvalue: 42 crates for Juniper Terminal East"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-entry",
+            "role": "current",
+            "text": "subject: Juniper Terminal East\ndimension: capacity\nvalue: 42 crates for Juniper Terminal East"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "east-entry",
+            "role": "current",
+            "text": "subject: Juniper Terminal East\ndimension: capacity\nvalue: 42 crates for Juniper Terminal East"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-similar-name.json",
+      "receipt_sha256": "52b2d86d3bde0a3171f68d6ed4c9da2f634ee4f4810cb82195d41369dc0d50e9"
+    },
+    {
+      "case_id": "single-current",
+      "source_order": [
+        "sole-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-entry",
+            "role": "unknown",
+            "text": "subject: Mossline Plant\ndimension: capacity\nvalue: 54 crates for Mossline Plant"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-entry",
+            "role": "current",
+            "text": "subject: Mossline Plant\ndimension: capacity\nvalue: 54 crates for Mossline Plant"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sole-entry",
+            "role": "current",
+            "text": "subject: Mossline Plant\ndimension: capacity\nvalue: 54 crates for Mossline Plant"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-single-current.json",
+      "receipt_sha256": "7a6e41895a54afd7a0e2d5fcbf1172cdfbeb5948223a17a103d7c050e427fd4f"
+    },
+    {
+      "case_id": "peer-conflict",
+      "source_order": [
+        "dispute-b",
+        "dispute-a"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "dispute-b",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 39 crates for Cedar Annex"
+          },
+          {
+            "event_id": "dispute-a",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 38 crates for Cedar Annex"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "dispute-b",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 39 crates for Cedar Annex"
+          },
+          {
+            "event_id": "dispute-a",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 38 crates for Cedar Annex"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "dispute-b",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 39 crates for Cedar Annex"
+          },
+          {
+            "event_id": "dispute-a",
+            "role": "conflicting",
+            "text": "subject: Cedar Annex\ndimension: capacity\nvalue: 38 crates for Cedar Annex"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-peer-conflict.json",
+      "receipt_sha256": "7a0a2ea15f8bc9910a900183a48694bf5c1cab4cd034babd0b84516453f5c981"
+    },
+    {
+      "case_id": "unverified-correction",
+      "source_order": [
+        "forum-entry",
+        "supported-entry"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "forum-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 30 crates, unverified correction reported on a forum for Thistle Port"
+          },
+          {
+            "event_id": "supported-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 24 crates for Thistle Port"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "forum-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 30 crates, unverified correction reported on a forum for Thistle Port"
+          },
+          {
+            "event_id": "supported-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 24 crates for Thistle Port"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "forum-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 30 crates, unverified correction reported on a forum for Thistle Port"
+          },
+          {
+            "event_id": "supported-entry",
+            "role": "conflicting",
+            "text": "subject: Thistle Port\ndimension: capacity\nvalue: 24 crates for Thistle Port"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-unverified-correction.json",
+      "receipt_sha256": "6c73041d45d2061d961404dc4a78d82ed28ade6d2381ab6620229c54e129fb27"
+    },
+    {
+      "case_id": "prior-knowledge",
+      "source_order": [
+        "pre-report"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-report",
+            "role": "current",
+            "text": "subject: Amber Quay\ndimension: capacity\nvalue: 11 crates for Amber Quay"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-report",
+            "role": "current",
+            "text": "subject: Amber Quay\ndimension: capacity\nvalue: 11 crates for Amber Quay"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "pre-report",
+            "role": "current",
+            "text": "subject: Amber Quay\ndimension: capacity\nvalue: 11 crates for Amber Quay"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-prior-knowledge.json",
+      "receipt_sha256": "71ce3f79f31d7ec59c3255f678d337fe43a2b63bfdf480f09f379b832e114e4e"
+    },
+    {
+      "case_id": "valid-boundary",
+      "source_order": [
+        "earlier-valid",
+        "later-valid"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "earlier-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 14 crates for Copper Wharf"
+          },
+          {
+            "event_id": "later-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 23 crates for Copper Wharf"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "earlier-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 14 crates for Copper Wharf"
+          },
+          {
+            "event_id": "later-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 23 crates for Copper Wharf"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition",
+          "incorrect_role"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "earlier-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 14 crates for Copper Wharf"
+          },
+          {
+            "event_id": "later-valid",
+            "role": "conflicting",
+            "text": "subject: Copper Wharf\ndimension: capacity\nvalue: 23 crates for Copper Wharf"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition",
+          "incorrect_role"
+        ]
+      },
+      "reason_codes": [
+        "forbidden_source",
+        "incorrect_disposition",
+        "incorrect_role"
+      ],
+      "receipt_path": "receipt-valid-boundary.json",
+      "receipt_sha256": "81b5fa88c0cd92863e74a5379b0ff30eaea1a68eabc726382c770de8c634f136"
+    },
+    {
+      "case_id": "office-entry",
+      "source_order": [
+        "office-entry"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-entry",
+            "role": "unknown",
+            "text": "subject: Mossline Office\ndimension: location\nvalue: Dovetail Lane for Mossline Office"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-entry",
+            "role": "current",
+            "text": "subject: Mossline Office\ndimension: location\nvalue: Dovetail Lane for Mossline Office"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "office-entry",
+            "role": "current",
+            "text": "subject: Mossline Office\ndimension: location\nvalue: Dovetail Lane for Mossline Office"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-office-entry.json",
+      "receipt_sha256": "e8d7d5341f39ddfa7e060e4a36ae34a0aa125820da6258d3bb809e55d0001bf3"
+    }
+  ]
+}

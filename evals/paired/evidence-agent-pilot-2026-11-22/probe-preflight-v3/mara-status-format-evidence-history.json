@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "mara-status-format-note",
+    "source_id": "mara-project-brief",
+    "source_type": "user-preference",
+    "content": "subject: Mara\npreference: weekly status updates should be concise bullet lists",
+    "valid_at": "2026-06-01T09:00:00Z"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What maintenance window was recorded for Northvale Orbital Depot on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "3e96fb4a36fdbba3f22dd277218292625af15d810fd9b551b2b2ee054810fde2",
+  "claim_rollout_stage": "shadow"
+}

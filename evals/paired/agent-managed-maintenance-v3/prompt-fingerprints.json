@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-mcp-agent-prompt-fingerprints/v1",
+  "raw_prompt_sha256": {
+    "maintenance_system": "522cf5356de737abf255fa54417129452d380e7a29a6c8f96c33f1c6477970cc",
+    "maintenance_task": "f3e7481da90c67452ec09afd2593a47d8fd1abed5c1e41213585db98d3b38ff3",
+    "recall_system": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+    "recall_task": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095"
+  },
+  "composite_plan_sha256": {
+    "system_prompt_sha256": "1f608baad1673f98aa136c81d4081299b63b49faf841728de0a2e23ccfd2d8e7",
+    "task_prompt_sha256": "c6af451ce7616257af0dff18a8156206919463f9921c0b697ce6c988b01183ec"
+  },
+  "composite_algorithm": "memory-mcp-agent-managed-prompt-phases/v1"
+}

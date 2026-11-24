@@ -1,0 +1,9 @@
+{
+  "input_sha256": "49796070bb2797fc20cf36fabacaac48267ca2840f3898a548eed65ed3e08d62",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "cobalt-initial"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

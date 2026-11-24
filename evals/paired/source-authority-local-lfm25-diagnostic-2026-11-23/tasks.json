@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "velvetbrook_archive",
+        "case_id": "velvetbrook_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Velvetbrook Archive, the archive lantern is kept in Nacre-57. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Velvetbrook Archive, where is the archive lantern kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Velvetbrook Archive, where is the archive lantern kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-velvetbrook_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-lfm25-diagnostic-2026-11-23-velvetbrook_archive"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Nacre-57"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "morrowbend_clinic",
+        "case_id": "morrowbend_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this durable fact for a later session: at Morrowbend Clinic, the cold-chain log is kept in Pinecone-64. Save exactly that fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Morrowbend Clinic, where is the cold-chain log kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Morrowbend Clinic, where is the cold-chain log kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-morrowbend_clinic",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-lfm25-diagnostic-2026-11-23-morrowbend_clinic"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Pinecone-64"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "alderveil_relay",
+        "case_id": "alderveil_relay-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember the factual detail about Alderveil Relay for a later session. It is in the source file fixtures/alderveil_relay.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "candidate_formation_prompt": "An operator import and extraction were completed for Alderveil Relay before this phase. Use assemble_context to verify the memory fact: At Alderveil Relay, where is the transmitter key kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "alderveil_relay",
+          "relative_path": "fixtures/alderveil_relay.txt",
+          "content": "Fact: At Alderveil Relay, the transmitter key is kept in Beryl-29.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-23T00:00:00Z",
+          "event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-alderveil_relay"
+        }
+      ],
+      "recall_prompt": "At Alderveil Relay, where is the transmitter key kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Alderveil Relay, where is the transmitter key kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-alderveil_relay",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-lfm25-diagnostic-2026-11-23-alderveil_relay"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Beryl-29"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "northglen_depot",
+        "case_id": "northglen_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember the factual detail about Northglen Depot for a later session. It is in the source file fixtures/northglen_depot.txt. Use that exact relative file path as the content argument to the memory ingest tool, then extract the returned episode. Store only facts in that file and do not invent details. Confirm briefly after both calls succeed.",
+      "candidate_formation_prompt": "An operator import and extraction were completed for Northglen Depot before this phase. Use assemble_context to verify the memory fact: At Northglen Depot, where is the signal ledger kept? Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "northglen_depot",
+          "relative_path": "fixtures/northglen_depot.txt",
+          "content": "Fact: At Northglen Depot, the signal ledger is kept in Fennel-83.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-23T00:00:00Z",
+          "event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-northglen_depot"
+        }
+      ],
+      "recall_prompt": "At Northglen Depot, where is the signal ledger kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Northglen Depot, where is the signal ledger kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-lfm25-diagnostic-2026-11-23-northglen_depot",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-lfm25-diagnostic-2026-11-23-northglen_depot"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Fennel-83"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "plan_id": "agent-managed-maintenance-feasibility-2026-11-23-v6",
+  "attempt_id": "preflight-setup-failure-01",
+  "attempt_status": "failed_before_agent_invocation",
+  "observed_at_utc": "2026-11-22T23:46:37.677618+00:00",
+  "exit_code": 2,
+  "error": "invalid evaluation configuration: paired temporary root must be an existing absolute directory",
+  "agent_invocations": 0,
+  "model_turns": 0,
+  "memory_tool_calls": 0,
+  "memory_writes": 0,
+  "quality_result": null,
+  "classification": "local runner setup failure; not a trial and not evidence about either arm"
+}

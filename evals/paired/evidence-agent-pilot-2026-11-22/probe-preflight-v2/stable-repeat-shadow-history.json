@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "stable-marsh-lab",
+    "source_id": "marsh-lab-inventory",
+    "source_type": "inventory-record",
+    "content": "subject: Marsh Lab\ndimension: location\nvalue: West Annex for the Marsh Lab location on June 1, 2026",
+    "valid_at": "2026-06-01T09:00:00Z"
+  }
+]

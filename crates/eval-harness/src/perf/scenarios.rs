@@ -24,7 +24,8 @@ use memory_mcp::service::memory_container_shims::{
     memory_capabilities_invalidate::InvalidateCapability,
     memory_capabilities_resolve::ResolveCapability,
 };
-use memory_mcp::storage::SurrealDbClient;
+use memory_mcp::storage::{DbClient, SurrealDbClient};
+use serde_json::json;
 
 use crate::perf::db_observer::{QueryLedger, QueryPhase};
 use crate::perf::profile::{ScenarioId, ScenarioSpec};
@@ -73,7 +74,16 @@ impl PerfEnv {
     /// service, then installs the eval SQL observer. Migrations run before
     /// the observer exists, so setup SQL never pollutes a scenario ledger.
     pub async fn connect() -> Self {
-        let memory = TestMemory::new().await;
+        let claim_stage =
+            std::env::var("MEMORY_CLAIM_ROLLOUT_STAGE").unwrap_or_else(|_| "evidence".to_owned());
+        Self::connect_with_claim_stage(&claim_stage).await
+    }
+
+    /// Connects the in-process stack at a named claim stage. This seam lets a
+    /// paired performance profile compare Shadow and Evidence without changing
+    /// the global environment or process defaults.
+    pub async fn connect_with_claim_stage(claim_stage: &str) -> Self {
+        let memory = TestMemory::new_with_claim_stage(claim_stage).await;
         let ledger = QueryLedger::new();
         memory
             .db_client
@@ -95,6 +105,226 @@ fn micros_since(start: Instant) -> u64 {
 /// iteration and index so no iteration can be swallowed by dedup.
 fn perf_source_id(scenario: ScenarioId, scale: u32, iteration: u32, i: u32) -> String {
     format!("perf-{}-{}-{}-{}", scenario.as_str(), scale, iteration, i)
+}
+
+async fn seed_claim_facts(env: &PerfEnv, scenario: ScenarioId, scale: u32) -> Result<(), String> {
+    let lineage = format!("perf-claim-lineage-{}-{scale}", scenario.as_str());
+    for i in 0..scale {
+        let source_id = perf_source_id(scenario, scale, 0, i);
+        let episode_id = format!("episode:{source_id}");
+        let timestamp = fixture_t_ref().to_rfc3339();
+        env.db_client
+            .create(
+                &episode_id,
+                json!({
+                    "episode_id": episode_id,
+                    "source_type": "document",
+                    "source_id": source_id,
+                    "content": format!(
+                        "subject: ARR; dimension: ARR; value: {}",
+                        if i == 0 { "legacy" } else { "supersedes" }
+                    ),
+                    "t_ref": timestamp,
+                    "t_ingested": timestamp,
+                    "policy_tags": [],
+                    "source_lineage": lineage,
+                }),
+                crate::test_support::ACTIVE_NAMESPACE,
+                memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map_err(|err| format!("claim seed episode {i}: {err}"))?;
+        ExtractCapability::extract_from_service(&env.service, &episode_id, None, None)
+            .await
+            .map_err(|err| format!("claim seed extraction {i}: {err}"))?;
+    }
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let rows = DbClient::query(
+                env.db_client.as_ref(),
+                "SELECT count() AS c FROM claim_relation GROUP ALL",
+                None,
+                crate::test_support::ACTIVE_NAMESPACE,
+            )
+            .await
+            .map_err(|err| format!("read claim relation seed count: {err}"))?;
+            if rows
+                .as_array()
+                .and_then(|rows| rows.first())
+                .and_then(|row| row.get("c"))
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|count| count > 0)
+            {
+                return Ok(());
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .map_err(|_| "claim seed did not produce a persisted relation within 5 seconds".to_owned())?
+}
+
+/// Measures the public fact-write path that runs deterministic claim
+/// projection, inline reconciliation, and the configured persistence stage.
+/// Seed claims are setup; each sample is one new fact against `scale` existing
+/// same-slot claims so candidate-page work is represented in the measurement.
+struct ClaimWrite {
+    scale: u32,
+    seeded: Mutex<bool>,
+}
+
+impl ClaimWrite {
+    async fn seed(&self, env: &PerfEnv) -> Result<(), String> {
+        crate::test_support::seed_entity(
+            &env.db_client,
+            "entity:perf-claim-subject",
+            "person",
+            "Alice Smith",
+            &[],
+        )
+        .await;
+        for i in 0..self.scale {
+            let source_id = perf_source_id(self.id(), self.scale, 0, i);
+            let episode_id = ingest_one(
+                env,
+                source_id,
+                "claim performance seed".into(),
+                fixture_t_ref(),
+            )
+            .await
+            .map_err(|err| format!("claim seed ingest {i}: {err}"))?;
+            env.service
+                .add_fact(
+                    "note",
+                    &format!("subject: Alice Smith\ndimension: ARR\nvalue: {i}"),
+                    "claim performance seed",
+                    &episode_id,
+                    fixture_t_ref(),
+                    1.0,
+                    vec!["entity:perf-claim-subject".into()],
+                    vec![],
+                    memory_mcp::models::Provenance::agent_observation(&episode_id),
+                )
+                .await
+                .map_err(|err| format!("claim seed projection {i}: {err}"))?;
+        }
+        Ok(())
+    }
+}
+
+/// Measures the stage-gated read path after deterministic claim setup. Each
+/// iteration uses a distinct query to avoid reporting a context-cache hit.
+struct ClaimAssemble {
+    scale: u32,
+    seeded: Mutex<bool>,
+}
+
+#[async_trait]
+impl ScenarioRun for ClaimAssemble {
+    fn id(&self) -> ScenarioId {
+        ScenarioId::LatencyClaimAssemble
+    }
+
+    fn scale(&self) -> u32 {
+        self.scale
+    }
+
+    async fn run(&self, env: &PerfEnv, iteration: u32) -> ScenarioEvidence {
+        let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
+        env.ledger.set_phase(QueryPhase::Setup);
+        let needs_seed = !*self.seeded.lock().expect("claim seed lock poisoned");
+        if needs_seed {
+            if let Err(reason) = seed_claim_facts(env, self.id(), self.scale).await {
+                ev.invalid_reasons.push(reason);
+                return ev;
+            }
+            *self.seeded.lock().expect("claim seed lock poisoned") = true;
+        }
+
+        let request = AssembleContextRequest {
+            query: format!("ARR observation {iteration}"),
+            fact_types: vec![],
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        };
+        env.ledger.set_phase(QueryPhase::Timed);
+        timed(
+            &mut ev,
+            "claim-stage assemble",
+            AssembleContextCapability::assemble_context_from_service(&env.service, request),
+        )
+        .await;
+        ev
+    }
+}
+
+#[async_trait]
+impl ScenarioRun for ClaimWrite {
+    fn id(&self) -> ScenarioId {
+        ScenarioId::LatencyClaimWrite
+    }
+
+    fn scale(&self) -> u32 {
+        self.scale
+    }
+
+    async fn run(&self, env: &PerfEnv, iteration: u32) -> ScenarioEvidence {
+        let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
+        env.ledger.set_phase(QueryPhase::Setup);
+        let needs_seed = !*self.seeded.lock().expect("claim seed lock poisoned");
+        if needs_seed {
+            if let Err(reason) = self.seed(env).await {
+                ev.invalid_reasons.push(reason);
+                return ev;
+            }
+            *self.seeded.lock().expect("claim seed lock poisoned") = true;
+        }
+
+        let episode_id = match ingest_one(
+            env,
+            perf_source_id(self.id(), self.scale, iteration, self.scale),
+            "claim performance sample".into(),
+            fixture_t_ref(),
+        )
+        .await
+        {
+            Ok(episode_id) => episode_id,
+            Err(err) => {
+                ev.invalid_reasons
+                    .push(format!("claim sample ingest: {err}"));
+                return ev;
+            }
+        };
+
+        env.ledger.set_phase(QueryPhase::Timed);
+        let content = format!(
+            "subject: Alice Smith\ndimension: ARR\nvalue: {}",
+            self.scale + iteration
+        );
+        timed(
+            &mut ev,
+            "claim projection and inline reconciliation",
+            env.service.add_fact(
+                "note",
+                &content,
+                &content,
+                &episode_id,
+                fixture_t_ref(),
+                1.0,
+                vec!["entity:perf-claim-subject".into()],
+                vec![],
+                memory_mcp::models::Provenance::agent_observation(&episode_id),
+            ),
+        )
+        .await;
+        ev
+    }
 }
 
 /// Times one capability call: records the latency on success, or the
@@ -422,7 +652,10 @@ impl ScenarioRun for LatencyScenario {
                 )
                 .await;
             }
-            ScenarioId::IngestScale | ScenarioId::AssembleScale => {
+            ScenarioId::IngestScale
+            | ScenarioId::AssembleScale
+            | ScenarioId::LatencyClaimWrite
+            | ScenarioId::LatencyClaimAssemble => {
                 ev.invalid_reasons
                     .push("latency scenario built with a scale scenario id".into());
             }
@@ -435,6 +668,18 @@ impl ScenarioRun for LatencyScenario {
 /// runner into one spec per scale, so the first scale is authoritative here.
 pub fn build(spec: &ScenarioSpec) -> Box<dyn ScenarioRun> {
     let scale = spec.scales.first().copied().unwrap_or(1);
+    if spec.id == ScenarioId::LatencyClaimWrite {
+        return Box::new(ClaimWrite {
+            scale,
+            seeded: Mutex::new(false),
+        });
+    }
+    if spec.id == ScenarioId::LatencyClaimAssemble {
+        return Box::new(ClaimAssemble {
+            scale,
+            seeded: Mutex::new(false),
+        });
+    }
     match spec.id {
         ScenarioId::IngestScale => Box::new(IngestScale { scale }),
         ScenarioId::AssembleScale => Box::new(AssembleScale {

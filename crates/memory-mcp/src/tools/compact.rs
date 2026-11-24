@@ -52,6 +52,68 @@ pub fn skip_if_none_or_compact<T>(value: &Option<T>) -> bool {
     value.is_none() || is_compact()
 }
 
+/// Serialize full reconciliation evidence in verbose mode and a compact,
+/// typed relation summary for default agent responses.
+pub fn serialize_reconciliation<S: serde::Serializer>(
+    value: &Option<crate::models::ClaimReconciliationMetadata>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let Some(value) = value else {
+        return serializer.serialize_none();
+    };
+    if !is_compact() {
+        return serde::Serialize::serialize(value, serializer);
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "snake_case")]
+    struct CompactReconciliation {
+        relations: Vec<CompactRelation>,
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "snake_case")]
+    struct CompactRelation {
+        outcome: crate::models::claim::ClaimRelationOutcome,
+        role: &'static str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        counterpart_source_episode_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        superseded_by_fact_id: Option<String>,
+    }
+
+    let summary = CompactReconciliation {
+        relations: value
+            .relations
+            .iter()
+            .map(|relation| {
+                use crate::models::claim::ClaimRelationOutcome;
+
+                let role = match relation.outcome {
+                    ClaimRelationOutcome::Duplicate => "duplicate",
+                    ClaimRelationOutcome::Supersession
+                        if relation.superseded_by_fact_id.is_some() =>
+                    {
+                        "superseded"
+                    }
+                    ClaimRelationOutcome::Supersession | ClaimRelationOutcome::Correction => {
+                        "relation_participant"
+                    }
+                    ClaimRelationOutcome::Contradiction => "conflict",
+                    ClaimRelationOutcome::TemporalAmbiguity => "temporally_ambiguous",
+                };
+                CompactRelation {
+                    outcome: relation.outcome,
+                    role,
+                    counterpart_source_episode_id: relation.counterpart_source_episode_id.clone(),
+                    superseded_by_fact_id: relation.superseded_by_fact_id.clone(),
+                }
+            })
+            .collect(),
+    };
+    serde::Serialize::serialize(&summary, serializer)
+}
+
 /// Custom serializer for `rationale`. Under compact mode, emits only the
 /// leading `tier=<tier>` token; otherwise passes the string through.
 /// Must be `pub` because `models/request.rs` references it.

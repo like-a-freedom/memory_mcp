@@ -1,0 +1,77 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "azure-lantern-history", "case_id": "azure-lantern-rollback-shelf-tag", "repetition": 1, "incumbent_first": true},
+      "formation_prompt": "Please retain this durable project fact for a later session: Azure Lantern uses Bramble-57 as its rollback shelf tag. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Azure Lantern, what is the rollback shelf tag? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Azure Lantern, what is the rollback shelf tag?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-01",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-01"] ]], "accepted_answers": ["Bramble-57"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "copper-meadow-history", "case_id": "copper-meadow-nightly-export-bucket", "repetition": 1, "incumbent_first": false},
+      "formation_prompt": "Please retain this durable project fact for a later session: Copper Meadow uses Lynx-24 as its nightly export bucket. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Copper Meadow, what is the nightly export bucket? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Copper Meadow, what is the nightly export bucket?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-02",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-02"] ]], "accepted_answers": ["Lynx-24"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "frosted-meridian-history", "case_id": "frosted-meridian-incident-handoff-alias", "repetition": 1, "incumbent_first": true},
+      "formation_prompt": "Please retain this durable project fact for a later session: Frosted Meridian uses Pine-68 as its incident handoff alias. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Frosted Meridian, what is the incident handoff alias? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Frosted Meridian, what is the incident handoff alias?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-03",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-03"] ]], "accepted_answers": ["Pine-68"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "golden-kestrel-history", "case_id": "golden-kestrel-release-audit-label", "repetition": 1, "incumbent_first": false},
+      "formation_prompt": "Please retain this durable project fact for a later session: Golden Kestrel uses Cedar-31 as its release audit label. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Golden Kestrel, what is the release audit label? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Golden Kestrel, what is the release audit label?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-04",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-04"] ]], "accepted_answers": ["Cedar-31"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "ivory-circuit-history", "case_id": "ivory-circuit-archive-checksum-prefix", "repetition": 1, "incumbent_first": true},
+      "formation_prompt": "Please retain this durable project fact for a later session: Ivory Circuit uses Quartz-92 as its archive checksum prefix. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Ivory Circuit, what is the archive checksum prefix? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Ivory Circuit, what is the archive checksum prefix?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-05",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-05"] ]], "accepted_answers": ["Quartz-92"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "jade-compass-history", "case_id": "jade-compass-recovery-queue-name", "repetition": 1, "incumbent_first": false},
+      "formation_prompt": "Please retain this durable project fact for a later session: Jade Compass uses Moss-46 as its recovery queue name. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Jade Compass, what is the recovery queue name? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Jade Compass, what is the recovery queue name?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-06",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-06"] ]], "accepted_answers": ["Moss-46"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "lunar-orchard-history", "case_id": "lunar-orchard-rotation-notebook-code", "repetition": 1, "incumbent_first": true},
+      "formation_prompt": "Please retain this durable project fact for a later session: Lunar Orchard uses Harbor-15 as its rotation notebook code. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Lunar Orchard, what is the rotation notebook code? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Lunar Orchard, what is the rotation notebook code?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-07",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-07"] ]], "accepted_answers": ["Harbor-15"], "forbidden_event_ids": [], "needs_clarification": false}
+    },
+    {
+      "key": {"stratum_id": "durable_fact_recall", "family_id": "silver-tundra-history", "case_id": "silver-tundra-escalation-channel", "repetition": 1, "incumbent_first": false},
+      "formation_prompt": "Please retain this durable project fact for a later session: Silver Tundra uses Maple-83 as its escalation channel. Save the fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "For Silver Tundra, what is the escalation channel? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {"query": "For Silver Tundra, what is the escalation channel?", "valid_at": "2026-11-22T00:00:00Z", "context_budget": 8192},
+      "seed_episodes": [],
+      "target_write_event_id": "formation-v5-08",
+      "oracle": {"sufficient_evidence_alternatives": [[ ["formation-v5-08"] ]], "accepted_answers": ["Maple-83"], "forbidden_event_ids": [], "needs_clarification": false}
+    }
+  ]
+}

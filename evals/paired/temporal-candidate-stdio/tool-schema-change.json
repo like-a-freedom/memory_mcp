@@ -1,0 +1,36 @@
+{
+  "schema_version": "memory-mcp-tool-schema-change/v1",
+  "measurement": "MCP tools/list from clean frozen baseline and current release candidate; canonical serde_json value serialization",
+  "incumbent_tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+  "candidate_tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "tool_count": 8,
+  "changed_tool_count": 8,
+  "changed_tools": [
+    "app_command",
+    "assemble_context",
+    "explain",
+    "extract",
+    "ingest",
+    "invalidate",
+    "open_app",
+    "resolve"
+  ],
+  "input_schema_changes": {
+    "assemble_context": {
+      "added_properties": [
+        "known_at",
+        "known_revision",
+        "valid_at"
+      ],
+      "retained_legacy_property": "as_of",
+      "description": "Declares independent valid-time and server-knowledge cutoffs, exact revision selection, and snapshot completeness behavior."
+    },
+    "ingest": {
+      "property": "t_ingested",
+      "json_type_unchanged": true,
+      "description_change": "Optional ingestion timestamp is now documented as deprecated compatibility input; transaction time is assigned by the server."
+    }
+  },
+  "output_schema_change": "Candidate schemas expose the shared response envelope and, for assemble_context, snapshot, completeness, and candidate-scan metadata. All eight output schemas differ from the baseline.",
+  "scope_note": "This is a tool-schema compatibility declaration. It does not assert product quality or promotion."
+}

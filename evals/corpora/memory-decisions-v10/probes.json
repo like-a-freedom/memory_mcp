@@ -1,0 +1,83 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "v10-absent-target",
+      "family_id": "v10-absent-target-family",
+      "event_ids": ["v10-absence-distractor"],
+      "query": "What capacity was recorded for Raven Silo?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "v10-similar-name",
+      "family_id": "v10-similar-name-family",
+      "event_ids": ["v10-mica-west", "v10-mica-east"],
+      "query": "What capacity was recorded for Mica Terminal East?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-current-snapshot",
+      "family_id": "v10-current-snapshot-family",
+      "event_ids": ["v10-fern-current"],
+      "query": "What capacity was recorded for Fern Lift?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-peer-conflict",
+      "family_id": "v10-peer-conflict-family",
+      "event_ids": ["v10-orchid-a", "v10-orchid-b"],
+      "query": "What pressure was recorded for Orchid Pump?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-unverified-correction",
+      "family_id": "v10-unverified-correction-family",
+      "event_ids": ["v10-larch-ledger", "v10-larch-forum"],
+      "query": "What dwell was verified for Larch Valve House?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-prior-knowledge",
+      "family_id": "v10-prior-knowledge-family",
+      "event_ids": ["v10-pumice-before", "v10-pumice-after"],
+      "knowledge_before_event_id": "v10-pumice-after",
+      "query": "Before the later inspection, what load was recorded for Pumice Jetty?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-valid-boundary",
+      "family_id": "v10-valid-boundary-family",
+      "event_ids": ["v10-topaz-earlier", "v10-topaz-later"],
+      "query": "What pressure applied to Topaz Foundry on August 15, 2026?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-08-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "v10-ordinary-location",
+      "family_id": "v10-ordinary-location-family",
+      "event_ids": ["v10-wren-office"],
+      "query": "Where was Wren Office located?",
+      "valid_at": "2026-08-15T09:00:00Z",
+      "repeat_read": 2,
+      "budget": 5
+    }
+  ]
+}

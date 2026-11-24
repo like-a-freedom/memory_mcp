@@ -48,6 +48,8 @@ pub struct FactService {
 pub(crate) struct CreateFactOutcome {
     pub(crate) fact_id: String,
     pub(crate) created: bool,
+    pub(crate) content: Option<String>,
+    pub(crate) quote: Option<String>,
 }
 
 impl FactService {
@@ -93,10 +95,14 @@ impl FactService {
 
         let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
         let existing = self.db.select_one(&fact_id).await?;
-        if existing.is_some() {
+        if let Some(existing) = existing {
+            let persisted = crate::knowledge::fact_parsing::fact_from_value_or_wrapper(&existing)
+                .filter(|fact| fact.fact_id == fact_id);
             return Ok(CreateFactOutcome {
                 fact_id,
                 created: false,
+                content: persisted.as_ref().map(|fact| fact.content.clone()),
+                quote: persisted.map(|fact| fact.quote),
             });
         }
 
@@ -138,9 +144,20 @@ impl FactService {
             {
                 Ok(()) => {}
                 Err(MemoryError::Storage(message)) if message.contains("already exists") => {
+                    let existing = self.db.select_one(&fact_id).await?.ok_or_else(|| {
+                        MemoryError::Storage(
+                            "existing fact evidence could not be read after an idempotent write"
+                                .into(),
+                        )
+                    })?;
+                    let persisted =
+                        crate::knowledge::fact_parsing::fact_from_value_or_wrapper(&existing)
+                            .filter(|fact| fact.fact_id == fact_id);
                     return Ok(CreateFactOutcome {
                         fact_id,
                         created: false,
+                        content: persisted.as_ref().map(|fact| fact.content.clone()),
+                        quote: persisted.map(|fact| fact.quote),
                     });
                 }
                 Err(error) => return Err(error),
@@ -165,6 +182,8 @@ impl FactService {
         Ok(CreateFactOutcome {
             fact_id,
             created: true,
+            content: Some(content.to_owned()),
+            quote: Some(quote.to_owned()),
         })
     }
 

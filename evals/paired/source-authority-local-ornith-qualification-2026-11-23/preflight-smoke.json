@@ -1,0 +1,18 @@
+{
+  "test": "local_chat_completions_smoke_executes_a_public_memory_tool",
+  "result": "passed",
+  "model_id": "memory-local-eval-ornith",
+  "model_key": "ornith-1.5-35b-a3b-mlx",
+  "runner_config": {
+    "temperature": 0,
+    "top_p": "provider default"
+  },
+  "test_assertions": {
+    "trial_completed": true,
+    "tool_calls": 1,
+    "tool_name": "assemble_context",
+    "expected_source_episode_present": true
+  },
+  "cargo_reported_suite_elapsed_seconds": 6.4,
+  "interpretation": "protocol and public memory-tool compatibility only; not source-authority task reliability or memory benefit"
+}

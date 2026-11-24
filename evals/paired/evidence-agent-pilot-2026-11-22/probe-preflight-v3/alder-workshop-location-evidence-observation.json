@@ -1,0 +1,9 @@
+{
+  "input_sha256": "e0c3ba99df2f5a4f7caed08c1ebe6bc730bdd77e2a9aaeebdb50a78651255732",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "alder-workshop-location"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

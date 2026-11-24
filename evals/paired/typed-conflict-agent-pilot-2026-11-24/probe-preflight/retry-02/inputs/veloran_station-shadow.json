@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What calibration interval was recorded for Veloran Signal Station on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 14,
+  "context_budget": 1,
+  "history_sha256": "4a8af916cb7f45b4bdc2fb3736ebdbd05b5bf4c8d472530d0a117929e1b97f7d",
+  "claim_rollout_stage": "shadow"
+}

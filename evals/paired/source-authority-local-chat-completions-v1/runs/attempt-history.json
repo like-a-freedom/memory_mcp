@@ -1,0 +1,16 @@
+{
+  "schema_version": "memory-mcp-local-chat-completions-attempt-history/v1",
+  "plan_id": "source-authority-local-chat-completions-2026-11-23-v1",
+  "attempt_id": "failed-run-01-evaluator-validation",
+  "recorded_at_utc": "2026-11-23T07:51:50Z",
+  "status": "incomplete_invalid_capture",
+  "completed_receipt_counts": {
+    "incumbent": 1,
+    "candidate": 2
+  },
+  "preserved_receipts_directory": "failed-run-01-evaluator-validation",
+  "failure": "The shared paired-artifact validator rejected a valid model_failure trace because its normalized error_class was not a tool_error event.",
+  "model_calls_occurred": true,
+  "reusable_for_confirmatory_or_repeated_trial": false,
+  "task_or_prompt_changed": false
+}

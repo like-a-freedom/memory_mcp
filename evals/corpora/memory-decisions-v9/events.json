@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "absent-v9-entry",
+      "source_id": "absent-v9-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Jade Hangar\ndimension: capacity\nvalue: 1161 crates for Jade Hangar",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "east-v9-entry",
+      "source_id": "east-v9-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Myrtle Terminal East\ndimension: capacity\nvalue: 1147 crates for Myrtle Terminal East",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "west-v9-entry",
+      "source_id": "west-v9-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Myrtle Terminal West\ndimension: capacity\nvalue: 1129 crates for Myrtle Terminal West",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "sole-v9-entry",
+      "source_id": "sole-v9-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Pine Works\ndimension: capacity\nvalue: 1158 crates for Pine Works",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v9-a",
+      "source_id": "dispute-v9-a-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Slate Annex\ndimension: capacity\nvalue: 1141 crates for Slate Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v9-b",
+      "source_id": "dispute-v9-b-peer",
+      "source_type": "inspection-record",
+      "content": "subject: Slate Annex\ndimension: capacity\nvalue: 1143 crates for Slate Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "supported-v9-entry",
+      "source_id": "supported-v9-entry-ledger",
+      "source_type": "maintenance-record",
+      "content": "subject: Silver Port\ndimension: capacity\nvalue: 1127 crates for Silver Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "forum-v9-entry",
+      "source_id": "forum-v9-entry-ledger",
+      "source_type": "forum-report",
+      "content": "subject: Silver Port\ndimension: capacity\nvalue: 1132 crates, unverified correction reported on a forum for Silver Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "pre-v9-report",
+      "source_id": "pre-v9-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Violet Quay\ndimension: capacity\nvalue: 1113 crates for Violet Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "post-v9-report",
+      "source_id": "post-v9-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Violet Quay\ndimension: capacity\nvalue: 1119 crates, correction claimed by another inspector for Violet Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "earlier-v9-valid",
+      "source_id": "earlier-v9-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Basalt Wharf\ndimension: capacity\nvalue: 1116 crates for Basalt Wharf",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "later-v9-valid",
+      "source_id": "later-v9-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Basalt Wharf\ndimension: capacity\nvalue: 1121 crates for Basalt Wharf",
+      "t_ref": "2026-08-01T09:01:00Z"
+    },
+    {
+      "id": "office-v9-entry",
+      "source_id": "office-v9-entry-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Pine Office\ndimension: location\nvalue: Loom Lane for Pine Office",
+      "t_ref": "2026-08-01T09:00:00Z"
+    }
+  ]
+}

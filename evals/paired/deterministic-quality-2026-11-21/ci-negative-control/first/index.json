@@ -1,0 +1,548 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "ci-current",
+    "product_binary_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+    "corpus_sha256": "b171280ab3b71e493956bf8703820bbe90e3dc4f4077e769cfce2646017b7383",
+    "config_sha256": "3144a7d443da339afa86af571d95cc486ae959fa28c61e2610598194fdbcc483",
+    "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61"
+  },
+  "cases": [
+    {
+      "case_id": "absent-subject",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "unknown-record",
+            "role": "unknown",
+            "text": "subject: Quartz Depot\ndimension: capacity\nvalue: 63 crates for Quartz Depot"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "unknown-record",
+            "role": "unknown",
+            "text": "subject: Quartz Depot\ndimension: capacity\nvalue: 63 crates for Quartz Depot"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition"
+        ]
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-absent-subject.json",
+      "receipt_sha256": "b11658db984f823b8e1d83e3673ebc0189ecf99223a0a780398927a9f5119c02"
+    },
+    {
+      "case_id": "similar-name",
+      "source_order": [
+        "target",
+        "distractor"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "target",
+            "role": "unknown",
+            "text": "subject: Larch Depot East\ndimension: capacity\nvalue: 18 crates for Larch Depot East"
+          },
+          {
+            "event_id": "distractor",
+            "role": "unknown",
+            "text": "subject: Larch Depot West\ndimension: capacity\nvalue: 81 crates for Larch Depot West"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable",
+          "forbidden_source"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "target",
+            "role": "unknown",
+            "text": "subject: Larch Depot East\ndimension: capacity\nvalue: 18 crates for Larch Depot East"
+          },
+          {
+            "event_id": "distractor",
+            "role": "unknown",
+            "text": "subject: Larch Depot West\ndimension: capacity\nvalue: 81 crates for Larch Depot West"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable",
+          "forbidden_source"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable",
+        "forbidden_source"
+      ],
+      "receipt_path": "receipt-similar-name.json",
+      "receipt_sha256": "292b8a74ab4219df41ee6a2c9efb61a336f03cb4c95dceff89ab478a196dcefc"
+    },
+    {
+      "case_id": "single-current",
+      "source_order": [
+        "single"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "single",
+            "role": "unknown",
+            "text": "subject: Onyx Plant\ndimension: capacity\nvalue: 47 crates for Onyx Plant"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "single",
+            "role": "unknown",
+            "text": "subject: Onyx Plant\ndimension: capacity\nvalue: 47 crates for Onyx Plant"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-single-current.json",
+      "receipt_sha256": "19dc63ffae12cd7caf0fd1d3c8cfc35d546b35b46796dcec175f3b1eac2a5005"
+    },
+    {
+      "case_id": "peer-conflict",
+      "source_order": [
+        "conflict-b",
+        "conflict-a"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "conflict-a",
+            "role": "unknown",
+            "text": "subject: Raven Terminal\ndimension: capacity\nvalue: 29 crates for Raven Terminal"
+          },
+          {
+            "event_id": "conflict-b",
+            "role": "unknown",
+            "text": "subject: Raven Terminal\ndimension: capacity\nvalue: 34 crates for Raven Terminal"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "conflict-a",
+            "role": "unknown",
+            "text": "subject: Raven Terminal\ndimension: capacity\nvalue: 29 crates for Raven Terminal"
+          },
+          {
+            "event_id": "conflict-b",
+            "role": "unknown",
+            "text": "subject: Raven Terminal\ndimension: capacity\nvalue: 34 crates for Raven Terminal"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-peer-conflict.json",
+      "receipt_sha256": "22722bfd4911f2bdbcae2bc03075d78f97de4f620080b9b4c2a9718b9ea1ba8e"
+    },
+    {
+      "case_id": "unverified-correction",
+      "source_order": [
+        "unverified",
+        "verified"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "unverified",
+            "role": "unknown",
+            "text": "subject: Topaz Mill\ndimension: capacity\nvalue: 31 crates, unverified correction reported on a forum for Topaz Mill"
+          },
+          {
+            "event_id": "verified",
+            "role": "unknown",
+            "text": "subject: Topaz Mill\ndimension: capacity\nvalue: 22 crates for Topaz Mill"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "unverified",
+            "role": "unknown",
+            "text": "subject: Topaz Mill\ndimension: capacity\nvalue: 31 crates, unverified correction reported on a forum for Topaz Mill"
+          },
+          {
+            "event_id": "verified",
+            "role": "unknown",
+            "text": "subject: Topaz Mill\ndimension: capacity\nvalue: 22 crates for Topaz Mill"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-unverified-correction.json",
+      "receipt_sha256": "11f5170ff889c2e3bde698a9a7c40a30a694f9b1b46625fae29cfa060716fdfd"
+    },
+    {
+      "case_id": "prior-knowledge",
+      "source_order": [
+        "prior",
+        "later"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "prior",
+            "role": "unknown",
+            "text": "subject: Zircon Dock\ndimension: capacity\nvalue: 15 crates for Zircon Dock"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "prior",
+            "role": "unknown",
+            "text": "subject: Zircon Dock\ndimension: capacity\nvalue: 15 crates for Zircon Dock"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable",
+        "forbidden_source"
+      ],
+      "receipt_path": "receipt-prior-knowledge.json",
+      "receipt_sha256": "c54e708ec7df780bd0a1c98fd40e15379b4ed587629d2a2ee0007f68a6486197"
+    },
+    {
+      "case_id": "valid-boundary",
+      "source_order": [
+        "future-valid",
+        "old-valid"
+      ],
+      "roles": [
+        "unknown",
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "old-valid",
+            "role": "unknown",
+            "text": "subject: Ash Store\ndimension: capacity\nvalue: 12 crates for Ash Store"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "old-valid",
+            "role": "unknown",
+            "text": "subject: Ash Store\ndimension: capacity\nvalue: 12 crates for Ash Store"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "reason_codes": [
+        "decision_unobservable",
+        "forbidden_source"
+      ],
+      "receipt_path": "receipt-valid-boundary.json",
+      "receipt_sha256": "32878d1b490b622753df7bb4236df43da3d21c652f67b434f7f37196bb3d9283"
+    },
+    {
+      "case_id": "ordinary-location",
+      "source_order": [
+        "ordinary-location"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": false,
+      "probe_success": false,
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "ordinary-location",
+            "role": "unknown",
+            "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false,
+        "reason_codes": [
+          "decision_unobservable"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "ordinary-location",
+            "role": "current",
+            "text": "subject: Onyx Plant Office\ndimension: location\nvalue: Harbor Road for Onyx Plant Office"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "receipt_path": "receipt-ordinary-location.json",
+      "receipt_sha256": "fa230212f09b3c9145b32dc106119f5116383fe7ec1608c66fb450897539a77f"
+    }
+  ]
+}

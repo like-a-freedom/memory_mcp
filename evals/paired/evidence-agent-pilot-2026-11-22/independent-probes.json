@@ -1,0 +1,532 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "alder-workshop-booking-history",
+      "case_id": "alder-workshop-location",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Where was the Alder workshop booked?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-02T10:00:00Z",
+      "known_revision": 4,
+      "context_budget": 5,
+      "history_sha256": "4ccea5e0402d7a4ba8617268d3def9ef8dd8a2fd9e962a42d5b42480f09f5620",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "alder-workshop-location"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "beacon-export-decision-history",
+      "case_id": "beacon-export-format",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Which serialization format was selected for the Beacon export?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-03T11:30:00Z",
+      "known_revision": 7,
+      "context_budget": 5,
+      "history_sha256": "53b1314203439b395dde25947bab21be01970d9f95c3afdbc2d7e44d20f77ebe",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "beacon-export-format-decision"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "cedar-release-readiness-history",
+      "case_id": "cedar-release-check",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What check remains before approving the Cedar release?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-04T14:00:00Z",
+      "known_revision": 2,
+      "context_budget": 5,
+      "history_sha256": "917228c2f0349548bedef023cd496ed8921855edef06754f1458be61beecd904",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "cedar-release-check"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "mara-status-preference-history",
+      "case_id": "mara-status-format",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What response format does Mara prefer for weekly status updates?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-01T09:00:00Z",
+      "known_revision": 2,
+      "context_budget": 5,
+      "history_sha256": "af4309973882a9c85d47db1f8bde1252703a22e5b18dbf0456bb39e662f794f4",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "mara-status-format-note"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "slate-review-schedule-history",
+      "case_id": "slate-review-start-time",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "When does the Slate review start?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-05T08:00:00Z",
+      "known_revision": 4,
+      "context_budget": 5,
+      "history_sha256": "315cb822b12942e2a513bea0092681cc5ecd84bef74bc7ed816988e7311743a5",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "slate-review-start"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_workflows",
+      "family_id": "transient-retry-policy-history",
+      "case_id": "retry-after-rate-limit",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "How should a write be retried after a transient rate limit?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-06T16:00:00Z",
+      "known_revision": 1,
+      "context_budget": 5,
+      "history_sha256": "787e69299e88f5983ae38519dbacbef20cf80ca688945858676bd1d30c780d7f",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "retry-after-rate-limit-policy"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "birch-valid-time-history",
+      "case_id": "birch-valid-time-update",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What pressure applied to Birch Pump on June 11, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-11T08:00:00Z",
+      "known_revision": 15,
+      "context_budget": 5,
+      "history_sha256": "f70a840d6aadba2a948eaf6ae9bcef8536030fa7d96e1cae07b634b02b3a813a",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "birch-initial"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [
+        "birch-update"
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "cobalt-retroactive-history",
+      "case_id": "cobalt-retroactive-correction",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What lift capacity was recorded for Cobalt Terminal on June 3, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-03T09:00:00Z",
+      "known_revision": 15,
+      "context_budget": 5,
+      "history_sha256": "d3a7f68d8266ae15d30651906eab8cd6c100f6d60cbab880c9542753b2709824",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "cobalt-initial"
+          ],
+          [
+            "cobalt-correction"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "juniper-unverified-correction-history",
+      "case_id": "juniper-unverified-correction",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What valve dwell was verified for Juniper Station on June 9, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-09T07:00:00Z",
+      "known_revision": 15,
+      "context_budget": 5,
+      "history_sha256": "833db4a07277e89241d4cd578379118477767692282361b221890f7e19bf4020",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "juniper-initial"
+          ],
+          [
+            "juniper-forum-correction"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "maple-reversed-arrival-history",
+      "case_id": "maple-reversed-conflict",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What humidity limit was recorded for Maple Vault on June 8, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-08T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 5,
+      "history_sha256": "79b7623094ed9daa2f8f4eb235a94c0aeee42e3e11deb12654f143879c96cb8e",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "maple-initial"
+          ],
+          [
+            "maple-peer"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "opal-open-conflict-history",
+      "case_id": "opal-open-conflict",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What occupancy limit was recorded for Opal Cabin on June 7, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-07T11:00:00Z",
+      "known_revision": 15,
+      "context_budget": 5,
+      "history_sha256": "1114cdcad8287a0b0db3c1deb565bb77982f95e8276ab7c3da531d1be23b67e2",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "opal-initial"
+          ],
+          [
+            "opal-peer"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "stable-repeat-history",
+      "case_id": "stable-repeat",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Where was Marsh Lab located?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-20T00:00:00Z",
+      "known_revision": 9,
+      "context_budget": 5,
+      "history_sha256": "405c517251221062b8e2e1a14072d5ff4b6115e83e736f4c5bec4e2a6bfe6cb5",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "stable-marsh-lab"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "unknown-abstention-history",
+      "case_id": "unknown-target",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What fill level was recorded for Cedar Sluice on June 6, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-06T06:00:00Z",
+      "known_revision": 7,
+      "context_budget": 5,
+      "history_sha256": "522d25f5f806e6273cb165dbb1074c3ccf1c1bb7b7082f5248bf0e2f0cbce59e",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [],
+      "forbidden_event_ids": [
+        "remote-drum"
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "temporal_decisions",
+      "family_id": "unrelated-distractor-history",
+      "case_id": "willow-unrelated-distractor",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What cycle limit applied to Willow Gate on June 12, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-06-12T09:00:00Z",
+      "known_revision": 14,
+      "context_budget": 5,
+      "history_sha256": "1e612be7b3135c3d92a9404a613189df26f8bc177bde5e667a22c8e964896ac2",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "willow-target"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [
+        "willow-distractor"
+      ]
+    }
+  }
+]

@@ -1,0 +1,1818 @@
+{
+  "schema_version": "memory-mcp-agent-pilot-report/v3",
+  "plan_sha256": "8a4bf4a926403b94b76c85636e83eaaef8fde5e2215b90fe60f9dc1db135dbfc",
+  "manifest_sha256": "8df539869ba2dc48dd8c65f7f3dc80169b4df7cf74c9fe10a335a6b6dda02052",
+  "independent_family_count": 8,
+  "paired_trial_count_per_run": 8,
+  "first_run": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "4502-1795259353855331000-0",
+    "run_started_at": "2026-11-21T11:09:13.855359Z",
+    "run_completed_at": "2026-11-21T11:13:58.838780Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "temporal-incumbent-development-pilot-v1",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 8,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "975b016f9ab3441c5211545d4b8ea7ce7b5807a9ecf27218305feb338530b951",
+        "oracle_sha256": "b656a9521728a2ec645f56914ee111b3dc1091ab9ae8bfe9e705ec9dc09bf3fd",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 32768,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+        "binary_sha256": "b8183356a88586763ecaf476504856520e86232417333dd03c424bea4436ac49",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+        "enabled_features": [
+          "fs-watch"
+        ]
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+        "binary_sha256": "b8183356a88586763ecaf476504856520e86232417333dd03c424bea4436ac49",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+        "enabled_features": [
+          "fs-watch"
+        ]
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112101,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "8a4bf4a926403b94b76c85636e83eaaef8fde5e2215b90fe60f9dc1db135dbfc",
+    "manifest_sha256": "8df539869ba2dc48dd8c65f7f3dc80169b4df7cf74c9fe10a335a6b6dda02052",
+    "incumbent_artifact_sha256": "8e62e2673314dcfc41cda56e89b9bf69ddd016e180197446be3bfad1c3479ddf",
+    "candidate_artifact_sha256": "add66ee78433fba074acc15e49d1298a4b3d51fce1efea2834faf542b6ea1957",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 3.0,
+        "interval": {
+          "estimate": 3.0,
+          "lower": -4646.0,
+          "upper": 4653.625,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": -9298.0,
+          "cobalt-retroactive-history": -1.0,
+          "juniper-unverified-correction-history": -9291.0,
+          "maple-reversed-arrival-history": 9307.0,
+          "opal-open-conflict-history": 11.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 9304.0,
+          "unrelated-distractor-history": -8.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": -1.125,
+        "interval": {
+          "estimate": -1.125,
+          "lower": -16.5,
+          "upper": 14.625,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": -12.0,
+          "cobalt-retroactive-history": 2.0,
+          "juniper-unverified-correction-history": -30.0,
+          "maple-reversed-arrival-history": 37.0,
+          "opal-open-conflict-history": 9.0,
+          "stable-repeat-history": -5.0,
+          "unknown-abstention-history": 23.0,
+          "unrelated-distractor-history": -33.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 842.875,
+        "interval": {
+          "estimate": 842.875,
+          "lower": -1076.75,
+          "upper": 2920.125,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": -1076.0,
+          "cobalt-retroactive-history": -2181.0,
+          "juniper-unverified-correction-history": -3055.0,
+          "maple-reversed-arrival-history": 2605.0,
+          "opal-open-conflict-history": 6512.0,
+          "stable-repeat-history": 1405.0,
+          "unknown-abstention-history": 1344.0,
+          "unrelated-distractor-history": 1189.0
+        }
+      }
+    },
+    "by_stratum": {
+      "temporal_decisions": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 3.0,
+          "interval": {
+            "estimate": 3.0,
+            "lower": -4646.0,
+            "upper": 4653.625,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": -9298.0,
+            "cobalt-retroactive-history": -1.0,
+            "juniper-unverified-correction-history": -9291.0,
+            "maple-reversed-arrival-history": 9307.0,
+            "opal-open-conflict-history": 11.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 9304.0,
+            "unrelated-distractor-history": -8.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -1.125,
+          "interval": {
+            "estimate": -1.125,
+            "lower": -16.5,
+            "upper": 14.625,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": -12.0,
+            "cobalt-retroactive-history": 2.0,
+            "juniper-unverified-correction-history": -30.0,
+            "maple-reversed-arrival-history": 37.0,
+            "opal-open-conflict-history": 9.0,
+            "stable-repeat-history": -5.0,
+            "unknown-abstention-history": 23.0,
+            "unrelated-distractor-history": -33.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 842.875,
+          "interval": {
+            "estimate": 842.875,
+            "lower": -1076.75,
+            "upper": 2920.125,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": -1076.0,
+            "cobalt-retroactive-history": -2181.0,
+            "juniper-unverified-correction-history": -3055.0,
+            "maple-reversed-arrival-history": 2605.0,
+            "opal-open-conflict-history": 6512.0,
+            "stable-repeat-history": 1405.0,
+            "unknown-abstention-history": 1344.0,
+            "unrelated-distractor-history": 1189.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 8,
+    "independent_family_count": 8,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "temporal_decisions": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "second_run": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "4926-1795259667016056000-0",
+    "run_started_at": "2026-11-21T11:14:27.016084Z",
+    "run_completed_at": "2026-11-21T11:19:10.469878Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "temporal-incumbent-development-pilot-v1",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 8,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "975b016f9ab3441c5211545d4b8ea7ce7b5807a9ecf27218305feb338530b951",
+        "oracle_sha256": "b656a9521728a2ec645f56914ee111b3dc1091ab9ae8bfe9e705ec9dc09bf3fd",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 32768,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+        "binary_sha256": "b8183356a88586763ecaf476504856520e86232417333dd03c424bea4436ac49",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+        "enabled_features": [
+          "fs-watch"
+        ]
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+        "binary_sha256": "b8183356a88586763ecaf476504856520e86232417333dd03c424bea4436ac49",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+        "enabled_features": [
+          "fs-watch"
+        ]
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112101,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "8a4bf4a926403b94b76c85636e83eaaef8fde5e2215b90fe60f9dc1db135dbfc",
+    "manifest_sha256": "8df539869ba2dc48dd8c65f7f3dc80169b4df7cf74c9fe10a335a6b6dda02052",
+    "incumbent_artifact_sha256": "3d183ef8a3b88561e715b4fe36ce2c5259d85bae1130c375b801c634848883ea",
+    "candidate_artifact_sha256": "8bedd71d7fe4e3a9b8a67a1ae55d6b4f2d4b5bb44497c355df6c3edb7dd834e5",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 2.625,
+        "interval": {
+          "estimate": 2.625,
+          "lower": -3489.625,
+          "upper": 3496.625,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 0.0,
+          "cobalt-retroactive-history": -4.0,
+          "juniper-unverified-correction-history": -9309.0,
+          "maple-reversed-arrival-history": 10.0,
+          "opal-open-conflict-history": 9324.0,
+          "stable-repeat-history": 2.0,
+          "unknown-abstention-history": -7.0,
+          "unrelated-distractor-history": 5.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 2.5,
+        "interval": {
+          "estimate": 2.5,
+          "lower": -13.125,
+          "upper": 19.375,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 7.0,
+          "cobalt-retroactive-history": 2.0,
+          "juniper-unverified-correction-history": -34.0,
+          "maple-reversed-arrival-history": 6.0,
+          "opal-open-conflict-history": 52.0,
+          "stable-repeat-history": -9.0,
+          "unknown-abstention-history": -17.0,
+          "unrelated-distractor-history": 13.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 62.625,
+        "interval": {
+          "estimate": 62.625,
+          "lower": -1661.375,
+          "upper": 1752.0,
+          "independent_clusters": 8,
+          "draws": 10000,
+          "seed": 2026112101,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "birch-valid-time-history": 3551.0,
+          "cobalt-retroactive-history": -3444.0,
+          "juniper-unverified-correction-history": -2958.0,
+          "maple-reversed-arrival-history": 1751.0,
+          "opal-open-conflict-history": 2920.0,
+          "stable-repeat-history": -1921.0,
+          "unknown-abstention-history": 521.0,
+          "unrelated-distractor-history": 81.0
+        }
+      }
+    },
+    "by_stratum": {
+      "temporal_decisions": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 2.625,
+          "interval": {
+            "estimate": 2.625,
+            "lower": -3489.625,
+            "upper": 3496.625,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": -4.0,
+            "juniper-unverified-correction-history": -9309.0,
+            "maple-reversed-arrival-history": 10.0,
+            "opal-open-conflict-history": 9324.0,
+            "stable-repeat-history": 2.0,
+            "unknown-abstention-history": -7.0,
+            "unrelated-distractor-history": 5.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 2.5,
+          "interval": {
+            "estimate": 2.5,
+            "lower": -13.125,
+            "upper": 19.375,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 7.0,
+            "cobalt-retroactive-history": 2.0,
+            "juniper-unverified-correction-history": -34.0,
+            "maple-reversed-arrival-history": 6.0,
+            "opal-open-conflict-history": 52.0,
+            "stable-repeat-history": -9.0,
+            "unknown-abstention-history": -17.0,
+            "unrelated-distractor-history": 13.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 62.625,
+          "interval": {
+            "estimate": 62.625,
+            "lower": -1661.375,
+            "upper": 1752.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112101,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 3551.0,
+            "cobalt-retroactive-history": -3444.0,
+            "juniper-unverified-correction-history": -2958.0,
+            "maple-reversed-arrival-history": 1751.0,
+            "opal-open-conflict-history": 2920.0,
+            "stable-repeat-history": -1921.0,
+            "unknown-abstention-history": 521.0,
+            "unrelated-distractor-history": 81.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 8,
+    "independent_family_count": 8,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "temporal_decisions": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "metrics": {
+    "direct_memory_success": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "task_success": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "repair_turn_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "turn_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "tool_call_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "clarification_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "input_token_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": -9298.0,
+        "cobalt-retroactive-history": -1.0,
+        "juniper-unverified-correction-history": -9291.0,
+        "maple-reversed-arrival-history": 9307.0,
+        "opal-open-conflict-history": 11.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 9304.0,
+        "unrelated-distractor-history": -8.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": -4.0,
+        "juniper-unverified-correction-history": -9309.0,
+        "maple-reversed-arrival-history": 10.0,
+        "opal-open-conflict-history": 9324.0,
+        "stable-repeat-history": 2.0,
+        "unknown-abstention-history": -7.0,
+        "unrelated-distractor-history": 5.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": -4649.0,
+        "cobalt-retroactive-history": -2.5,
+        "juniper-unverified-correction-history": -9300.0,
+        "maple-reversed-arrival-history": 4658.5,
+        "opal-open-conflict-history": 4667.5,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 4648.5,
+        "unrelated-distractor-history": -1.5
+      },
+      "between_family_sample_variance": 24742696.85267857
+    },
+    "output_token_gain": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": -12.0,
+        "cobalt-retroactive-history": 2.0,
+        "juniper-unverified-correction-history": -30.0,
+        "maple-reversed-arrival-history": 37.0,
+        "opal-open-conflict-history": 9.0,
+        "stable-repeat-history": -5.0,
+        "unknown-abstention-history": 23.0,
+        "unrelated-distractor-history": -33.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 7.0,
+        "cobalt-retroactive-history": 2.0,
+        "juniper-unverified-correction-history": -34.0,
+        "maple-reversed-arrival-history": 6.0,
+        "opal-open-conflict-history": 52.0,
+        "stable-repeat-history": -9.0,
+        "unknown-abstention-history": -17.0,
+        "unrelated-distractor-history": 13.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": -2.5,
+        "cobalt-retroactive-history": 2.0,
+        "juniper-unverified-correction-history": -32.0,
+        "maple-reversed-arrival-history": 21.5,
+        "opal-open-conflict-history": 30.5,
+        "stable-repeat-history": -7.0,
+        "unknown-abstention-history": 3.0,
+        "unrelated-distractor-history": -10.0
+      },
+      "between_family_sample_variance": 368.70982142857144
+    },
+    "wall_time_gain_ms": {
+      "first_run_family_deltas": {
+        "birch-valid-time-history": -1076.0,
+        "cobalt-retroactive-history": -2181.0,
+        "juniper-unverified-correction-history": -3055.0,
+        "maple-reversed-arrival-history": 2605.0,
+        "opal-open-conflict-history": 6512.0,
+        "stable-repeat-history": 1405.0,
+        "unknown-abstention-history": 1344.0,
+        "unrelated-distractor-history": 1189.0
+      },
+      "second_run_family_deltas": {
+        "birch-valid-time-history": 3551.0,
+        "cobalt-retroactive-history": -3444.0,
+        "juniper-unverified-correction-history": -2958.0,
+        "maple-reversed-arrival-history": 1751.0,
+        "opal-open-conflict-history": 2920.0,
+        "stable-repeat-history": -1921.0,
+        "unknown-abstention-history": 521.0,
+        "unrelated-distractor-history": 81.0
+      },
+      "family_deltas": {
+        "birch-valid-time-history": 1237.5,
+        "cobalt-retroactive-history": -2812.5,
+        "juniper-unverified-correction-history": -3006.5,
+        "maple-reversed-arrival-history": 2178.0,
+        "opal-open-conflict-history": 4716.0,
+        "stable-repeat-history": -258.0,
+        "unknown-abstention-history": 932.5,
+        "unrelated-distractor-history": 635.0
+      },
+      "between_family_sample_variance": 6452061.357142857
+    }
+  },
+  "same_product_outcomes": {
+    "direct_memory_success": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.125,
+      "test_retest_sample_variance": 0.0
+    },
+    "task_success": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.125,
+      "test_retest_sample_variance": 0.0
+    },
+    "charged_repair_turns": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 6.125,
+      "test_retest_sample_variance": 0.0
+    },
+    "charged_turns": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 8.0,
+        "maple-reversed-arrival-history": 8.0,
+        "opal-open-conflict-history": 8.0,
+        "stable-repeat-history": 8.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 8.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 6.125,
+      "test_retest_sample_variance": 0.0
+    },
+    "tool_calls": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0,
+      "test_retest_sample_variance": 0.0
+    },
+    "user_clarifications": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "birch-valid-time-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0,
+      "test_retest_sample_variance": 0.0
+    },
+    "input_tokens": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 21082.0,
+        "cobalt-retroactive-history": 25749.5,
+        "juniper-unverified-correction-history": 21100.5,
+        "maple-reversed-arrival-history": 21088.5,
+        "opal-open-conflict-history": 25756.5,
+        "stable-repeat-history": 16427.0,
+        "unknown-abstention-history": 21102.0,
+        "unrelated-distractor-history": 25744.0
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 25731.0,
+        "cobalt-retroactive-history": 25748.0,
+        "juniper-unverified-correction-history": 21096.5,
+        "maple-reversed-arrival-history": 25744.0,
+        "opal-open-conflict-history": 21097.0,
+        "stable-repeat-history": 25731.0,
+        "unknown-abstention-history": 25755.5,
+        "unrelated-distractor-history": 25743.5
+      },
+      "family_means": {
+        "birch-valid-time-history": 23406.5,
+        "cobalt-retroactive-history": 25748.75,
+        "juniper-unverified-correction-history": 21098.5,
+        "maple-reversed-arrival-history": 23416.25,
+        "opal-open-conflict-history": 23426.75,
+        "stable-repeat-history": 21079.0,
+        "unknown-abstention-history": 23428.75,
+        "unrelated-distractor-history": 25743.75
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 4649.0,
+        "cobalt-retroactive-history": -1.5,
+        "juniper-unverified-correction-history": -4.0,
+        "maple-reversed-arrival-history": 4655.5,
+        "opal-open-conflict-history": -4659.5,
+        "stable-repeat-history": 9304.0,
+        "unknown-abstention-history": 4653.5,
+        "unrelated-distractor-history": -0.5
+      },
+      "between_family_sample_variance": 3098976.4363839286,
+      "test_retest_sample_variance": 18569798.816964287
+    },
+    "output_tokens": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 145.0,
+        "cobalt-retroactive-history": 158.0,
+        "juniper-unverified-correction-history": 156.0,
+        "maple-reversed-arrival-history": 135.5,
+        "opal-open-conflict-history": 163.5,
+        "stable-repeat-history": 124.5,
+        "unknown-abstention-history": 151.5,
+        "unrelated-distractor-history": 167.5
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 150.5,
+        "cobalt-retroactive-history": 163.0,
+        "juniper-unverified-correction-history": 141.0,
+        "maple-reversed-arrival-history": 158.0,
+        "opal-open-conflict-history": 140.0,
+        "stable-repeat-history": 153.5,
+        "unknown-abstention-history": 174.5,
+        "unrelated-distractor-history": 167.5
+      },
+      "family_means": {
+        "birch-valid-time-history": 147.75,
+        "cobalt-retroactive-history": 160.5,
+        "juniper-unverified-correction-history": 148.5,
+        "maple-reversed-arrival-history": 146.75,
+        "opal-open-conflict-history": 151.75,
+        "stable-repeat-history": 139.0,
+        "unknown-abstention-history": 163.0,
+        "unrelated-distractor-history": 167.5
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 5.5,
+        "cobalt-retroactive-history": 5.0,
+        "juniper-unverified-correction-history": -15.0,
+        "maple-reversed-arrival-history": 22.5,
+        "opal-open-conflict-history": -23.5,
+        "stable-repeat-history": 29.0,
+        "unknown-abstention-history": 23.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 92.98102678571429,
+      "test_retest_sample_variance": 348.35267857142856
+    },
+    "wall_time_ms": {
+      "first_run_family_means": {
+        "birch-valid-time-history": 10614.0,
+        "cobalt-retroactive-history": 11424.5,
+        "juniper-unverified-correction-history": 10010.5,
+        "maple-reversed-arrival-history": 11443.5,
+        "opal-open-conflict-history": 15229.0,
+        "stable-repeat-history": 8481.5,
+        "unknown-abstention-history": 10792.0,
+        "unrelated-distractor-history": 11801.5
+      },
+      "second_run_family_means": {
+        "birch-valid-time-history": 11716.5,
+        "cobalt-retroactive-history": 12188.0,
+        "juniper-unverified-correction-history": 10571.0,
+        "maple-reversed-arrival-history": 10697.5,
+        "opal-open-conflict-history": 9452.0,
+        "stable-repeat-history": 10963.5,
+        "unknown-abstention-history": 11807.5,
+        "unrelated-distractor-history": 11519.5
+      },
+      "family_means": {
+        "birch-valid-time-history": 11165.25,
+        "cobalt-retroactive-history": 11806.25,
+        "juniper-unverified-correction-history": 10290.75,
+        "maple-reversed-arrival-history": 11070.5,
+        "opal-open-conflict-history": 12340.5,
+        "stable-repeat-history": 9722.5,
+        "unknown-abstention-history": 11299.75,
+        "unrelated-distractor-history": 11660.5
+      },
+      "retest_family_deltas": {
+        "birch-valid-time-history": 1102.5,
+        "cobalt-retroactive-history": 763.5,
+        "juniper-unverified-correction-history": 560.5,
+        "maple-reversed-arrival-history": -746.0,
+        "opal-open-conflict-history": -5777.0,
+        "stable-repeat-history": 2482.0,
+        "unknown-abstention-history": 1015.5,
+        "unrelated-distractor-history": -282.0
+      },
+      "between_family_sample_variance": 701509.6071428572,
+      "test_retest_sample_variance": 6173844.553571428
+    }
+  }
+}

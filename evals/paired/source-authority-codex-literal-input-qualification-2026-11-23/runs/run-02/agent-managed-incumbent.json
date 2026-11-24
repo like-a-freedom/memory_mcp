@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "7465-1795449143929572000-0",
+  "identity_sha256": "d38af08ba3b805a4c04f3e93fd71790d6525cf068445d44111df7eb53636dc6b",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "juniper_arc_foundry",
+      "case_id": "juniper_arc_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "pewter_wave_relay",
+      "case_id": "pewter_wave_relay-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "quartz_lark_annex",
+      "case_id": "quartz_lark_annex-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "vermilion_halcyon_station",
+      "case_id": "vermilion_halcyon_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "juniper_arc_foundry",
+        "case_id": "juniper_arc_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39394,
+        "output_tokens": 189,
+        "wall_time_ms": 20149
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "fbd23316278afd84521b3488c4ad0bc79370e14ae5502a617bd13e426b97211b",
+        "response_sha256": "7df501b06fa5f071c21b683c07544f57c2e74896b629b8e61842f48d47268ccb",
+        "known_revision": 6,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-juniper_arc_foundry"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2067,
+          "maximum_wire_bytes": 2067
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "pewter_wave_relay",
+        "case_id": "pewter_wave_relay-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39366,
+        "output_tokens": 193,
+        "wall_time_ms": 17731
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "73e8abb9ab1362465f635b9193c85b3baac321b4d067aaa5c9bb78616a472cc5",
+        "response_sha256": "30ce372839a763096cb7a48d8c6a5329c2679d7894dbff62af00f29a4c8bf3f0",
+        "known_revision": 6,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-pewter_wave_relay"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2029,
+          "maximum_wire_bytes": 2029
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "quartz_lark_annex",
+        "case_id": "quartz_lark_annex-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39365,
+        "output_tokens": 188,
+        "wall_time_ms": 21804
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b9851097480cb5a5757f96a62f9089793f9979d9f5b905459c60734241167e8d",
+        "response_sha256": "5cac6a806bb76faa0598cb3b83d8cc4a03fa57fb1724d9215193512c558e5792",
+        "known_revision": 6,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-quartz_lark_annex"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2055,
+          "maximum_wire_bytes": 2055
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "vermilion_halcyon_station",
+        "case_id": "vermilion_halcyon_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39468,
+        "output_tokens": 206,
+        "wall_time_ms": 24869
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "9bdcfd5d495b32ec671ce6e270ca567d40ce2fb368d911e9fd141f63cca219c1",
+        "response_sha256": "8ff00d7295bcda8202a4b096f225a9e17ed9f855eab51ef1c405449a66f5112f",
+        "known_revision": 6,
+        "retained_store_bytes": 34242636,
+        "source_event_ids": [
+          "literal-source-vermilion_halcyon_station"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2141,
+          "maximum_wire_bytes": 2141
+        }
+      }
+    }
+  ]
+}

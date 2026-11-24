@@ -1,0 +1,16 @@
+90a9de97040f52ce91073d1dd08a34442d840f137434a6003736bc314bbe0194  evals/paired/source-authority-local-flint-v1-qualification/README.md
+65db2aa82306cf67008a80e43c5f774a633481446d75d7f67e42eaeedd86a4d7  evals/paired/source-authority-local-flint-v1-qualification/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-flint-v1-qualification/host-policy.json
+1da8aa75b22a7c291be7de68162415b13ac908f2484a24a408a35689b6db0577  evals/paired/source-authority-local-flint-v1-qualification/plan.json
+65debbcf3334550cff336de647b3a40d4eb6b47a88be913a05450d6db73963b3  evals/paired/source-authority-local-flint-v1-qualification/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-flint-v1-qualification/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-flint-v1-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-flint-v1-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-flint-v1-qualification/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-flint-v1-qualification/prompts/memory-recall-task-rules-v1.txt
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-flint-v1-qualification/protocol-config.json
+a3d759e6c27c63bec0e8f25f309d332ec61276942cb14e55b794b1bcd39e008d  evals/paired/source-authority-local-flint-v1-qualification/provider-inventory.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-flint-v1-qualification/retry-policy.json
+7bf8894f5838e096a6cb6147707a98733e730985618c8d72e3e0d49c38a273e0  evals/paired/source-authority-local-flint-v1-qualification/sampling-config.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-flint-v1-qualification/simulator.json
+654f2f83dfafe07973e1482fb020ac6dd2f50ad6c0b5f5329ae95f2d461a957c  evals/paired/source-authority-local-flint-v1-qualification/tasks-v1.json

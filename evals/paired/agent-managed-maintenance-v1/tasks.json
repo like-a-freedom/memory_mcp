@@ -1,0 +1,341 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "saffron-orbit-history",
+        "case_id": "saffron-orbit-current-weekly-export-bucket",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Saffron Orbit uses Quartz-72 as its weekly export bucket. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/saffron-orbit/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Saffron Orbit's current weekly export bucket? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Saffron Orbit's current weekly export bucket?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-01",
+          "source_id": "conversation://maintenance/saffron-orbit/original-01",
+          "source_type": "conversation",
+          "content": "Saffron Orbit uses Amber-14 as its weekly export bucket.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-72"
+        ],
+        "forbidden_event_ids": [
+          "old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "velvet-circuit-history",
+        "case_id": "velvet-circuit-current-incident-handoff-alias",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Velvet Circuit uses Birch-61 as its incident handoff alias. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/velvet-circuit/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Velvet Circuit's current incident handoff alias? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Velvet Circuit's current incident handoff alias?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-02",
+          "source_id": "conversation://maintenance/velvet-circuit/original-01",
+          "source_type": "conversation",
+          "content": "Velvet Circuit uses Cedar-28 as its incident handoff alias.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-02",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-02"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Birch-61"
+        ],
+        "forbidden_event_ids": [
+          "old-02"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "marble-harbor-history",
+        "case_id": "marble-harbor-current-archive-checksum-prefix",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Marble Harbor uses Maple-84 as its archive checksum prefix. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/marble-harbor/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Marble Harbor's current archive checksum prefix? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Marble Harbor's current archive checksum prefix?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-03",
+          "source_id": "conversation://maintenance/marble-harbor/original-01",
+          "source_type": "conversation",
+          "content": "Marble Harbor uses Willow-35 as its archive checksum prefix.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-03",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-03"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Maple-84"
+        ],
+        "forbidden_event_ids": [
+          "old-03"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "indigo-meadow-history",
+        "case_id": "indigo-meadow-current-recovery-queue-name",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Indigo Meadow uses Silver-96 as its recovery queue name. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/indigo-meadow/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Indigo Meadow's current recovery queue name? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Indigo Meadow's current recovery queue name?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-04",
+          "source_id": "conversation://maintenance/indigo-meadow/original-01",
+          "source_type": "conversation",
+          "content": "Indigo Meadow uses Copper-43 as its recovery queue name.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-04",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-04"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Silver-96"
+        ],
+        "forbidden_event_ids": [
+          "old-04"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "granite-lantern-history",
+        "case_id": "granite-lantern-current-release-audit-label",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Granite Lantern uses Flint-17 as its release audit label. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/granite-lantern/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Granite Lantern's current release audit label? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Granite Lantern's current release audit label?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-05",
+          "source_id": "conversation://maintenance/granite-lantern/original-01",
+          "source_type": "conversation",
+          "content": "Granite Lantern uses Moss-52 as its release audit label.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-05",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-05"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Flint-17"
+        ],
+        "forbidden_event_ids": [
+          "old-05"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cobalt-garden-history",
+        "case_id": "cobalt-garden-current-nightly-snapshot-tag",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Cobalt Garden uses Reed-23 as its nightly snapshot tag. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/cobalt-garden/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Cobalt Garden's current nightly snapshot tag? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Cobalt Garden's current nightly snapshot tag?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-06",
+          "source_id": "conversation://maintenance/cobalt-garden/original-01",
+          "source_type": "conversation",
+          "content": "Cobalt Garden uses Pine-69 as its nightly snapshot tag.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-06",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-06"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Reed-23"
+        ],
+        "forbidden_event_ids": [
+          "old-06"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "autumn-meridian-history",
+        "case_id": "autumn-meridian-current-rollback-shelf-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Autumn Meridian uses Onyx-58 as its rollback shelf code. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/autumn-meridian/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Autumn Meridian's current rollback shelf code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Autumn Meridian's current rollback shelf code?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-07",
+          "source_id": "conversation://maintenance/autumn-meridian/original-01",
+          "source_type": "conversation",
+          "content": "Autumn Meridian uses Slate-31 as its rollback shelf code.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-07",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-07"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Onyx-58"
+        ],
+        "forbidden_event_ids": [
+          "old-07"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "crystal-tundra-history",
+        "case_id": "crystal-tundra-current-escalation-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain the project memory. A user has provided this durable correction: User correction, valid from 2026-11-21T12:00:00Z: Crystal Tundra uses Basil-82 as its escalation channel. Ingest only that correction once using source_type=conversation, source_id=conversation://maintenance/crystal-tundra/update-01, and t_ref=2026-11-21T12:00:00Z. First find the exact existing fact. Extract the returned episode ID once, verify the new value in memory, and only then invalidate the exact superseded fact using t_invalid=2026-11-21T12:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate the existing fact; ask for clarification.",
+      "recall_prompt": "As of 2026-11-22T00:00:00Z, what is Crystal Tundra's current escalation channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-22T00:00:00Z, what is Crystal Tundra's current escalation channel?",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "old-08",
+          "source_id": "conversation://maintenance/crystal-tundra/original-01",
+          "source_type": "conversation",
+          "content": "Crystal Tundra uses Linen-47 as its escalation channel.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "update-08",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "update-08"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Basil-82"
+        ],
+        "forbidden_event_ids": [
+          "old-08"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What humidity limit was recorded for Maple Vault on June 8, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-08T12:00:00Z",
+  "known_revision": 3,
+  "context_budget": 5,
+  "history_sha256": "79b7623094ed9daa2f8f4eb235a94c0aeee42e3e11deb12654f143879c96cb8e",
+  "claim_rollout_stage": "evidence"
+}

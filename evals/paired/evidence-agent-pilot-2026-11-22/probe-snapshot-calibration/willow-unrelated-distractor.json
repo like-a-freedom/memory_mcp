@@ -1,0 +1,39 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "willow-unrelated-distractor",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "1e612be7b3135c3d92a9404a613189df26f8bc177bde5e667a22c8e964896ac2",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-12T09:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:49.951912Z",
+    "known_revision": 14,
+    "valid_at": "2026-06-12T09:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "willow-target",
+      "episode_id": "episode:a8e50b3321c83d3386b1524b",
+      "fact_ids": [
+        "fact:d9123f364c5ae88cee98149e"
+      ],
+      "reconciliation": null
+    },
+    {
+      "event_id": "willow-distractor",
+      "episode_id": "episode:71afa1108096f2979dc520f7",
+      "fact_ids": [
+        "fact:ce7b72669e10fb3b315dffce"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

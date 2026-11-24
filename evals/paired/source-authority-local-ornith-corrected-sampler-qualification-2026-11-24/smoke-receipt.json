@@ -1,0 +1,17 @@
+{
+  "schema_version": "memory-mcp-local-tool-roundtrip-smoke/v1",
+  "model_alias": "memory-local-eval-ornith-v2",
+  "endpoint": "http://127.0.0.1:1234/v1",
+  "sampling": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20
+  },
+  "tool_call_contract": "pass",
+  "tool_call_count": 1,
+  "tool_argument_schema_valid": true,
+  "synthetic_expected_argument_match": true,
+  "reasoning_content_forwarded_on_followup": true,
+  "followup_contract": "pass",
+  "raw_response_retained": false
+}

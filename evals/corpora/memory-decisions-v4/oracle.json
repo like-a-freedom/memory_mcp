@@ -1,0 +1,159 @@
+{
+  "schema_version": "memory-decisions-oracle/v1",
+  "oracles": [
+    {
+      "probe_id": "absent-subject",
+      "disposition": "unknown",
+      "evidence_alternatives": [],
+      "expected_assertions": {},
+      "expected_roles": {},
+      "forbidden_event_ids": [
+        "unknown-record"
+      ]
+    },
+    {
+      "probe_id": "similar-name",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "target"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "target": "18 crates"
+      },
+      "expected_roles": {
+        "target": "current"
+      },
+      "forbidden_event_ids": [
+        "distractor"
+      ]
+    },
+    {
+      "probe_id": "single-current",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "single"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "single": "47 crates"
+      },
+      "expected_roles": {
+        "single": "current"
+      },
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "peer-conflict",
+      "disposition": "conflict",
+      "evidence_alternatives": [
+        [
+          [
+            "conflict-a"
+          ],
+          [
+            "conflict-b"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "conflict-a": "29 crates",
+        "conflict-b": "34 crates"
+      },
+      "expected_roles": {
+        "conflict-a": "conflicting",
+        "conflict-b": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "unverified-correction",
+      "disposition": "conflict",
+      "evidence_alternatives": [
+        [
+          [
+            "verified"
+          ],
+          [
+            "unverified"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "verified": "22 crates",
+        "unverified": "31 crates"
+      },
+      "expected_roles": {
+        "verified": "conflicting",
+        "unverified": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "prior-knowledge",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "prior"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "prior": "15 crates"
+      },
+      "expected_roles": {
+        "prior": "current"
+      },
+      "forbidden_event_ids": [
+        "later"
+      ]
+    },
+    {
+      "probe_id": "valid-boundary",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "old-valid"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "old-valid": "12 crates"
+      },
+      "expected_roles": {
+        "old-valid": "current"
+      },
+      "forbidden_event_ids": [
+        "future-valid"
+      ]
+    },
+    {
+      "probe_id": "ordinary-location",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "ordinary-location"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "ordinary-location": "Harbor Road"
+      },
+      "expected_roles": {
+        "ordinary-location": "current"
+      },
+      "forbidden_event_ids": []
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What lift capacity was recorded for Cobalt Terminal on June 3, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-03T09:00:00Z",
+  "known_revision": 15,
+  "context_budget": 5,
+  "history_sha256": "d3a7f68d8266ae15d30651906eab8cd6c100f6d60cbab880c9542753b2709824",
+  "claim_rollout_stage": "shadow"
+}

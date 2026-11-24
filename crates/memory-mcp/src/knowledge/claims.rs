@@ -12,6 +12,12 @@ use crate::models::{EpisodeId, FactId};
 use crate::shared::temporal::normalize_dt;
 use crate::storage::{BoundDbClient, DbClient};
 
+const REVISION_VISIBLE_FACT_IDS: &str = "SELECT VALUE fact_id FROM fact WHERE \
+    known_revision IS NOT NONE AND known_revision <= $known_revision \
+    AND (closed_revision IS NONE OR closed_revision > $known_revision \
+         OR t_invalid IS NONE OR t_invalid > type::datetime($cutoff)) \
+    AND t_valid <= type::datetime($cutoff)";
+
 /// True when the error reports a duplicate deterministic record ID. For claim
 /// projection this is an idempotent no-op (repeat projection of an identical
 /// claim), not a failure.
@@ -82,6 +88,7 @@ pub(crate) trait TemporalRelationReadStore: Send + Sync {
         &self,
         fact_ids: &[FactId],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError>;
 
@@ -89,6 +96,7 @@ pub(crate) trait TemporalRelationReadStore: Send + Sync {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError>;
 
@@ -96,6 +104,7 @@ pub(crate) trait TemporalRelationReadStore: Send + Sync {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<ClaimRelation>, MemoryError>;
 
@@ -103,6 +112,7 @@ pub(crate) trait TemporalRelationReadStore: Send + Sync {
         &self,
         fact_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<TemporalCounterpartFact>, MemoryError>;
 }
@@ -275,25 +285,38 @@ impl SurrealClaimStore {
         &self,
         fact_ids: &[FactId],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError> {
         if fact_ids.is_empty() || limit == 0 {
             return Ok(vec![]);
         }
         let ids = fact_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let sql = "SELECT * FROM claim WHERE source_fact_id IN $fact_ids \
-                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
-                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
-                   AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
-                   AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
-                   ORDER BY source_fact_id ASC, claim_id ASC LIMIT $limit";
+        let transaction_visibility = if known_revision.is_some() {
+            format!(
+                "known_revision IS NOT NONE AND known_revision <= $known_revision \
+                 AND (closed_revision IS NONE OR closed_revision > $known_revision \
+                      OR source_fact_id IN ({REVISION_VISIBLE_FACT_IDS}))"
+            )
+        } else {
+            "(t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+             AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff))".to_string()
+        };
+        let sql = format!(
+            "SELECT * FROM claim WHERE source_fact_id IN $fact_ids \
+             AND ({transaction_visibility}) \
+             AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
+             AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
+             ORDER BY source_fact_id ASC, claim_id ASC LIMIT $limit"
+        );
         let result = self
             .db
             .query(
-                sql,
+                &sql,
                 Some(serde_json::json!({
                     "fact_ids": ids,
                     "cutoff": cutoff,
+                    "known_revision": known_revision,
                     "limit": limit,
                 })),
             )
@@ -311,24 +334,37 @@ impl SurrealClaimStore {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError> {
         if claim_ids.is_empty() || limit == 0 {
             return Ok(vec![]);
         }
-        let sql = "SELECT * FROM claim WHERE claim_id IN $claim_ids \
-                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
-                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
-                   AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
-                   AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
-                   ORDER BY claim_id ASC LIMIT $limit";
+        let transaction_visibility = if known_revision.is_some() {
+            format!(
+                "known_revision IS NOT NONE AND known_revision <= $known_revision \
+                 AND (closed_revision IS NONE OR closed_revision > $known_revision \
+                      OR source_fact_id IN ({REVISION_VISIBLE_FACT_IDS}))"
+            )
+        } else {
+            "(t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+             AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff))".to_string()
+        };
+        let sql = format!(
+            "SELECT * FROM claim WHERE claim_id IN $claim_ids \
+             AND ({transaction_visibility}) \
+             AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
+             AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
+             ORDER BY claim_id ASC LIMIT $limit"
+        );
         let result = self
             .db
             .query(
-                sql,
+                &sql,
                 Some(serde_json::json!({
                     "claim_ids": claim_ids,
                     "cutoff": cutoff,
+                    "known_revision": known_revision,
                     "limit": limit,
                 })),
             )
@@ -346,23 +382,37 @@ impl SurrealClaimStore {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<ClaimRelation>, MemoryError> {
         if claim_ids.is_empty() || limit == 0 {
             return Ok(vec![]);
         }
-        let sql = "SELECT * FROM claim_relation \
-                   WHERE (left_claim_id IN $claim_ids OR right_claim_id IN $claim_ids) \
-                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
-                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
-                   ORDER BY claim_relation_id ASC LIMIT $limit";
+        let transaction_visibility = if known_revision.is_some() {
+            format!(
+                "known_revision IS NOT NONE AND known_revision <= $known_revision \
+                 AND (closed_revision IS NONE OR closed_revision > $known_revision \
+                      OR (left_fact_id IN ({REVISION_VISIBLE_FACT_IDS}) \
+                          AND right_fact_id IN ({REVISION_VISIBLE_FACT_IDS})))"
+            )
+        } else {
+            "(t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+             AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff))".to_string()
+        };
+        let sql = format!(
+            "SELECT * FROM claim_relation \
+             WHERE (left_claim_id IN $claim_ids OR right_claim_id IN $claim_ids) \
+             AND ({transaction_visibility}) \
+             ORDER BY claim_relation_id ASC LIMIT $limit"
+        );
         let result = self
             .db
             .query(
-                sql,
+                &sql,
                 Some(serde_json::json!({
                     "claim_ids": claim_ids,
                     "cutoff": cutoff,
+                    "known_revision": known_revision,
                     "limit": limit,
                 })),
             )
@@ -380,15 +430,25 @@ impl SurrealClaimStore {
         &self,
         fact_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<TemporalCounterpartFact>, MemoryError> {
         if fact_ids.is_empty() || limit == 0 {
             return Ok(vec![]);
         }
-        let visibility = crate::shared::temporal::visibility_clause("$cutoff");
-        let sql = format!(
-            "SELECT fact_id, policy_tags FROM fact WHERE fact_id IN $fact_ids AND {visibility} ORDER BY fact_id ASC LIMIT $limit"
-        );
+        let sql = if known_revision.is_some() {
+            "SELECT fact_id, policy_tags FROM fact WHERE fact_id IN $fact_ids \
+             AND known_revision IS NOT NONE AND known_revision <= $known_revision \
+             AND (closed_revision IS NONE OR closed_revision > $known_revision OR t_invalid IS NONE OR t_invalid > type::datetime($cutoff)) \
+             AND t_valid <= type::datetime($cutoff) \
+             ORDER BY fact_id ASC LIMIT $limit"
+                .to_string()
+        } else {
+            let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+            format!(
+                "SELECT fact_id, policy_tags FROM fact WHERE fact_id IN $fact_ids AND {visibility} ORDER BY fact_id ASC LIMIT $limit"
+            )
+        };
         let result = self
             .db
             .query(
@@ -396,6 +456,7 @@ impl SurrealClaimStore {
                 Some(serde_json::json!({
                     "fact_ids": fact_ids,
                     "cutoff": cutoff,
+                    "known_revision": known_revision,
                     "limit": limit,
                 })),
             )
@@ -417,9 +478,10 @@ impl TemporalRelationReadStore for SurrealClaimStore {
         &self,
         fact_ids: &[FactId],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError> {
-        self.select_temporal_claims_by_facts(fact_ids, cutoff, limit)
+        self.select_temporal_claims_by_facts(fact_ids, cutoff, known_revision, limit)
             .await
     }
 
@@ -427,9 +489,10 @@ impl TemporalRelationReadStore for SurrealClaimStore {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<Claim>, MemoryError> {
-        self.select_temporal_claims_by_ids(claim_ids, cutoff, limit)
+        self.select_temporal_claims_by_ids(claim_ids, cutoff, known_revision, limit)
             .await
     }
 
@@ -437,9 +500,10 @@ impl TemporalRelationReadStore for SurrealClaimStore {
         &self,
         claim_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<ClaimRelation>, MemoryError> {
-        self.select_temporal_relations_by_claim_ids(claim_ids, cutoff, limit)
+        self.select_temporal_relations_by_claim_ids(claim_ids, cutoff, known_revision, limit)
             .await
     }
 
@@ -447,9 +511,10 @@ impl TemporalRelationReadStore for SurrealClaimStore {
         &self,
         fact_ids: &[String],
         cutoff: &str,
+        known_revision: Option<i64>,
         limit: usize,
     ) -> Result<Vec<TemporalCounterpartFact>, MemoryError> {
-        self.select_temporal_facts_by_ids(fact_ids, cutoff, limit)
+        self.select_temporal_facts_by_ids(fact_ids, cutoff, known_revision, limit)
             .await
     }
 }
@@ -509,14 +574,14 @@ impl ClaimStore for SurrealClaimStore {
         for claim in &request.claims {
             let content = serde_json::to_value(claim)
                 .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
-            if let Err(err) = self
-                .db
-                .create(
-                    claim.claim_id.as_ref(),
-                    content,
-                    crate::knowledge::queries::CLAIM_TEMPORAL_FIELDS,
-                )
-                .await
+            if let Err(err) = crate::knowledge::revisions::create(
+                &self.db,
+                claim.claim_id.as_ref(),
+                content,
+                crate::knowledge::queries::CLAIM_TEMPORAL_FIELDS,
+                crate::knowledge::revisions::KnowledgeRevisionKind::Claim,
+            )
+            .await
             {
                 // CREATE never overwrites, so a collision is an idempotent
                 // no-op (repeat projection of a deterministic claim), not a
@@ -697,14 +762,15 @@ impl ClaimStore for SurrealClaimStore {
             // contradiction detection in `extract`.
             let record_id = relation.claim_relation_id.as_ref();
             let content = Self::serialize(relation)?;
-            self.db
-                .create(
-                    record_id,
-                    content,
-                    crate::knowledge::queries::CLAIM_RELATION_TEMPORAL_FIELDS,
-                )
-                .await
-                .map_err(|e| MemoryError::Storage(format!("persist relation: {e}")))?;
+            crate::knowledge::revisions::create(
+                &self.db,
+                record_id,
+                content,
+                crate::knowledge::queries::CLAIM_RELATION_TEMPORAL_FIELDS,
+                crate::knowledge::revisions::KnowledgeRevisionKind::ClaimRelation,
+            )
+            .await
+            .map_err(|e| MemoryError::Storage(format!("persist relation: {e}")))?;
         }
 
         // Update job counters and cursor
@@ -872,6 +938,15 @@ mod tests {
         ) -> Result<Value, MemoryError> {
             self.query_count.fetch_add(1, Ordering::SeqCst);
             self.inner.query(sql, vars, namespace).await
+        }
+
+        async fn transaction_query(
+            &self,
+            sql: &str,
+            vars: Option<Value>,
+            namespace: &str,
+        ) -> Result<(), MemoryError> {
+            self.inner.transaction_query(sql, vars, namespace).await
         }
 
         async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
@@ -1150,7 +1225,7 @@ mod tests {
         // catalog entry is chosen by position, not by count.
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "055_episode_source_context.surql");
+        assert_eq!(last.file_name, "056_knowledge_revisions.surql");
     }
 
     #[test]
@@ -1484,6 +1559,7 @@ mod tests {
             store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: fact_ids.clone(),
+                known_revision: None,
                 cutoff,
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -1714,6 +1790,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:historical-old")],
+                known_revision: None,
                 cutoff: chrono::Utc.with_ymd_and_hms(2026, 1, 5, 0, 0, 0).unwrap(),
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -1729,6 +1806,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:historical-old")],
+                known_revision: None,
                 cutoff: before_invalidation,
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -1748,6 +1826,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:historical-old")],
+                known_revision: None,
                 cutoff: after_invalidation,
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -1845,6 +1924,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:visible-old")],
+                known_revision: None,
                 cutoff,
                 policy_tags: vec!["public".to_string()],
                 counterpart_limit: 32,
@@ -1947,6 +2027,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:batch-root")],
+                known_revision: None,
                 cutoff,
                 policy_tags: vec![],
                 counterpart_limit: 100,
@@ -2005,6 +2086,7 @@ mod tests {
             &shadow_reader,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:stage-old")],
+                known_revision: None,
                 cutoff,
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -2021,6 +2103,7 @@ mod tests {
             &enabled_reader,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:stage-old")],
+                known_revision: None,
                 cutoff,
                 policy_tags: vec![],
                 counterpart_limit: 32,
@@ -2079,6 +2162,7 @@ mod tests {
             &store,
             crate::knowledge::api::TemporalRelationsQuery {
                 fact_ids: vec![FactId::from("fact:depth-0")],
+                known_revision: None,
                 cutoff,
                 policy_tags: vec![],
                 counterpart_limit: 32,

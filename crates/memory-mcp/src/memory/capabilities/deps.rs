@@ -18,7 +18,6 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 
-use crate::knowledge::claims::ClaimStore;
 use crate::knowledge::claims_policy::projection::ClaimService;
 use crate::knowledge::entity_resolution::EntityResolver;
 use crate::knowledge::entity_service::EntityService;
@@ -204,7 +203,6 @@ pub(crate) struct InvalidateDeps {
     pub(crate) db_client: Arc<dyn crate::storage::DbClient>,
     pub(crate) active_namespace: String,
     pub(crate) rate_limiter: Arc<RateLimiter>,
-    pub(crate) claim_store: Option<Arc<dyn ClaimStore>>,
     pub(crate) context_cache: ContextCache,
     #[cfg(feature = "streamable-http")]
     pub(crate) outbox_enabled: bool,

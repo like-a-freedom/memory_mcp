@@ -1,0 +1,42 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "junebrook_foundry-record-a"
+      ]
+    ],
+    [
+      [
+        "junebrook_foundry-record-b"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [],
+  "required_claim_annotation_alternatives": [
+    [
+      {
+        "source_event_id": "junebrook_foundry-record-a",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "source_event_id": "junebrook_foundry-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ]
+  ]
+}

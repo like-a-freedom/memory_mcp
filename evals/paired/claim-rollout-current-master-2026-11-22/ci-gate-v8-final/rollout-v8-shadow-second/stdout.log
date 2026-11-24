@@ -1,0 +1,28 @@
+# Evaluation Report — nightly
+
+**Verdict:** QUALITY FAILED
+**Schema:** `memory-mcp-eval/v2`
+**Run ID:** `run-1795312106`
+**Duration:** 167422ms
+**Budget:** passed
+
+## Coverage
+
+**Expected cases:** 8
+**Outcomes:** 8 (failed: 7, invalid: 0)
+
+**Gates:** 0 (failed: 0, invalid: 0)
+
+| Status | Count |
+|--------|-------|
+| Passed | 1 |
+| Quality Failed | 7 |
+| Invalid | 0 |
+
+## Suite Metrics
+
+| Suite | Total | Passed | Failed | Invalid | Metrics |
+|-------|-------|--------|--------|---------|--------|
+| memory-decisions | 8 | 1 | 7 | 0 | decision_success_rate=0.1250, evidence_stage_temporal_decision_success_rate=0.8750, evidence_stage_temporal_evidence_success_rate=1.0000, evidence_stage_temporal_probe_success_rate=0.8750, evidence_success_rate=1.0000, probe_success_rate=0.1250, temporal_decision_success_rate=0.0000, temporal_evidence_success_rate=1.0000, temporal_probe_success_rate=0.0000 |
+
+profile=nightly total=8 passed=1 quality_failed=7 invalid=0 duration_ms=167422

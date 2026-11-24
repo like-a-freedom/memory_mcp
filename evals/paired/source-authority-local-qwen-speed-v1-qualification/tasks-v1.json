@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "cloudtallow_archive",
+        "case_id": "cloudtallow_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Cloudtallow Archive, the catalog ledger is stored in Prism-43. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Cloudtallow Archive, where is the catalog ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cloudtallow Archive, where is the catalog ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-qwen-speed-cloudtallow_archive-archive-catalog-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-qwen-speed-cloudtallow_archive-archive-catalog-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Prism-43"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "bramblegate_station",
+        "case_id": "bramblegate_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Bramblegate Station, the signal routing card is stored in Lumen-27. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Bramblegate Station, where is the signal routing card stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Bramblegate Station, where is the signal routing card stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-qwen-speed-bramblegate_station-station-routing-card",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-qwen-speed-bramblegate_station-station-routing-card"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lumen-27"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "copperwick_foundry",
+        "case_id": "copperwick_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Copperwick Foundry, the safety inspection code is stored in Copper-81. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Copperwick Foundry, where is the safety inspection code stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Copperwick Foundry, where is the safety inspection code stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-qwen-speed-copperwick_foundry-foundry-inspection-code",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-qwen-speed-copperwick_foundry-foundry-inspection-code"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Copper-81"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Copperwick Foundry before this phase. Use assemble_context to verify: At Copperwick Foundry, where is the safety inspection code stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "copperwick_foundry",
+          "relative_path": "fixtures/copperwick_foundry.txt",
+          "content": "Fact: At Copperwick Foundry, the safety inspection code is stored in Copper-81.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-qwen-speed-copperwick_foundry-foundry-inspection-code"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "larkspur_icehouse",
+        "case_id": "larkspur_icehouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Larkspur Icehouse, the shipment schedule is stored in Glacier-59. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Larkspur Icehouse, where is the shipment schedule stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Larkspur Icehouse, where is the shipment schedule stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-qwen-speed-larkspur_icehouse-icehouse-shipment-schedule",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-qwen-speed-larkspur_icehouse-icehouse-shipment-schedule"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Glacier-59"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Larkspur Icehouse before this phase. Use assemble_context to verify: At Larkspur Icehouse, where is the shipment schedule stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "larkspur_icehouse",
+          "relative_path": "fixtures/larkspur_icehouse.txt",
+          "content": "Fact: At Larkspur Icehouse, the shipment schedule is stored in Glacier-59.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-qwen-speed-larkspur_icehouse-icehouse-shipment-schedule"
+        }
+      ]
+    }
+  ]
+}

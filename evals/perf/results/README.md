@@ -11,6 +11,7 @@ never a gate input.
 |---|---|---|
 | `2026-10-10/` | `weekly.json` | Passed — release-build baseline (`../baselines/perf-weekly-local.json`); first record was the dev-build run, superseded the same day when weekly moved to `--release` and the assemble scenario started measuring cold retrieval |
 | `2026-10-11/` | `weekly.json` | Passed — new baseline after the incremental community walk (extract's `EdgeNeighbors` setup statements ~150× fewer at scale 100, run 97s → 3.7s) and the catalog's setup/timed phase split |
+| `2026-11-21-claim-stage-local/` | `shadow.json`, `evidence.json` | Exploratory — single local debug run per stage; stage-gated assemble read and claim-write timing, not a formal no-regression gate; see the directory README |
 
 How to record another run: `make perf-weekly`, then copy
 `target/perf/perf-weekly.json` into a new dated directory and add a row.

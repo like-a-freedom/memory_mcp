@@ -6,7 +6,6 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{AccessPayload, IngestRequest};
 
 use crate::error::MemoryError;
-use crate::memory::content_extraction::prepare_ingest_request;
 use crate::platform::log_event::log_event;
 use crate::platform::rate_limiter::RateLimiter;
 use crate::shared::ids::deterministic_episode_id_v2;
@@ -20,8 +19,6 @@ use crate::shared::validation::validate_ingest_request;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct IngestionMetadata {
     pub source_lineage: Option<String>,
-    /// Redacted identifier used only by generic ingest logs.
-    pub log_source_id: Option<String>,
 }
 
 #[cfg(feature = "streamable-http")]
@@ -30,7 +27,7 @@ fn is_duplicate_episode_error(error: &MemoryError) -> bool {
     message.contains("already exists") || message.contains("duplicate")
 }
 
-/// Handles episode ingestion: file parsing, deduplication, and persistence.
+/// Handles literal episode validation, deduplication, and persistence.
 #[derive(Clone)]
 pub struct IngestionService {
     episode_store: crate::memory::episode_store::EpisodeStoreClient,
@@ -82,24 +79,13 @@ impl IngestionService {
     ) -> Result<String, MemoryError> {
         self.rate_limiter.check_access(access.as_ref())?;
 
-        let ingest_transport =
-            crate::memory::content_extraction::detect_ingest_transport(&request.content);
-        let original_source_id = request.source_id.clone();
         let original_content_len = request.content.len();
-        // Generic ingest logs must never expose full filesystem paths or full
-        // hashes; internal callers supply a redacted `log_source_id` instead.
-        let log_source_id = metadata
-            .log_source_id
-            .as_deref()
-            .unwrap_or(&request.source_id)
-            .to_string();
         self.logger.log(
             log_event(
                 "ingest.prepare",
                 json!({
-                    "source_type": request.source_type,
-                    "source_id": log_source_id,
-                    "transport": ingest_transport,
+                    "transport": "literal",
+                    "content_len": original_content_len,
                 }),
                 json!({}),
                 access.as_ref(),
@@ -108,16 +94,13 @@ impl IngestionService {
             ),
             LogLevel::Debug,
         );
-        let request = prepare_ingest_request(request).await?;
         self.logger.log(
             log_event(
                 "ingest.prepared",
                 json!({
-                    "transport": ingest_transport,
-                    "source_id_rewritten": request.source_id != original_source_id,
+                    "transport": "literal",
                 }),
                 json!({
-                    "source_id": log_source_id,
                     "content_len": request.content.len(),
                     "original_content_len": original_content_len,
                 }),
@@ -129,6 +112,16 @@ impl IngestionService {
         );
 
         validate_ingest_request(&request)?;
+        if metadata
+            .source_lineage
+            .as_deref()
+            .is_some_and(crate::models::contains_credential_material)
+        {
+            return Err(MemoryError::Validation(
+                "ingest refused because the content or metadata resembles credential material"
+                    .into(),
+            ));
+        }
 
         let v2_episode_id =
             deterministic_episode_id_v2(&request.source_type, &request.source_id, request.t_ref);
@@ -163,18 +156,19 @@ impl IngestionService {
                     )
                 })?,
                 _ => {
-                    return Err(MemoryError::Conflict(format!(
-                        "ambiguous legacy episode identity for source_type={} source_id={} t_ref={}; refusing to create a duplicate",
-                        request.source_type,
-                        request.source_id,
-                        normalize_dt(request.t_ref),
-                    )));
+                    return Err(MemoryError::Conflict(
+                        "ambiguous legacy episode identity; refusing to create a duplicate"
+                            .to_string(),
+                    ));
                 }
             }
         };
 
         if existing.is_none() && episode_id == v2_episode_id {
-            let t_ingested = request.t_ingested.unwrap_or_else(now);
+            // Transaction time is assigned by this server at persistence,
+            // never accepted from a producer. Keep the legacy request field
+            // for source compatibility, but do not let it backdate knowledge.
+            let t_ingested = now();
             let mut payload = serde_json::Map::from_iter([
                 ("episode_id".to_string(), json!(episode_id)),
                 ("source_type".to_string(), json!(request.source_type)),
@@ -242,10 +236,7 @@ impl IngestionService {
             self.logger.log(
                 log_event(
                     "ingest.duplicate",
-                    json!({
-                        "episode_id": episode_id,
-                        "source_id": log_source_id,
-                    }),
+                    json!({"episode_id": episode_id}),
                     json!({"status": "existing_episode_reused"}),
                     access.as_ref(),
                     None,
@@ -258,11 +249,7 @@ impl IngestionService {
         self.logger.log(
             log_event(
                 "ingest",
-                json!({
-                    "source_type": request.source_type,
-                    "source_id": log_source_id,
-                    "t_ref": normalize_dt(request.t_ref),
-                }),
+                json!({"content_mode": "literal"}),
                 json!({"episode_id": episode_id}),
                 access.as_ref(),
                 None,
@@ -272,5 +259,70 @@ impl IngestionService {
         );
 
         Ok(episode_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    async fn ingestion_service() -> Result<IngestionService, MemoryError> {
+        let db = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory(
+                "ingestion_lineage_credential_test",
+                "org",
+                "warn",
+            )
+            .await?,
+        );
+        db.apply_migrations_impl("org").await?;
+        Ok(IngestionService::new(
+            db,
+            "org".into(),
+            StdoutLogger::new("warn"),
+            Arc::new(RateLimiter::new(50, 100)),
+        ))
+    }
+
+    #[tokio::test]
+    async fn credential_like_watcher_lineage_is_refused_before_persistence() {
+        let service = ingestion_service().await.expect("test storage initializes");
+        let request = IngestRequest {
+            source_context: None,
+            source_type: "document".into(),
+            source_id: "safe-source-id".into(),
+            content: "A normal document excerpt.".into(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        };
+        let episode_id =
+            deterministic_episode_id_v2(&request.source_type, &request.source_id, request.t_ref);
+        let result = service
+            .ingest_with_metadata(
+                request,
+                None,
+                IngestionMetadata {
+                    source_lineage: Some("source.API_KEY=sensitive-lineage-canary".into()),
+                },
+            )
+            .await;
+
+        let error = result.expect_err("credential-like lineage must be refused");
+        assert!(matches!(error, MemoryError::Validation(_)));
+        assert!(
+            !error.to_string().contains("sensitive-lineage-canary"),
+            "the refusal must not disclose the matched value"
+        );
+        assert!(
+            service
+                .episode_store
+                .select_one(&episode_id)
+                .await
+                .expect("episode lookup succeeds")
+                .is_none(),
+            "refused watcher metadata must not persist an episode"
+        );
     }
 }

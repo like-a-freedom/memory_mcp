@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "v10-absence-distractor",
+      "source_id": "v10-absence-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Garnet Drydock\ndimension: capacity\nvalue: 1182 crates for Garnet Drydock",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-mica-east",
+      "source_id": "v10-mica-east-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Mica Terminal East\ndimension: capacity\nvalue: 1174 crates for Mica Terminal East",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-mica-west",
+      "source_id": "v10-mica-west-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Mica Terminal West\ndimension: capacity\nvalue: 1136 crates for Mica Terminal West",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-fern-current",
+      "source_id": "v10-fern-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Fern Lift\ndimension: capacity\nvalue: 1168 crates for Fern Lift",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-orchid-a",
+      "source_id": "v10-orchid-ledger-a",
+      "source_type": "inspection-record",
+      "content": "subject: Orchid Pump\ndimension: pressure\nvalue: 1281 kPa for Orchid Pump",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-orchid-b",
+      "source_id": "v10-orchid-ledger-b",
+      "source_type": "inspection-record",
+      "content": "subject: Orchid Pump\ndimension: pressure\nvalue: 1287 kPa for Orchid Pump",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-larch-ledger",
+      "source_id": "v10-larch-maintenance-ledger",
+      "source_type": "maintenance-record",
+      "content": "subject: Larch Valve House\ndimension: dwell\nvalue: 14 seconds verified for Larch Valve House",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-larch-forum",
+      "source_id": "v10-larch-forum-post",
+      "source_type": "forum-report",
+      "content": "subject: Larch Valve House\ndimension: dwell\nvalue: unverified correction of 19 seconds reported on a forum for Larch Valve House",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-pumice-before",
+      "source_id": "v10-pumice-first-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Pumice Jetty\ndimension: load\nvalue: 1097 tonnes for Pumice Jetty",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-pumice-after",
+      "source_id": "v10-pumice-later-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Pumice Jetty\ndimension: load\nvalue: 1104 tonnes, correction reported by a later inspector for Pumice Jetty",
+      "t_ref": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "v10-topaz-earlier",
+      "source_id": "v10-topaz-first-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Topaz Foundry\ndimension: pressure\nvalue: 1362 kPa for Topaz Foundry",
+      "t_ref": "2026-08-14T09:00:00Z"
+    },
+    {
+      "id": "v10-topaz-later",
+      "source_id": "v10-topaz-later-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Topaz Foundry\ndimension: pressure\nvalue: 1371 kPa for Topaz Foundry",
+      "t_ref": "2026-08-16T09:00:00Z"
+    },
+    {
+      "id": "v10-wren-office",
+      "source_id": "v10-wren-office-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Wren Office\ndimension: location\nvalue: Alder Walk for Wren Office",
+      "t_ref": "2026-08-15T09:00:00Z"
+    }
+  ]
+}

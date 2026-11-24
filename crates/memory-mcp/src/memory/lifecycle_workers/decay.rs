@@ -83,8 +83,8 @@ pub(crate) fn spawn_decay_worker(
                         serde_json::Value::String("lifecycle.decay.error".to_string()),
                     );
                     event.insert(
-                        "error".to_string(),
-                        serde_json::Value::String(format!("{}", e)),
+                        "error_code".to_string(),
+                        serde_json::Value::String(e.code().to_string()),
                     );
                     logger.log(event, e.log_level());
                 }

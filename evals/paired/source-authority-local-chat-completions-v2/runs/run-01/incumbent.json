@@ -1,0 +1,1990 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v2",
+  "arm": "incumbent",
+  "run_id": "99817-1795421637860319000-0",
+  "run_started_at": "2026-11-23T08:13:57.860337Z",
+  "run_completed_at": "2026-11-23T08:45:25.115609Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "openai-compatible-chat-completions",
+      "agent_version": "LM Studio CLI commit dcefd5a; Chat Completions endpoint version unreported",
+      "model": "memory-local-eval-qwen38",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+      "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+      "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+      "transport": "stdio",
+      "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+      "reader_config_sha256": "6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490",
+      "judge_config_sha256": null,
+      "corpus_sha256": "f959acc038d6dafc07936d0d506feb39ac27eb07a96eda4cdefd3cf9e24312aa",
+      "oracle_sha256": "0d41ed75cc37542986cc4088fd840963da487ee551d98be833a41800503842e1",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+      "provider_fingerprints": {
+        "chat_completions_endpoint_config": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+        "lmstudio_cli": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+        "memory_eval_cli": "75b58649a757efa72e2a0b122b6f76a9d864fc64938fe66dbce0c9fa3b585fce"
+      },
+      "context_budget_tokens": 15360,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-local-chat-completions-v2-2026-11-23",
+      "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "coppermeadow_library",
+      "case_id": "coppermeadow_library-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "rainbell_turbinehall",
+      "case_id": "rainbell_turbinehall-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "silverfern_courthouse",
+      "case_id": "silverfern_courthouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "cloudberry_foundry",
+      "case_id": "cloudberry_foundry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "northquartz_clinic",
+      "case_id": "northquartz_clinic-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "embercove_lighthouse",
+      "case_id": "embercove_lighthouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "mossriver_bikeworks",
+      "case_id": "mossriver_bikeworks-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "winterlark_canteen",
+      "case_id": "winterlark_canteen-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "opalcurrent_archive",
+      "case_id": "opalcurrent_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "foxglove_surveydepot",
+      "case_id": "foxglove_surveydepot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "brightsilt_seedvault",
+      "case_id": "brightsilt_seedvault-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "gullwing_signalhouse",
+      "case_id": "gullwing_signalhouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cedarwake_weatherroom",
+      "case_id": "cedarwake_weatherroom-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "blueheron_cameralab",
+      "case_id": "blueheron_cameralab-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "sunmote_waterstation",
+      "case_id": "sunmote_waterstation-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "thistleforge_maproom",
+      "case_id": "thistleforge_maproom-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "cloudberry_foundry",
+        "case_id": "cloudberry_foundry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 4,
+      "tool_calls": 3,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 7359,
+      "output_tokens": 355,
+      "wall_time_ms": 22229,
+      "hard_violations": [
+        "unsupported_evidence"
+      ],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1016,
+          "output_tokens": 66
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "744289005",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "59cc78716f86af57a57ce2832e7191d50d8afb8fb642967b8d5d92c12f092f55",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "744289005",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "732284508d23544c35c16c44ed09aad8bfcf109c41cb43e84ed3ecd7b8013d46",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1558,
+          "output_tokens": 73
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "970612709",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2e50c6fd3f3c1c7c90d7e64b6283216c5799190c40ed676c4bc739af385c1cf1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "970612709",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "ee319e1b7a289b314316b991b202c318b0b9ca363a9a6eaa2351404daa38c3a1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2115,
+          "output_tokens": 69
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "896933797",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "fe15dd98149134d53c986eb1d0576b3632e7f713c624074e1d9fadd539708d6b",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "896933797",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "876b5abfed7f242b9c4b1ddf8704b3830c51c681a9387a7f9433c0297c90530d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2670,
+          "output_tokens": 147
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "coppermeadow_library",
+        "case_id": "coppermeadow_library-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2184,
+      "output_tokens": 184,
+      "wall_time_ms": 12591,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1014,
+          "output_tokens": 88
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "768031980",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "4b90dc3fc699aa9b60bebf1ea0e061a4ba299c51774fdabcfdb9b9ebf459f408",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "768031980",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1170,
+          "output_tokens": 96
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "embercove_lighthouse",
+        "case_id": "embercove_lighthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 5,
+      "tool_calls": 4,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 11023,
+      "output_tokens": 475,
+      "wall_time_ms": 33862,
+      "hard_violations": [
+        "unsupported_evidence"
+      ],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 87
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "810782820",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "782d93e3b644925bf07c9c6a45f8ae5625b58f5e120001ce241a1f53d17d76e7",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "810782820",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "fab08be2d6574798b34e13246858af24fa7af6504c5f23f7a8aac3d029cbf0e5",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1573,
+          "output_tokens": 75
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "646987219",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "5c0fffbb666611716b8ab7bfce4630e091371ab994c76e5238d2c9ed0662eb8f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "646987219",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "51107717af1421827655f2e75176a2fb26e3c58d5a7f4d7897f3b767c235e564",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2132,
+          "output_tokens": 92
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "564491580",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "742f282b42380bee1c38227b66bd46d6c39b3f6946b36f81e2890227ba9a3185",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "564491580",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "3f0057b56224d730880042f5dbe64f13a42063c072cc726b4291260468d29e89",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2876,
+          "output_tokens": 105
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "memory_read",
+          "call_id": "484140969",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "276a91cbb5e1510a0cc7041d8d30c49fb898522626e5a518650de52edb67b938",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 16,
+          "turn": 4,
+          "kind": "tool_response",
+          "call_id": "484140969",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "8e15f2ba798da70d2da9057f304d90bce99e393bc21986ba161ce12a31481460",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 17,
+          "turn": 5,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 18,
+          "turn": 5,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3427,
+          "output_tokens": 116
+        },
+        {
+          "sequence": 19,
+          "turn": 5,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mossriver_bikeworks",
+        "case_id": "mossriver_bikeworks-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2182,
+      "output_tokens": 170,
+      "wall_time_ms": 11762,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1014,
+          "output_tokens": 75
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "239696154",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "0e8299151b5823512143e2d0f1837ba1c5f393896b5222d4e2c427bb743105b1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "239696154",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1168,
+          "output_tokens": 95
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "northquartz_clinic",
+        "case_id": "northquartz_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2170,
+      "output_tokens": 164,
+      "wall_time_ms": 11392,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1014,
+          "output_tokens": 65
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "284955461",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "02e71a3dd3ea5e1f937ba59551a453b309aa1d79deceb958c295c250c1d914f2",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "284955461",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1156,
+          "output_tokens": 99
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "rainbell_turbinehall",
+        "case_id": "rainbell_turbinehall-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2172,
+      "output_tokens": 165,
+      "wall_time_ms": 10901,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 64
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "673834700",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "d01d8f18da731a725a39b6b44990ed963df538bb4aea3abe8dafae71e6989f1e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "673834700",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1157,
+          "output_tokens": 101
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "silverfern_courthouse",
+        "case_id": "silverfern_courthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2184,
+      "output_tokens": 172,
+      "wall_time_ms": 11939,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 76
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "147811630",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "3041e8843ce853738bc7fa71b82412aff91a333d2047369b0d2cd1580fc5d31a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "147811630",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1169,
+          "output_tokens": 96
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "winterlark_canteen",
+        "case_id": "winterlark_canteen-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2190,
+      "output_tokens": 183,
+      "wall_time_ms": 12011,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1017,
+          "output_tokens": 80
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "866941035",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "7e3090f19855cc4c1306ab9192b409fda39a1c9ac5f2efd70eafb52e00a52282",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "866941035",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1173,
+          "output_tokens": 103
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "blueheron_cameralab",
+        "case_id": "blueheron_cameralab-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2185,
+      "output_tokens": 182,
+      "wall_time_ms": 12458,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 77
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "669176394",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "4afdac6a53f26137c92e738f8990f8ce4c134b84c78e542011601cdc9f9c047d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "669176394",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1170,
+          "output_tokens": 105
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brightsilt_seedvault",
+        "case_id": "brightsilt_seedvault-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2187,
+      "output_tokens": 179,
+      "wall_time_ms": 12278,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1016,
+          "output_tokens": 78
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "284316455",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "eebfa6dd28d02a33fa3d987af1f546e28d7d36dd75ba61cf8a09c1404c2af349",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "284316455",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1171,
+          "output_tokens": 101
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cedarwake_weatherroom",
+        "case_id": "cedarwake_weatherroom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2182,
+      "output_tokens": 171,
+      "wall_time_ms": 11813,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1014,
+          "output_tokens": 75
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "378024252",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "a414a1dec92c76eb78cdeffc878dfc71db266e78556831f25a581146e8fb55ae",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "378024252",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1168,
+          "output_tokens": 96
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "foxglove_surveydepot",
+        "case_id": "foxglove_surveydepot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2191,
+      "output_tokens": 200,
+      "wall_time_ms": 16390,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1017,
+          "output_tokens": 94
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "151663064",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "6d1e17ea2871676a81753a19bc9c60795013b5ccb1774338b7c9b9edac5f42de",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "151663064",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1174,
+          "output_tokens": 106
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "gullwing_signalhouse",
+        "case_id": "gullwing_signalhouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2185,
+      "output_tokens": 187,
+      "wall_time_ms": 14488,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 88
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "292068059",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "d9ec6e8fe654f38e531724abc3f08780301d15c9288202e420e48b6ca0c70bab",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "292068059",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1170,
+          "output_tokens": 99
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opalcurrent_archive",
+        "case_id": "opalcurrent_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2179,
+      "output_tokens": 185,
+      "wall_time_ms": 13519,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1013,
+          "output_tokens": 84
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "132768248",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "502687a910ab77da2eb24466dd1a18e362ff9fa8e7ed7ed48152c32a46c3cf0c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "132768248",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1166,
+          "output_tokens": 101
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "sunmote_waterstation",
+        "case_id": "sunmote_waterstation-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2184,
+      "output_tokens": 180,
+      "wall_time_ms": 13069,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 84
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "649383187",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "d0840f9486d02387a20591aa4d88a5125cf0d57080bf76441261c2f29924e02f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "649383187",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1169,
+          "output_tokens": 96
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "thistleforge_maproom",
+        "case_id": "thistleforge_maproom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2185,
+      "output_tokens": 185,
+      "wall_time_ms": 12441,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1015,
+          "output_tokens": 90
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "543878083",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "3e0fa649cb6915e00987a76666b7946f6764110342daa9ed3efb88d07de9a83d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "543878083",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "842c7c6da7d37c608361a66668d3b24624a289372fb5d3cd2c635763afed2060",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1170,
+          "output_tokens": 95
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": "internal",
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1010 @@
+{
+  "schema_version": "memory-mcp-agent-managed-comparison/v2",
+  "plan_id": "source-authority-local-chat-completions-2026-11-23-v3",
+  "plan_sha256": "af0d4f6d7de9061fe1ec9bcef5c065b686a1dbd3cd7fc5349400bef31cf66368",
+  "run_id": "6575-1795425077531357000-0",
+  "incumbent_artifact_sha256": "61e75ed6849cad1ab72cc0e967411a5766d575471ccbd7101c7c924912d5a0cb",
+  "candidate_artifact_sha256": "caf2a29646a62c837cc0ad83dfa9cc573041099777b7e9232d0972e0486f5252",
+  "incumbent_stage_sha256": "8d4dd73bc63104bfccbed4928ab3580da4078534d93b219ca91eeb6186601c0a",
+  "candidate_stage_sha256": "2d51f743a699d5b284f5f3d99c8cc0f796d905e123bdac9129427e24823d63bc",
+  "paired_agent_comparison": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "6575-1795425077531357000-0",
+    "run_started_at": "2026-11-23T09:11:17.531359Z",
+    "run_completed_at": "2026-11-23T09:57:59.917434Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "source-authority-local-chat-completions-2026-11-23-v3",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "alderglass_lab",
+          "case_id": "alderglass_lab-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "marblefin_post",
+          "case_id": "marblefin_post-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "kindlebrook_forge",
+          "case_id": "kindlebrook_forge-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "mosslight_courthouse",
+          "case_id": "mosslight_courthouse-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "sunquartz_cafe",
+          "case_id": "sunquartz_cafe-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "willowspoke_depot",
+          "case_id": "willowspoke_depot-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "frostwillow_clinic",
+          "case_id": "frostwillow_clinic-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "conversation_control",
+          "family_id": "cloudmint_theater",
+          "case_id": "cloudmint_theater-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "violetcairn_archive",
+          "case_id": "violetcairn_archive-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "brasshaven_seedbank",
+          "case_id": "brasshaven_seedbank-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "grayharbor_surveyroom",
+          "case_id": "grayharbor_surveyroom-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "reedshadow_farmhouse",
+          "case_id": "reedshadow_farmhouse-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "starlinggrove_workshop",
+          "case_id": "starlinggrove_workshop-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "cobaltmeadow_signalbox",
+          "case_id": "cobaltmeadow_signalbox-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "quietember_records",
+          "case_id": "quietember_records-fact-recall",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "source_file_import",
+          "family_id": "sunkenbirch_lighthouse",
+          "case_id": "sunkenbirch_lighthouse-fact-recall",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 16,
+      "shared_identity": {
+        "agent_runner": "openai-compatible-chat-completions",
+        "agent_version": "LM Studio CLI commit dcefd5a (0.0.47); Chat Completions endpoint version unreported",
+        "model": "memory-local-eval-qwen38",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+        "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+        "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+        "transport": "stdio",
+        "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+        "reader_config_sha256": "6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490",
+        "judge_config_sha256": null,
+        "corpus_sha256": "2cbd63e3fc67e1dce1bcef4d8c0e2b97159bf5796babed3fbc80ffdc1accd6db",
+        "oracle_sha256": "7255e59959b9101d99475795a1d57c2b623b1ddb5efb68cbb3336b5ee9f0fd55",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+        "provider_fingerprints": {
+          "chat_completions_endpoint_config": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+          "lmstudio_cli": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+          "memory_eval_cli": "7b01ea7fe203edbc7ea6ee91dc42247e6979fd07082e153ba59fb58bf722f759"
+        },
+        "context_budget_tokens": 15360,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 1024,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-local-chat-completions-v3-2026-11-23",
+        "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-local-chat-completions-v3-2026-11-23",
+        "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112324,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "af0d4f6d7de9061fe1ec9bcef5c065b686a1dbd3cd7fc5349400bef31cf66368",
+    "manifest_sha256": "a6f5c19561ea781918bc01ba431bb659abf783333394c3739fd7779981bcf25c",
+    "incumbent_artifact_sha256": "61e75ed6849cad1ab72cc0e967411a5766d575471ccbd7101c7c924912d5a0cb",
+    "candidate_artifact_sha256": "caf2a29646a62c837cc0ad83dfa9cc573041099777b7e9232d0972e0486f5252",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.125,
+        "interval": {
+          "estimate": 0.125,
+          "lower": -0.1875,
+          "upper": 0.4375,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 0.0,
+          "cloudmint_theater": -1.0,
+          "cobaltmeadow_signalbox": 0.0,
+          "frostwillow_clinic": 1.0,
+          "grayharbor_surveyroom": 1.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": -1.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 0.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": 1.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": 1.0,
+          "violetcairn_archive": 1.0,
+          "willowspoke_depot": -1.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 0.0,
+          "cloudmint_theater": 0.0,
+          "cobaltmeadow_signalbox": 0.0,
+          "frostwillow_clinic": 0.0,
+          "grayharbor_surveyroom": 0.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": 0.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 0.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": 0.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": 0.0,
+          "violetcairn_archive": 0.0,
+          "willowspoke_depot": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 0.0,
+          "cloudmint_theater": 0.0,
+          "cobaltmeadow_signalbox": 0.0,
+          "frostwillow_clinic": 0.0,
+          "grayharbor_surveyroom": 0.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": 0.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 0.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": 0.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": 0.0,
+          "violetcairn_archive": 0.0,
+          "willowspoke_depot": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 0.0,
+          "cloudmint_theater": 0.0,
+          "cobaltmeadow_signalbox": 0.0,
+          "frostwillow_clinic": 0.0,
+          "grayharbor_surveyroom": 0.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": 0.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 0.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": 0.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": 0.0,
+          "violetcairn_archive": 0.0,
+          "willowspoke_depot": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": -1.0,
+        "interval": {
+          "estimate": -1.0,
+          "lower": -2.1875,
+          "upper": 0.125,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 1.0,
+          "cloudmint_theater": -4.0,
+          "cobaltmeadow_signalbox": -1.0,
+          "frostwillow_clinic": -2.0,
+          "grayharbor_surveyroom": -2.0,
+          "kindlebrook_forge": -1.0,
+          "marblefin_post": 2.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 2.0,
+          "reedshadow_farmhouse": -2.0,
+          "starlinggrove_workshop": 0.0,
+          "sunkenbirch_lighthouse": -3.0,
+          "sunquartz_cafe": -2.0,
+          "violetcairn_archive": -7.0,
+          "willowspoke_depot": 3.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 0.0,
+          "cloudmint_theater": 0.0,
+          "cobaltmeadow_signalbox": 0.0,
+          "frostwillow_clinic": 0.0,
+          "grayharbor_surveyroom": 0.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": 0.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 0.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": 0.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": 0.0,
+          "violetcairn_archive": 0.0,
+          "willowspoke_depot": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": -6535.4375,
+        "interval": {
+          "estimate": -6535.4375,
+          "lower": -11887.375,
+          "upper": -1806.1875,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": -1302.0,
+          "cloudmint_theater": -4858.0,
+          "cobaltmeadow_signalbox": -14942.0,
+          "frostwillow_clinic": -5117.0,
+          "grayharbor_surveyroom": -7004.0,
+          "kindlebrook_forge": -5384.0,
+          "marblefin_post": 5092.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 5223.0,
+          "reedshadow_farmhouse": -19689.0,
+          "starlinggrove_workshop": -6996.0,
+          "sunkenbirch_lighthouse": -22048.0,
+          "sunquartz_cafe": -5279.0,
+          "violetcairn_archive": -31103.0,
+          "willowspoke_depot": 8840.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": -10.875,
+        "interval": {
+          "estimate": -10.875,
+          "lower": -167.6875,
+          "upper": 145.9375,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 0.0,
+          "brasshaven_seedbank": 496.0,
+          "cloudmint_theater": -272.0,
+          "cobaltmeadow_signalbox": 22.0,
+          "frostwillow_clinic": -217.0,
+          "grayharbor_surveyroom": -225.0,
+          "kindlebrook_forge": 0.0,
+          "marblefin_post": 229.0,
+          "mosslight_courthouse": 0.0,
+          "quietember_records": 644.0,
+          "reedshadow_farmhouse": 0.0,
+          "starlinggrove_workshop": -190.0,
+          "sunkenbirch_lighthouse": 0.0,
+          "sunquartz_cafe": -210.0,
+          "violetcairn_archive": -769.0,
+          "willowspoke_depot": 318.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": -4224.75,
+        "interval": {
+          "estimate": -4224.75,
+          "lower": -15609.4375,
+          "upper": 6668.875,
+          "independent_clusters": 16,
+          "draws": 10000,
+          "seed": 2026112324,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alderglass_lab": 3867.0,
+          "brasshaven_seedbank": 28352.0,
+          "cloudmint_theater": -22404.0,
+          "cobaltmeadow_signalbox": -6989.0,
+          "frostwillow_clinic": -16794.0,
+          "grayharbor_surveyroom": -18607.0,
+          "kindlebrook_forge": 6272.0,
+          "marblefin_post": 21299.0,
+          "mosslight_courthouse": -4708.0,
+          "quietember_records": 34301.0,
+          "reedshadow_farmhouse": -10460.0,
+          "starlinggrove_workshop": -16343.0,
+          "sunkenbirch_lighthouse": -13849.0,
+          "sunquartz_cafe": -15371.0,
+          "violetcairn_archive": -60769.0,
+          "willowspoke_depot": 24607.0
+        }
+      }
+    },
+    "by_stratum": {
+      "conversation_control": {
+        "direct_memory_success": {
+          "estimate": -0.125,
+          "interval": {
+            "estimate": -0.125,
+            "lower": -0.625,
+            "upper": 0.375,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": -1.0,
+            "frostwillow_clinic": 1.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": -1.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": 1.0,
+            "willowspoke_depot": -1.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": 0.0,
+            "frostwillow_clinic": 0.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": 0.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": 0.0,
+            "willowspoke_depot": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": 0.0,
+            "frostwillow_clinic": 0.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": 0.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": 0.0,
+            "willowspoke_depot": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": 0.0,
+            "frostwillow_clinic": 0.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": 0.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": 0.0,
+            "willowspoke_depot": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": -0.5,
+          "interval": {
+            "estimate": -0.5,
+            "lower": -2.0,
+            "upper": 1.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": -4.0,
+            "frostwillow_clinic": -2.0,
+            "kindlebrook_forge": -1.0,
+            "marblefin_post": 2.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": -2.0,
+            "willowspoke_depot": 3.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": 0.0,
+            "frostwillow_clinic": 0.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": 0.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": 0.0,
+            "willowspoke_depot": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -838.25,
+          "interval": {
+            "estimate": -838.25,
+            "lower": -3946.0,
+            "upper": 2810.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": -4858.0,
+            "frostwillow_clinic": -5117.0,
+            "kindlebrook_forge": -5384.0,
+            "marblefin_post": 5092.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": -5279.0,
+            "willowspoke_depot": 8840.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -19.0,
+          "interval": {
+            "estimate": -19.0,
+            "lower": -153.0,
+            "upper": 120.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 0.0,
+            "cloudmint_theater": -272.0,
+            "frostwillow_clinic": -217.0,
+            "kindlebrook_forge": 0.0,
+            "marblefin_post": 229.0,
+            "mosslight_courthouse": 0.0,
+            "sunquartz_cafe": -210.0,
+            "willowspoke_depot": 318.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": -404.0,
+          "interval": {
+            "estimate": -404.0,
+            "lower": -11568.375,
+            "upper": 11005.25,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alderglass_lab": 3867.0,
+            "cloudmint_theater": -22404.0,
+            "frostwillow_clinic": -16794.0,
+            "kindlebrook_forge": 6272.0,
+            "marblefin_post": 21299.0,
+            "mosslight_courthouse": -4708.0,
+            "sunquartz_cafe": -15371.0,
+            "willowspoke_depot": 24607.0
+          }
+        }
+      },
+      "source_file_import": {
+        "direct_memory_success": {
+          "estimate": 0.375,
+          "interval": {
+            "estimate": 0.375,
+            "lower": 0.0,
+            "upper": 0.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 0.0,
+            "cobaltmeadow_signalbox": 0.0,
+            "grayharbor_surveyroom": 1.0,
+            "quietember_records": 0.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": 1.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": 1.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 0.0,
+            "cobaltmeadow_signalbox": 0.0,
+            "grayharbor_surveyroom": 0.0,
+            "quietember_records": 0.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": 0.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 0.0,
+            "cobaltmeadow_signalbox": 0.0,
+            "grayharbor_surveyroom": 0.0,
+            "quietember_records": 0.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": 0.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 0.0,
+            "cobaltmeadow_signalbox": 0.0,
+            "grayharbor_surveyroom": 0.0,
+            "quietember_records": 0.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": 0.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": -1.5,
+          "interval": {
+            "estimate": -1.5,
+            "lower": -3.375,
+            "upper": 0.25,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 1.0,
+            "cobaltmeadow_signalbox": -1.0,
+            "grayharbor_surveyroom": -2.0,
+            "quietember_records": 2.0,
+            "reedshadow_farmhouse": -2.0,
+            "starlinggrove_workshop": 0.0,
+            "sunkenbirch_lighthouse": -3.0,
+            "violetcairn_archive": -7.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 0.0,
+            "cobaltmeadow_signalbox": 0.0,
+            "grayharbor_surveyroom": 0.0,
+            "quietember_records": 0.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": 0.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -12232.625,
+          "interval": {
+            "estimate": -12232.625,
+            "lower": -19960.0,
+            "upper": -4385.875,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": -1302.0,
+            "cobaltmeadow_signalbox": -14942.0,
+            "grayharbor_surveyroom": -7004.0,
+            "quietember_records": 5223.0,
+            "reedshadow_farmhouse": -19689.0,
+            "starlinggrove_workshop": -6996.0,
+            "sunkenbirch_lighthouse": -22048.0,
+            "violetcairn_archive": -31103.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -2.75,
+          "interval": {
+            "estimate": -2.75,
+            "lower": -278.25,
+            "upper": 287.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 496.0,
+            "cobaltmeadow_signalbox": 22.0,
+            "grayharbor_surveyroom": -225.0,
+            "quietember_records": 644.0,
+            "reedshadow_farmhouse": 0.0,
+            "starlinggrove_workshop": -190.0,
+            "sunkenbirch_lighthouse": 0.0,
+            "violetcairn_archive": -769.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": -8045.5,
+          "interval": {
+            "estimate": -8045.5,
+            "lower": -26360.5,
+            "upper": 11026.25,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112324,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "brasshaven_seedbank": 28352.0,
+            "cobaltmeadow_signalbox": -6989.0,
+            "grayharbor_surveyroom": -18607.0,
+            "quietember_records": 34301.0,
+            "reedshadow_farmhouse": -10460.0,
+            "starlinggrove_workshop": -16343.0,
+            "sunkenbirch_lighthouse": -13849.0,
+            "violetcairn_archive": -60769.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 16,
+    "independent_family_count": 16,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 2,
+    "arm_order_counts": {
+      "conversation_control": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      },
+      "source_file_import": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "incumbent": {
+    "expected_trials": 16,
+    "formation_status_counts": {
+      "completed": 6,
+      "modelfailure": 10
+    },
+    "formation_turns_total": 39,
+    "formation_tool_calls_total": 23,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 61852,
+    "formation_output_tokens_total": 9422,
+    "formation_wall_time_ms_total": 618548,
+    "retained_store_bytes_total": 547390663,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 12,
+        "succeeded": 12,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/ingest": {
+        "attempts": 11,
+        "succeeded": 11,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 11,
+    "independent_probe_trials": 16,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 16,
+      "extract_calls": 12,
+      "evidence_requests": 5,
+      "evidence_responses": 0,
+      "evidence_before_invalidation": 0,
+      "response_sizes": {
+        "measured_responses": 12,
+        "total_wire_bytes": 20878,
+        "maximum_wire_bytes": 2128
+      }
+    }
+  },
+  "candidate": {
+    "expected_trials": 16,
+    "formation_status_counts": {
+      "completed": 9,
+      "modelfailure": 7
+    },
+    "formation_turns_total": 54,
+    "formation_tool_calls_total": 38,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 132849,
+    "formation_output_tokens_total": 8080,
+    "formation_wall_time_ms_total": 575541,
+    "retained_store_bytes_total": 547914951,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 5,
+        "succeeded": 5,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/ingest": {
+        "attempts": 5,
+        "succeeded": 5,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 13,
+    "independent_probe_trials": 16,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "operator_import_fixtures_total": 8,
+    "operator_setup_actions_total": 16,
+    "operator_setup_wall_time_ms_total": 3954,
+    "fact_evidence_audit": {
+      "telemetry_trials": 8,
+      "extract_calls": 5,
+      "evidence_requests": 0,
+      "evidence_responses": 0,
+      "evidence_before_invalidation": 0,
+      "response_sizes": {
+        "measured_responses": 5,
+        "total_wire_bytes": 10604,
+        "maximum_wire_bytes": 2128
+      }
+    }
+  },
+  "independent_probe_pairs": {
+    "paired_trials": 16,
+    "both_succeeded": 8,
+    "incumbent_only_succeeded": 3,
+    "candidate_only_succeeded": 5,
+    "neither_succeeded": 0
+  }
+}

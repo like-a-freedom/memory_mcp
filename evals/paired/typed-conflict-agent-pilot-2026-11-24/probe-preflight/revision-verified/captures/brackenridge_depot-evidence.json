@@ -1,0 +1,98 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:237308a2edd151ee87998585": "brackenridge_depot-record-a"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "865fdee8836dac4305009b250d1a12874c45e28c13803cca1d4ae48a7fdd2b82",
+    "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+    "source_event_ids": [
+      "brackenridge_depot-record-a"
+    ],
+    "claim_annotations": [
+      {
+        "source_event_id": "brackenridge_depot-record-a",
+        "evidence_status": "current"
+      }
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 1,
+    "compact": true,
+    "known_revision": 7,
+    "query": "What inventory shelf was recorded for Brackenridge Depot on July 15, 2026?",
+    "valid_at": "2026-07-15T12:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-24T06:51:16.191216Z\",\"known_revision\":7,\"valid_at\":\"2026-07-15T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Brackenridge Depot\\ndimension: inventory_shelf\\nvalue: C-12 effective July 15, 2026\",\"evidence_status\":\"current\",\"fact_id\":\"fact:9b20e48a853342c01acd70e7\",\"grounding\":0.88,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":7,\"source_episode_id\":\"episode:237308a2edd151ee87998585\",\"source_id\":\"brackenridge_depot-operations-log-a\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-07-15T12:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.88,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:237308a2edd151ee87998585\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-24T06:51:16.191216Z",
+            "known_revision": 7,
+            "valid_at": "2026-07-15T12:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Brackenridge Depot\ndimension: inventory_shelf\nvalue: C-12 effective July 15, 2026",
+            "evidence_status": "current",
+            "fact_id": "fact:9b20e48a853342c01acd70e7",
+            "grounding": 0.88,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 7,
+              "source_episode_id": "episode:237308a2edd151ee87998585",
+              "source_id": "brackenridge_depot-operations-log-a",
+              "source_type": "owner-record",
+              "valid_at": "2026-07-15T12:00:00+00:00"
+            },
+            "rationale": "historical",
+            "relevance": 0.88,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:237308a2edd151ee87998585"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "claim_rollout_stage": "evidence"
+}

@@ -1,0 +1,15 @@
+{
+  "input_sha256": "131be11c82e76e1a0809ef85dbbcaaf9e31e6f6a3e742d96ef9b4081ed666b01",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "ivory_lantern_clinic-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "ivory_lantern_clinic-record-b",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

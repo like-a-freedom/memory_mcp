@@ -11,12 +11,12 @@ use crate::error::MemoryError;
 pub enum ClaimRolloutStage {
     /// No claim extraction or reconciliation.
     Disabled,
-    /// Extract and store claims but do not expose relations. Default.
-    #[default]
+    /// Extract and store claims but do not expose relations.
     Shadow,
     /// Persist relation decisions without exposing them.
     Relations,
-    /// Also expose authorized evidence and context.
+    /// Also expose authorized evidence and context. Default.
+    #[default]
     Evidence,
 }
 
@@ -126,8 +126,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_stage_is_shadow() {
-        assert_eq!(ClaimRolloutStage::default(), ClaimRolloutStage::Shadow);
+    fn default_stage_is_evidence() {
+        assert_eq!(ClaimRolloutStage::default(), ClaimRolloutStage::Evidence);
     }
 
     #[test]
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn default_config_values() {
         let config = ClaimConfig::default();
-        assert_eq!(config.rollout_stage, ClaimRolloutStage::Shadow);
+        assert_eq!(config.rollout_stage, ClaimRolloutStage::Evidence);
         assert_eq!(config.candidate_page_size, 256);
         assert_eq!(config.inline_candidate_limit, 1024);
         assert_eq!(config.inline_budget, std::time::Duration::from_millis(50));

@@ -97,6 +97,20 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
     ) -> Result<Value, MemoryError>;
 
+    /// Executes all statements inside one database transaction. Implementors
+    /// that cannot provide atomic transactions fail closed rather than falling
+    /// back to a sequence of ordinary queries.
+    async fn transaction_query(
+        &self,
+        _sql: &str,
+        _vars: Option<Value>,
+        _namespace: &str,
+    ) -> Result<(), MemoryError> {
+        Err(MemoryError::Unavailable(
+            "database adapter does not support atomic transaction queries".into(),
+        ))
+    }
+
     /// Applies database migrations for a namespace.
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError>;
 }
@@ -165,6 +179,14 @@ impl BoundDbClient {
 
     pub(crate) async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
         self.db.query(sql, vars, &self.namespace).await
+    }
+
+    pub(crate) async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+    ) -> Result<(), MemoryError> {
+        self.db.transaction_query(sql, vars, &self.namespace).await
     }
 
     /// Runs a query and returns its result rows.
@@ -276,6 +298,10 @@ pub struct SurrealDbClient {
     active_database: Option<String>,
     logger: StdoutLogger,
     fact_embedding_dimension: usize,
+    /// Revision writes serialize on one database clock row. Queue writes from
+    /// this client before opening a transaction to avoid a local conflict
+    /// storm; conflicts from other processes still use the bounded retry.
+    revision_transaction_lock: tokio::sync::Mutex<()>,
     #[cfg(feature = "eval-support")]
     eval_query_observer: OnceLock<Arc<dyn QueryObserver>>,
 }
@@ -296,6 +322,11 @@ pub struct SqlObservation {
 #[cfg(feature = "eval-support")]
 pub trait QueryObserver: Send + Sync + 'static {
     fn observe(&self, obs: &SqlObservation);
+
+    /// Receives separate in-process revision-clock wait and successful
+    /// transaction durations. Other observations need not implement this
+    /// optional benchmark signal.
+    fn observe_revision_transaction(&self, _lock_wait_micros: u64, _transaction_micros: u64) {}
 }
 
 enum DbEngine {
@@ -309,6 +340,17 @@ enum DbEngine {
 }
 
 impl SurrealDbClient {
+    /// Gracefully shuts down the bound SurrealDB connection. Embedded
+    /// backends use this to release the on-disk store lock before reopening a
+    /// database during maintenance or a controlled process restart.
+    pub async fn shutdown(&self) -> Result<(), MemoryError> {
+        let result = match &self.engine {
+            DbEngine::Local(db) | DbEngine::Mem(db) => db.shutdown().await,
+            DbEngine::Remote(db) => db.shutdown().await,
+        };
+        result.map_err(|_| MemoryError::Unavailable("database shutdown failed".into()))
+    }
+
     /// Installs the eval-only SQL observer (ADR-0082). The first caller wins;
     /// later calls are no-ops so a re-wrap cannot double-count statements.
     #[cfg(feature = "eval-support")]
@@ -379,6 +421,7 @@ impl SurrealDbClient {
             active_database: Some(database.to_string()),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         })
@@ -451,6 +494,7 @@ impl SurrealDbClient {
             active_database: Some(target.database.clone()),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         })
@@ -493,6 +537,7 @@ impl SurrealDbClient {
             active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         }
@@ -525,6 +570,7 @@ impl SurrealDbClient {
             active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         }
@@ -558,6 +604,7 @@ impl SurrealDbClient {
             active_database: None,
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         }
@@ -577,6 +624,7 @@ impl SurrealDbClient {
             active_database: Some(config.db_name.clone()),
             logger: StdoutLogger::new(&config.log_level),
             fact_embedding_dimension: config.embedding.fallback_dimension(),
+            revision_transaction_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "eval-support")]
             eval_query_observer: OnceLock::new(),
         })
@@ -800,7 +848,6 @@ impl SurrealDbClient {
                 Ok(value)
             }
             Err(err) => {
-                let error_message = err.to_string();
                 self.logger.log(
                     build_db_execute_event(
                         "db.execute_query.error",
@@ -808,7 +855,7 @@ impl SurrealDbClient {
                         sql,
                         vars.as_ref(),
                         Some(timer.elapsed()),
-                        Some(&error_message),
+                        Some(&err),
                     ),
                     LogLevel::Debug,
                 );
@@ -869,7 +916,6 @@ impl SurrealDbClient {
                 Ok(())
             }
             Err(err) => {
-                let error_message = err.to_string();
                 self.logger.log(
                     build_db_execute_event(
                         "db.execute_raw_query.error",
@@ -877,7 +923,7 @@ impl SurrealDbClient {
                         sql,
                         vars.as_ref(),
                         Some(timer.elapsed()),
-                        Some(&error_message),
+                        Some(&err),
                     ),
                     LogLevel::Debug,
                 );
@@ -1376,6 +1422,63 @@ async fn run_query_take(
         .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
 }
 
+async fn run_transaction_query<C: surrealdb::Connection>(
+    db: &Surreal<C>,
+    sql: &str,
+    vars: Option<Value>,
+) -> Result<(), MemoryError> {
+    let transaction = db
+        .clone()
+        .begin()
+        .await
+        .map_err(|error| transaction_error("begin", &error.to_string()))?;
+    let mut query = transaction.query(sql);
+    if let Some(vars) = vars {
+        query = query.bind(vars);
+    }
+    let mut response = match query.await {
+        Ok(response) => response,
+        Err(error) => {
+            let _ = transaction.cancel().await;
+            return Err(transaction_error("query", &error.to_string()));
+        }
+    };
+    let mut statement_errors = response.take_errors().into_iter().collect::<Vec<_>>();
+    if !statement_errors.is_empty() {
+        statement_errors.sort_by_key(|(index, _)| *index);
+        let is_conflict = statement_errors.iter().any(|(_, error)| {
+            let message = error.to_string();
+            let lowered = message.to_ascii_lowercase();
+            lowered.contains("transaction conflict") || lowered.contains("write conflict")
+        });
+        let is_duplicate = statement_errors
+            .iter()
+            .any(|(_, error)| is_record_already_exists_error(&error.to_string()));
+        let _ = transaction.cancel().await;
+        return Err(if is_conflict {
+            MemoryError::Storage("Transaction conflict".into())
+        } else if is_duplicate {
+            MemoryError::Storage("record already exists".into())
+        } else {
+            MemoryError::Storage("transaction statement failed".into())
+        });
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| transaction_error("commit", &error.to_string()))?;
+    Ok(())
+}
+
+fn transaction_error(stage: &str, message: &str) -> MemoryError {
+    let lowered = message.to_ascii_lowercase();
+    if lowered.contains("transaction conflict") || lowered.contains("write conflict") {
+        MemoryError::Storage("Transaction conflict".into())
+    } else {
+        MemoryError::Storage(format!("transaction {stage} failed"))
+    }
+}
+
 pub(crate) fn is_record_already_exists_error(message: &str) -> bool {
     let lowered = message.to_ascii_lowercase();
     lowered.contains("already exists")
@@ -1395,13 +1498,20 @@ fn bind_var_count(vars: Option<&Value>) -> usize {
     }
 }
 
+fn record_id_log_detail(record_id: &str) -> (&'static str, Value) {
+    (
+        "record_id_chars",
+        Value::Number(serde_json::Number::from(record_id.chars().count())),
+    )
+}
+
 fn build_db_execute_event(
     op: &str,
     namespace: &str,
     sql: &str,
     vars: Option<&Value>,
     duration: Option<Duration>,
-    error: Option<&str>,
+    error: Option<&MemoryError>,
 ) -> HashMap<String, Value> {
     let mut event = HashMap::from([
         ("op".to_string(), json!(op)),
@@ -1413,7 +1523,7 @@ fn build_db_execute_event(
         event.insert("duration_ms".to_string(), json!(duration_ms(duration)));
     }
     if let Some(error) = error {
-        event.insert("error".to_string(), json!(error));
+        event.insert("error_code".to_string(), json!(error.code()));
     }
     event
 }
@@ -1428,7 +1538,7 @@ impl DbClient for SurrealDbClient {
         self.log_op(
             "db.select_one",
             vec![
-                ("record_id", Value::String(record_id.to_string())),
+                record_id_log_detail(record_id),
                 ("namespace", Value::String(namespace.to_string())),
             ],
         );
@@ -1451,7 +1561,7 @@ impl DbClient for SurrealDbClient {
         self.log_op(
             "db.select_one.result",
             vec![
-                ("record_id", Value::String(record_id.to_string())),
+                record_id_log_detail(record_id),
                 ("found", Value::Bool(result.is_some())),
             ],
         );
@@ -1506,7 +1616,7 @@ impl DbClient for SurrealDbClient {
         self.log_op(
             "db.create",
             vec![
-                ("record_id", Value::String(record_id.to_string())),
+                record_id_log_detail(record_id),
                 ("namespace", Value::String(namespace.to_string())),
             ],
         );
@@ -1536,7 +1646,7 @@ impl DbClient for SurrealDbClient {
         self.log_op(
             "db.update",
             vec![
-                ("record_id", Value::String(record_id.to_string())),
+                record_id_log_detail(record_id),
                 ("namespace", Value::String(namespace.to_string())),
             ],
         );
@@ -1589,6 +1699,95 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(Value::Array(results))
+    }
+
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        self.ensure_active_namespace(namespace)?;
+        #[cfg(feature = "eval-support")]
+        let lock_wait_started = Instant::now();
+        let _revision_guard = self.revision_transaction_lock.lock().await;
+        #[cfg(feature = "eval-support")]
+        let lock_wait_micros =
+            u64::try_from(lock_wait_started.elapsed().as_micros()).unwrap_or(u64::MAX);
+        let timer = Instant::now();
+        self.logger.log(
+            build_db_execute_event(
+                "db.execute_query.start",
+                namespace,
+                sql,
+                vars.as_ref(),
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+        let vars_for_retry = vars.clone();
+        let result = match &self.engine {
+            DbEngine::Local(db) | DbEngine::Mem(db) => {
+                crate::platform::persistence::transactions::with_db_retry(
+                    "transaction_query",
+                    &self.logger,
+                    || async { run_transaction_query(db, sql, vars_for_retry.clone()).await },
+                )
+                .await
+            }
+            DbEngine::Remote(db) => {
+                crate::platform::persistence::transactions::with_remote_transaction_retry(
+                    "transaction_query",
+                    &self.logger,
+                    || async { run_transaction_query(db, sql, vars_for_retry.clone()).await },
+                )
+                .await
+            }
+        };
+        match result {
+            Ok(()) => {
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_query.done",
+                        namespace,
+                        sql,
+                        vars.as_ref(),
+                        Some(timer.elapsed()),
+                        None,
+                    ),
+                    LogLevel::Debug,
+                );
+                #[cfg(feature = "eval-support")]
+                if let Some(observer) = self.eval_query_observer.get() {
+                    let transaction_micros =
+                        u64::try_from(timer.elapsed().as_micros()).unwrap_or(u64::MAX);
+                    observer.observe(&SqlObservation {
+                        op: "db.execute_query",
+                        sql: sql.to_owned(),
+                        micros: transaction_micros,
+                    });
+                    if sql.contains("knowledge_revision_clock:active") {
+                        observer.observe_revision_transaction(lock_wait_micros, transaction_micros);
+                    }
+                }
+                Ok(())
+            }
+            Err(error) => {
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_query.error",
+                        namespace,
+                        sql,
+                        vars.as_ref(),
+                        Some(timer.elapsed()),
+                        Some(&error),
+                    ),
+                    LogLevel::Debug,
+                );
+                Err(error)
+            }
+        }
     }
 
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {

@@ -1,0 +1,29 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "alder-workshop-location",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "4ccea5e0402d7a4ba8617268d3def9ef8dd8a2fd9e962a42d5b42480f09f5620",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-02T10:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:37:20.018039Z",
+    "known_revision": 4,
+    "valid_at": "2026-06-02T10:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "alder-workshop-location",
+      "episode_id": "episode:6c5a213a6c874120baae2875",
+      "fact_ids": [],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

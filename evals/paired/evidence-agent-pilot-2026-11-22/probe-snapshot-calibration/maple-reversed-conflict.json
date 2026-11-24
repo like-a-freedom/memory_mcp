@@ -1,0 +1,39 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "maple-reversed-conflict",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "79b7623094ed9daa2f8f4eb235a94c0aeee42e3e11deb12654f143879c96cb8e",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-08T12:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:21.662958Z",
+    "known_revision": 15,
+    "valid_at": "2026-06-08T12:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "maple-peer",
+      "episode_id": "episode:42b87986f5a5cbf28ba4cac3",
+      "fact_ids": [
+        "fact:0c941fe8d947642c177d491b"
+      ],
+      "reconciliation": null
+    },
+    {
+      "event_id": "maple-initial",
+      "episode_id": "episode:0e8b3d10a5d0b9f4a8990ee3",
+      "fact_ids": [
+        "fact:e59caf8eafb4730007f3c8ea"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

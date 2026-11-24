@@ -32,10 +32,13 @@ mod knowledge_store;
 pub mod queries;
 mod triple_store;
 
-pub(crate) use close_store::{CloseStoreClient, CloseTimestamps};
+pub(crate) use close_store::{CloseStoreClient, CloseTimestamps, build_close_query};
 pub(crate) use community::CommunityRecord;
 pub(crate) use entity_store::EntityStoreClient;
 pub use fact_store::FactStoreClient;
 pub use graph_store::KnowledgeGraphStore;
 pub use knowledge_store::KnowledgeStoreClient;
 pub(crate) use triple_store::TripleStoreClient;
+
+// Shared commit ledger owned by knowledge; memory contributes episode revisions.
+pub(crate) mod revisions;

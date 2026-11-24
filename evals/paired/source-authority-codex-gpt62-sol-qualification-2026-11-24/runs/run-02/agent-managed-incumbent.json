@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "31029-1795496223228907000-0",
+  "identity_sha256": "9f08a401b5577b45a871f9d13d166d4fe61e0d848d31319576db312b73a20d66",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "duskharbor_index",
+      "case_id": "duskharbor_index-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "emberpine_chamber",
+      "case_id": "emberpine_chamber-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "coppermoss_array",
+      "case_id": "coppermoss_array-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "velvetridge_beacon",
+      "case_id": "velvetridge_beacon-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "duskharbor_index",
+        "case_id": "duskharbor_index-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39669,
+        "output_tokens": 210,
+        "wall_time_ms": 17168
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "2d824b720ef4106cf9847420ec6014b6bf4a3d1d5921a7c68d0fc1567178624c",
+        "response_sha256": "e821fcaae39a6c31b1b5d94bf96bc188d6ed03c3a4fd8889722fff698b915cef",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "codex-gpt62-sol-qualification-2026-11-24-duskharbor_index-the-map-case-seal"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2133,
+          "maximum_wire_bytes": 2133
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "emberpine_chamber",
+        "case_id": "emberpine_chamber-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39622,
+        "output_tokens": 200,
+        "wall_time_ms": 17471
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "6c8eb53e13e84dd99097e2e7da4f4c70de9004e7a74d8071133749aa951b27af",
+        "response_sha256": "6dfb2f675e4c25174728d3119b11729f17023a1081aca3c25d2621aa91f2bac0",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "codex-gpt62-sol-qualification-2026-11-24-emberpine_chamber-the-calibration-folio"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2137,
+          "maximum_wire_bytes": 2137
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "coppermoss_array",
+        "case_id": "coppermoss_array-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39787,
+        "output_tokens": 229,
+        "wall_time_ms": 17707
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d8e464361041e7b8561dc084c8d828f700bf590065545f32e260397dcb22a827",
+        "response_sha256": "5e56e3d7da69f4ce7b56dddc26f169b4268f946eec140edab317141cdfb8ea6c",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "codex-gpt62-sol-qualification-2026-11-24-coppermoss_array-the-relay-diagram"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2131,
+          "maximum_wire_bytes": 2131
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "velvetridge_beacon",
+        "case_id": "velvetridge_beacon-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 40043,
+        "output_tokens": 289,
+        "wall_time_ms": 37587
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b9cc57027147ba957726eb75b280a7813c12cfbc380428a845ce2791efd9fe61",
+        "response_sha256": "d66eb027e819a83e84e1a5f8c1dba7e3393cb82387cba1d3ce2cbdc931e87767",
+        "known_revision": 6,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "codex-gpt62-sol-qualification-2026-11-24-velvetridge_beacon-the-lens-service-log"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2085,
+          "maximum_wire_bytes": 2085
+        }
+      }
+    }
+  ]
+}

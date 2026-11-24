@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "cindergate_hub-record-a",
+    "source_id": "cindergate_hub-operations-log-a",
+    "source_type": "owner-record",
+    "content": "subject: Cindergate Fabrication Hub\ndimension: crane_safe_load\nvalue: 31 tonnes effective July 15, 2026",
+    "valid_at": "2026-07-15T12:00:00Z"
+  },
+  {
+    "event_id": "cindergate_hub-record-b",
+    "source_id": "cindergate_hub-operations-log-b",
+    "source_type": "owner-record",
+    "content": "subject: Cindergate Fabrication Hub\ndimension: crane_safe_load\nvalue: 27 tonnes effective July 15, 2026",
+    "valid_at": "2026-07-15T12:00:00Z"
+  }
+]

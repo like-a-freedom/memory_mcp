@@ -36,6 +36,27 @@ fn validation_message<T: std::fmt::Debug>(result: Result<T, MemoryError>) -> Str
     }
 }
 
+#[test]
+fn legacy_extract_request_defaults_fact_evidence_on() {
+    let params: ExtractParams = serde_json::from_value(serde_json::json!({
+        "episode_id": "episode:legacy"
+    }))
+    .expect("request omitting the fact-evidence flag remains valid");
+
+    assert!(params.include_fact_evidence);
+}
+
+#[test]
+fn explicit_false_keeps_extract_response_compact() {
+    let params: ExtractParams = serde_json::from_value(serde_json::json!({
+        "episode_id": "episode:legacy",
+        "include_fact_evidence": false
+    }))
+    .expect("explicit compact-output request is valid");
+
+    assert!(!params.include_fact_evidence);
+}
+
 /// content + text (no episode_id): the dual-field check fires.
 #[tokio::test]
 async fn content_and_text_together_is_refused() {
@@ -51,6 +72,7 @@ async fn content_and_text_together_is_refused() {
                 source_id: None,
                 t_ref: None,
                 zero_shot_labels: None,
+                include_fact_evidence: false,
             },
         )
         .await,
@@ -73,6 +95,7 @@ async fn episode_id_and_content_together_is_refused() {
                 source_id: None,
                 t_ref: None,
                 zero_shot_labels: None,
+                include_fact_evidence: false,
             },
         )
         .await,
@@ -95,6 +118,7 @@ async fn neither_episode_nor_inline_is_refused() {
                 source_id: None,
                 t_ref: None,
                 zero_shot_labels: None,
+                include_fact_evidence: false,
             },
         )
         .await,
@@ -121,6 +145,7 @@ async fn dual_field_check_wins_over_dual_source_when_all_three_are_present() {
                 source_id: None,
                 t_ref: None,
                 zero_shot_labels: None,
+                include_fact_evidence: false,
             },
         )
         .await,

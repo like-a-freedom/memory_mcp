@@ -1,0 +1,27 @@
+{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "claim-stage-shadow-promotion-check",
+  "budget_seconds": 900,
+  "host_tag": "local",
+  "env": {
+    "NER_EXTRACTOR": "regex",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow"
+  },
+  "scenarios": [
+    {
+      "id": "latency-claim-write",
+      "driver": "in_process",
+      "scales": [100],
+      "iterations": 100,
+      "warmup": 5
+    },
+    {
+      "id": "latency-claim-assemble",
+      "driver": "in_process",
+      "scales": [2],
+      "iterations": 100,
+      "warmup": 5
+    }
+  ],
+  "gates": []
+}

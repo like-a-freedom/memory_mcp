@@ -1,0 +1,177 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "birch_glass_depot",
+        "case_id": "birch_glass_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Birch Glass Depot, the calibration log is kept in Cabinet-63.",
+      "recall_prompt": "At Birch Glass Depot, where is the calibration log kept? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Birch Glass Depot, where is the calibration log kept?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-birch_glass_depot",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-birch_glass_depot"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-63"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Birch Glass Depot before this session. Use assemble_context to check this memory question: At Birch Glass Depot, where is the calibration log kept? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "birch_glass_depot",
+          "relative_path": "fixtures/birch_glass_depot.txt",
+          "content": "Fact: At Birch Glass Depot, the calibration log is kept in Cabinet-63.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-birch_glass_depot"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cinder_maple_station",
+        "case_id": "cinder_maple_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Cinder Maple Station, the transfer key is stored in Locker-42.",
+      "recall_prompt": "At Cinder Maple Station, where is the transfer key stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cinder Maple Station, where is the transfer key stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-cinder_maple_station",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-cinder_maple_station"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Locker-42"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Cinder Maple Station before this session. Use assemble_context to check this memory question: At Cinder Maple Station, where is the transfer key stored? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "cinder_maple_station",
+          "relative_path": "fixtures/cinder_maple_station.txt",
+          "content": "Fact: At Cinder Maple Station, the transfer key is stored in Locker-42.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-cinder_maple_station"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "fable_iron_archive",
+        "case_id": "fable_iron_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Fable Iron Archive, the quality checklist is filed in Drawer-19.",
+      "recall_prompt": "At Fable Iron Archive, where is the quality checklist filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Fable Iron Archive, where is the quality checklist filed?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-fable_iron_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-fable_iron_archive"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Drawer-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Fable Iron Archive before this session. Use assemble_context to check this memory question: At Fable Iron Archive, where is the quality checklist filed? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "fable_iron_archive",
+          "relative_path": "fixtures/fable_iron_archive.txt",
+          "content": "Fact: At Fable Iron Archive, the quality checklist is filed in Drawer-19.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-fable_iron_archive"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "granite_silver_workshop",
+        "case_id": "granite_silver_workshop-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Granite Silver Workshop, the inspection stencil is labeled Plate-58.",
+      "recall_prompt": "At Granite Silver Workshop, what label is on the inspection stencil? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Granite Silver Workshop, what label is on the inspection stencil?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-granite_silver_workshop",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-granite_silver_workshop"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Plate-58"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Granite Silver Workshop before this session. Use assemble_context to check this memory question: At Granite Silver Workshop, what label is on the inspection stencil? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "granite_silver_workshop",
+          "relative_path": "fixtures/granite_silver_workshop.txt",
+          "content": "Fact: At Granite Silver Workshop, the inspection stencil is labeled Plate-58.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-granite_silver_workshop"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "input_sha256": "147eb73dd3048009346de26adc0d154d44bc40ea1708fba7fddded013ed76e32",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "asterline-correction"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "asterline-correction",
+      "evidence_status": "conflicting",
+      "relations": [
+        {
+          "outcome": "contradiction",
+          "role": "conflict"
+        }
+      ]
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

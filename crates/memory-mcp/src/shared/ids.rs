@@ -104,6 +104,25 @@ pub fn deterministic_edge_id(
     format!("edge:{}", hash_prefix(&payload))
 }
 
+/// Generate a deterministic triple ID scoped to the source fact. Replaying
+/// extraction for one fact must not create another equivalent triple row.
+#[must_use]
+pub fn deterministic_triple_id(
+    subject: &str,
+    predicate: &str,
+    object: &str,
+    source_fact_id: &str,
+) -> String {
+    let payload = format!(
+        "{}|{}|{}|{}",
+        normalize_text(subject),
+        normalize_text(predicate),
+        normalize_text(object),
+        normalize_text(source_fact_id),
+    );
+    format!("triple:{}", hash_prefix(&payload))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "maple-peer",
+    "source_id": "maple-vault-sensor",
+    "source_type": "inspection-record",
+    "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026",
+    "valid_at": "2026-06-08T12:00:00Z"
+  },
+  {
+    "event_id": "maple-initial",
+    "source_id": "maple-vault-engineer",
+    "source_type": "inspection-record",
+    "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026",
+    "valid_at": "2026-06-08T12:00:00Z"
+  }
+]

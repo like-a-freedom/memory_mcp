@@ -1,0 +1,10 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "cedar-release-check"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

@@ -1,0 +1,133 @@
+use eval_harness::suites::load_verified_replay;
+use std::path::PathBuf;
+fn baseline() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../evals/paired/deterministic-quality-2026-11-21/baseline-v4-1-valid")
+}
+#[test]
+fn archived_raw_receipts_reconstruct_the_registered_replay() {
+    load_verified_replay(&baseline().join("index.json")).expect("portable verified replay");
+}
+#[test]
+fn detached_decision_score_is_rejected_even_when_repeated() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(baseline().join("index.json")).unwrap()).unwrap();
+    for entry in std::fs::read_dir(baseline()).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_name().to_string_lossy().starts_with("receipt-") {
+            std::fs::copy(entry.path(), dir.path().join(entry.file_name())).unwrap();
+        }
+    }
+    index["cases"][0]["evidence_enabled_temporal_score"]["decision_success"] =
+        serde_json::json!(true);
+    std::fs::write(
+        dir.path().join("index.json"),
+        serde_json::to_vec(&index).unwrap(),
+    )
+    .unwrap();
+    assert!(load_verified_replay(&dir.path().join("index.json")).is_err());
+}
+#[test]
+fn missing_raw_receipts_never_degrade_to_index_only_acceptance() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::copy(baseline().join("index.json"), dir.path().join("index.json")).unwrap();
+    assert!(load_verified_replay(&dir.path().join("index.json")).is_err());
+}
+
+#[test]
+fn self_consistent_but_changed_probe_request_is_not_registered() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().unwrap();
+    for entry in std::fs::read_dir(baseline()).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_name().to_string_lossy().ends_with(".json") {
+            std::fs::copy(entry.path(), dir.path().join(entry.file_name())).unwrap();
+        }
+    }
+    let path = dir.path().join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let case = &mut index["cases"][0];
+    let file = dir.path().join(case["receipt_path"].as_str().unwrap());
+    let mut raw: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    raw["evidence_enabled_diagnostic"]["temporal_revision_request"]["query"] =
+        serde_json::json!("");
+    let bytes = serde_json::to_vec_pretty(&raw).unwrap();
+    std::fs::write(&file, &bytes).unwrap();
+    case["receipt_sha256"] = serde_json::json!(hex::encode(Sha256::digest(&bytes)));
+    std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
+    assert!(
+        eval_harness::suites::load_registered_replay(
+            &path,
+            &baseline().join("../../../corpora/memory-decisions-v4")
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn archived_raw_receipts_match_the_actual_registered_corpus() {
+    eval_harness::suites::load_registered_replay(
+        &baseline().join("index.json"),
+        &baseline().join("../../../corpora/memory-decisions-v4"),
+    )
+    .expect("registered baseline must remain portable");
+}
+
+fn reject_changed_registration(change: impl FnOnce(&mut serde_json::Value), expected: &str) {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().unwrap();
+    for entry in std::fs::read_dir(baseline()).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_name().to_string_lossy().ends_with(".json") {
+            std::fs::copy(entry.path(), dir.path().join(entry.file_name())).unwrap();
+        }
+    }
+    let path = dir.path().join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let case = &mut index["cases"][0];
+    let file = dir.path().join(case["receipt_path"].as_str().unwrap());
+    let mut raw: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    change(&mut raw);
+    let bytes = serde_json::to_vec_pretty(&raw).unwrap();
+    std::fs::write(file, &bytes).unwrap();
+    case["receipt_sha256"] = serde_json::json!(hex::encode(Sha256::digest(&bytes)));
+    std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
+    let error = eval_harness::suites::load_registered_replay(
+        &path,
+        &baseline().join("../../../corpora/memory-decisions-v4"),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains(expected), "{error}");
+}
+#[test]
+fn changed_private_oracle_cannot_redefine_registered_success() {
+    reject_changed_registration(
+        |raw| raw["desired_goal"]["oracle"]["probe_id"] = serde_json::json!("unregistered"),
+        "oracle differs from registration",
+    );
+}
+#[test]
+fn changed_checkpoint_cannot_attest_the_registered_history() {
+    reject_changed_registration(
+        |raw| {
+            raw["evidence_enabled_diagnostic"]["revision_checkpoint_receipts"][0]["known_revision"] =
+                serde_json::json!(0)
+        },
+        "checkpoint or seed identity mismatch",
+    );
+}
+#[test]
+fn changed_seed_payload_cannot_attest_the_registered_history() {
+    reject_changed_registration(
+        |raw| {
+            raw["evidence_enabled_diagnostic"]["ingest_receipts"][0]["request"]["content"] =
+                serde_json::json!("unregistered")
+        },
+        "seed order or inputs differ",
+    );
+}

@@ -1,0 +1,131 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "emberlane_station",
+        "case_id": "emberlane_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Emberlane Station, the night register is stored in Harbor-63. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Emberlane Station, where is the night register stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Emberlane Station, where is the night register stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "qwen-splash-json-emberlane-night-register",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "qwen-splash-json-emberlane-night-register"
+        ]]],
+        "accepted_answers": ["Harbor-63"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mosslight_library",
+        "case_id": "mosslight_library-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Mosslight Library, the specimen index is stored in Aster-19. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Mosslight Library, where is the specimen index stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Mosslight Library, where is the specimen index stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "qwen-splash-json-mosslight-specimen-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "qwen-splash-json-mosslight-specimen-index"
+        ]]],
+        "accepted_answers": ["Aster-19"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brambleford_archive",
+        "case_id": "brambleford_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Brambleford Archive, the tide chart is stored in Quartz-72. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Brambleford Archive, where is the tide chart stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Brambleford Archive, where is the tide chart stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "qwen-splash-json-brambleford-tide-chart",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "qwen-splash-json-brambleford-tide-chart"
+        ]]],
+        "accepted_answers": ["Quartz-72"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Brambleford Archive before this phase. Use assemble_context to verify: At Brambleford Archive, where is the tide chart stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "brambleford_archive",
+          "relative_path": "fixtures/brambleford_archive.txt",
+          "content": "Fact: At Brambleford Archive, the tide chart is stored in Quartz-72.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "qwen-splash-json-brambleford-tide-chart"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "clearwater_observatory",
+        "case_id": "clearwater_observatory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Clearwater Observatory, the solar log is stored in Vale-48. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Clearwater Observatory, where is the solar log stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Clearwater Observatory, where is the solar log stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "qwen-splash-json-clearwater-solar-log",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "qwen-splash-json-clearwater-solar-log"
+        ]]],
+        "accepted_answers": ["Vale-48"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Clearwater Observatory before this phase. Use assemble_context to verify: At Clearwater Observatory, where is the solar log stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "clearwater_observatory",
+          "relative_path": "fixtures/clearwater_observatory.txt",
+          "content": "Fact: At Clearwater Observatory, the solar log is stored in Vale-48.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "qwen-splash-json-clearwater-solar-log"
+        }
+      ]
+    }
+  ]
+}

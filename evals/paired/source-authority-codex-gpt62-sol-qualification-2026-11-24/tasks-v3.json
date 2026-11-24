@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "emberpine_chamber",
+        "case_id": "emberpine_chamber-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Emberpine Chamber, the calibration folio is filed in Cobalt-72. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Emberpine Chamber, where is the calibration folio filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Emberpine Chamber, where is the calibration folio filed?",
+        "valid_at": "2026-11-24T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "codex-gpt62-sol-qualification-2026-11-24-emberpine_chamber-the-calibration-folio",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "codex-gpt62-sol-qualification-2026-11-24-emberpine_chamber-the-calibration-folio"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-72"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "duskharbor_index",
+        "case_id": "duskharbor_index-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Duskharbor Index, the map case seal is filed in Larch-19. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Duskharbor Index, where is the map case seal filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Duskharbor Index, where is the map case seal filed?",
+        "valid_at": "2026-11-24T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "codex-gpt62-sol-qualification-2026-11-24-duskharbor_index-the-map-case-seal",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "codex-gpt62-sol-qualification-2026-11-24-duskharbor_index-the-map-case-seal"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Larch-19"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "velvetridge_beacon",
+        "case_id": "velvetridge_beacon-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Velvetridge Beacon, the lens service log is filed in Saffron-64.",
+      "recall_prompt": "At Velvetridge Beacon, where is the lens service log filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Velvetridge Beacon, where is the lens service log filed?",
+        "valid_at": "2026-11-24T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "codex-gpt62-sol-qualification-2026-11-24-velvetridge_beacon-the-lens-service-log",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "codex-gpt62-sol-qualification-2026-11-24-velvetridge_beacon-the-lens-service-log"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Saffron-64"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Velvetridge Beacon before this session. Use assemble_context to verify: At Velvetridge Beacon, where is the lens service log filed? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "velvetridge_beacon",
+          "relative_path": "fixtures/velvetridge_beacon.txt",
+          "content": "Fact: At Velvetridge Beacon, the lens service log is filed in Saffron-64.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "codex-gpt62-sol-qualification-2026-11-24-velvetridge_beacon-the-lens-service-log"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "coppermoss_array",
+        "case_id": "coppermoss_array-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Coppermoss Array, the relay diagram is filed in Opal-38.",
+      "recall_prompt": "At Coppermoss Array, where is the relay diagram filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Coppermoss Array, where is the relay diagram filed?",
+        "valid_at": "2026-11-24T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "codex-gpt62-sol-qualification-2026-11-24-coppermoss_array-the-relay-diagram",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "codex-gpt62-sol-qualification-2026-11-24-coppermoss_array-the-relay-diagram"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Opal-38"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Coppermoss Array before this session. Use assemble_context to verify: At Coppermoss Array, where is the relay diagram filed? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "coppermoss_array",
+          "relative_path": "fixtures/coppermoss_array.txt",
+          "content": "Fact: At Coppermoss Array, the relay diagram is filed in Opal-38.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "codex-gpt62-sol-qualification-2026-11-24-coppermoss_array-the-relay-diagram"
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,12 @@
 **Date:** 2026-11-13  
 **Scope:** Bound every successful `explain` response while preserving exact citation evidence and on-demand access to complete source text. This document specifies behavior only; it does not authorize implementation until approved.
 
+## Implementation debt — 2026-11-24
+
+This proposal remains pending. The current adapter has no `explain_budget` module, source/provenance continuation contract or public 32 KiB enforcement proof. Implementation requires the existing `explain` public interface tests to reproduce unbounded output, then capability-owned quote/window/provenance semantics and adapter-owned final-envelope budgeting. Acceptance must cover both modes, escaping-heavy and multi-megabyte inputs, exact quote retention, distinct item/source/provenance offsets, atomic partial metadata and exact Unicode-scalar reconstruction. Extend the response-size evaluator through the real tool envelope and retain the 61 shared cases plus a separately named synthetic reconstruction case.
+
+Ratify the compatibility change in a newly allocated ADR and amend ADR-0022 and the July 30 response specification. ADR-0083 now belongs to [revision-bounded temporal context](../../adr/0083-revision-bounded-temporal-context.md), so the historical ADR number proposed below is superseded. Current implementation must follow the workspace MSRV and repository-required feature/test checks.
+
 ## Intent
 
 Prevent one `explain` call from consuming hundreds of thousands of tokens while retaining enough evidence for an agent to cite a claim correctly and enough metadata to retrieve any omitted source text through the same tool.
@@ -259,7 +265,7 @@ This separation gives the memory context locality over evidence semantics while 
 
 1. **Eight-tool surface:** unchanged. Only parameters on `explain` are added.
 2. **Compact quote exception:** ADR-0022 is amended to state that `explain` keeps a complete bounded exact quote in compact mode. Other compact omissions remain unchanged.
-3. **Full-body policy:** ADR-0083 supersedes the July 30 decision to inline full `citation_context` and populated `all_sources.episode_content`.
+3. **Full-body policy:** The newly allocated citation-output ADR will supersede the July 30 decision to inline full `citation_context` and populated `all_sources.episode_content`.
 4. **Verbose compatibility break:** `compact=false` remains diagnostically richer than compact mode but is now bounded. It no longer means unbounded or full-body output.
 5. **`ProvenanceSource.episode_content`:** changes from required `String` to optional `String`. Existing constructors must be updated explicitly; no silent full-body default is allowed.
 6. **Continuation convention:** `ToolResponse.next_offset` remains an item index for `explain`. Source and provenance offsets use their own named fields. No overlapping offset names are introduced.

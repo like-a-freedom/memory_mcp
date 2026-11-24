@@ -134,7 +134,7 @@ async fn custom_zero_shot_labels_are_forwarded() {
 }
 
 #[tokio::test]
-async fn a_missing_episode_is_reported_with_its_id_and_never_extracted() {
+async fn a_missing_episode_is_reported_without_reflecting_its_id_and_never_extracted() {
     let port = RecordingPort::knowing(&[]);
 
     let error = extract_from_episode(port.as_ref(), &AllowAll, &command("episode:nope"))
@@ -142,8 +142,8 @@ async fn a_missing_episode_is_reported_with_its_id_and_never_extracted() {
         .expect_err("a missing episode cannot be extracted");
 
     assert!(
-        matches!(&error, MemoryError::NotFound(message) if message.contains("episode:nope")),
-        "the not-found message must name the episode, got {error:?}"
+        matches!(&error, MemoryError::NotFound(message) if !message.contains("episode:nope")),
+        "the not-found message must not reflect the submitted episode ID, got {error:?}"
     );
     assert!(
         port.calls().is_empty(),

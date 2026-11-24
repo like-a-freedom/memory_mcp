@@ -107,6 +107,19 @@ async fn ready_legacy_fixture() -> (
         "REMOVE FIELD source_group ON TABLE episode",
         "REMOVE FIELD source_position ON TABLE episode",
         "REMOVE FIELD kind ON TABLE tenant_task",
+        "REMOVE FIELD known_revision ON TABLE episode",
+        "REMOVE FIELD known_revision ON TABLE fact",
+        "REMOVE FIELD known_revision ON TABLE edge",
+        "REMOVE FIELD known_revision ON TABLE triple",
+        "REMOVE FIELD known_revision ON TABLE claim",
+        "REMOVE FIELD known_revision ON TABLE claim_relation",
+        "REMOVE FIELD closed_revision ON TABLE fact",
+        "REMOVE FIELD closed_revision ON TABLE edge",
+        "REMOVE FIELD closed_revision ON TABLE triple",
+        "REMOVE FIELD closed_revision ON TABLE claim",
+        "REMOVE FIELD closed_revision ON TABLE claim_relation",
+        "REMOVE TABLE knowledge_revision",
+        "REMOVE TABLE knowledge_revision_clock",
     ] {
         db.query(sql, None, &tenant.namespace_binding.namespace)
             .await
@@ -116,6 +129,7 @@ async fn ready_legacy_fixture() -> (
         "script_migration:053_context_lookup_indexes_surql",
         "script_migration:054_query_index_coverage_surql",
         "script_migration:055_episode_source_context_surql",
+        "script_migration:056_knowledge_revisions_surql",
     ] {
         db.query(
             &format!("DELETE {record_id}"),
@@ -200,7 +214,7 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
 
     let applied = db
         .query(
-            "SELECT VALUE script_name FROM script_migration WHERE script_name IN ['053_context_lookup_indexes.surql', '054_query_index_coverage.surql', '055_episode_source_context.surql'] ORDER BY script_name ASC",
+            "SELECT VALUE script_name FROM script_migration WHERE script_name IN ['053_context_lookup_indexes.surql', '054_query_index_coverage.surql', '055_episode_source_context.surql', '056_knowledge_revisions.surql'] ORDER BY script_name ASC",
             None,
             &tenant.namespace_binding.namespace,
         )
@@ -213,6 +227,7 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
             "053_context_lookup_indexes.surql",
             "054_query_index_coverage.surql",
             "055_episode_source_context.surql",
+            "056_knowledge_revisions.surql",
         ]
     );
 
@@ -253,7 +268,7 @@ async fn ready_legacy_tenant_receives_missing_catalog_before_runtime_admission()
         .expect("read upgraded tenant")
         .expect("tenant remains registered");
     assert_eq!(persisted_tenant.status, TenantStatus::Ready);
-    assert_eq!(persisted_tenant.schema_version, 45);
+    assert_eq!(persisted_tenant.schema_version, 46);
 
     let maintenance = db
         .query(
@@ -370,20 +385,21 @@ async fn concurrent_ready_schema_activation_is_fenced_and_retryable() {
 
     let applied = db
         .query(
-            "SELECT VALUE script_name FROM script_migration WHERE script_name IN ['053_context_lookup_indexes.surql', '054_query_index_coverage.surql', '055_episode_source_context.surql'] ORDER BY script_name ASC",
+            "SELECT VALUE script_name FROM script_migration WHERE script_name IN ['053_context_lookup_indexes.surql', '054_query_index_coverage.surql', '055_episode_source_context.surql', '056_knowledge_revisions.surql'] ORDER BY script_name ASC",
             None,
             &tenant.namespace_binding.namespace,
         )
         .await
         .expect("read shared migration ledger");
     let applied: Vec<String> = serde_json::from_value(applied).expect("parse migration ledger");
-    assert_eq!(applied.len(), 3);
+    assert_eq!(applied.len(), 4);
     assert_eq!(
         applied,
         vec![
             "053_context_lookup_indexes.surql",
             "054_query_index_coverage.surql",
             "055_episode_source_context.surql",
+            "056_knowledge_revisions.surql",
         ]
     );
 }

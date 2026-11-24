@@ -1,0 +1,23 @@
+{
+  "schema_version": "memory-mcp-agent-managed-fingerprint-record/v1",
+  "plan_file_sha256": "257ce5e4396e7a7b938d2cb5e64296bf06e0c09dc54ad7cb905135ad3d607140",
+  "task_manifest_file_sha256": "dba9f8fa67969a1b6c7330c2cef77c9c6c66fcdbbcb064e517a8f98babd47f32",
+  "memory_eval_cli_sha256": "5eb82aed0b6423640b1de180975b731c63cf3c2a736e4d78691328e0dcf653fe",
+  "memory_server_sha256": "cc0e08b7b1327a515677b756faebefcd27fd7c7881d888bf150eba1677de82da",
+  "codex_cli_sha256": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+  "codex_cli_version": "codex-cli 0.171.0",
+  "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "product_config_sha256": "292c1e67d3d73323a7357382d29f831c375b5a0c16b0955d2e9d3d6d51184111",
+  "product_config_canonicalization": "compact UTF-8 JSON with lexicographically sorted keys",
+  "corpus_sha256": "f81edcb4cb6892fe7a0670c819fcca935dfc91268202ce8b4aa2223968457ad4",
+  "oracle_sha256": "d1c14dc21f52de8a6e0c2c97f9040699098aa9d3d4ef9488350ef11e7fbc8918",
+  "system_prompt_sha256": "02b1f7248e5e15d2559ce858ee52b6ad453d1c9ab5d3f642875ab106bc4c3624",
+  "task_prompt_sha256": "e2daebe026e2f4c67be1596905fbee453e6c524c3d4931674bc03543161f74a5",
+  "host_policy_sha256": "75772877ce57072e5e3199a25274e9cd745dbf05e51807884fe37f7c441734fa",
+  "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+  "simulator_sha256": "b2712b51bd2142a280fdab7a79a4fd0d4bafbbaede636c25523af0071e649887",
+  "protocol_config_sha256": "bcd2a701916075e90825d107a2396def7f53238f1bcbcc05b027529691fb3a7c",
+  "independent_family_count": 8,
+  "task_count": 8,
+  "plan_id": "agent-managed-formation-recall-development-pilot-2026-11-22-v4"
+}

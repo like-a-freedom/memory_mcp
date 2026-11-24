@@ -1,0 +1,93 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:71afa1108096f2979dc520f7": "willow-distractor",
+    "episode:a8e50b3321c83d3386b1524b": "willow-target"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "db74c72b05ae8af6851eecb7186284da3565a854ba7889e0da8c36898ecad003",
+    "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+    "source_event_ids": [
+      "willow-target"
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 5,
+    "compact": true,
+    "known_revision": 14,
+    "query": "What cycle limit applied to Willow Gate on June 12, 2026?",
+    "valid_at": "2026-06-12T09:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-22T03:43:43.353679Z\",\"known_revision\":14,\"valid_at\":\"2026-06-12T09:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Willow Gate\\ndimension: cycle_limit\\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026\",\"evidence_status\":\"current\",\"fact_id\":\"fact:d9123f364c5ae88cee98149e\",\"grounding\":0.88,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":14,\"source_episode_id\":\"episode:a8e50b3321c83d3386b1524b\",\"source_id\":\"willow-gate-log\",\"source_type\":\"inspection-record\",\"valid_at\":\"2026-06-12T09:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.88,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:a8e50b3321c83d3386b1524b\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-22T03:43:43.353679Z",
+            "known_revision": 14,
+            "valid_at": "2026-06-12T09:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Willow Gate\ndimension: cycle_limit\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026",
+            "evidence_status": "current",
+            "fact_id": "fact:d9123f364c5ae88cee98149e",
+            "grounding": 0.88,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 14,
+              "source_episode_id": "episode:a8e50b3321c83d3386b1524b",
+              "source_id": "willow-gate-log",
+              "source_type": "inspection-record",
+              "valid_at": "2026-06-12T09:00:00+00:00"
+            },
+            "rationale": "historical",
+            "relevance": 0.88,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:a8e50b3321c83d3386b1524b"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "claim_rollout_stage": "evidence"
+}

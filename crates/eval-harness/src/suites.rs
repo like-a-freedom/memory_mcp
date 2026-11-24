@@ -5,6 +5,7 @@ pub mod end_to_end;
 pub mod external_retrieval;
 pub mod extraction;
 pub mod lifecycle;
+pub(crate) mod memory_decisions;
 pub mod ner_quality;
 pub mod poisoning;
 pub mod registry;
@@ -20,6 +21,10 @@ pub use end_to_end::EndToEndSuite;
 pub use external_retrieval::{ExternalRetrievalSuite, WorkerPolicy};
 pub use extraction::ExtractionSuite;
 pub use lifecycle::LifecycleReleaseSuite;
+pub use memory_decisions::{
+    AcceptanceScoreChannel, DeterministicAcceptancePlan, DeterministicAcceptanceReport,
+    ReplayIndex, accept_candidate, compare_replays, load_registered_replay, load_verified_replay,
+};
 pub use ner_quality::NerQualitySuite;
 pub use poisoning::PoisoningSuite;
 pub use response_size::ResponseSizeSuite;
@@ -58,6 +63,7 @@ mod tests {
         "external_retrieval.rs",
         "extraction.rs",
         "lifecycle.rs",
+        "memory_decisions.rs",
         "ner_quality.rs",
         "poisoning.rs",
         "retrieval_quality.rs",

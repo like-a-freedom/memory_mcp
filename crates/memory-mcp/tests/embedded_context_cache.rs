@@ -1,7 +1,9 @@
 mod common;
 
 use chrono::{DateTime, Duration, Utc};
-use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
+use memory_mcp::models::{
+    AssembleContextRequest, InvalidateRequest, Provenance, TemporalContextQuery,
+};
 use memory_mcp::service::MemoryService;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
@@ -200,6 +202,87 @@ async fn historical_cutoffs_in_one_bucket_do_not_reuse_a_later_result()
 }
 
 #[tokio::test]
+async fn exact_knowledge_revisions_do_not_reuse_a_cached_historical_result()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, database) = common::make_service_with_client().await;
+    let known_at = Utc::now();
+    let initial_revision = database
+        .query(
+            "SELECT latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+            None,
+            "org",
+        )
+        .await?
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|row| row["latest_revision"].as_i64())
+        .expect("the revision clock is initialized");
+    let mut exact_request = request();
+    exact_request.query = "archive marker indigo".into();
+    let cutoff = known_at + Duration::days(1);
+
+    let before = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        exact_request.clone(),
+        TemporalContextQuery {
+            valid_at: Some(cutoff),
+            known_at: None,
+            known_revision: Some(initial_revision),
+        },
+    )
+    .await?;
+    assert!(before.items.is_empty());
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "The archive marker is indigo.",
+            "The archive marker is indigo.",
+            "episode:cache-revision-boundary",
+            known_at,
+            0.9,
+            vec![],
+            vec![],
+            Provenance::agent_observation("episode:cache-revision-boundary"),
+        )
+        .await?;
+    let latest_revision = database
+        .query(
+            "SELECT latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+            None,
+            "org",
+        )
+        .await?
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|row| row["latest_revision"].as_i64())
+        .expect("the revision clock advances after the fact is visible");
+    assert!(latest_revision > initial_revision);
+
+    let after = AssembleContextCapability::assemble_context_temporal_from_service(
+        &service,
+        exact_request,
+        TemporalContextQuery {
+            valid_at: Some(cutoff),
+            known_at: None,
+            known_revision: Some(latest_revision),
+        },
+    )
+    .await?;
+    assert_eq!(after.items.len(), 1);
+    assert_eq!(after.items[0].fact_id, fact_id);
+    assert_eq!(
+        after
+            .metadata
+            .expect("snapshot metadata")
+            .snapshot
+            .known_revision,
+        latest_revision
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn fact_creation_invalidates_context_warmed_during_claim_projection()
 -> Result<(), Box<dyn std::error::Error>> {
     let inner =
@@ -372,6 +455,24 @@ impl DbClient for ProjectionBarrierDb {
             self.fact_query_count.fetch_add(1, Ordering::SeqCst);
         }
         self.inner.query(sql, vars, namespace).await
+    }
+
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), memory_mcp::MemoryError> {
+        if sql.contains("CREATE claim:") && !self.gate.blocked.swap(true, Ordering::SeqCst) {
+            self.gate.started.notify_one();
+            self.gate
+                .release
+                .acquire()
+                .await
+                .expect("claim projection release semaphore remains open")
+                .forget();
+        }
+        self.inner.transaction_query(sql, vars, namespace).await
     }
 
     async fn apply_migrations(&self, namespace: &str) -> Result<(), memory_mcp::MemoryError> {

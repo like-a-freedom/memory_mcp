@@ -1,0 +1,42 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "hollowcrest_observatory-record-a"
+      ]
+    ],
+    [
+      [
+        "hollowcrest_observatory-record-b"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [],
+  "required_claim_annotation_alternatives": [
+    [
+      {
+        "source_event_id": "hollowcrest_observatory-record-a",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "source_event_id": "hollowcrest_observatory-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ]
+  ]
+}

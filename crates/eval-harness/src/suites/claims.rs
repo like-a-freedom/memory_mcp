@@ -215,6 +215,31 @@ struct IngestParams<'a> {
     policy_tags: &'a [String],
 }
 
+#[cfg(test)]
+mod ingestion_time_tests {
+    use super::{IngestParams, ingestion_request};
+    use chrono::DateTime;
+
+    #[test]
+    fn eval_ingest_preserves_server_owned_transaction_time() {
+        let event_time = DateTime::parse_from_rfc3339("2026-05-01T10:00:00Z")
+            .unwrap()
+            .to_utc();
+        let params = IngestParams {
+            source_type: "fixture",
+            source_id: "event-a",
+            content: "A source fact",
+            t_ref: "2026-05-01T10:00:00Z",
+            policy_tags: &[],
+        };
+
+        let request = ingestion_request(&params, event_time);
+
+        assert_eq!(request.t_ref, event_time);
+        assert!(request.t_ingested.is_none());
+    }
+}
+
 async fn ingest_and_extract(
     service: &memory_mcp::service::MemoryService,
     params: &IngestParams<'_>,
@@ -223,15 +248,7 @@ async fn ingest_and_extract(
 
     let episode_id = IngestCapability::ingest_from_service(
         service,
-        IngestRequest {
-            source_context: None,
-            source_type: params.source_type.to_string(),
-            source_id: params.source_id.to_string(),
-            content: params.content.to_string(),
-            t_ref: t_ref_datetime,
-            t_ingested: Some(t_ref_datetime),
-            policy_tags: params.policy_tags.to_vec(),
-        },
+        ingestion_request(params, t_ref_datetime),
         None,
     )
     .await
@@ -257,6 +274,18 @@ struct ExtractedSource {
     #[allow(dead_code)]
     episode_id: String,
     fact_ids: BTreeSet<String>,
+}
+
+fn ingestion_request(params: &IngestParams<'_>, t_ref: DateTime<Utc>) -> IngestRequest {
+    IngestRequest {
+        source_context: None,
+        source_type: params.source_type.to_string(),
+        source_id: params.source_id.to_string(),
+        content: params.content.to_string(),
+        t_ref,
+        t_ingested: None,
+        policy_tags: params.policy_tags.to_vec(),
+    }
 }
 
 struct CaseMetrics {

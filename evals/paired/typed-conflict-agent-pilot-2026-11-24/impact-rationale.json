@@ -1,0 +1,32 @@
+{
+  "schema_version": "memory-mcp-agent-impact-rationale/v1",
+  "status": "frozen before model capture; exploratory pilot only",
+  "treatment": "same current product binary, shadow control versus evidence-stage typed conflict annotations",
+  "target_population": "synthetic one-item memory retrieval tasks with simultaneous conflicting records, plus ordinary single-record recall controls",
+  "primary_outcomes": {
+    "agent_conflict_task_success": "exact safe conflict response, expected clarification flag, citation to returned supporting source, and completion within the one-memory-read budget",
+    "independent_typed_memory_success": "fixed public-MCP probe returns an admissible source with evidence_status=conflicting and contradiction/conflict annotation on that same source"
+  },
+  "impact_margins": {
+    "minimum_worthwhile_conflict_task_success_gain": 0.1,
+    "ordinary_recall_finite_control": "candidate must not have fewer successful controls than incumbent in either capture and must score at least 3/4 in each arm and capture; this is a regression screen, not a population non-inferiority claim"
+  },
+  "target_alternatives_for_power": {
+    "conflict_task_success_gain": 0.25
+  },
+  "rationale": [
+    "A ten percentage-point increase means one additional safe first-pass handling per ten conflict queries; that is the smallest user-visible benefit judged worth a claim for this narrowly defined high-conflict population.",
+    "Power will be planned for a twenty-five percentage-point gain, not the minimum margin; the estimate must be derived from the frozen development pilot paired-family discordance without using confirmatory outcomes.",
+    "Four ordinary controls per capture are a finite regression screen only; they are not a representative sample and cannot support a population non-inferiority claim.",
+    "The typed fixed-query probe is scored independently of the agent and its memory calls. It is a required memory-quality gate, not a substitute for agent-task success.",
+    "All cases are synthetic and families in confirmation must be disjoint from this pilot. Repeated runs are retests, not additional independent families."
+  ],
+  "power_protocol": {
+    "one_sided_alpha_primary": 0.025,
+    "power_primary": 0.9,
+    "independent_unit": "synthetic history family; repeated captures within a family do not increase sample size",
+    "primary_method": "one paired binary task outcome per disjoint synthetic family; one-sided exact McNemar test of no conflict-task-success difference, with a point-estimate floor of +0.10; exact power is computed at the +0.25 alternative using the 95% Clopper-Pearson upper bound on family-level discordance from the pilot",
+    "stopping": "no sample-size change after confirmatory outcomes are opened; if required N exceeds the preregistered feasibility cap, report no-go rather than underpowering"
+  },
+  "pilot_scope": "Estimate workflow feasibility, per-stratum headroom, paired discordance and repeatability. It cannot confirm benefit or change frozen margins."
+}

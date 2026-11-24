@@ -1,0 +1,9 @@
+{
+  "input_sha256": "6b7911bdfefd2bac91e15e87b03e8b3c25788e6fbda5a06ee6b781025d369a37",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "opal-initial"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

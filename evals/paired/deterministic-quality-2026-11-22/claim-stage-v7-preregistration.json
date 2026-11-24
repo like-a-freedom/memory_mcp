@@ -1,0 +1,43 @@
+{
+  "schema_version": "memory-mcp-rollout-preregistration/v1",
+  "status": "frozen-before-v7-capture",
+  "frozen_at": "2026-11-22",
+  "product_binary_sha256": "4e950f3fdc8b031d0245bd1a349d8815651e9bc316a3da4ccda571080b9f672a",
+  "evaluator_binary_sha256": "bf0338416ec64ea09a9d9a98e2d1c9deff0164a0764e1a2ba31d32dbdae7bde2",
+  "corpus_sha256": "50e07192c520422b8b8f71fe62efafccc3e7c0671128522c6ac5fd745fe60b0d",
+  "acceptance_plan_sha256": "9fb4831e12a4d9828e9a8915b1d3c5c227cf7400431497b7afeefd56ac7a9193",
+  "cohort": {
+    "cases": 8,
+    "independent_families": 8,
+    "repetitions_per_arm": 2,
+    "storage": "fresh embedded store for every case and capture",
+    "relationship_to_v6": "disjoint event ids, source ids, subjects, values and one corrected valid-time boundary; same eight scenario templates",
+    "scope_limit": "finite deterministic replication; not a new task-family sample or population estimate"
+  },
+  "arms": {
+    "incumbent": "explicit MEMORY_CLAIM_ROLLOUT_STAGE=shadow",
+    "candidate": "product default with MEMORY_CLAIM_ROLLOUT_STAGE absent"
+  },
+  "acceptance": {
+    "score_channel": "primary public observation",
+    "same_product_revision_and_binary": true,
+    "same_corpus_and_input_schema": true,
+    "distinct_raw_captures_and_exact_repeat_semantics": true,
+    "minimum_equal_family_decision_gain_basis_points": 2500,
+    "evidence_success_nonregression_per_case": true,
+    "ordinary_decision_nonregression_per_case": true,
+    "new_candidate_safety_findings": 0,
+    "maximum_returned_items": 5,
+    "all_cases_valid_and_covered": true,
+    "shared_incumbent_safety_findings": "reported separately and not misclassified as a candidate regression"
+  },
+  "agent_or_provider_required": false,
+  "preflight_amendments": [
+    {
+      "date": "2026-11-22",
+      "status": "pre-capture correction",
+      "reason": "Initial v7 draft transformed event values without updating the positive oracle assertion strings. The v7 product gate had not captured any v7 observations. The failed preflight draft and partial v4 compatibility attempt are preserved separately.",
+      "action": "Synced every oracle assertion with its registered source and added a corpus guard requiring source-grounded assertions plus an exact valid-time cutoff event and a future forbidden event."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What packaging code was recorded for Opaline Workshop on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 7,
+  "context_budget": 1,
+  "history_sha256": "f7fd9e24eeff16642c10de27382931db48b220abfa01fcb57fc52a96075d4eea",
+  "claim_rollout_stage": "evidence"
+}

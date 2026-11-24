@@ -1,0 +1,12 @@
+76cc37235d15d1b919ba58e359b18bd30b5a0bd590f84407bd40e16575ce2450  evals/paired/typed-evidence-probe-2026-11-24/evidence-capture.json
+ab2256e076f409e366f19ff85a2d97dc176ad9e1ad73492178efd24eaf075c9b  evals/paired/typed-evidence-probe-2026-11-24/evidence-input.json
+1f3be540157ab0b267df7fa568d7c95f34697f60a218e055989e6a2ab4db080b  evals/paired/typed-evidence-probe-2026-11-24/evidence-observation.json
+5ce0c8c9855f5ec0c92e1dc4992c68c7f2adfc330940a9085849160576293680  evals/paired/typed-evidence-probe-2026-11-24/evidence-score-current-evaluator.json
+5ce0c8c9855f5ec0c92e1dc4992c68c7f2adfc330940a9085849160576293680  evals/paired/typed-evidence-probe-2026-11-24/evidence-score.json
+895b8573ab68164ed8abf2a7aeeb91627d72345d0c204df94a77fabf40bce4af  evals/paired/typed-evidence-probe-2026-11-24/history.json
+ff9c6d81774de473e84ef13a457e974f626e8e5000196f779db4d20c3c59ade6  evals/paired/typed-evidence-probe-2026-11-24/oracle.json
+dbb050cabc898c59caceeaa961bc12c492010571022e0ee66926d4264f324ed8  evals/paired/typed-evidence-probe-2026-11-24/shadow-capture.json
+19c32d509cbd10cce83c3db0261bbd44f841793eb629a7db0a9c7e00696a2752  evals/paired/typed-evidence-probe-2026-11-24/shadow-input.json
+fe95c3f028bcc960086ef2e5bbdd195fbd316bd1dde89583049f5053dad6b49e  evals/paired/typed-evidence-probe-2026-11-24/shadow-observation.json
+d734126396fdd387570672d67efa8fb2deb549192cbef553409d3ab4dd67bb8b  evals/paired/typed-evidence-probe-2026-11-24/shadow-score-current-evaluator.json
+d734126396fdd387570672d67efa8fb2deb549192cbef553409d3ab4dd67bb8b  evals/paired/typed-evidence-probe-2026-11-24/shadow-score.json

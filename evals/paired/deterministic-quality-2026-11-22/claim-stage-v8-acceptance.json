@@ -1,0 +1,24 @@
+{
+  "schema_version": "memory-mcp-deterministic-acceptance/v1",
+  "corpus_sha256": "2a815affebbcfbfdf697c77dad722b9d12a84ddffd758c4957f15b2ab20a8722",
+  "config_sha256": "d52b1ccd6308b544317bb2b9ca8b10ca5fcfe9f6d3a39c59419db0a5ee42755a",
+  "candidate_config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+  "product_binary_sha256": "f669effa27ef6c6a315e498d191a2fa4ecd387414c89773e2fc5b8ee0c6e5f29",
+  "score_channel": "primary",
+  "families": {
+    "absent-subject": "absent-subject-v8-history",
+    "office-entry": "ordinary-location-v8-history",
+    "peer-conflict": "peer-conflict-v8-history",
+    "prior-knowledge": "prior-knowledge-v8-history",
+    "similar-name": "similar-name-v8-history",
+    "single-current": "single-current-v8-history",
+    "unverified-correction": "unverified-correction-v8-history",
+    "valid-boundary": "valid-boundary-v8-history"
+  },
+  "ordinary_cases": [
+    "office-entry",
+    "single-current"
+  ],
+  "minimum_gain_basis_points": 2500,
+  "maximum_items": 5
+}

@@ -181,7 +181,6 @@ async fn process_with_deps(
     let t_ref = claim.record.t_ref;
     let content_hash = claim.record.content_sha256.clone();
     let prepared_content = claim.prepared_content.clone();
-    let log_source_id = format!("fs:{}", &content_hash[..12.min(content_hash.len())]);
 
     // Advance to `ingesting` before the first ingest attempt.
     if let Err(_err) = store
@@ -199,7 +198,6 @@ async fn process_with_deps(
         let lineage = lineage.clone();
         let content_hash = content_hash.clone();
         let prepared_content = prepared_content.clone();
-        let log_source_id = log_source_id.clone();
         async move {
             let episode_id = ingestion_service
                 .ingest_with_metadata(
@@ -215,7 +213,6 @@ async fn process_with_deps(
                     None,
                     IngestionMetadata {
                         source_lineage: Some(lineage),
-                        log_source_id: Some(log_source_id),
                     },
                 )
                 .await?;

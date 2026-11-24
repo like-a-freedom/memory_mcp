@@ -13,8 +13,7 @@ use serde_json::json;
 use crate::error::MemoryError;
 
 use crate::knowledge::{CloseStoreClient, CloseTimestamps};
-use crate::storage::record_id_from_json_value;
-use crate::storage::{BoundDbClient, DbClient};
+use crate::storage::{BoundDbClient, DbClient, record_id_from_json_value};
 
 /// Narrow store that owns every read/write on the `triple` table in the
 /// Active Namespace.
@@ -39,23 +38,23 @@ impl TripleStoreClient {
         confidence: f64,
         source_fact_id: &str,
     ) -> Result<String, MemoryError> {
-        let row = self
-            .db
-            .create(
-                "triple",
-                json!({
-                    "subject": subject,
-                    "predicate": predicate,
-                    "object": object,
-                    "confidence": confidence,
-                    "source_fact_id": source_fact_id,
-                }),
-                crate::knowledge::queries::TRIPLE_TEMPORAL_FIELDS,
-            )
-            .await?;
-        row.get("id")
-            .and_then(record_id_from_json_value)
-            .ok_or_else(|| MemoryError::Storage("triple create returned no record id".to_string()))
+        let triple_id =
+            crate::shared::ids::deterministic_triple_id(subject, predicate, object, source_fact_id);
+        crate::knowledge::revisions::create(
+            &self.db,
+            &triple_id,
+            json!({
+                "subject": subject,
+                "predicate": predicate,
+                "object": object,
+                "confidence": confidence,
+                "source_fact_id": source_fact_id,
+            }),
+            crate::knowledge::queries::TRIPLE_TEMPORAL_FIELDS,
+            crate::knowledge::revisions::KnowledgeRevisionKind::Triple,
+        )
+        .await?;
+        Ok(triple_id)
     }
 
     /// Active triples with the same (subject, predicate) but a different

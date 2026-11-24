@@ -1,0 +1,37 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "literal-path-preservation",
+      "family_id": "literal-path-preservation",
+      "event_ids": ["literal-source-reference"],
+      "query": "Which exact source reference did I give you to remember? evals/corpora/memory-decisions-source-authority-v1/source-content.txt",
+      "valid_at": "2026-11-22T12:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "literal-url-preservation",
+      "family_id": "literal-url-preservation",
+      "event_ids": ["literal-url-reference"],
+      "query": "Which exact URL should I remember as the agent-provided reference? http://127.0.0.1:9/agent-reference",
+      "valid_at": "2026-11-22T12:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "ordinary-fact-control",
+      "family_id": "ordinary-fact-control",
+      "event_ids": ["ordinary-fact"],
+      "query": "Where was Pine Office located?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "unknown-reference-control",
+      "family_id": "unknown-reference-control",
+      "event_ids": ["unknown-history"],
+      "query": "What exact SFTP endpoint was provided for the audit archive?",
+      "valid_at": "2026-11-22T12:00:00Z",
+      "budget": 5
+    }
+  ]
+}

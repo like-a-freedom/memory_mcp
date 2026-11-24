@@ -88,7 +88,7 @@ async fn explain_inner<T: ToolContext>(
             ctx.record(ToolEvent {
                 op: "explain.error",
                 args: json!({}),
-                result: json!({"error": err.to_string()}),
+                result: json!({"error_code": err.code()}),
                 level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });

@@ -1,0 +1,123 @@
+{
+  "schema_version": "memory-mcp-agent-plan/v2",
+  "plan_id": "agent-managed-maintenance-feasibility-2026-11-22-v3",
+  "stage": "development_pilot",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "marble-garden-history",
+      "case_id": "marble-garden-current-database-failover-zone",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "tundra-observatory-history",
+      "case_id": "tundra-observatory-current-export-encryption-profile",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "copper-lantern-history",
+      "case_id": "copper-lantern-current-artifact-signing-profile",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "willow-bridge-history",
+      "case_id": "willow-bridge-current-nightly-snapshot-region",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "velvet-compass-history",
+      "case_id": "velvet-compass-current-incident-routing-queue",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "granite-orchard-history",
+      "case_id": "granite-orchard-current-build-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "silver-meadow-history",
+      "case_id": "silver-meadow-current-audit-export-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "quiet-citadel-history",
+      "case_id": "quiet-citadel-current-rollback-manifest-prefix",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "planned_independent_families": 8,
+  "shared_identity": {
+    "agent_runner": "codex-cli",
+    "agent_version": "0.171.0",
+    "model": "gpt-6.1-sol",
+    "model_identity_protocol": {
+      "method": "same_alias_within_invocation",
+      "max_duration_seconds": 7200
+    },
+    "system_prompt_sha256": "1f608baad1673f98aa136c81d4081299b63b49faf841728de0a2e23ccfd2d8e7",
+    "task_prompt_sha256": "c6af451ce7616257af0dff18a8156206919463f9921c0b697ce6c988b01183ec",
+    "host_policy_sha256": "c7ee6bfcb59dccfd8f91f972373743e9fe9e4f09d27a2462cbbd36a861588e1e",
+    "transport": "stdio",
+    "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+    "reader_config_sha256": "1bbe675e6d3d217ee485e7d91daaf3a715cb801b750a9b0691727deb7dbe5555",
+    "judge_config_sha256": null,
+    "corpus_sha256": "62d2b77a8f3c7e7254cce707ac1c6d96187a3cc8852ca8ef3993e9b142dccfe6",
+    "oracle_sha256": "6df5a3520b0beb45e171acf169a94f5c0f504879f226704aae780c37142fbf80",
+    "clock_id": "macos-utc-wall-clock-v1",
+    "simulator_sha256": "a69954eb71dda1e77f8485cb27b36a63d8ca4c6018128a14baf8c60549b4e3a7",
+    "provider_fingerprints": {
+      "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+      "memory_eval_cli": "2eb8901c0c3ab574ddd983dd08088d6b3b65ffb685fb91ae8e6401fb8ba846e4"
+    },
+    "context_budget_tokens": 65536,
+    "tool_call_budget": 8,
+    "turn_budget": 8,
+    "output_token_budget": 2048,
+    "wall_time_budget_ms": 120000,
+    "hardware_class": "macos-arm64"
+  },
+  "incumbent_product": {
+    "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-agent-maintenance-v3-2026-11-22",
+    "binary_sha256": "a06d3151ce1e854692e343cfcdbf829cfa26e46f283ca19fc37ae9ff2ff35273",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "candidate_product": {
+    "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-agent-maintenance-v3-2026-11-22",
+    "binary_sha256": "a06d3151ce1e854692e343cfcdbf829cfa26e46f283ca19fc37ae9ff2ff35273",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "declared_tool_schema_change": null,
+  "bootstrap": {
+    "seed": 2026112203,
+    "draws": 10000,
+    "confidence_level_basis_points": 9500
+  },
+  "pilot_report_sha256": null,
+  "power_analysis_sha256": null,
+  "promotion_criteria": null
+}

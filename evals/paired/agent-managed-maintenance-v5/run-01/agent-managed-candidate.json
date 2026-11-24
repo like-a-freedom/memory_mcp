@@ -1,0 +1,386 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "candidate",
+  "run_id": "37176-1795388784002732000-0",
+  "identity_sha256": "3853cda2d6b44f2f3de0a92f75f9d94071953b61d1f3a425b24cd6ac9f5ea8c2",
+  "expected_trials": [
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "birch-archive-history",
+      "case_id": "birch-archive-current-cold-backup-tier",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "cinder-harbor-history",
+      "case_id": "cinder-harbor-current-vessel-backup-region",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "eclipse-transit-history",
+      "case_id": "eclipse-transit-current-schedule-export-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "fern-mapping-history",
+      "case_id": "fern-mapping-current-map-tile-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "maple-vault-history",
+      "case_id": "maple-vault-current-signing-key-alias",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "opal-studio-history",
+      "case_id": "opal-studio-current-render-archive-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "raven-canyon-history",
+      "case_id": "raven-canyon-current-telemetry-ingress-queue",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "single_correction_invalidation",
+      "family_id": "solstice-lab-history",
+      "case_id": "solstice-lab-current-dataset-snapshot-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "birch-archive-history",
+        "case_id": "birch-archive-current-cold-backup-tier",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 327
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "e12d248b5107480c4ff3e5bee46745211bc577a5acaa5b70b2c659564256077e",
+        "response_sha256": "f2b7409f0ca0e9113a640328266e555419e528a410e76a703d92ad055a46fe62",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "cinder-harbor-history",
+        "case_id": "cinder-harbor-current-vessel-backup-region",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 270
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "2331fef17ab3f711ecb05dad5a8ce10c5e94c93c4406cf29160be7b1bce3ff24",
+        "response_sha256": "5128bc8626e8d486d0e9ec2cbc1b7f4769810b861bf70f8b37441c267e6a1ad9",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "eclipse-transit-history",
+        "case_id": "eclipse-transit-current-schedule-export-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 302
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "fc16bb0d045af92079ac3fce86fcf906e4e8c5de3bf1199edde22e86cf617351",
+        "response_sha256": "a4da4facf29601beec0a53149cad4710da79e3405709b1bcf20cdc5ceb0bb7c4",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "fern-mapping-history",
+        "case_id": "fern-mapping-current-map-tile-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 294
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "22a782aaa6e98e5740816bce901104a17e55d849e9337de49fbebc361ac1561f",
+        "response_sha256": "f91792ddf26207fccbb4db2199de7a67c187d9c71fe884ac0d3d17de567f2d8e",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "maple-vault-history",
+        "case_id": "maple-vault-current-signing-key-alias",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 266
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "ef265a9ac22aafb7cdb38625306d11651e57d103d81f04ba81da5809a7c3eb95",
+        "response_sha256": "f8a4f9656d9ddff6b6c3ec3bf87fc67b816ff644240650471e7e78b4bc97614b",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "opal-studio-history",
+        "case_id": "opal-studio-current-render-archive-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 266
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "cefdc31708b8ae71b3d52766e5f2e0ecbada90f2f58e063e768cfa276eb7b3a6",
+        "response_sha256": "45852047ce4df19f281f2b3fab58c65cdb53030c55dd63b2e5ce52392658bfab",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "raven-canyon-history",
+        "case_id": "raven-canyon-current-telemetry-ingress-queue",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 279
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "3bfc85f0f5dea1c40eeffcdcfb0d4f2e0d60fa6f113321f410cccbce67f8933f",
+        "response_sha256": "228a79f14b7e325be1c131e4a4727f6e9d38b70fff05ed67f739ef2e0f9e1320",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "single_correction_invalidation",
+        "family_id": "solstice-lab-history",
+        "case_id": "solstice-lab-current-dataset-snapshot-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 274
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "ccc0c8aa78521a7dbdaf3e5177ee524dac05b10b636805fcd137cb0236d632a4",
+        "response_sha256": "d3d4a33748d581f03f14ddf8443bd189f4c6f10f04b8dc208d36cd345349c7e8",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "v5-old-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

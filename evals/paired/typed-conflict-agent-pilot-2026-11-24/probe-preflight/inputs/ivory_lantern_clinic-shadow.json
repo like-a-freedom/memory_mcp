@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What night shift staffing was recorded for Ivory Lantern Research Clinic on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 15,
+  "context_budget": 1,
+  "history_sha256": "fc0c7d24c18d0f89e30798c4c3b63b85f4ae6cc1999281ac112a750be9ec8eef",
+  "claim_rollout_stage": "shadow"
+}

@@ -1,0 +1,434 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "93193-1795353847093525000-0",
+  "identity_sha256": "240347ae92e54dc8a938f884e97850fd6805bd06fb88a29583493fc665de1859",
+  "expected_trials": [
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "brass-orchard-history",
+      "case_id": "brass-orchard-escalation-mailbox",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "cinder-atlas-history",
+      "case_id": "cinder-atlas-export-marker",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "mauve-harbor-history",
+      "case_id": "mauve-harbor-backup-cabinet-label",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "orchid-relay-history",
+      "case_id": "orchid-relay-release-ledger-tag",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "pollen-circuit-history",
+      "case_id": "pollen-circuit-nightly-handoff-queue",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "quiet-juniper-history",
+      "case_id": "quiet-juniper-review-packet-code",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "tidal-archive-history",
+      "case_id": "tidal-archive-restore-shorthand",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "velvet-comet-history",
+      "case_id": "velvet-comet-rotation-shelf-label",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "brass-orchard-history",
+        "case_id": "brass-orchard-escalation-mailbox",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80604,
+        "output_tokens": 362,
+        "wall_time_ms": 30912
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "9661f0b73b55cc5ab72e2fc5c06222f631a9838c93b4f01dd80a77aebda9b830",
+        "response_sha256": "1ee44d16e55d01df5a0db445929f1a40b807ffef89370fb9e8a4db7a9704640b",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "cinder-atlas-history",
+        "case_id": "cinder-atlas-export-marker",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80749,
+        "output_tokens": 377,
+        "wall_time_ms": 37688
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d7353c46cd96b7b26986ff990e1fe80339e0619e3a16f32255497b663088de88",
+        "response_sha256": "904b94e06e88fdd127f73cdbddc7aeb67b9bac760ec8a981cc07b65e863a52cc",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "mauve-harbor-history",
+        "case_id": "mauve-harbor-backup-cabinet-label",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 67840,
+        "output_tokens": 356,
+        "wall_time_ms": 34980
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "2c42503ebd15d814b9da8185e5b410f0ff861238446aa7acfc7d8d9f10a36cbb",
+        "response_sha256": "09fc4f4bff15ff93d6b75cb07c849fca027765f435a0c2eb3409836f07f0ff77",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "orchid-relay-history",
+        "case_id": "orchid-relay-release-ledger-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80592,
+        "output_tokens": 370,
+        "wall_time_ms": 32482
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "cc174ca7a744c53e1681f8e14bfb6a8b09c73840a5ec668bc0d9420f2e221e65",
+        "response_sha256": "cc613862c343667ce7ee7d0123db6da315821ba8b0a0593097aa24ebbb87b9b7",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "pollen-circuit-history",
+        "case_id": "pollen-circuit-nightly-handoff-queue",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80692,
+        "output_tokens": 381,
+        "wall_time_ms": 36597
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "a302649b489603c463c926489c297b92919999f42b82a9c05a0b82ab08decc88",
+        "response_sha256": "b1e2f4c65cd24c8c785f2a5256cf1d4b89475d8827b8eecf9440e1f05b43c68b",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "quiet-juniper-history",
+        "case_id": "quiet-juniper-review-packet-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80669,
+        "output_tokens": 383,
+        "wall_time_ms": 35074
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "c1215ae3da637f054ccb0aea155102a9ea495cf94b17e17c15f4d4f9c5f91824",
+        "response_sha256": "40161e5796b0de6e2d91af02e2ba5fb817f2941970ad503bbbe84aa62d83a7d0",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "tidal-archive-history",
+        "case_id": "tidal-archive-restore-shorthand",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80586,
+        "output_tokens": 371,
+        "wall_time_ms": 31677
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "7195141277e29734c5440f25314a99dae85acd7da1c9d1988354302b4016dc8c",
+        "response_sha256": "55a0e858c887f658c584f9c805b0594918abd7b5b4f1904757171bb49a84f190",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "velvet-comet-history",
+        "case_id": "velvet-comet-rotation-shelf-label",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 1,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 80833,
+        "output_tokens": 385,
+        "wall_time_ms": 33049
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 2,
+          "succeeded": 2,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 2,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "dfe70509515b9cf6fdbd052fd5edb5f059d700a51d66ee0f381c02cdab0b25ad",
+        "response_sha256": "bf5a06dc64f171112e19ed26c85ec18ae1c1a7e1c3f2ee5ed4e8242bd8f7df52",
+        "known_revision": 9,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [],
+        "unsupported_source_count": 1,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      }
+    }
+  ]
+}

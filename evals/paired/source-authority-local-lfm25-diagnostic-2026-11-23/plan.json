@@ -1,0 +1,97 @@
+{
+  "schema_version": "memory-mcp-agent-plan/v2",
+  "plan_id": "source-authority-local-lfm25-diagnostic-2026-11-23",
+  "stage": "development_pilot",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "velvetbrook_archive",
+      "case_id": "velvetbrook_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "morrowbend_clinic",
+      "case_id": "morrowbend_clinic-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "alderveil_relay",
+      "case_id": "alderveil_relay-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "northglen_depot",
+      "case_id": "northglen_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "planned_independent_families": 4,
+  "shared_identity": {
+    "agent_runner": "openai-compatible-chat-completions",
+    "agent_version": "LM Studio local Chat Completions; CLI commit dcefd5a; server build unreported",
+    "model": "memory-local-eval-lfm25",
+    "model_identity_protocol": {
+      "method": "same_alias_within_invocation",
+      "max_duration_seconds": 1800
+    },
+    "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+    "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+    "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+    "transport": "stdio",
+    "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+    "reader_config_sha256": "6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490",
+    "judge_config_sha256": null,
+    "corpus_sha256": "e503cb7dc4e25ff74eda046e1dc4fe50fc1e7120aa6417b2fd8533fc4c48ff26",
+    "oracle_sha256": "035b8a82ff90c9b832df08c7c379ce106beb3f1127dd72989695b5031b2c0f7c",
+    "clock_id": "macos-utc-wall-clock-v1",
+    "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+    "provider_fingerprints": {
+      "memory_eval_cli": "31d6f0a7e5ce1bbff32e8ef8e0dac709654e789828327990737928ae9bd844cc",
+      "chat_completions_endpoint_config": "f7bc8c808719d3bafd7ade8b4a4636cc29db9357b7dd495b8231dfbe2ea9af08",
+      "lmstudio_cli": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+      "local_model_inventory": "439dd69987f89707ffb8767d302ad3e07dab0bcb3a686e3210a1caccf915f3f2"
+    },
+    "context_budget_tokens": 15360,
+    "tool_call_budget": 8,
+    "turn_budget": 8,
+    "output_token_budget": 1024,
+    "wall_time_budget_ms": 120000,
+    "hardware_class": "macos-arm64"
+  },
+  "incumbent_product": {
+    "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-lfm25-diagnostic-2026-11-23",
+    "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "candidate_product": {
+    "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-master-lfm25-diagnostic-2026-11-23",
+    "binary_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "declared_tool_schema_change": null,
+  "bootstrap": {
+    "seed": 2026112324,
+    "draws": 10000,
+    "confidence_level_basis_points": 9500
+  },
+  "pilot_report_sha256": null,
+  "power_analysis_sha256": null,
+  "promotion_criteria": null
+}

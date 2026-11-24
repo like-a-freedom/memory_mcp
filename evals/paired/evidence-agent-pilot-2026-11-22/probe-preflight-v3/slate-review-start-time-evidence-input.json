@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "When does the Slate review start?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-05T08:00:00Z",
+  "known_revision": 4,
+  "context_budget": 5,
+  "history_sha256": "315cb822b12942e2a513bea0092681cc5ecd84bef74bc7ed816988e7311743a5",
+  "claim_rollout_stage": "evidence"
+}

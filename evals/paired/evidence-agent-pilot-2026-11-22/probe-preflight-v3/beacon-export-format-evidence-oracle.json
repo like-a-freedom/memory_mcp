@@ -1,0 +1,10 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "beacon-export-format-decision"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

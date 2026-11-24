@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "absent-subject",
+      "family_id": "absent-subject-v7-history",
+      "event_ids": [
+        "absent-v7-entry"
+      ],
+      "query": "What capacity was recorded for Opal Hangar?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "similar-name",
+      "family_id": "similar-name-v7-history",
+      "event_ids": [
+        "west-v7-entry",
+        "east-v7-entry"
+      ],
+      "query": "What capacity was recorded for Larch Terminal East?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "single-current",
+      "family_id": "single-current-v7-history",
+      "event_ids": [
+        "sole-v7-entry"
+      ],
+      "query": "What capacity was recorded for Fenwick Works?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "peer-conflict",
+      "family_id": "peer-conflict-v7-history",
+      "event_ids": [
+        "dispute-v7-b",
+        "dispute-v7-a"
+      ],
+      "query": "What capacity was recorded for Willow Annex?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "unverified-correction",
+      "family_id": "unverified-correction-v7-history",
+      "event_ids": [
+        "supported-v7-entry",
+        "forum-v7-entry"
+      ],
+      "query": "What capacity was recorded for Saffron Port?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5
+    },
+    {
+      "id": "prior-knowledge",
+      "family_id": "prior-knowledge-v7-history",
+      "event_ids": [
+        "pre-v7-report",
+        "post-v7-report"
+      ],
+      "query": "Before the later report, what capacity was recorded for Topaz Quay?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "knowledge_before_event_id": "post-v7-report",
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "valid-boundary",
+      "family_id": "valid-boundary-v7-history",
+      "event_ids": [
+        "earlier-v7-valid",
+        "later-v7-valid"
+      ],
+      "query": "What capacity was recorded for Marble Wharf on August 1, 2026?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "requires_separate_time_cutoffs": true,
+      "temporal_diagnostic_as_of": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "office-entry",
+      "family_id": "ordinary-location-v7-history",
+      "event_ids": [
+        "office-v7-entry"
+      ],
+      "query": "Where was Fenwick Office located?",
+      "valid_at": "2026-08-01T09:00:00Z",
+      "budget": 5,
+      "repeat_read": 2
+    }
+  ]
+}

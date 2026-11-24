@@ -18,7 +18,7 @@ pub struct IngestParams {
     pub content: String,
     /// Reference timestamp (ISO 8601 format)
     pub t_ref: String,
-    /// Ingestion timestamp (ISO 8601 format, optional)
+    /// Deprecated compatibility field. Omit it: transaction time is assigned by the memory server.
     pub t_ingested: Option<String>,
     /// Policy tags (optional)
     #[serde(default)]
@@ -65,6 +65,15 @@ pub struct ExtractParams {
 
     /// Custom zero-shot entity labels for GLiNER (opt-in, overrides default labels)
     pub zero_shot_labels: Option<Vec<String>>,
+    /// Include extracted statements and supporting source quotes in the result;
+    /// callers can set this to false to request the compact response.
+    #[serde(default = "default_include_fact_evidence")]
+    #[schemars(default = "default_include_fact_evidence")]
+    pub include_fact_evidence: bool,
+}
+
+fn default_include_fact_evidence() -> bool {
+    true
 }
 
 /// Parameters for the `resolve` tool.
@@ -107,6 +116,15 @@ pub struct AssembleContextParams {
     /// The timestamp to assemble context as-of (ISO 8601 format, default: now)
     #[serde(default)]
     pub as_of: String,
+    /// Valid-time boundary (ISO 8601), independent of server knowledge time.
+    #[serde(default)]
+    pub valid_at: Option<String>,
+    /// Server-knowledge boundary (ISO 8601), resolved to a committed revision.
+    #[serde(default)]
+    pub known_at: Option<String>,
+    /// Exact committed knowledge revision; mutually exclusive with known_at.
+    #[serde(default)]
+    pub known_revision: Option<i64>,
     /// Maximum number of facts to return (default: 5)
     #[serde(default = "crate::tools::parsers::default_budget")]
     pub budget: i32,
@@ -343,6 +361,18 @@ mod tests {
         assert!(!properties.contains_key("project"));
         assert_eq!(properties["fact_types"]["type"], "array");
         assert_eq!(properties["as_of"]["type"], "string");
+        assert_eq!(
+            properties["valid_at"]["type"],
+            serde_json::json!(["string", "null"])
+        );
+        assert_eq!(
+            properties["known_at"]["type"],
+            serde_json::json!(["string", "null"])
+        );
+        assert_eq!(
+            properties["known_revision"]["type"],
+            serde_json::json!(["integer", "null"])
+        );
         assert_eq!(properties["budget"]["type"], "integer");
         assert_eq!(
             properties["view_mode"]["type"],
@@ -387,5 +417,19 @@ mod tests {
             .is_err()
         );
         assert!(params.compact, "compact must default to true");
+    }
+
+    #[test]
+    fn assemble_context_params_deserializes_independent_temporal_axes() {
+        let params: AssembleContextParams = serde_json::from_value(serde_json::json!({
+            "query": "maintenance window",
+            "valid_at": "2026-11-01T00:00:00Z",
+            "known_at": "2026-11-15T00:00:00Z"
+        }))
+        .expect("flat temporal parameters");
+
+        assert_eq!(params.valid_at.as_deref(), Some("2026-11-01T00:00:00Z"));
+        assert_eq!(params.known_at.as_deref(), Some("2026-11-15T00:00:00Z"));
+        assert_eq!(params.known_revision, None);
     }
 }

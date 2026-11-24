@@ -1,0 +1,7 @@
+{
+  "SURREALDB_EMBEDDED": "true",
+  "SURREALDB_DB_NAME": "memory_decisions",
+  "SURREALDB_NAMESPACE": "main",
+  "EMBEDDINGS_ENABLED": "false",
+  "NER_EXTRACTOR": "regex"
+}

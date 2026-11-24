@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "Which serialization format was selected for the Beacon export?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-03T11:30:00Z",
+  "known_revision": 2,
+  "context_budget": 5,
+  "history_sha256": "53b1314203439b395dde25947bab21be01970d9f95c3afdbc2d7e44d20f77ebe",
+  "claim_rollout_stage": "evidence"
+}

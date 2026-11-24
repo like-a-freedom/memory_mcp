@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What inventory shelf was recorded for Brackenridge Depot on July 15, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-07-15T12:00:00Z",
+  "known_revision": 7,
+  "context_budget": 1,
+  "history_sha256": "dd9ec6c46702bf483a58966244fedaa9b0be1dd656197d5b9362dc951623f7d7",
+  "claim_rollout_stage": "shadow"
+}

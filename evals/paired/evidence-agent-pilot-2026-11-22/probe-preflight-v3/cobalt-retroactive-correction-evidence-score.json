@@ -1,0 +1,8 @@
+{
+  "schema_version": "memory-mcp-independent-probe-score/v1",
+  "input_sha256": "5b719e9343b14c70627e88d1336bb15eedc97500c8b1308ea9333780b5783012",
+  "oracle_sha256": "71f6dfcaeaf48577c320574d25f2abe5568aea9b442984c56f85b8dfdd98db28",
+  "observation_sha256": "2f6fb313599d974dfdbe9c78a12dc33273bd3047268ce4205a93dacb893f2f68",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "evidence_success": true
+}

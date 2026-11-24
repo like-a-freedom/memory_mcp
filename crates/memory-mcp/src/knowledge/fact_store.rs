@@ -52,13 +52,14 @@ impl FactStoreClient {
 
     /// Persists a new fact record. Returns `Value::Null` on success.
     pub(crate) async fn create(&self, fact_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db
-            .create(
-                fact_id,
-                content,
-                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
-            )
-            .await
+        crate::knowledge::revisions::create(
+            &self.db,
+            fact_id,
+            content,
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            crate::knowledge::revisions::KnowledgeRevisionKind::Fact,
+        )
+        .await
     }
 
     #[cfg(feature = "streamable-http")]
@@ -68,13 +69,14 @@ impl FactStoreClient {
         content: Value,
     ) -> Result<(), MemoryError> {
         crate::storage::validate_record_id(fact_id)?;
-        let (sql, vars) = crate::storage::build_create_query(
+        let (sql, vars, revision) = crate::knowledge::revisions::prepare_create(
             fact_id,
             content,
             crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
-        );
+            crate::knowledge::revisions::KnowledgeRevisionKind::Fact,
+        )?;
         let mutation = crate::platform::persistence::outbox::TenantMutation::new(sql, vars)?;
-        crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
+        crate::platform::persistence::outbox::commit_revisioned_tenant_mutation_with_event(
             &self.db,
             mutation,
             crate::platform::persistence::outbox::TenantChangeEvent {
@@ -84,6 +86,7 @@ impl FactStoreClient {
                 change_kind: "fact_created".into(),
                 created_at: chrono::Utc::now(),
             },
+            revision,
             &self.db.fault_injector,
         )
         .await

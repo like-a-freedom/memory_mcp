@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "absent-v7-entry",
+      "source_id": "absent-v7-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Quartz Hangar\ndimension: capacity\nvalue: 61 crates for Quartz Hangar",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "east-v7-entry",
+      "source_id": "east-v7-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Larch Terminal East\ndimension: capacity\nvalue: 47 crates for Larch Terminal East",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "west-v7-entry",
+      "source_id": "west-v7-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Larch Terminal West\ndimension: capacity\nvalue: 29 crates for Larch Terminal West",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "sole-v7-entry",
+      "source_id": "sole-v7-entry-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Fenwick Works\ndimension: capacity\nvalue: 58 crates for Fenwick Works",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v7-a",
+      "source_id": "dispute-v7-a-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Willow Annex\ndimension: capacity\nvalue: 41 crates for Willow Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "dispute-v7-b",
+      "source_id": "dispute-v7-b-peer",
+      "source_type": "inspection-record",
+      "content": "subject: Willow Annex\ndimension: capacity\nvalue: 43 crates for Willow Annex",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "supported-v7-entry",
+      "source_id": "supported-v7-entry-ledger",
+      "source_type": "maintenance-record",
+      "content": "subject: Saffron Port\ndimension: capacity\nvalue: 27 crates for Saffron Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "forum-v7-entry",
+      "source_id": "forum-v7-entry-ledger",
+      "source_type": "forum-report",
+      "content": "subject: Saffron Port\ndimension: capacity\nvalue: 32 crates, unverified correction reported on a forum for Saffron Port",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "pre-v7-report",
+      "source_id": "pre-v7-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Topaz Quay\ndimension: capacity\nvalue: 13 crates for Topaz Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "post-v7-report",
+      "source_id": "post-v7-report-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Topaz Quay\ndimension: capacity\nvalue: 19 crates, correction claimed by another inspector for Topaz Quay",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "earlier-v7-valid",
+      "source_id": "earlier-v7-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Marble Wharf\ndimension: capacity\nvalue: 16 crates for Marble Wharf",
+      "t_ref": "2026-08-01T09:00:00Z"
+    },
+    {
+      "id": "later-v7-valid",
+      "source_id": "later-v7-valid-ledger",
+      "source_type": "inspection-record",
+      "content": "subject: Marble Wharf\ndimension: capacity\nvalue: 21 crates for Marble Wharf",
+      "t_ref": "2026-08-01T09:01:00Z"
+    },
+    {
+      "id": "office-v7-entry",
+      "source_id": "office-v7-entry-ledger",
+      "source_type": "inventory-record",
+      "content": "subject: Fenwick Office\ndimension: location\nvalue: Dovetail Lane for Fenwick Office",
+      "t_ref": "2026-08-01T09:00:00Z"
+    }
+  ]
+}

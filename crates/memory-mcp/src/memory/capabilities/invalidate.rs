@@ -1,5 +1,4 @@
 use crate::error::MemoryError;
-use crate::knowledge::CloseTimestamps;
 use crate::memory::capabilities::deps::InvalidateDeps;
 use crate::memory::context_cache::invalidate_cache;
 
@@ -56,31 +55,15 @@ impl crate::memory::api::InvalidationPort for InvalidationPort<'_> {
         })
     }
 
-    async fn close_record(
+    async fn close_fact_and_claims(
         &self,
-        record_id: &str,
+        fact_id: &str,
         t_invalid: chrono::DateTime<chrono::Utc>,
-        t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
         reason: &str,
     ) -> Result<(), MemoryError> {
         self.close_store()
-            .close_record(
-                record_id,
-                &CloseTimestamps {
-                    t_invalid: Some(t_invalid),
-                    t_invalid_ingested,
-                },
-                Some(reason),
-            )
+            .retract_fact_and_claims_at(fact_id, t_invalid, reason)
             .await
-    }
-
-    async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError> {
-        self.close_store().close_claims_for_fact(fact_id).await
-    }
-
-    fn claim_pipeline_is_wired(&self) -> bool {
-        self.deps.claim_store.is_some()
     }
 
     async fn invalidate_assembled_context(&self) -> Result<(), MemoryError> {
@@ -117,7 +100,10 @@ mod tests {
                 "fact:1",
                 Some(json!({"fact_id": "fact:1", "content": "test", "scope": "personal"})),
             )
-            .expect_update("fact:1", json!({"ok": true}));
+            .expect_transaction_with(
+                |sql| sql.contains("closed_revision = $__knowledge_revision"),
+                |_, _| Ok(()),
+            );
         let svc = make_service(db);
 
         let result = crate::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability::invalidate_from_service(&svc, fact_request("fact:1"), None).await;
@@ -141,7 +127,10 @@ mod tests {
                 "fact:2",
                 Some(json!({"fact_id": "fact:2", "content": "x", "scope": "team"})),
             )
-            .expect_update("fact:2", json!({"ok": true}));
+            .expect_transaction_with(
+                |sql| sql.contains("closed_revision = $__knowledge_revision"),
+                |_, _| Ok(()),
+            );
         let svc = make_service(db);
 
         let cache_key = CacheKey::new(
@@ -214,7 +203,10 @@ mod tests {
                 "fact:3",
                 Some(json!({"fact_id": "fact:3", "content": "no scope"})),
             )
-            .expect_update("fact:3", json!({"ok": true}));
+            .expect_transaction_with(
+                |sql| sql.contains("closed_revision = $__knowledge_revision"),
+                |_, _| Ok(()),
+            );
         let svc = make_service(db);
 
         let result = crate::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability::invalidate_from_service(&svc, fact_request("fact:3"), None).await;

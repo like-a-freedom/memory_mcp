@@ -1,0 +1,177 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "lagoon_copper_archive",
+        "case_id": "lagoon_copper_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Lagoon Copper Archive, the calibration key is stored in Vault-32.",
+      "recall_prompt": "At Lagoon Copper Archive, where is the calibration key stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Lagoon Copper Archive, where is the calibration key stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-lagoon_copper_archive",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-lagoon_copper_archive"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Vault-32"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Lagoon Copper Archive before this session. Use assemble_context to check this memory question: At Lagoon Copper Archive, where is the calibration key stored? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "lagoon_copper_archive",
+          "relative_path": "fixtures/lagoon_copper_archive.txt",
+          "content": "Fact: At Lagoon Copper Archive, the calibration key is stored in Vault-32.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-lagoon_copper_archive"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "mosaic_pine_terminal",
+        "case_id": "mosaic_pine_terminal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Mosaic Pine Terminal, the nightly checksum is recorded in Binder-61.",
+      "recall_prompt": "At Mosaic Pine Terminal, where is the nightly checksum recorded? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Mosaic Pine Terminal, where is the nightly checksum recorded?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-mosaic_pine_terminal",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-mosaic_pine_terminal"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Binder-61"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Mosaic Pine Terminal before this session. Use assemble_context to check this memory question: At Mosaic Pine Terminal, where is the nightly checksum recorded? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "mosaic_pine_terminal",
+          "relative_path": "fixtures/mosaic_pine_terminal.txt",
+          "content": "Fact: At Mosaic Pine Terminal, the nightly checksum is recorded in Binder-61.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-mosaic_pine_terminal"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opal_wind_atelier",
+        "case_id": "opal_wind_atelier-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Opal Wind Atelier, the inspection card is filed under Reference-84.",
+      "recall_prompt": "At Opal Wind Atelier, where is the inspection card filed? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Opal Wind Atelier, where is the inspection card filed?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-opal_wind_atelier",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-opal_wind_atelier"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Reference-84"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Opal Wind Atelier before this session. Use assemble_context to check this memory question: At Opal Wind Atelier, where is the inspection card filed? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "opal_wind_atelier",
+          "relative_path": "fixtures/opal_wind_atelier.txt",
+          "content": "Fact: At Opal Wind Atelier, the inspection card is filed under Reference-84.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-opal_wind_atelier"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "tundra_blue_depot",
+        "case_id": "tundra_blue_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this source fact for a later session. The exact literal source text is below. Pass that exact text as the content argument to the memory ingest tool, then extract the returned episode. Do not pass a file name or path as content, do not add facts, and confirm briefly after both calls succeed.\n\nFact: At Tundra Blue Depot, the spare latch code is written on Tag-27.",
+      "recall_prompt": "At Tundra Blue Depot, what is the spare latch code written on? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Tundra Blue Depot, what is the spare latch code written on?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "diagnostic-source-tundra_blue_depot",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "diagnostic-source-tundra_blue_depot"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Tag-27"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "The evaluator imported and extracted the source file for Tundra Blue Depot before this session. Use assemble_context to check this memory question: At Tundra Blue Depot, what is the spare latch code written on? Do not write or modify memory. Answer only when returned evidence supports the value. Cite exact source_episode IDs from assemble_context; if evidence is missing or conflicting, say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "tundra_blue_depot",
+          "relative_path": "fixtures/tundra_blue_depot.txt",
+          "content": "Fact: At Tundra Blue Depot, the spare latch code is written on Tag-27.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-20T00:00:00Z",
+          "event_id": "diagnostic-source-tundra_blue_depot"
+        }
+      ]
+    }
+  ]
+}

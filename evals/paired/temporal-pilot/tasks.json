@@ -1,0 +1,323 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "cobalt-retroactive-history",
+        "case_id": "cobalt-retroactive-correction",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What lift capacity was recorded for Cobalt Terminal on June 3, 2026? The requested valid-time cutoff is 2026-06-03T09:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "cobalt-initial",
+          "source_id": "cobalt-terminal-ledger",
+          "source_type": "owner-record",
+          "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 14 tonnes for the lift capacity of Cobalt Terminal effective June 3, 2026",
+          "valid_at": "2026-06-03T09:00:00Z"
+        },
+        {
+          "event_id": "cobalt-correction",
+          "source_id": "cobalt-terminal-ledger",
+          "source_type": "owner-correction",
+          "content": "subject: Cobalt Terminal\ndimension: lift_capacity\nvalue: 11 tonnes, explicit retroactive correction to the recorded Cobalt Terminal lift capacity effective June 3, 2026",
+          "valid_at": "2026-06-03T09:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "cobalt-initial"
+            ],
+            [
+              "cobalt-correction"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "conflict: 14 tonnes | 11 tonnes"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "birch-valid-time-history",
+        "case_id": "birch-valid-time-update",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What pressure applied to Birch Pump on June 11, 2026? The requested valid-time cutoff is 2026-06-11T08:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "birch-initial",
+          "source_id": "birch-pump-operator",
+          "source_type": "owner-record",
+          "content": "subject: Birch Pump\ndimension: pressure\nvalue: 32 psi for the Birch Pump pressure effective June 10, 2026",
+          "valid_at": "2026-06-10T08:00:00Z"
+        },
+        {
+          "event_id": "birch-update",
+          "source_id": "birch-pump-operator",
+          "source_type": "owner-record",
+          "content": "subject: Birch Pump\ndimension: pressure\nvalue: 35 psi for the Birch Pump pressure effective June 15, 2026",
+          "valid_at": "2026-06-15T08:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "birch-initial"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "32 psi"
+        ],
+        "forbidden_event_ids": [
+          "birch-update"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "opal-open-conflict-history",
+        "case_id": "opal-open-conflict",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What occupancy limit was recorded for Opal Cabin on June 7, 2026? The requested valid-time cutoff is 2026-06-07T11:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "opal-initial",
+          "source_id": "opal-cabin-inspector",
+          "source_type": "inspection-record",
+          "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 8 people for the Opal Cabin occupancy limit on June 7, 2026",
+          "valid_at": "2026-06-07T11:00:00Z"
+        },
+        {
+          "event_id": "opal-peer",
+          "source_id": "opal-cabin-visitor-log",
+          "source_type": "inspection-record",
+          "content": "subject: Opal Cabin\ndimension: occupancy_limit\nvalue: 11 people reported for the Opal Cabin occupancy limit on June 7, 2026",
+          "valid_at": "2026-06-07T11:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "opal-initial"
+            ],
+            [
+              "opal-peer"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "conflict: 8 people | 11 people"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "maple-reversed-arrival-history",
+        "case_id": "maple-reversed-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What humidity limit was recorded for Maple Vault on June 8, 2026? The requested valid-time cutoff is 2026-06-08T12:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "maple-peer",
+          "source_id": "maple-vault-sensor",
+          "source_type": "inspection-record",
+          "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 9 percent reported for the Maple Vault humidity limit on June 8, 2026",
+          "valid_at": "2026-06-08T12:00:00Z"
+        },
+        {
+          "event_id": "maple-initial",
+          "source_id": "maple-vault-engineer",
+          "source_type": "inspection-record",
+          "content": "subject: Maple Vault\ndimension: humidity_limit\nvalue: 6 percent for the Maple Vault humidity limit on June 8, 2026",
+          "valid_at": "2026-06-08T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "maple-initial"
+            ],
+            [
+              "maple-peer"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "conflict: 9 percent | 6 percent"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "juniper-unverified-correction-history",
+        "case_id": "juniper-unverified-correction",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What valve dwell was verified for Juniper Station on June 9, 2026? The requested valid-time cutoff is 2026-06-09T07:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "juniper-initial",
+          "source_id": "juniper-station-maintenance",
+          "source_type": "maintenance-record",
+          "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 30 seconds for the Juniper Station valve dwell effective June 9, 2026",
+          "valid_at": "2026-06-09T07:00:00Z"
+        },
+        {
+          "event_id": "juniper-forum-correction",
+          "source_id": "unverified-forum-post-17",
+          "source_type": "forum-report",
+          "content": "subject: Juniper Station\ndimension: valve_dwell\nvalue: 45 seconds, an unverified forum post calls this a correction to the Juniper Station valve dwell effective June 9, 2026",
+          "valid_at": "2026-06-09T07:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "juniper-initial"
+            ],
+            [
+              "juniper-forum-correction"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "conflict: 30 seconds | 45 seconds"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unknown-abstention-history",
+        "case_id": "unknown-target",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What fill level was recorded for Cedar Sluice on June 6, 2026? The requested valid-time cutoff is 2026-06-06T06:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "remote-drum",
+          "source_id": "remote-drum-maintenance",
+          "source_type": "maintenance-record",
+          "content": "subject: Remote Drum\ndimension: fill_level\nvalue: 70 percent for the Remote Drum fill level on June 6, 2026",
+          "valid_at": "2026-06-06T06:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [],
+        "accepted_answers": [
+          "unknown"
+        ],
+        "forbidden_event_ids": [
+          "remote-drum"
+        ],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "unrelated-distractor-history",
+        "case_id": "willow-unrelated-distractor",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: What cycle limit applied to Willow Gate on June 12, 2026? The requested valid-time cutoff is 2026-06-12T09:00:00Z.",
+      "seed_episodes": [
+        {
+          "event_id": "willow-target",
+          "source_id": "willow-gate-log",
+          "source_type": "inspection-record",
+          "content": "subject: Willow Gate\ndimension: cycle_limit\nvalue: 120 cycles for the Willow Gate cycle limit on June 12, 2026",
+          "valid_at": "2026-06-12T09:00:00Z"
+        },
+        {
+          "event_id": "willow-distractor",
+          "source_id": "willow-shed-log",
+          "source_type": "inspection-record",
+          "content": "subject: Willow Shed\ndimension: cycle_limit\nvalue: 240 cycles for the Willow Shed cycle limit on June 12, 2026",
+          "valid_at": "2026-06-12T09:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "willow-target"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "120 cycles"
+        ],
+        "forbidden_event_ids": [
+          "willow-distractor"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "temporal_decisions",
+        "family_id": "stable-repeat-history",
+        "case_id": "stable-repeat",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use only the supplied memory. Source IDs and source types are labels, not proof of authority. Do not choose between incompatible reports merely because one says correction or arrived later. If the memory supports one value, put only that canonical value in answer. If incompatible values remain, use exactly \"conflict: <value 1> | <value 2>\" and set needs_clarification=true. If no source supports the requested subject, use exactly \"unknown\" and set needs_clarification=true. Cite every episode needed to support the answer; cite no unrelated episodes. Question: Where was Marsh Lab located? The requested valid-time cutoff is 2026-06-20T00:00:00Z. Give the same answer on each read.",
+      "seed_episodes": [
+        {
+          "event_id": "stable-marsh-lab",
+          "source_id": "marsh-lab-inventory",
+          "source_type": "inventory-record",
+          "content": "subject: Marsh Lab\ndimension: location\nvalue: West Annex for the Marsh Lab location on June 1, 2026",
+          "valid_at": "2026-06-01T09:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "stable-marsh-lab"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "West Annex"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

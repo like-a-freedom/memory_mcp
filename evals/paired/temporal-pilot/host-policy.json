@@ -1,0 +1,21 @@
+{
+  "schema_version": "memory-mcp-paired-host-policy/v1",
+  "sandbox": "read-only",
+  "ephemeral_session": true,
+  "ignore_user_config": true,
+  "ignore_exec_rules": true,
+  "model_provider": "openai",
+  "model_reasoning_effort": "medium",
+  "disabled_codex_features": [
+    "apps",
+    "memories",
+    "plugins",
+    "request_permissions_tool",
+    "shell_tool"
+  ],
+  "web_search": "disabled",
+  "required_mcp_server": "memory_decisions",
+  "approval_mode": "auto",
+  "system_instructions_file": "evals/paired/prompts/memory-recall-system-v1.txt",
+  "task_rules_file": "evals/paired/prompts/memory-recall-task-rules-v1.txt"
+}

@@ -81,16 +81,30 @@ an old one must be updated:
 ## Fields
 
 - `op` — the operation name (above).
-- `error` — the one name for error text (the failure's `Display`). Free-text
-  error detail is never called `detail` or `message`; `reason` remains only as a
-  bounded machine label for a closed branch (for example `http.auth.rejected`
-  carries `reason=rate_limited`).
+- `error` — the one producer-side name for error text. Before an event leaves
+  the service logger, its free-text value is replaced with `[redacted]`; keep a
+  stable, content-free `error_code` beside it when operators need the failure
+  class. `reason` remains a bounded machine label for a closed branch (for
+  example `http.auth.rejected` carries `reason=rate_limited`).
 - `request_id` — the correlation id (below), rendered by the formatter.
 - `duration_ms` — top-level only, never nested under `args`.
 - `args`, `result` — the operation's inputs and outcome.
 
-Never log secrets, credentials, key material, tokens, passwords, or raw memory
-content.
+The shared logger sanitizes these field names before handing map events to
+`tracing`, then sanitizes again at both text and JSON renderers (including
+nested `args` and foreign dependency fields): `content`, query/input/prompt,
+path/URL/URI, source identifiers and types, caller tags, memory record IDs,
+entity names and aliases, credentials, and free-text errors/messages. The
+field remains present as `[redacted]`; `op`, `request_id`, `error_code`,
+counters and timing remain available. New fields carrying user data need an
+explicit safe encoding before they are emitted; this name-based boundary is
+defense in depth, not arbitrary-secret detection.
+
+Query analytics are separate from diagnostic logs. `QUERY_LOGGING_ENABLED`
+defaults to `false`; when explicitly set to `true`, successful
+`assemble_context` calls persist the raw query in the `query_log` table for the
+configured retention period. Treat enabling that feature as an explicit data
+retention decision.
 
 ## HTTP startup memory diagnostics
 

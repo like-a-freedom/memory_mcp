@@ -25,6 +25,10 @@ pub struct TestMemory {
 
 impl TestMemory {
     pub async fn new() -> Self {
+        Self::new_with_claim_stage("evidence").await
+    }
+
+    pub async fn new_with_claim_stage(claim_stage: &str) -> Self {
         let namespaces = vec![ACTIVE_NAMESPACE.to_string()];
         let db_name = next_test_db_name();
         let db_client = Arc::new(
@@ -47,22 +51,11 @@ impl TestMemory {
             100,
         )
         .expect("service init")
-        // The harness measures at the stage where relations are disclosed.
-        //
-        // Production defaults to `shadow`, which persists claim relations but
-        // serves none of them to `assemble_context`. An evaluation run at
-        // `shadow` would measure the *absence* of the reconciliation read path
-        // and report it as evidence about the feature. The persisted-evidence
-        // claims metrics are unaffected either way — they are read through
-        // `ClaimEvidenceReader`, which does not consult the stage — so
-        // turning disclosure on changes only what a reader of the assembled
-        // pack can see, which is exactly what Phase 0 is about.
-        //
-        // This does not promote the deployment default. The thresholds in
-        // `docs/evals/CLAIM_RECONCILIATION.md` remain the operator's to verify
-        // before `evidence` becomes the shipped stage.
-        .with_claim_rollout_stage("evidence")
-        .expect("evidence is a valid claim rollout stage");
+        // Evaluation defaults to the shipped stage. Performance scenarios can
+        // select Shadow explicitly so the cost of relation persistence and
+        // evidence reads is measured against the same fixture and code path.
+        .with_claim_rollout_stage(claim_stage)
+        .expect("claim stage is a valid rollout stage");
 
         Self { service, db_client }
     }

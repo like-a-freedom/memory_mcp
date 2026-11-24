@@ -164,7 +164,9 @@ pub(super) fn build_query_evidence(
     let raw = raw_query.unwrap_or_default();
     let without_urls = strip_url_tokens(raw);
     let (cleaned_query, scope_reference) = strip_project_scope(&without_urls);
-    let qualified_references = extract_qualified_references(&cleaned_query);
+    let mut qualified_references = extract_qualified_references(&cleaned_query);
+    qualified_references.extend(extract_qualified_references(raw));
+    let qualified_references = unique_terms(qualified_references);
     let reference_terms = reference_component_terms(&cleaned_query);
     let explicit_calendar_date = parse_explicit_calendar_date(&cleaned_query);
     let calendar_period = parse_calendar_period(&cleaned_query);
@@ -329,6 +331,70 @@ fn inferred_subject_terms(query: &str) -> Vec<String> {
             .flat_map(|(_, token)| search_query_terms(token))
             .collect(),
     )
+}
+
+/// A lexical match on a predicate alone cannot establish a named subject.
+/// Queries without an inferred explicit subject retain their lexical policy.
+pub(super) fn candidate_matches_explicit_query_subject(query: &str, content: &str) -> bool {
+    let inferred = inferred_subject_terms(query);
+    let tokens = query
+        .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
+    let proper = |token: &str| {
+        token.chars().next().is_some_and(char::is_uppercase)
+            && token.chars().skip(1).any(char::is_lowercase)
+    };
+    let numeric = |token: &str| token.chars().all(|c| c.is_ascii_digit());
+    let direct = inferred.is_empty()
+        && tokens.iter().any(|s| proper(s))
+        && tokens.iter().all(|s| proper(s) || numeric(s));
+    let mut spans = Vec::new();
+    let mut span = Vec::new();
+    for token in tokens {
+        let named = proper(token)
+            && (direct
+                || search_query_terms(token)
+                    .iter()
+                    .any(|t| inferred.contains(t)));
+        if named || (!span.is_empty() && numeric(token)) {
+            span.push(token);
+        } else if !span.is_empty() {
+            spans.push(std::mem::take(&mut span));
+        }
+    }
+    if !span.is_empty() {
+        spans.push(span);
+    }
+    // Multiple names need entity-aware query semantics; never concatenate them.
+    if spans.len() != 1 {
+        return true;
+    }
+    let subject = crate::knowledge::entity_resolution::normalize_entity_name(&spans[0].join(" "));
+    let fields = crate::knowledge::claims_policy::structural::explicit_schema_fields(content);
+    if let Some(declared) = fields.get("subject") {
+        return crate::knowledge::entity_resolution::normalize_entity_name(declared) == subject;
+    }
+    let normalized = crate::knowledge::entity_resolution::normalize_entity_name(content);
+    let words = |s: &str| {
+        s.split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    let wanted = words(&subject);
+    let available = words(&normalized);
+    !wanted.is_empty()
+        && available
+            .windows(wanted.len())
+            .any(|window| window == wanted)
+}
+
+pub(super) fn candidate_matches_declared_query_subject(query: &str, content: &str) -> bool {
+    let fields = crate::knowledge::claims_policy::structural::explicit_schema_fields(content);
+    fields
+        .get("subject")
+        .is_none_or(|_| candidate_matches_explicit_query_subject(query, content))
 }
 
 pub(super) fn candidate_has_explicit_subject_support(query: &str, content: &str) -> bool {
@@ -551,7 +617,12 @@ pub(super) fn evaluate_candidate(
             .iter()
             .any(|reference| candidate_references.contains(reference))
         {
-            if query.content_terms.is_empty()
+            let has_url_reference = query
+                .mandatory_reference_alternatives
+                .iter()
+                .any(|reference| reference.starts_with("url:"));
+            if (query.content_terms.is_empty() && !has_url_reference)
+                || is_literal_reference_recall_request(query)
                 || has_minimum_candidate_topic_hits(query, candidate)
                 || has_native_single_term_support(query, candidate)
             {
@@ -1294,6 +1365,81 @@ fn candidate_references(fact: &crate::models::Fact) -> Vec<String> {
         references.extend(extract_qualified_references(index_key));
     }
     unique_terms(references)
+}
+
+fn is_literal_reference_recall_request(query: &QueryEvidence) -> bool {
+    if !query
+        .mandatory_reference_alternatives
+        .iter()
+        .any(|reference| reference.starts_with("url:"))
+    {
+        return false;
+    }
+
+    let terms = query
+        .content_terms
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let asks_for_reference = ["reference", "source", "url", "link", "path", "file"]
+        .iter()
+        .any(|term| terms.contains(term));
+    let asks_to_recall = [
+        "exact", "remember", "recall", "provide", "provided", "give", "gave", "tell", "told",
+        "share", "shared", "send", "sent", "agent",
+    ]
+    .iter()
+    .any(|term| terms.contains(term));
+    let framing_terms = [
+        "exact",
+        "reference",
+        "source",
+        "url",
+        "link",
+        "path",
+        "file",
+        "what",
+        "which",
+        "who",
+        "did",
+        "do",
+        "is",
+        "are",
+        "was",
+        "were",
+        "has",
+        "have",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "should",
+        "i",
+        "you",
+        "me",
+        "my",
+        "the",
+        "to",
+        "as",
+        "for",
+        "from",
+        "remember",
+        "recall",
+        "provide",
+        "provided",
+        "give",
+        "gave",
+        "tell",
+        "told",
+        "share",
+        "shared",
+        "send",
+        "sent",
+        "agent",
+    ];
+
+    asks_for_reference && asks_to_recall && terms.iter().all(|term| framing_terms.contains(term))
 }
 
 fn has_sufficient_content_support_for_text(query: &QueryEvidence, content: &str) -> bool {
@@ -2226,7 +2372,24 @@ fn extract_qualified_references(raw: &str) -> Vec<String> {
         }
     }
 
+    references.extend(extract_url_references(raw));
     unique_terms(references)
+}
+
+fn extract_url_references(raw: &str) -> Vec<String> {
+    raw.split_whitespace()
+        .filter_map(|word| {
+            let url = word.trim_matches(|character: char| {
+                matches!(
+                    character,
+                    '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>'
+                )
+            });
+            let normalized = url.to_ascii_lowercase();
+            (normalized.starts_with("http://") || normalized.starts_with("https://"))
+                .then(|| format!("url:{url}"))
+        })
+        .collect()
 }
 
 fn canonical_reference(raw: &str) -> Option<String> {
@@ -2278,6 +2441,9 @@ fn reference_component_terms(raw: &str) -> HashSet<String> {
 }
 
 fn reference_family(reference: &str) -> String {
+    if reference.starts_with("url:") {
+        return reference.to_string();
+    }
     reference
         .chars()
         .take_while(|character| !character.is_ascii_digit())

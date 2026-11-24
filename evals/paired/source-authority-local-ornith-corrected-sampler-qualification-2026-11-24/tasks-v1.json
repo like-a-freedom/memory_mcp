@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "quillforge_registry",
+        "case_id": "quillforge_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Quillforge Registry, the signal ledger is stored in Amber-51. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Quillforge Registry, where is the signal ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Quillforge Registry, where is the signal ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-v2-quillforge_registry-signal-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-v2-quillforge_registry-signal-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Amber-51"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "opalwharf_archive",
+        "case_id": "opalwharf_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Opalwharf Archive, the grant register is stored in Violet-28. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Opalwharf Archive, where is the grant register stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Opalwharf Archive, where is the grant register stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-v2-opalwharf_archive-grant-register",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-v2-opalwharf_archive-grant-register"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Violet-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "foxglove_pier",
+        "case_id": "foxglove_pier-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Foxglove Pier, the navigation chart is stored in Beacon-74. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Foxglove Pier, where is the navigation chart stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Foxglove Pier, where is the navigation chart stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-v2-foxglove_pier-navigation-chart",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-v2-foxglove_pier-navigation-chart"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Beacon-74"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Foxglove Pier before this phase. Use assemble_context to verify: At Foxglove Pier, where is the navigation chart stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "foxglove_pier",
+          "relative_path": "fixtures/foxglove_pier.txt",
+          "content": "Fact: At Foxglove Pier, the navigation chart is stored in Beacon-74.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-v2-foxglove_pier-navigation-chart"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "larkspur_shed",
+        "case_id": "larkspur_shed-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Larkspur Shed, the maintenance schedule is stored in Copper-63. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Larkspur Shed, where is the maintenance schedule stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Larkspur Shed, where is the maintenance schedule stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-v2-larkspur_shed-maintenance-schedule",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-ornith-v2-larkspur_shed-maintenance-schedule"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Copper-63"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Larkspur Shed before this phase. Use assemble_context to verify: At Larkspur Shed, where is the maintenance schedule stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "larkspur_shed",
+          "relative_path": "fixtures/larkspur_shed.txt",
+          "content": "Fact: At Larkspur Shed, the maintenance schedule is stored in Copper-63.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-ornith-v2-larkspur_shed-maintenance-schedule"
+        }
+      ]
+    }
+  ]
+}

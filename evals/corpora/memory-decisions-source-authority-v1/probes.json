@@ -1,0 +1,13 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "literal-path-preservation",
+      "family_id": "literal-path-preservation",
+      "event_ids": ["literal-source-reference"],
+      "query": "Which exact source reference did I give you to remember? evals/corpora/memory-decisions-source-authority-v1/source-content.txt",
+      "valid_at": "2026-11-22T12:00:00Z",
+      "budget": 5
+    }
+  ]
+}

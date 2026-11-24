@@ -31,7 +31,11 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let mut candidates =
+    let standalone_reference =
+        super::statement_detection::is_standalone_reference_candidate(content);
+    let mut candidates = if standalone_reference {
+        Vec::new()
+    } else {
         match run_ner_extraction(service.entity_extractor.clone(), content, zero_shot_labels).await
         {
             Ok(candidates) => candidates,
@@ -40,10 +44,12 @@ pub async fn extract_entities(
                 log_ner_error(service, provider, content_chars, label_count, &err, timer);
                 return Err(err);
             }
-        };
+        }
+    };
 
-    if let Some(candidate) =
-        crate::knowledge::claims_policy::schema::grammatical_subject_candidate(content)
+    if !standalone_reference
+        && let Some(candidate) =
+            crate::knowledge::claims_policy::schema::grammatical_subject_candidate(content)
         && !candidates.iter().any(|existing| {
             normalize_text(&existing.canonical_name) == normalize_text(&candidate.canonical_name)
         })
@@ -68,7 +74,10 @@ pub async fn extract_entities(
         LogLevel::Debug,
     );
 
-    let entities = resolve_and_dedupe(service, provider, candidates).await?;
+    let fields = crate::knowledge::claims_policy::structural::explicit_schema_fields(content);
+    let explicit_subject = fields.get("subject").map(|name| normalize_text(name));
+    let entities =
+        resolve_and_dedupe(service, provider, candidates, explicit_subject.as_deref()).await?;
 
     persist_extraction_projection(service, episode_id, &entities).await?;
 
@@ -133,6 +142,7 @@ async fn resolve_and_dedupe(
     service: &ExtractDeps,
     provider: &str,
     candidates: Vec<EntityCandidate>,
+    explicit_subject: Option<&str>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
     let candidates = dedupe_entity_candidates(candidates)
         .into_iter()
@@ -142,36 +152,39 @@ async fn resolve_and_dedupe(
     let mut seen_entity_ids = HashSet::new();
 
     for candidate in candidates {
-        let entity_type = candidate.entity_type.clone();
         let canonical_name = candidate.canonical_name.clone();
 
-        let entity_id = service
-            .entity_resolver
-            .resolve_or_create(&service.entity_service, candidate.clone())
-            .await
-            .map(|(id, _created)| id)
-            .inspect_err(|err| {
-                service.logger.log(
-                    log_event(
-                        "ner.resolve.error",
-                        json!({
-                            "entity_type": &entity_type,
-                            "canonical_name": &canonical_name,
-                            "error": err.to_string(),
-                        }),
-                        json!({"provider": provider}),
-                        None,
-                        None,
-                        None,
-                    ),
-                    err.log_level(),
-                );
-            })?;
+        let resolved = if explicit_subject == Some(normalize_text(&canonical_name).as_str()) {
+            service
+                .entity_resolver
+                .resolve_explicit_subject(&service.entity_service, candidate.clone())
+                .await
+        } else {
+            service
+                .entity_resolver
+                .resolve_or_create(&service.entity_service, candidate.clone())
+                .await
+        };
+        let entity_id = resolved.map(|(id, _created)| id).inspect_err(|err| {
+            service.logger.log(
+                log_event(
+                    "ner.resolve.error",
+                    json!({
+                        "canonical_name_chars": canonical_name.chars().count(),
+                    }),
+                    json!({"provider": provider, "error_code": err.code()}),
+                    None,
+                    None,
+                    None,
+                ),
+                err.log_level(),
+            );
+        })?;
 
         if seen_entity_ids.insert(entity_id.clone()) {
             entities.push(ExtractedEntity {
                 entity_id,
-                entity_type,
+                entity_type: candidate.entity_type,
                 canonical_name,
             });
         }
@@ -376,7 +389,7 @@ pub(super) fn build_ner_log_result(
     provider: &str,
     entity_count: usize,
     zero_shot_label_count: Option<usize>,
-    error: Option<&str>,
+    error_code: Option<&str>,
 ) -> Value {
     let mut result = serde_json::Map::new();
     result.insert("provider".to_string(), json!(provider));
@@ -387,8 +400,8 @@ pub(super) fn build_ner_log_result(
             json!(zero_shot_label_count),
         );
     }
-    if let Some(error) = error {
-        result.insert("error".to_string(), json!(error));
+    if let Some(error_code) = error_code {
+        result.insert("error_code".to_string(), json!(error_code));
     }
     Value::Object(result)
 }
@@ -405,7 +418,7 @@ fn log_ner_error(
         log_event(
             "ner.extract.error",
             json!({"content_chars": content_chars}),
-            build_ner_log_result(provider, 0, zero_shot_label_count, Some(&err.to_string())),
+            build_ner_log_result(provider, 0, zero_shot_label_count, Some(err.code())),
             None,
             None,
             Some(duration_ms(timer.elapsed())),
@@ -480,8 +493,8 @@ mod tests {
             Some(6)
         );
         assert!(
-            result.get("error").is_none(),
-            "error field should be omitted when not provided"
+            result.get("error_code").is_none(),
+            "error_code field should be omitted when not provided"
         );
     }
 
@@ -501,13 +514,14 @@ mod tests {
     }
 
     #[test]
-    fn build_ner_log_result_includes_error_when_provided() {
-        let result = build_ner_log_result("gliner", 0, Some(3), Some("tokenization failed"));
+    fn build_ner_log_result_includes_content_free_error_code() {
+        let result = build_ner_log_result("gliner", 0, Some(3), Some("storage"));
 
         assert_eq!(
-            result.get("error").and_then(Value::as_str),
-            Some("tokenization failed")
+            result.get("error_code").and_then(Value::as_str),
+            Some("storage")
         );
+        assert!(result.get("error").is_none());
         assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
     }
 

@@ -1,0 +1,7 @@
+15b7cafb141e3d9a3fe68b8d6e96136c7b45dcaa3c311ea239bcd6fb438efbfd  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/agent-managed-candidate.json
+a327063d101def5cfe456ba816686bbe84d37fde5b08c15afa4878bffd963fa1  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/agent-managed-comparison.json
+c5954c0be8a9c82786c303be1d748dec7c62ff928e1cf9eada358a5abdcd15c7  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/agent-managed-incumbent.json
+1468bc3795a6f733ca7efa97df07240bf6cc9a576f9c72fd771f8ffbd9a11171  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/candidate-receipts.jsonl
+89f2a1e1f3fc4a5d8f57ee0bd14541b9177b7335e117e7a5d2bc4f95c4defd24  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/candidate.json
+3cbbf9e504efb800cc88583f5b92a932a494c06b1ba95ec1a4778e5f8ef230eb  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/incumbent-receipts.jsonl
+e4d68b080d3033224a10fae5dd3c62bb8c7b86fffdbe66caf54a538e5e43c8a4  evals/paired/source-authority-local-chat-completions-v4-qualification/runs/run-02/incumbent.json

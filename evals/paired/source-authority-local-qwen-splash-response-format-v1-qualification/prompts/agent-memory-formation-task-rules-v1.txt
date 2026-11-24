@@ -1,0 +1,1 @@
+Perform one ingest for the single fact in this task and one extract for its returned episode ID. Never repeat either write. Acknowledge success only after extraction succeeds; otherwise state that storage failed. Keep the answer brief and citations empty.

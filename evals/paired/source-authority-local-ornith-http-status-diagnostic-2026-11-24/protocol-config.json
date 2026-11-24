@@ -1,0 +1,42 @@
+{
+  "schema_version": "memory-mcp-source-authority-agent-workflow/literal-input-v1",
+  "transport": "stdio",
+  "source_delivery": "literal_source_content_in_formation_prompt",
+  "operator_import": {
+    "runs_before_agent": true,
+    "command": "memory_mcp import file",
+    "root_confined": true,
+    "maximum_file_bytes": 4194304,
+    "extract_episode_after_import": true,
+    "operator_actions_counted_separately": true
+  },
+  "incumbent_formation": {
+    "enabled_tools": ["ingest", "extract"],
+    "source_content_in_prompt": true,
+    "filesystem_reading": false,
+    "fresh_agent_session": true,
+    "wall_time_budget_seconds": 120
+  },
+  "candidate_formation": {
+    "enabled_tools": ["assemble_context"],
+    "read_only": true,
+    "fresh_agent_session": true,
+    "operator_import_receipt_required": true,
+    "wall_time_budget_seconds": 120
+  },
+  "recall": {
+    "enabled_tools": ["assemble_context"],
+    "fresh_agent_session": true,
+    "same_trial_store": true,
+    "wall_time_budget_seconds": 120
+  },
+  "independent_probe": {
+    "enabled_tools": ["assemble_context"],
+    "runs_after_recall": true,
+    "agent_session": false,
+    "same_trial_store": true
+  },
+  "agent_shell": false,
+  "network_fetch": false,
+  "runner_retries": 0
+}

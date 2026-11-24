@@ -1,0 +1,15 @@
+{
+  "input_sha256": "020da8d394c3792ee33af4ee3272868274f8b42b6879609aae96a2d376862574",
+  "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+  "source_event_ids": [
+    "junebrook_foundry-record-b"
+  ],
+  "claim_annotations": [
+    {
+      "source_event_id": "junebrook_foundry-record-b",
+      "evidence_status": "unknown"
+    }
+  ],
+  "budget_used": 1,
+  "completed": true
+}

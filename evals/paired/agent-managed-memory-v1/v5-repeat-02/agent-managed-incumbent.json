@@ -1,0 +1,450 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "99910-1795356596451326000-0",
+  "identity_sha256": "01172376cbeec1629cbbaa422015068344fed5e43807fcc79d05dc3995c99bf9",
+  "expected_trials": [
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "azure-lantern-history",
+      "case_id": "azure-lantern-rollback-shelf-tag",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "copper-meadow-history",
+      "case_id": "copper-meadow-nightly-export-bucket",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "frosted-meridian-history",
+      "case_id": "frosted-meridian-incident-handoff-alias",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "golden-kestrel-history",
+      "case_id": "golden-kestrel-release-audit-label",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "ivory-circuit-history",
+      "case_id": "ivory-circuit-archive-checksum-prefix",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "jade-compass-history",
+      "case_id": "jade-compass-recovery-queue-name",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "lunar-orchard-history",
+      "case_id": "lunar-orchard-rotation-notebook-code",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "durable_fact_recall",
+      "family_id": "silver-tundra-history",
+      "case_id": "silver-tundra-escalation-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "azure-lantern-history",
+        "case_id": "azure-lantern-rollback-shelf-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38757,
+        "output_tokens": 196,
+        "wall_time_ms": 18896
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "599eb2c4c1252c13d7697f9f63350893eb34b28c0cde1b44634bf3b30054492c",
+        "response_sha256": "316bc58271b675b50b6b74c9b8d68aaa18f5fed8852e6ccc8504fdd710aa0336",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "formation-v5-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "copper-meadow-history",
+        "case_id": "copper-meadow-nightly-export-bucket",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38768,
+        "output_tokens": 196,
+        "wall_time_ms": 20355
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "3f9bf5f02f59029067a77e84220f928204a2b39d85668e73aaf498e67a91823b",
+        "response_sha256": "66af136a8ec85bdd3727fb9497fd4dee0878efb598a1bee549dbcc5b71ce50d6",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-02"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "frosted-meridian-history",
+        "case_id": "frosted-meridian-incident-handoff-alias",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38782,
+        "output_tokens": 201,
+        "wall_time_ms": 17175
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "4e11f77801881c87e71656450d930963e67e7c5f701ea1379eade28c54b5b86d",
+        "response_sha256": "9cb9ff2a33a876819180396e5aa85064874ec2d6e437a27a6604b7a62548e5d4",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-03"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "golden-kestrel-history",
+        "case_id": "golden-kestrel-release-audit-label",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38754,
+        "output_tokens": 197,
+        "wall_time_ms": 20133
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "28c7fb54a29ec2c79bceea96aaad8ab1db6583a5c149c9b74e921c16404ed510",
+        "response_sha256": "18d3e08476e1f6d6b7e56f883375a3e97b4da2ce264a70f5ffa2bbe206fcdc60",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-04"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "ivory-circuit-history",
+        "case_id": "ivory-circuit-archive-checksum-prefix",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38809,
+        "output_tokens": 210,
+        "wall_time_ms": 17779
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d21a810d8884107eb9f68ff81584f04f258a8f8a627cdc867bef990be8f552ce",
+        "response_sha256": "7284273449d353b4f6b24eff43234b51d0bc7021afb6abfc69b31b640436c67f",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-05"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "jade-compass-history",
+        "case_id": "jade-compass-recovery-queue-name",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38777,
+        "output_tokens": 211,
+        "wall_time_ms": 20198
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "a3ee4d3c29a218aeefed13e06f817f6a8c6540586345ddef91962a82f89eb268",
+        "response_sha256": "a38fa01b4cbad5f90120d49348be18010b0e2e1aaee349e0a7b9e2e5718acfae",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-06"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "lunar-orchard-history",
+        "case_id": "lunar-orchard-rotation-notebook-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38723,
+        "output_tokens": 199,
+        "wall_time_ms": 18318
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "be07357ff22983124665223284bad7d2e4a439d1df0923de9b6093762f274fbb",
+        "response_sha256": "7788467cfa5a230404e1d229d063b3e50b16e2476a0b297b83e7ba780a109a69",
+        "known_revision": 3,
+        "retained_store_bytes": 34209867,
+        "source_event_ids": [
+          "formation-v5-07"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "durable_fact_recall",
+        "family_id": "silver-tundra-history",
+        "case_id": "silver-tundra-escalation-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 38740,
+        "output_tokens": 188,
+        "wall_time_ms": 17436
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "4aa32c93cd901a4813f19334c121dff5bde4c2f251120a06174b482193ce6cfa",
+        "response_sha256": "3cfabfb5c599836b398415ec2fbaf2eb59496f4546943f7c1d1d03338d381da2",
+        "known_revision": 3,
+        "retained_store_bytes": 34209868,
+        "source_event_ids": [
+          "formation-v5-08"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      }
+    }
+  ]
+}

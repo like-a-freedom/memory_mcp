@@ -1,0 +1,62 @@
+{
+  "schema_version": "memory-mcp-evaluator-correction/v1",
+  "date": "2026-11-21",
+  "base_revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+  "source_state": "authorized dirty master; source hashes identify this harness slice",
+  "change": "standalone independent stdio/HTTP capture and offline evidence scorer; selected child launch settings and source bindings preserved",
+  "new_independent_probe_tests": 25,
+  "evaluator_tests": {
+    "passed": 585,
+    "ignored": 20,
+    "exit_code": 0
+  },
+  "explicit_live_http_regression": {
+    "passed": 1,
+    "exit_code": 0
+  },
+  "checks": {
+    "strict_workspace_clippy": "passed",
+    "cargo_fmt_check": "passed",
+    "git_diff_check": "passed"
+  },
+  "red_assertions_observed": [
+    "missing_independent_observation_is_invalid_instead_of_success",
+    "one_side_of_a_required_evidence_set_fails",
+    "forbidden_source_defeats_otherwise_complete_evidence",
+    "score_receipt_binds_query_and_private_oracle",
+    "observation_with_more_sources_than_returned_items_is_invalid",
+    "fixed_probe_rejects_a_response_from_another_snapshot",
+    "local_fixture_cannot_claim_to_execute_as_an_arbitrary_principal",
+    "fixed_probe_requires_the_preregistered_retrieval_stage",
+    "negative_knowledge_revision_cannot_be_a_valid_probe",
+    "uncited_returned_items_cannot_pass_an_empty_evidence_oracle",
+    "score_receipt_binds_the_observation_that_was_scored",
+    "independent_http_probe_uses_a_fresh_tenant_and_the_fixed_snapshot",
+    "duplicate_event_ids_cannot_form_an_independent_history",
+    "capture_records_the_public_configuration_passed_to_the_child",
+    "capture_preserves_the_binding_from_public_episode_ids_to_fixed_events"
+  ],
+  "live_controls": "evals/independent-probes/2026-11-21-launch-profile-smoke/",
+  "live_control_results": {
+    "stdio_repeats": 2,
+    "http_repeats": 2,
+    "source_coverage_passes": 4,
+    "repeat_normalized_observations_equal": true
+  },
+  "legacy_http_configuration_integrity": "declared legacy profile is not implemented by current launch contract; historical diagnostics are not configuration-attested acceptance",
+  "memory_quality_improvement_claim": false,
+  "paired_integration_complete": false,
+  "deterministic_promotion_gate_complete": false,
+  "source_sha256": {
+    "crates/eval-harness/src/independent_probe.rs": "8140b0e9803a3c4a01aef0b36f33470ef4284835dba2841caf20a4e956d2ca1d",
+    "crates/eval-harness/src/memory_fixture.rs": "69f7a95619887163a61a04d400ea15ddda9e5fe13b4f04e6ca1bcff6465da129",
+    "crates/eval-harness/src/paired_agent/codex.rs": "c43f4e01c4396fc1b0fc5bec62ad742c0f9187222f2c7f35e59c90587d74e157",
+    "crates/eval-harness/src/paired_http.rs": "6d21b6de48b818c1e74dad25c8502b4c8532f501d31446ac51850cfb9e6e7518",
+    "crates/eval-harness/src/suites/memory_decisions/stdio.rs": "c5c0f5a1a30f65cb92f23300597af767cd39875878a8e3781907f922d1ce50f8",
+    "crates/eval-harness/src/cli.rs": "6ede7256b7be50fee2f4c0518e857e72a49f7d1f363def65a34de55d6af1e135",
+    "crates/eval-harness/src/main.rs": "1e151108b892052582d7e02c635d5662671c2cda0e758dee7a4c5cccb76cf780",
+    "crates/eval-harness/src/lib.rs": "5a0ceaa2bc8f3500c3d549cf2882babe99662521d6fbf3c262e46acfaf79b6c3",
+    "crates/eval-harness/tests/independent_probe.rs": "ed8d9302974e2851b2578434f584e31114f8b50e2b04ecf5fd256b45a3b72ab6",
+    "crates/eval-harness/tests/memory_decisions_stdio.rs": "744bbeb37b98d87804ad5fc253228fa4c2b04886c6ae60ac4418986a0c70d04d"
+  }
+}

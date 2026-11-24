@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "slate-review-start",
+    "source_id": "slate-team-calendar",
+    "source_type": "meeting-note",
+    "content": "subject: Slate review\nstart time: June 20, 2026 at 15:30 UTC",
+    "valid_at": "2026-06-05T08:00:00Z"
+  }
+]

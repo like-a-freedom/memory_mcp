@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v1",
+  "arm": "incumbent",
+  "run_id": "18890-1795451869486274000-0",
+  "identity_sha256": "9c5742c605b41f450b64ecb0d7f776b5c05f39e0916050a2570aa5f4b19dc837",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "birch_glass_depot",
+      "case_id": "birch_glass_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cinder_maple_station",
+      "case_id": "cinder_maple_station-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "fable_iron_archive",
+      "case_id": "fable_iron_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "granite_silver_workshop",
+      "case_id": "granite_silver_workshop-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "birch_glass_depot",
+        "case_id": "birch_glass_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39403,
+        "output_tokens": 194,
+        "wall_time_ms": 20429
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "8de0e1b20ed35e57beeb92d31e080b2b843aeba5d504a96162aebd0f732797fc",
+        "response_sha256": "fbc49cb253a4207777da7695e385378a88fc83392baa705c31cca1cc0b4588aa",
+        "known_revision": 6,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-birch_glass_depot"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2071,
+          "maximum_wire_bytes": 2071
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cinder_maple_station",
+        "case_id": "cinder_maple_station-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39408,
+        "output_tokens": 189,
+        "wall_time_ms": 18274
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "a2be189e13508bf16a41ab91c6e812ca12547a008855118696efdffee29602d7",
+        "response_sha256": "8fa2db0581a6cacbcdb7a5690f9807baf7b1d49809f6c24117a22e1e2d5009cf",
+        "known_revision": 6,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-cinder_maple_station"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2079,
+          "maximum_wire_bytes": 2079
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "fable_iron_archive",
+        "case_id": "fable_iron_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39445,
+        "output_tokens": 205,
+        "wall_time_ms": 16481
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5a6c459e343655f61027010fbc54e5b30d87bf4730f741942a33b52d652cea6d",
+        "response_sha256": "4cfdee86a099faf5c2f477cec1b83f74dd9fb39c8d4e9268ff62c75bedd3eaef",
+        "known_revision": 6,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-fable_iron_archive"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2083,
+          "maximum_wire_bytes": 2083
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "granite_silver_workshop",
+        "case_id": "granite_silver_workshop-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 39430,
+        "output_tokens": 198,
+        "wall_time_ms": 18171
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "311c0449440e23283f02762c9fc183d9ecc9b28ee4c1fc0c9abe60dab76be8ff",
+        "response_sha256": "cfa85741fffb438c59a03e70692ee70455f48dcf20bd0334244bf2e1f672f7ff",
+        "known_revision": 6,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-granite_silver_workshop"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2105,
+          "maximum_wire_bytes": 2105
+        }
+      }
+    }
+  ]
+}

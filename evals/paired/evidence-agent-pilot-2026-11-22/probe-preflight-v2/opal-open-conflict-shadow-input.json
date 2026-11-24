@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "What occupancy limit was recorded for Opal Cabin on June 7, 2026?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-06-07T11:00:00Z",
+  "known_revision": 3,
+  "context_budget": 5,
+  "history_sha256": "1114cdcad8287a0b0db3c1deb565bb77982f95e8276ab7c3da531d1be23b67e2",
+  "claim_rollout_stage": "shadow"
+}

@@ -1,0 +1,9 @@
+{
+  "input_sha256": "4d6ee53f652f3d2e6796761a4733294659c5032d2664a0fa51a33ecef3a19b9e",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "beacon-export-format-decision"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

@@ -1,0 +1,223 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v3",
+  "arm": "candidate",
+  "run_id": "86015-1795474107563424000-0",
+  "identity_sha256": "a9892d4e46a26daf43217445ad59b62f7e6bec6117780c440506ec2f9dfe5123",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "opalwharf_archive",
+      "case_id": "opalwharf_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "quillforge_registry",
+      "case_id": "quillforge_registry-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "foxglove_pier",
+      "case_id": "foxglove_pier-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "larkspur_shed",
+      "case_id": "larkspur_shed-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "opalwharf_archive",
+        "case_id": "opalwharf_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5656,
+        "output_tokens": 463,
+        "wall_time_ms": 7048
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "6d8dc7c7915cb7f802d11db8321f94a46c9f924ca89ec5a6c8e891000338b298",
+        "response_sha256": "6cafed5b1d53c9b2bbaead44f688ab070dd71842a7f71785b95752afe48f520d",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-ornith-v2-opalwharf_archive-grant-register"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2186,
+          "maximum_wire_bytes": 2186
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "quillforge_registry",
+        "case_id": "quillforge_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b1603c11389cce384984204e9715084a2b6e5dc4f692dd472332e60ddbb005f9",
+        "response_sha256": "4aee9b0abf307046226cada184fd080a9dd910d29ff45b09b924c23f59d41396",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "foxglove_pier",
+        "case_id": "foxglove_pier-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b17c86826e593f76303d3e934fd652e0ed71b80471ae67d8a8e59bd2412f0bf1",
+        "response_sha256": "23bcf1dfd29cdc4b8147ea675b9ed4ee0b267c19526216c4db43088444805e71",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "local-source-authority-ornith-v2-foxglove_pier-navigation-chart"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "foxglove_pier",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 495
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "larkspur_shed",
+        "case_id": "larkspur_shed-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "transport",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b17252303478eed5710417da651910888424a53cfd97eeae6a6ceb7fa9f59ddc",
+        "response_sha256": "ace9b1df30be89bc404558b8b2893093338e0716be7ac28121c3663982ef2679",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "local-source-authority-ornith-v2-larkspur_shed-maintenance-schedule"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "larkspur_shed",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 529
+        }
+      ]
+    }
+  ]
+}

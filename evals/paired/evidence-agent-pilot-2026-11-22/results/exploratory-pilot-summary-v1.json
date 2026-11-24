@@ -1,0 +1,3396 @@
+{
+  "schema_version": "memory-mcp-agent-exploratory-pilot-report/v1",
+  "plan_sha256": "6d5600c21d60445207c6187b8e5f0509d3b91aec1f9228c8cd16c4bf25e08670",
+  "manifest_sha256": "937283b4705eda4f989a04f509fedb6d6ce0aa3e76e4fe9acf0ea2303a09b55d",
+  "independent_family_count": 14,
+  "paired_trial_count_per_run": 14,
+  "first_run": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "80725-1795319559715864000-1",
+    "run_started_at": "2026-11-22T03:52:39.715864Z",
+    "run_completed_at": "2026-11-22T04:06:07.584277Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "evidence-default-agent-usability-development-pilot-2026-11-22-v1",
+      "stage": "exploratory_comparison",
+      "expected_trials": [
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "alder-workshop-booking-history",
+          "case_id": "alder-workshop-location",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "beacon-export-decision-history",
+          "case_id": "beacon-export-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "cedar-release-readiness-history",
+          "case_id": "cedar-release-check",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "mara-status-preference-history",
+          "case_id": "mara-status-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "slate-review-schedule-history",
+          "case_id": "slate-review-start-time",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "transient-retry-policy-history",
+          "case_id": "retry-after-rate-limit",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 14,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "fad8adc3beaf27f582eb9c0adfb0061605de82d47e9c78511adb4a428757e99c",
+        "oracle_sha256": "1c4391c5d037210227d71b319491c89ccf3de97861535ab7b42d4294de5517c4",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "shadow"
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "c8f65767e70e4d0fa4ae073b7ddd7529f10dc25d05a52c440f0faad7f8cff650",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112201,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "6d5600c21d60445207c6187b8e5f0509d3b91aec1f9228c8cd16c4bf25e08670",
+    "manifest_sha256": "937283b4705eda4f989a04f509fedb6d6ce0aa3e76e4fe9acf0ea2303a09b55d",
+    "incumbent_artifact_sha256": "e97b97de87dc30b06b384f500a1ec93c43e0ee7d65e73ad85d68061d495bb56f",
+    "candidate_artifact_sha256": "008e00ac07d9438d927dc79f33ab930901bc202838096f84d5d5f6bbe50384be",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": -0.2857142857142857,
+          "upper": 0.2857142857142857,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 1.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 1.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": -1.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": -1.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": -0.2857142857142857,
+          "upper": 0.2857142857142857,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 1.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 1.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": -1.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": -1.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 574.5,
+        "interval": {
+          "estimate": 574.5,
+          "lower": -2414.0714285714284,
+          "upper": 3560.6428571428573,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": -9893.0,
+          "beacon-export-decision-history": 7.0,
+          "birch-valid-time-history": 370.0,
+          "cedar-release-readiness-history": 9701.0,
+          "cobalt-retroactive-history": -735.0,
+          "juniper-unverified-correction-history": -174.0,
+          "maple-reversed-arrival-history": -1359.0,
+          "mara-status-preference-history": 9710.0,
+          "opal-open-conflict-history": -1338.0,
+          "slate-review-schedule-history": 9697.0,
+          "stable-repeat-history": 1209.0,
+          "transient-retry-policy-history": -9705.0,
+          "unknown-abstention-history": -625.0,
+          "unrelated-distractor-history": 1178.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 2.357142857142857,
+        "interval": {
+          "estimate": 2.357142857142857,
+          "lower": -21.142857142857142,
+          "upper": 23.214285714285715,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 7.0,
+          "beacon-export-decision-history": 6.0,
+          "birch-valid-time-history": -20.0,
+          "cedar-release-readiness-history": 9.0,
+          "cobalt-retroactive-history": 21.0,
+          "juniper-unverified-correction-history": -1.0,
+          "maple-reversed-arrival-history": 59.0,
+          "mara-status-preference-history": 16.0,
+          "opal-open-conflict-history": 56.0,
+          "slate-review-schedule-history": 7.0,
+          "stable-repeat-history": -99.0,
+          "transient-retry-policy-history": -8.0,
+          "unknown-abstention-history": 51.0,
+          "unrelated-distractor-history": -71.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 701.4285714285714,
+        "interval": {
+          "estimate": 701.4285714285714,
+          "lower": -979.9285714285714,
+          "upper": 2272.8571428571427,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 1083.0,
+          "beacon-export-decision-history": -102.0,
+          "birch-valid-time-history": 7148.0,
+          "cedar-release-readiness-history": 2684.0,
+          "cobalt-retroactive-history": 1898.0,
+          "juniper-unverified-correction-history": 836.0,
+          "maple-reversed-arrival-history": 2465.0,
+          "mara-status-preference-history": 516.0,
+          "opal-open-conflict-history": 3293.0,
+          "slate-review-schedule-history": 821.0,
+          "stable-repeat-history": -6749.0,
+          "transient-retry-policy-history": -2221.0,
+          "unknown-abstention-history": 1720.0,
+          "unrelated-distractor-history": -3572.0
+        }
+      }
+    },
+    "by_stratum": {
+      "ordinary_workflows": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 1586.1666666666667,
+          "interval": {
+            "estimate": 1586.1666666666667,
+            "lower": -4946.666666666667,
+            "upper": 8088.333333333333,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": -9893.0,
+            "beacon-export-decision-history": 7.0,
+            "cedar-release-readiness-history": 9701.0,
+            "mara-status-preference-history": 9710.0,
+            "slate-review-schedule-history": 9697.0,
+            "transient-retry-policy-history": -9705.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 6.166666666666667,
+          "interval": {
+            "estimate": 6.166666666666667,
+            "lower": -0.16666666666666666,
+            "upper": 11.5,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 7.0,
+            "beacon-export-decision-history": 6.0,
+            "cedar-release-readiness-history": 9.0,
+            "mara-status-preference-history": 16.0,
+            "slate-review-schedule-history": 7.0,
+            "transient-retry-policy-history": -8.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 463.5,
+          "interval": {
+            "estimate": 463.5,
+            "lower": -766.5,
+            "upper": 1598.6666666666667,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 1083.0,
+            "beacon-export-decision-history": -102.0,
+            "cedar-release-readiness-history": 2684.0,
+            "mara-status-preference-history": 516.0,
+            "slate-review-schedule-history": 821.0,
+            "transient-retry-policy-history": -2221.0
+          }
+        }
+      },
+      "temporal_decisions": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": -0.5,
+            "upper": 0.5,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 1.0,
+            "opal-open-conflict-history": 1.0,
+            "stable-repeat-history": -1.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": -1.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": -0.5,
+            "upper": 0.5,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 1.0,
+            "opal-open-conflict-history": 1.0,
+            "stable-repeat-history": -1.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": -1.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -184.25,
+          "interval": {
+            "estimate": -184.25,
+            "lower": -820.25,
+            "upper": 493.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 370.0,
+            "cobalt-retroactive-history": -735.0,
+            "juniper-unverified-correction-history": -174.0,
+            "maple-reversed-arrival-history": -1359.0,
+            "opal-open-conflict-history": -1338.0,
+            "stable-repeat-history": 1209.0,
+            "unknown-abstention-history": -625.0,
+            "unrelated-distractor-history": 1178.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -0.5,
+          "interval": {
+            "estimate": -0.5,
+            "lower": -41.0,
+            "upper": 36.125,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": -20.0,
+            "cobalt-retroactive-history": 21.0,
+            "juniper-unverified-correction-history": -1.0,
+            "maple-reversed-arrival-history": 59.0,
+            "opal-open-conflict-history": 56.0,
+            "stable-repeat-history": -99.0,
+            "unknown-abstention-history": 51.0,
+            "unrelated-distractor-history": -71.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 879.875,
+          "interval": {
+            "estimate": 879.875,
+            "lower": -2069.75,
+            "upper": 3514.75,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 7148.0,
+            "cobalt-retroactive-history": 1898.0,
+            "juniper-unverified-correction-history": 836.0,
+            "maple-reversed-arrival-history": 2465.0,
+            "opal-open-conflict-history": 3293.0,
+            "stable-repeat-history": -6749.0,
+            "unknown-abstention-history": 1720.0,
+            "unrelated-distractor-history": -3572.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 14,
+    "independent_family_count": 14,
+    "hard_violation_count": 2,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "ordinary_workflows": {
+        "incumbent_first": 3,
+        "candidate_first": 3
+      },
+      "temporal_decisions": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "second_run": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "83584-1795320508603342000-1",
+    "run_started_at": "2026-11-22T04:08:28.603343Z",
+    "run_completed_at": "2026-11-22T04:21:33.003313Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "evidence-default-agent-usability-development-pilot-2026-11-22-v1",
+      "stage": "exploratory_comparison",
+      "expected_trials": [
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "alder-workshop-booking-history",
+          "case_id": "alder-workshop-location",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "beacon-export-decision-history",
+          "case_id": "beacon-export-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "cedar-release-readiness-history",
+          "case_id": "cedar-release-check",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "mara-status-preference-history",
+          "case_id": "mara-status-format",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "slate-review-schedule-history",
+          "case_id": "slate-review-start-time",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "ordinary_workflows",
+          "family_id": "transient-retry-policy-history",
+          "case_id": "retry-after-rate-limit",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "birch-valid-time-history",
+          "case_id": "birch-valid-time-update",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "cobalt-retroactive-history",
+          "case_id": "cobalt-retroactive-correction",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "juniper-unverified-correction-history",
+          "case_id": "juniper-unverified-correction",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "maple-reversed-arrival-history",
+          "case_id": "maple-reversed-conflict",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "opal-open-conflict-history",
+          "case_id": "opal-open-conflict",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "stable-repeat-history",
+          "case_id": "stable-repeat",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unknown-abstention-history",
+          "case_id": "unknown-target",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "temporal_decisions",
+          "family_id": "unrelated-distractor-history",
+          "case_id": "willow-unrelated-distractor",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 14,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.169.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52",
+        "task_prompt_sha256": "f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095",
+        "host_policy_sha256": "f04fca8213144f80bdf814181c8056d9c30c47614c811e27905dcd62fb741473",
+        "transport": "stdio",
+        "retry_policy_sha256": "79a6a09f3236a7d9e64c0f8b4f49b069bbe38289345f2e4b60d1079cae259c0b",
+        "reader_config_sha256": "3fe3c25318fa7f740b7d4140d2d18431891854eb417e4715e7058452ebb72617",
+        "judge_config_sha256": null,
+        "corpus_sha256": "fad8adc3beaf27f582eb9c0adfb0061605de82d47e9c78511adb4a428757e99c",
+        "oracle_sha256": "1c4391c5d037210227d71b319491c89ccf3de97861535ab7b42d4294de5517c4",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "1595957b658ffa771ea8d9ec27a787313d368ecbf4ca6f86034625206b0a46c1",
+        "provider_fingerprints": {
+          "codex_cli": "739cda86e15d30a6e2b40cf8dcbbfb988aaf48b305b27065573bb8e9fd41d002"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 2048,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "ad110c546ee1474bf318e1bb5390b6ac8738cbd9f29122717ac00398fd30b0ac",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "shadow"
+      },
+      "candidate_product": {
+        "revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7+dirty-evidence-default-2026-11-22",
+        "binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+        "product_config_sha256": "c8f65767e70e4d0fa4ae073b7ddd7529f10dc25d05a52c440f0faad7f8cff650",
+        "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112201,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "6d5600c21d60445207c6187b8e5f0509d3b91aec1f9228c8cd16c4bf25e08670",
+    "manifest_sha256": "937283b4705eda4f989a04f509fedb6d6ce0aa3e76e4fe9acf0ea2303a09b55d",
+    "incumbent_artifact_sha256": "48cf0413587290b27149c2e882b1d80a2835c7d70b6131834faed65ed3e9b4eb",
+    "candidate_artifact_sha256": "e128e3e05628e1a8afe661f38cdc6061146ed90ff401cb5f168f0d3b5d4dc5ef",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": -0.07142857142857142,
+        "interval": {
+          "estimate": -0.07142857142857142,
+          "lower": -0.21428571428571427,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": -1.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": -0.07142857142857142,
+        "interval": {
+          "estimate": -0.07142857142857142,
+          "lower": -0.21428571428571427,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": -1.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": -0.5,
+        "interval": {
+          "estimate": -0.5,
+          "lower": -1.7142857142857142,
+          "upper": 0.2857142857142857,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": -1.0,
+          "maple-reversed-arrival-history": 1.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 1.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": -8.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": -0.5,
+        "interval": {
+          "estimate": -0.5,
+          "lower": -1.5,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": -7.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.21428571428571427,
+        "interval": {
+          "estimate": 0.21428571428571427,
+          "lower": -0.14285714285714285,
+          "upper": 0.6428571428571429,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": -1.0,
+          "maple-reversed-arrival-history": 2.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 2.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": 0.0,
+          "beacon-export-decision-history": 0.0,
+          "birch-valid-time-history": 0.0,
+          "cedar-release-readiness-history": 0.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": 0.0,
+          "maple-reversed-arrival-history": 0.0,
+          "mara-status-preference-history": 0.0,
+          "opal-open-conflict-history": 0.0,
+          "slate-review-schedule-history": 0.0,
+          "stable-repeat-history": 0.0,
+          "transient-retry-policy-history": 0.0,
+          "unknown-abstention-history": 0.0,
+          "unrelated-distractor-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 374.07142857142856,
+        "interval": {
+          "estimate": 374.07142857142856,
+          "lower": -2611.8571428571427,
+          "upper": 3243.4285714285716,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": -18.0,
+          "beacon-export-decision-history": -9702.0,
+          "birch-valid-time-history": 18.0,
+          "cedar-release-readiness-history": -16.0,
+          "cobalt-retroactive-history": -164.0,
+          "juniper-unverified-correction-history": 997.0,
+          "maple-reversed-arrival-history": 7364.0,
+          "mara-status-preference-history": 1.0,
+          "opal-open-conflict-history": -149.0,
+          "slate-review-schedule-history": 9703.0,
+          "stable-repeat-history": 8866.0,
+          "transient-retry-policy-history": -9.0,
+          "unknown-abstention-history": -11515.0,
+          "unrelated-distractor-history": -139.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 11.142857142857142,
+        "interval": {
+          "estimate": 11.142857142857142,
+          "lower": -11.285714285714286,
+          "upper": 38.92857142857143,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": -18.0,
+          "beacon-export-decision-history": -8.0,
+          "birch-valid-time-history": 2.0,
+          "cedar-release-readiness-history": -8.0,
+          "cobalt-retroactive-history": 0.0,
+          "juniper-unverified-correction-history": -62.0,
+          "maple-reversed-arrival-history": 114.0,
+          "mara-status-preference-history": 1.0,
+          "opal-open-conflict-history": 5.0,
+          "slate-review-schedule-history": 13.0,
+          "stable-repeat-history": 127.0,
+          "transient-retry-policy-history": -2.0,
+          "unknown-abstention-history": -6.0,
+          "unrelated-distractor-history": -2.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 891.1428571428571,
+        "interval": {
+          "estimate": 891.1428571428571,
+          "lower": -925.8571428571429,
+          "upper": 2940.4285714285716,
+          "independent_clusters": 14,
+          "draws": 10000,
+          "seed": 2026112201,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "alder-workshop-booking-history": -2266.0,
+          "beacon-export-decision-history": -3056.0,
+          "birch-valid-time-history": -10.0,
+          "cedar-release-readiness-history": 1577.0,
+          "cobalt-retroactive-history": -1230.0,
+          "juniper-unverified-correction-history": -4422.0,
+          "maple-reversed-arrival-history": 7379.0,
+          "mara-status-preference-history": 902.0,
+          "opal-open-conflict-history": -398.0,
+          "slate-review-schedule-history": 182.0,
+          "stable-repeat-history": 9892.0,
+          "transient-retry-policy-history": -305.0,
+          "unknown-abstention-history": 950.0,
+          "unrelated-distractor-history": 3281.0
+        }
+      }
+    },
+    "by_stratum": {
+      "ordinary_workflows": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": 0.0,
+            "beacon-export-decision-history": 0.0,
+            "cedar-release-readiness-history": 0.0,
+            "mara-status-preference-history": 0.0,
+            "slate-review-schedule-history": 0.0,
+            "transient-retry-policy-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -6.833333333333333,
+          "interval": {
+            "estimate": -6.833333333333333,
+            "lower": -4855.333333333333,
+            "upper": 4845.833333333333,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": -18.0,
+            "beacon-export-decision-history": -9702.0,
+            "cedar-release-readiness-history": -16.0,
+            "mara-status-preference-history": 1.0,
+            "slate-review-schedule-history": 9703.0,
+            "transient-retry-policy-history": -9.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": -3.6666666666666665,
+          "interval": {
+            "estimate": -3.6666666666666665,
+            "lower": -11.333333333333334,
+            "upper": 4.0,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": -18.0,
+            "beacon-export-decision-history": -8.0,
+            "cedar-release-readiness-history": -8.0,
+            "mara-status-preference-history": 1.0,
+            "slate-review-schedule-history": 13.0,
+            "transient-retry-policy-history": -2.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": -494.3333333333333,
+          "interval": {
+            "estimate": -494.3333333333333,
+            "lower": -1875.6666666666667,
+            "upper": 774.5,
+            "independent_clusters": 6,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "alder-workshop-booking-history": -2266.0,
+            "beacon-export-decision-history": -3056.0,
+            "cedar-release-readiness-history": 1577.0,
+            "mara-status-preference-history": 902.0,
+            "slate-review-schedule-history": 182.0,
+            "transient-retry-policy-history": -305.0
+          }
+        }
+      },
+      "temporal_decisions": {
+        "direct_memory_success": {
+          "estimate": -0.125,
+          "interval": {
+            "estimate": -0.125,
+            "lower": -0.375,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": -1.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": -0.125,
+          "interval": {
+            "estimate": -0.125,
+            "lower": -0.375,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": -1.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": -0.875,
+          "interval": {
+            "estimate": -0.875,
+            "lower": -3.0,
+            "upper": 0.5,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": -1.0,
+            "maple-reversed-arrival-history": 1.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 1.0,
+            "unknown-abstention-history": -8.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": -0.875,
+          "interval": {
+            "estimate": -0.875,
+            "lower": -2.625,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": -7.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.375,
+          "interval": {
+            "estimate": 0.375,
+            "lower": -0.25,
+            "upper": 1.125,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": -1.0,
+            "maple-reversed-arrival-history": 2.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 2.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 0.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": 0.0,
+            "maple-reversed-arrival-history": 0.0,
+            "opal-open-conflict-history": 0.0,
+            "stable-repeat-history": 0.0,
+            "unknown-abstention-history": 0.0,
+            "unrelated-distractor-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 659.75,
+          "interval": {
+            "estimate": 659.75,
+            "lower": -3436.875,
+            "upper": 4333.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 18.0,
+            "cobalt-retroactive-history": -164.0,
+            "juniper-unverified-correction-history": 997.0,
+            "maple-reversed-arrival-history": 7364.0,
+            "opal-open-conflict-history": -149.0,
+            "stable-repeat-history": 8866.0,
+            "unknown-abstention-history": -11515.0,
+            "unrelated-distractor-history": -139.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 22.25,
+          "interval": {
+            "estimate": 22.25,
+            "lower": -16.25,
+            "upper": 66.0,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": 2.0,
+            "cobalt-retroactive-history": 0.0,
+            "juniper-unverified-correction-history": -62.0,
+            "maple-reversed-arrival-history": 114.0,
+            "opal-open-conflict-history": 5.0,
+            "stable-repeat-history": 127.0,
+            "unknown-abstention-history": -6.0,
+            "unrelated-distractor-history": -2.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 1930.25,
+          "interval": {
+            "estimate": 1930.25,
+            "lower": -970.0,
+            "upper": 5154.625,
+            "independent_clusters": 8,
+            "draws": 10000,
+            "seed": 2026112201,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "birch-valid-time-history": -10.0,
+            "cobalt-retroactive-history": -1230.0,
+            "juniper-unverified-correction-history": -4422.0,
+            "maple-reversed-arrival-history": 7379.0,
+            "opal-open-conflict-history": -398.0,
+            "stable-repeat-history": 9892.0,
+            "unknown-abstention-history": 950.0,
+            "unrelated-distractor-history": 3281.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 14,
+    "independent_family_count": 14,
+    "hard_violation_count": 1,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "ordinary_workflows": {
+        "incumbent_first": 3,
+        "candidate_first": 3
+      },
+      "temporal_decisions": {
+        "incumbent_first": 4,
+        "candidate_first": 4
+      }
+    }
+  },
+  "metrics": {
+    "direct_memory_success": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -0.5,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.017857142857142856
+    },
+    "task_success": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -0.5,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.017857142857142856
+    },
+    "repair_turn_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": -1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -8.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": -0.5,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.5,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -4.0,
+        "unrelated-distractor-history": -0.5
+      },
+      "between_family_sample_variance": 1.2980769230769231
+    },
+    "turn_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -7.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -3.5,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.875
+    },
+    "tool_call_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": -1.0,
+        "maple-reversed-arrival-history": 2.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 2.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": -0.5,
+        "maple-reversed-arrival-history": 1.5,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.5,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.5,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -0.5
+      },
+      "between_family_sample_variance": 0.23763736263736265
+    },
+    "clarification_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.0
+    },
+    "input_token_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": -9893.0,
+        "beacon-export-decision-history": 7.0,
+        "birch-valid-time-history": 370.0,
+        "cedar-release-readiness-history": 9701.0,
+        "cobalt-retroactive-history": -735.0,
+        "juniper-unverified-correction-history": -174.0,
+        "maple-reversed-arrival-history": -1359.0,
+        "mara-status-preference-history": 9710.0,
+        "opal-open-conflict-history": -1338.0,
+        "slate-review-schedule-history": 9697.0,
+        "stable-repeat-history": 1209.0,
+        "transient-retry-policy-history": -9705.0,
+        "unknown-abstention-history": -625.0,
+        "unrelated-distractor-history": 1178.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": -18.0,
+        "beacon-export-decision-history": -9702.0,
+        "birch-valid-time-history": 18.0,
+        "cedar-release-readiness-history": -16.0,
+        "cobalt-retroactive-history": -164.0,
+        "juniper-unverified-correction-history": 997.0,
+        "maple-reversed-arrival-history": 7364.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": -149.0,
+        "slate-review-schedule-history": 9703.0,
+        "stable-repeat-history": 8866.0,
+        "transient-retry-policy-history": -9.0,
+        "unknown-abstention-history": -11515.0,
+        "unrelated-distractor-history": -139.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": -4955.5,
+        "beacon-export-decision-history": -4847.5,
+        "birch-valid-time-history": 194.0,
+        "cedar-release-readiness-history": 4842.5,
+        "cobalt-retroactive-history": -449.5,
+        "juniper-unverified-correction-history": 411.5,
+        "maple-reversed-arrival-history": 3002.5,
+        "mara-status-preference-history": 4855.5,
+        "opal-open-conflict-history": -743.5,
+        "slate-review-schedule-history": 9700.0,
+        "stable-repeat-history": 5037.5,
+        "transient-retry-policy-history": -4857.0,
+        "unknown-abstention-history": -6070.0,
+        "unrelated-distractor-history": 519.5
+      },
+      "between_family_sample_variance": 21698470.64285714
+    },
+    "output_token_gain": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 7.0,
+        "beacon-export-decision-history": 6.0,
+        "birch-valid-time-history": -20.0,
+        "cedar-release-readiness-history": 9.0,
+        "cobalt-retroactive-history": 21.0,
+        "juniper-unverified-correction-history": -1.0,
+        "maple-reversed-arrival-history": 59.0,
+        "mara-status-preference-history": 16.0,
+        "opal-open-conflict-history": 56.0,
+        "slate-review-schedule-history": 7.0,
+        "stable-repeat-history": -99.0,
+        "transient-retry-policy-history": -8.0,
+        "unknown-abstention-history": 51.0,
+        "unrelated-distractor-history": -71.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": -18.0,
+        "beacon-export-decision-history": -8.0,
+        "birch-valid-time-history": 2.0,
+        "cedar-release-readiness-history": -8.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": -62.0,
+        "maple-reversed-arrival-history": 114.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 5.0,
+        "slate-review-schedule-history": 13.0,
+        "stable-repeat-history": 127.0,
+        "transient-retry-policy-history": -2.0,
+        "unknown-abstention-history": -6.0,
+        "unrelated-distractor-history": -2.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": -5.5,
+        "beacon-export-decision-history": -1.0,
+        "birch-valid-time-history": -9.0,
+        "cedar-release-readiness-history": 0.5,
+        "cobalt-retroactive-history": 10.5,
+        "juniper-unverified-correction-history": -31.5,
+        "maple-reversed-arrival-history": 86.5,
+        "mara-status-preference-history": 8.5,
+        "opal-open-conflict-history": 30.5,
+        "slate-review-schedule-history": 10.0,
+        "stable-repeat-history": 14.0,
+        "transient-retry-policy-history": -5.0,
+        "unknown-abstention-history": 22.5,
+        "unrelated-distractor-history": -36.5
+      },
+      "between_family_sample_variance": 863.1826923076923
+    },
+    "wall_time_gain_ms": {
+      "first_run_family_deltas": {
+        "alder-workshop-booking-history": 1083.0,
+        "beacon-export-decision-history": -102.0,
+        "birch-valid-time-history": 7148.0,
+        "cedar-release-readiness-history": 2684.0,
+        "cobalt-retroactive-history": 1898.0,
+        "juniper-unverified-correction-history": 836.0,
+        "maple-reversed-arrival-history": 2465.0,
+        "mara-status-preference-history": 516.0,
+        "opal-open-conflict-history": 3293.0,
+        "slate-review-schedule-history": 821.0,
+        "stable-repeat-history": -6749.0,
+        "transient-retry-policy-history": -2221.0,
+        "unknown-abstention-history": 1720.0,
+        "unrelated-distractor-history": -3572.0
+      },
+      "second_run_family_deltas": {
+        "alder-workshop-booking-history": -2266.0,
+        "beacon-export-decision-history": -3056.0,
+        "birch-valid-time-history": -10.0,
+        "cedar-release-readiness-history": 1577.0,
+        "cobalt-retroactive-history": -1230.0,
+        "juniper-unverified-correction-history": -4422.0,
+        "maple-reversed-arrival-history": 7379.0,
+        "mara-status-preference-history": 902.0,
+        "opal-open-conflict-history": -398.0,
+        "slate-review-schedule-history": 182.0,
+        "stable-repeat-history": 9892.0,
+        "transient-retry-policy-history": -305.0,
+        "unknown-abstention-history": 950.0,
+        "unrelated-distractor-history": 3281.0
+      },
+      "family_deltas": {
+        "alder-workshop-booking-history": -591.5,
+        "beacon-export-decision-history": -1579.0,
+        "birch-valid-time-history": 3569.0,
+        "cedar-release-readiness-history": 2130.5,
+        "cobalt-retroactive-history": 334.0,
+        "juniper-unverified-correction-history": -1793.0,
+        "maple-reversed-arrival-history": 4922.0,
+        "mara-status-preference-history": 709.0,
+        "opal-open-conflict-history": 1447.5,
+        "slate-review-schedule-history": 501.5,
+        "stable-repeat-history": 1571.5,
+        "transient-retry-policy-history": -1263.0,
+        "unknown-abstention-history": 1335.0,
+        "unrelated-distractor-history": -145.5
+      },
+      "between_family_sample_variance": 3654847.4120879117
+    }
+  },
+  "incumbent_outcomes": {
+    "direct_memory_success": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.5,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.017857142857142856,
+      "test_retest_sample_variance": 0.07142857142857142
+    },
+    "task_success": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.5,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.13873626373626377,
+      "test_retest_sample_variance": 0.07142857142857142
+    },
+    "charged_repair_turns": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.5,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.5,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 4.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": -1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -8.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 8.532967032967035,
+      "test_retest_sample_variance": 4.7252747252747245
+    },
+    "charged_turns": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 4.5,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": -7.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 6.798076923076923,
+      "test_retest_sample_variance": 3.5
+    },
+    "tool_calls": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 2.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 2.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 3.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 3.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 2.5,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.5,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 2.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": -1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 2.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.25824175824175827,
+      "test_retest_sample_variance": 0.4395604395604395
+    },
+    "user_clarifications": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.24725274725274715,
+      "test_retest_sample_variance": 0.0
+    },
+    "input_tokens": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 16635.0,
+        "beacon-export-decision-history": 26568.0,
+        "birch-valid-time-history": 27023.0,
+        "cedar-release-readiness-history": 26554.0,
+        "cobalt-retroactive-history": 26882.0,
+        "juniper-unverified-correction-history": 27491.0,
+        "maple-reversed-arrival-history": 26295.0,
+        "mara-status-preference-history": 26548.0,
+        "opal-open-conflict-history": 26254.0,
+        "slate-review-schedule-history": 26540.0,
+        "stable-repeat-history": 27011.0,
+        "transient-retry-policy-history": 16847.0,
+        "unknown-abstention-history": 36096.0,
+        "unrelated-distractor-history": 27031.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 16826.0,
+        "beacon-export-decision-history": 16861.0,
+        "birch-valid-time-history": 27023.0,
+        "cedar-release-readiness-history": 26559.0,
+        "cobalt-retroactive-history": 27455.0,
+        "juniper-unverified-correction-history": 27496.0,
+        "maple-reversed-arrival-history": 35018.0,
+        "mara-status-preference-history": 16847.0,
+        "opal-open-conflict-history": 27436.0,
+        "slate-review-schedule-history": 26545.0,
+        "stable-repeat-history": 35861.0,
+        "transient-retry-policy-history": 26557.0,
+        "unknown-abstention-history": 25196.0,
+        "unrelated-distractor-history": 27031.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 16730.5,
+        "beacon-export-decision-history": 21714.5,
+        "birch-valid-time-history": 27023.0,
+        "cedar-release-readiness-history": 26556.5,
+        "cobalt-retroactive-history": 27168.5,
+        "juniper-unverified-correction-history": 27493.5,
+        "maple-reversed-arrival-history": 30656.5,
+        "mara-status-preference-history": 21697.5,
+        "opal-open-conflict-history": 26845.0,
+        "slate-review-schedule-history": 26542.5,
+        "stable-repeat-history": 31436.0,
+        "transient-retry-policy-history": 21702.0,
+        "unknown-abstention-history": 30646.0,
+        "unrelated-distractor-history": 27031.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 191.0,
+        "beacon-export-decision-history": -9707.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 5.0,
+        "cobalt-retroactive-history": 573.0,
+        "juniper-unverified-correction-history": 5.0,
+        "maple-reversed-arrival-history": 8723.0,
+        "mara-status-preference-history": -9701.0,
+        "opal-open-conflict-history": 1182.0,
+        "slate-review-schedule-history": 5.0,
+        "stable-repeat-history": 8850.0,
+        "transient-retry-policy-history": 9710.0,
+        "unknown-abstention-history": -10900.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 17005720.840659343,
+      "test_retest_sample_variance": 42886440.307692304
+    },
+    "output_tokens": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 122.0,
+        "beacon-export-decision-history": 121.0,
+        "birch-valid-time-history": 135.0,
+        "cedar-release-readiness-history": 120.0,
+        "cobalt-retroactive-history": 182.0,
+        "juniper-unverified-correction-history": 166.0,
+        "maple-reversed-arrival-history": 233.0,
+        "mara-status-preference-history": 116.0,
+        "opal-open-conflict-history": 219.0,
+        "slate-review-schedule-history": 121.0,
+        "stable-repeat-history": 127.0,
+        "transient-retry-policy-history": 117.0,
+        "unknown-abstention-history": 220.0,
+        "unrelated-distractor-history": 137.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 103.0,
+        "beacon-export-decision-history": 108.0,
+        "birch-valid-time-history": 135.0,
+        "cedar-release-readiness-history": 125.0,
+        "cobalt-retroactive-history": 162.0,
+        "juniper-unverified-correction-history": 171.0,
+        "maple-reversed-arrival-history": 288.0,
+        "mara-status-preference-history": 109.0,
+        "opal-open-conflict-history": 162.0,
+        "slate-review-schedule-history": 126.0,
+        "stable-repeat-history": 253.0,
+        "transient-retry-policy-history": 130.0,
+        "unknown-abstention-history": 158.0,
+        "unrelated-distractor-history": 137.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 112.5,
+        "beacon-export-decision-history": 114.5,
+        "birch-valid-time-history": 135.0,
+        "cedar-release-readiness-history": 122.5,
+        "cobalt-retroactive-history": 172.0,
+        "juniper-unverified-correction-history": 168.5,
+        "maple-reversed-arrival-history": 260.5,
+        "mara-status-preference-history": 112.5,
+        "opal-open-conflict-history": 190.5,
+        "slate-review-schedule-history": 123.5,
+        "stable-repeat-history": 190.0,
+        "transient-retry-policy-history": 123.5,
+        "unknown-abstention-history": 189.0,
+        "unrelated-distractor-history": 137.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": -19.0,
+        "beacon-export-decision-history": -13.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 5.0,
+        "cobalt-retroactive-history": -20.0,
+        "juniper-unverified-correction-history": 5.0,
+        "maple-reversed-arrival-history": 55.0,
+        "mara-status-preference-history": -7.0,
+        "opal-open-conflict-history": -57.0,
+        "slate-review-schedule-history": 5.0,
+        "stable-repeat-history": 126.0,
+        "transient-retry-policy-history": 13.0,
+        "unknown-abstention-history": -62.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 1864.2925824175825,
+      "test_retest_sample_variance": 2088.335164835165
+    },
+    "wall_time_ms": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 12332.0,
+        "beacon-export-decision-history": 11337.0,
+        "birch-valid-time-history": 18988.0,
+        "cedar-release-readiness-history": 12460.0,
+        "cobalt-retroactive-history": 14854.0,
+        "juniper-unverified-correction-history": 14379.0,
+        "maple-reversed-arrival-history": 15798.0,
+        "mara-status-preference-history": 11708.0,
+        "opal-open-conflict-history": 14665.0,
+        "slate-review-schedule-history": 11330.0,
+        "stable-repeat-history": 13558.0,
+        "transient-retry-policy-history": 9641.0,
+        "unknown-abstention-history": 19090.0,
+        "unrelated-distractor-history": 13222.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 10560.0,
+        "beacon-export-decision-history": 9504.0,
+        "birch-valid-time-history": 12516.0,
+        "cedar-release-readiness-history": 14802.0,
+        "cobalt-retroactive-history": 12886.0,
+        "juniper-unverified-correction-history": 13013.0,
+        "maple-reversed-arrival-history": 19408.0,
+        "mara-status-preference-history": 11172.0,
+        "opal-open-conflict-history": 12527.0,
+        "slate-review-schedule-history": 11142.0,
+        "stable-repeat-history": 21188.0,
+        "transient-retry-policy-history": 12843.0,
+        "unknown-abstention-history": 18115.0,
+        "unrelated-distractor-history": 15847.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 11446.0,
+        "beacon-export-decision-history": 10420.5,
+        "birch-valid-time-history": 15752.0,
+        "cedar-release-readiness-history": 13631.0,
+        "cobalt-retroactive-history": 13870.0,
+        "juniper-unverified-correction-history": 13696.0,
+        "maple-reversed-arrival-history": 17603.0,
+        "mara-status-preference-history": 11440.0,
+        "opal-open-conflict-history": 13596.0,
+        "slate-review-schedule-history": 11236.0,
+        "stable-repeat-history": 17373.0,
+        "transient-retry-policy-history": 11242.0,
+        "unknown-abstention-history": 18602.5,
+        "unrelated-distractor-history": 14534.5
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": -1772.0,
+        "beacon-export-decision-history": -1833.0,
+        "birch-valid-time-history": -6472.0,
+        "cedar-release-readiness-history": 2342.0,
+        "cobalt-retroactive-history": -1968.0,
+        "juniper-unverified-correction-history": -1366.0,
+        "maple-reversed-arrival-history": 3610.0,
+        "mara-status-preference-history": -536.0,
+        "opal-open-conflict-history": -2138.0,
+        "slate-review-schedule-history": -188.0,
+        "stable-repeat-history": 7630.0,
+        "transient-retry-policy-history": 3202.0,
+        "unknown-abstention-history": -975.0,
+        "unrelated-distractor-history": 2625.0
+      },
+      "between_family_sample_variance": 6943688.913461538,
+      "test_retest_sample_variance": 11808751.785714287
+    }
+  },
+  "candidate_outcomes": {
+    "direct_memory_success": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.07142857142857142,
+      "test_retest_sample_variance": 0.0
+    },
+    "task_success": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.1813186813186813,
+      "test_retest_sample_variance": 0.0
+    },
+    "charged_repair_turns": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 0.5,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.5,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 0.5
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      },
+      "between_family_sample_variance": 11.254120879120878,
+      "test_retest_sample_variance": 0.2252747252747253
+    },
+    "charged_turns": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 8.0,
+        "cobalt-retroactive-history": 8.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 8.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 8.884615384615385,
+      "test_retest_sample_variance": 0.0
+    },
+    "tool_calls": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 2.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 2.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 2.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.0,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 1.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 1.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": 1.0,
+        "cedar-release-readiness-history": 1.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.5,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 1.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 1.0,
+        "stable-repeat-history": 1.5,
+        "transient-retry-policy-history": 1.0,
+        "unknown-abstention-history": 2.0,
+        "unrelated-distractor-history": 1.5
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": -1.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": -1.0
+      },
+      "between_family_sample_variance": 0.10027472527472528,
+      "test_retest_sample_variance": 0.2252747252747253
+    },
+    "user_clarifications": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 1.0,
+        "maple-reversed-arrival-history": 1.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 1.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 1.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 0.0,
+        "beacon-export-decision-history": 0.0,
+        "birch-valid-time-history": 0.0,
+        "cedar-release-readiness-history": 0.0,
+        "cobalt-retroactive-history": 0.0,
+        "juniper-unverified-correction-history": 0.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 0.0,
+        "opal-open-conflict-history": 0.0,
+        "slate-review-schedule-history": 0.0,
+        "stable-repeat-history": 0.0,
+        "transient-retry-policy-history": 0.0,
+        "unknown-abstention-history": 0.0,
+        "unrelated-distractor-history": 0.0
+      },
+      "between_family_sample_variance": 0.24725274725274715,
+      "test_retest_sample_variance": 0.0
+    },
+    "input_tokens": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 26528.0,
+        "beacon-export-decision-history": 26561.0,
+        "birch-valid-time-history": 26653.0,
+        "cedar-release-readiness-history": 16853.0,
+        "cobalt-retroactive-history": 27617.0,
+        "juniper-unverified-correction-history": 27665.0,
+        "maple-reversed-arrival-history": 27654.0,
+        "mara-status-preference-history": 16838.0,
+        "opal-open-conflict-history": 27592.0,
+        "slate-review-schedule-history": 16843.0,
+        "stable-repeat-history": 25802.0,
+        "transient-retry-policy-history": 26552.0,
+        "unknown-abstention-history": 36721.0,
+        "unrelated-distractor-history": 25853.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 16844.0,
+        "beacon-export-decision-history": 26563.0,
+        "birch-valid-time-history": 27005.0,
+        "cedar-release-readiness-history": 26575.0,
+        "cobalt-retroactive-history": 27619.0,
+        "juniper-unverified-correction-history": 26499.0,
+        "maple-reversed-arrival-history": 27654.0,
+        "mara-status-preference-history": 16846.0,
+        "opal-open-conflict-history": 27585.0,
+        "slate-review-schedule-history": 16842.0,
+        "stable-repeat-history": 26995.0,
+        "transient-retry-policy-history": 26566.0,
+        "unknown-abstention-history": 36711.0,
+        "unrelated-distractor-history": 27170.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 21686.0,
+        "beacon-export-decision-history": 26562.0,
+        "birch-valid-time-history": 26829.0,
+        "cedar-release-readiness-history": 21714.0,
+        "cobalt-retroactive-history": 27618.0,
+        "juniper-unverified-correction-history": 27082.0,
+        "maple-reversed-arrival-history": 27654.0,
+        "mara-status-preference-history": 16842.0,
+        "opal-open-conflict-history": 27588.5,
+        "slate-review-schedule-history": 16842.5,
+        "stable-repeat-history": 26398.5,
+        "transient-retry-policy-history": 26559.0,
+        "unknown-abstention-history": 36716.0,
+        "unrelated-distractor-history": 26511.5
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": -9684.0,
+        "beacon-export-decision-history": 2.0,
+        "birch-valid-time-history": 352.0,
+        "cedar-release-readiness-history": 9722.0,
+        "cobalt-retroactive-history": 2.0,
+        "juniper-unverified-correction-history": -1166.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 8.0,
+        "opal-open-conflict-history": -7.0,
+        "slate-review-schedule-history": -1.0,
+        "stable-repeat-history": 1193.0,
+        "transient-retry-policy-history": 14.0,
+        "unknown-abstention-history": -10.0,
+        "unrelated-distractor-history": 1317.0
+      },
+      "between_family_sample_variance": 25109019.785714287,
+      "test_retest_sample_variance": 14824769.340659343
+    },
+    "output_tokens": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 115.0,
+        "beacon-export-decision-history": 115.0,
+        "birch-valid-time-history": 155.0,
+        "cedar-release-readiness-history": 111.0,
+        "cobalt-retroactive-history": 161.0,
+        "juniper-unverified-correction-history": 167.0,
+        "maple-reversed-arrival-history": 174.0,
+        "mara-status-preference-history": 100.0,
+        "opal-open-conflict-history": 163.0,
+        "slate-review-schedule-history": 114.0,
+        "stable-repeat-history": 226.0,
+        "transient-retry-policy-history": 125.0,
+        "unknown-abstention-history": 169.0,
+        "unrelated-distractor-history": 208.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 121.0,
+        "beacon-export-decision-history": 116.0,
+        "birch-valid-time-history": 133.0,
+        "cedar-release-readiness-history": 133.0,
+        "cobalt-retroactive-history": 162.0,
+        "juniper-unverified-correction-history": 233.0,
+        "maple-reversed-arrival-history": 174.0,
+        "mara-status-preference-history": 108.0,
+        "opal-open-conflict-history": 157.0,
+        "slate-review-schedule-history": 113.0,
+        "stable-repeat-history": 126.0,
+        "transient-retry-policy-history": 132.0,
+        "unknown-abstention-history": 164.0,
+        "unrelated-distractor-history": 139.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 118.0,
+        "beacon-export-decision-history": 115.5,
+        "birch-valid-time-history": 144.0,
+        "cedar-release-readiness-history": 122.0,
+        "cobalt-retroactive-history": 161.5,
+        "juniper-unverified-correction-history": 200.0,
+        "maple-reversed-arrival-history": 174.0,
+        "mara-status-preference-history": 104.0,
+        "opal-open-conflict-history": 160.0,
+        "slate-review-schedule-history": 113.5,
+        "stable-repeat-history": 176.0,
+        "transient-retry-policy-history": 128.5,
+        "unknown-abstention-history": 166.5,
+        "unrelated-distractor-history": 173.5
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 6.0,
+        "beacon-export-decision-history": 1.0,
+        "birch-valid-time-history": -22.0,
+        "cedar-release-readiness-history": 22.0,
+        "cobalt-retroactive-history": 1.0,
+        "juniper-unverified-correction-history": 66.0,
+        "maple-reversed-arrival-history": 0.0,
+        "mara-status-preference-history": 8.0,
+        "opal-open-conflict-history": -6.0,
+        "slate-review-schedule-history": -1.0,
+        "stable-repeat-history": -100.0,
+        "transient-retry-policy-history": 7.0,
+        "unknown-abstention-history": -5.0,
+        "unrelated-distractor-history": -69.0
+      },
+      "between_family_sample_variance": 893.956043956044,
+      "test_retest_sample_variance": 1514.879120879121
+    },
+    "wall_time_ms": {
+      "first_run_family_means": {
+        "alder-workshop-booking-history": 11249.0,
+        "beacon-export-decision-history": 11439.0,
+        "birch-valid-time-history": 11840.0,
+        "cedar-release-readiness-history": 9776.0,
+        "cobalt-retroactive-history": 12956.0,
+        "juniper-unverified-correction-history": 13543.0,
+        "maple-reversed-arrival-history": 13333.0,
+        "mara-status-preference-history": 11192.0,
+        "opal-open-conflict-history": 11372.0,
+        "slate-review-schedule-history": 10509.0,
+        "stable-repeat-history": 20307.0,
+        "transient-retry-policy-history": 11862.0,
+        "unknown-abstention-history": 17370.0,
+        "unrelated-distractor-history": 16794.0
+      },
+      "second_run_family_means": {
+        "alder-workshop-booking-history": 12826.0,
+        "beacon-export-decision-history": 12560.0,
+        "birch-valid-time-history": 12526.0,
+        "cedar-release-readiness-history": 13225.0,
+        "cobalt-retroactive-history": 14116.0,
+        "juniper-unverified-correction-history": 17435.0,
+        "maple-reversed-arrival-history": 12029.0,
+        "mara-status-preference-history": 10270.0,
+        "opal-open-conflict-history": 12925.0,
+        "slate-review-schedule-history": 10960.0,
+        "stable-repeat-history": 11296.0,
+        "transient-retry-policy-history": 13148.0,
+        "unknown-abstention-history": 17165.0,
+        "unrelated-distractor-history": 12566.0
+      },
+      "family_means": {
+        "alder-workshop-booking-history": 12037.5,
+        "beacon-export-decision-history": 11999.5,
+        "birch-valid-time-history": 12183.0,
+        "cedar-release-readiness-history": 11500.5,
+        "cobalt-retroactive-history": 13536.0,
+        "juniper-unverified-correction-history": 15489.0,
+        "maple-reversed-arrival-history": 12681.0,
+        "mara-status-preference-history": 10731.0,
+        "opal-open-conflict-history": 12148.5,
+        "slate-review-schedule-history": 10734.5,
+        "stable-repeat-history": 15801.5,
+        "transient-retry-policy-history": 12505.0,
+        "unknown-abstention-history": 17267.5,
+        "unrelated-distractor-history": 14680.0
+      },
+      "retest_family_deltas": {
+        "alder-workshop-booking-history": 1577.0,
+        "beacon-export-decision-history": 1121.0,
+        "birch-valid-time-history": 686.0,
+        "cedar-release-readiness-history": 3449.0,
+        "cobalt-retroactive-history": 1160.0,
+        "juniper-unverified-correction-history": 3892.0,
+        "maple-reversed-arrival-history": -1304.0,
+        "mara-status-preference-history": -922.0,
+        "opal-open-conflict-history": 1553.0,
+        "slate-review-schedule-history": 451.0,
+        "stable-repeat-history": -9011.0,
+        "transient-retry-policy-history": 1286.0,
+        "unknown-abstention-history": -205.0,
+        "unrelated-distractor-history": -4228.0
+      },
+      "between_family_sample_variance": 3957012.7486263737,
+      "test_retest_sample_variance": 10655474.247252746
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input_sha256": "5635dd5a7e6501a56a3a69dc0e2b7a8719e12a4aec5876fca9be747f872f0be2",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "mara-status-format-note"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

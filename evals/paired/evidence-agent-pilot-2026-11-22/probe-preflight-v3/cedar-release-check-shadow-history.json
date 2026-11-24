@@ -1,0 +1,9 @@
+[
+  {
+    "event_id": "cedar-release-check",
+    "source_id": "cedar-release-review",
+    "source_type": "release-note",
+    "content": "subject: Cedar release\nremaining check: verify restoration from a clean backup before approval",
+    "valid_at": "2026-06-04T14:00:00Z"
+  }
+]

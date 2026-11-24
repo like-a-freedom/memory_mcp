@@ -1,0 +1,67 @@
+{
+  "acceptance": {
+    "accepted": true,
+    "baseline_safety_findings": [],
+    "candidate_family_success": 0.625,
+    "candidate_sha256": "58695c4ab2f0da8f5897bb677e51ebb48247d993ccffd6207b42aad77a09c231",
+    "cases": 8,
+    "descriptive_family_gain_interval": {
+      "algorithm": "splitmix64-v1",
+      "confidence_level_basis_points": 9500,
+      "draws": 10000,
+      "estimate": 0.5,
+      "independent_clusters": 8,
+      "lower": 0.125,
+      "seed": 20261121,
+      "upper": 0.875
+    },
+    "families": 8,
+    "hard_failures": [],
+    "incumbent_family_success": 0.125,
+    "incumbent_sha256": "58695c4ab2f0da8f5897bb677e51ebb48247d993ccffd6207b42aad77a09c231",
+    "losses": [],
+    "plan_sha256": "a5f3746ac3e8be388f0258ce66fe9bb96bce1d34439862dd0a7075ae7d9ff561",
+    "schema_version": "memory-mcp-deterministic-acceptance-report/v2",
+    "wins": [
+      "peer-conflict",
+      "prior-knowledge",
+      "unverified-correction",
+      "valid-boundary"
+    ]
+  },
+  "accepted": true,
+  "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+  "decision_gains": [
+    "peer-conflict",
+    "prior-knowledge",
+    "unverified-correction",
+    "valid-boundary"
+  ],
+  "decision_losses": [],
+  "default_config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+  "default_metrics": {
+    "cases": 8,
+    "decision_success": 5,
+    "evidence_success": 8
+  },
+  "default_replays": [
+    "rollout-v9-default-first/index.json",
+    "rollout-v9-default-second/index.json"
+  ],
+  "evidence_regressions": [],
+  "input_schema_sha256": "f90fc7e2c541e1243792f0ba12c4462e72bb1e1d0a5a57b2dfb31b6d1fa0c0d2",
+  "product_binary_sha256": "58695c4ab2f0da8f5897bb677e51ebb48247d993ccffd6207b42aad77a09c231",
+  "product_revision": "ci-current",
+  "repeat_captures_match": true,
+  "schema_version": "memory-mcp-claim-rollout-acceptance/v1",
+  "shadow_config_sha256": "d52b1ccd6308b544317bb2b9ca8b10ca5fcfe9f6d3a39c59419db0a5ee42755a",
+  "shadow_metrics": {
+    "cases": 8,
+    "decision_success": 1,
+    "evidence_success": 8
+  },
+  "shadow_replays": [
+    "rollout-v9-shadow-first/index.json",
+    "rollout-v9-shadow-second/index.json"
+  ]
+}

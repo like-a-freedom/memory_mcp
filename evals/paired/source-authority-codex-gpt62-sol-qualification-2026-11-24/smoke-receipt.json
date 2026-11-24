@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-mcp-model-smoke/v1",
+  "provider": "codex-cli",
+  "codex_version": "0.171.0",
+  "model_alias": "gpt-6.2-sol",
+  "synthetic_only": true,
+  "ephemeral": true,
+  "sandbox": "read-only",
+  "shell_enabled": false,
+  "network_tools_enabled": false,
+  "exit_code": 0,
+  "expected_fixed_reply_observed": true,
+  "raw_prompt_and_reply_retained": false
+}

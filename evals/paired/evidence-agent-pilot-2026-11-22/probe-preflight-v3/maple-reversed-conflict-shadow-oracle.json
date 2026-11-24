@@ -1,0 +1,13 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "maple-initial"
+      ],
+      [
+        "maple-peer"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": []
+}

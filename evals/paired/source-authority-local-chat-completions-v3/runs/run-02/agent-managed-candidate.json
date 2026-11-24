@@ -1,0 +1,872 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "21445-1795429314096811000-0",
+  "identity_sha256": "e19259e170ffadafc7cb7025e34ff1e475b63f0b3e9192708dd7d3ba8472ab4c",
+  "expected_trials": [
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "alderglass_lab",
+      "case_id": "alderglass_lab-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "cloudmint_theater",
+      "case_id": "cloudmint_theater-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "frostwillow_clinic",
+      "case_id": "frostwillow_clinic-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "kindlebrook_forge",
+      "case_id": "kindlebrook_forge-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "marblefin_post",
+      "case_id": "marblefin_post-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "mosslight_courthouse",
+      "case_id": "mosslight_courthouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "sunquartz_cafe",
+      "case_id": "sunquartz_cafe-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "conversation_control",
+      "family_id": "willowspoke_depot",
+      "case_id": "willowspoke_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "brasshaven_seedbank",
+      "case_id": "brasshaven_seedbank-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "cobaltmeadow_signalbox",
+      "case_id": "cobaltmeadow_signalbox-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "grayharbor_surveyroom",
+      "case_id": "grayharbor_surveyroom-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "quietember_records",
+      "case_id": "quietember_records-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "reedshadow_farmhouse",
+      "case_id": "reedshadow_farmhouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "starlinggrove_workshop",
+      "case_id": "starlinggrove_workshop-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "sunkenbirch_lighthouse",
+      "case_id": "sunkenbirch_lighthouse-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "violetcairn_archive",
+      "case_id": "violetcairn_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "alderglass_lab",
+        "case_id": "alderglass_lab-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5539,
+        "output_tokens": 728,
+        "wall_time_ms": 43980
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5c4a57a7f9bdb93dcdfd2f68f500c8a786c1197283aed0fa7293c4717e148638",
+        "response_sha256": "da81bf8aaef97880af47efa4dcfae61cf9586f1ad20dd0f4317f8d8d813c6271",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-v3-alderglass_lab"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2114,
+          "maximum_wire_bytes": 2114
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "cloudmint_theater",
+        "case_id": "cloudmint_theater-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "761452feb10f0c1f15fd9f7a6d1399bf72e477074a35ea8b0745aeb820fa9433",
+        "response_sha256": "0b57fd98f6d8a1bf0e24d7fc8fd4453404caaabbfdc4e0c6c75c4026ecc15aec",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "frostwillow_clinic",
+        "case_id": "frostwillow_clinic-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5521,
+        "output_tokens": 701,
+        "wall_time_ms": 51841
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "2841a8b1b8c00c1d27a8baadd6fa0a98aaf5abf179db88ae1945a761e2cb59c0",
+        "response_sha256": "fe72f334cfe8d5405dac5a3e5b3c397f89c1dca71ede02ef9e2fad36bb3543d8",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-v3-frostwillow_clinic"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2124,
+          "maximum_wire_bytes": 2124
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "kindlebrook_forge",
+        "case_id": "kindlebrook_forge-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5521,
+        "output_tokens": 684,
+        "wall_time_ms": 41385
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "9e2bb24f9b330e0a51c13d617a135023bcda3eca2c93e1d7086865fd2894e686",
+        "response_sha256": "04331172cac72cefc10dafc27e949626a355323ef666dc341c33e03ffb274438",
+        "known_revision": 3,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "local-source-authority-v3-kindlebrook_forge"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2120,
+          "maximum_wire_bytes": 2120
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "marblefin_post",
+        "case_id": "marblefin_post-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "81a22bde8f84df31437c7ed91877d90b5c5a03c276f857d86a8a8ef7b98d49c5",
+        "response_sha256": "18f869c12596756e483460c3eccb5220371e6e6d4061d3b89bff19aaa2ed29b8",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "mosslight_courthouse",
+        "case_id": "mosslight_courthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5506,
+        "output_tokens": 703,
+        "wall_time_ms": 50740
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "0ded1846c32a30684d19f5b503e7b1d7badad48df7cb222a56b78bfd720c174b",
+        "response_sha256": "1f410634d126d1c5ddabbda4972f4d8b5e9f2bbbb79c2504c53f6bdb2c53223a",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-v3-mosslight_courthouse"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2128,
+          "maximum_wire_bytes": 2128
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "sunquartz_cafe",
+        "case_id": "sunquartz_cafe-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5543,
+        "output_tokens": 661,
+        "wall_time_ms": 44993
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "aa7ef65d47e8d6689bcc094206061e1fea842eaea3550900972d163f9845b3cc",
+        "response_sha256": "aa3226da8407793200eb2de93c65fc55aa84b2c2c271444ad199c2ada595cc47",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "local-source-authority-v3-sunquartz_cafe"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2118,
+          "maximum_wire_bytes": 2118
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "willowspoke_depot",
+        "case_id": "willowspoke_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "4d4a6436620358ecd54e01126de2915973a23d7adf55f80fccc4a07c65c8f544",
+        "response_sha256": "ba5ff4cab2877c69aa74301fa6efc8d056095f3d51cc712a236354ba019c53eb",
+        "known_revision": 0,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "brasshaven_seedbank",
+        "case_id": "brasshaven_seedbank-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 8,
+        "tool_calls": 7,
+        "user_clarifications": 0,
+        "input_tokens": 34701,
+        "output_tokens": 1023,
+        "wall_time_ms": 84181
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "96fbcf5a8b531c290c6c26cec2c17978af6cb46848bdb4c07085c0ee34c29e18",
+        "response_sha256": "6d553c3b4611b7f247e6b288a666634dd7b96c5cad9b61f55b28e8974bb5a71b",
+        "known_revision": 7,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "local-source-authority-v3-brasshaven_seedbank"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "brasshaven_seedbank",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 454
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cobaltmeadow_signalbox",
+        "case_id": "cobaltmeadow_signalbox-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 6,
+        "tool_calls": 5,
+        "user_clarifications": 0,
+        "input_tokens": 18078,
+        "output_tokens": 761,
+        "wall_time_ms": 59519
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "2097a9a25b14d432e64143f0e8d4bd28f95d05503269a4cd531e2fda5634a8e1",
+        "response_sha256": "a608f32f166d6057d68b031f5ef846108473dc314eb2a2dd16096bc48b208f5c",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-cobaltmeadow_signalbox"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "cobaltmeadow_signalbox",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 509
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "grayharbor_surveyroom",
+        "case_id": "grayharbor_surveyroom-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "budget_exceeded",
+        "turns_used": 8,
+        "tool_calls": 8,
+        "user_clarifications": 0,
+        "input_tokens": 32274,
+        "output_tokens": 988,
+        "wall_time_ms": 79121
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "0ccb7470e26367274912a1198eb59ef6cf07c0f6465bdef162e91c1528ee1cf2",
+        "response_sha256": "3bef1b3d01329e2307b074d84b57d712341de0469e1a5f1899e686b1028075ec",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-grayharbor_surveyroom"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "grayharbor_surveyroom",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 456
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "quietember_records",
+        "case_id": "quietember_records-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 4,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 9462,
+        "output_tokens": 438,
+        "wall_time_ms": 34170
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "7c121b36cb4bfc040ecb8a5a3ea4ab0b9da9338764e52b390da07768e24c49c7",
+        "response_sha256": "287b38724633e83f0bb9a889e05faa89584bce5f0240aeb3222d8afed8285e0b",
+        "known_revision": 7,
+        "retained_store_bytes": 34275404,
+        "source_event_ids": [
+          "local-source-authority-v3-quietember_records"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "quietember_records",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 443
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "reedshadow_farmhouse",
+        "case_id": "reedshadow_farmhouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "7e12834d8324ea707cde6b46cd98ca8e3b28d2708f69a40daa68fb2760f26825",
+        "response_sha256": "15212f38196937cd838be6dacd2f3061c556e21b8d4c5814fafd008fe38d4ae4",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-reedshadow_farmhouse"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "reedshadow_farmhouse",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 734
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "starlinggrove_workshop",
+        "case_id": "starlinggrove_workshop-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 4,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 9299,
+        "output_tokens": 398,
+        "wall_time_ms": 33833
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b995d534c49bd2673032c9826472b611e4ff23f6913d76e4ceb112fde2e75b63",
+        "response_sha256": "6717eda7ece5c59b53f9268e9dbb5fd76d3f211ad95a77b2d8adb9bbcf641360",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-starlinggrove_workshop"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "starlinggrove_workshop",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 473
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "sunkenbirch_lighthouse",
+        "case_id": "sunkenbirch_lighthouse-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 1,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "3218a9ba14294153e39fe609588f6efa52a17d6e0c216f0c8fc8ef3295c1eb47",
+        "response_sha256": "0ec5f3a519f91fef5702c2df8b8719a348db29eb1e640f2126ef37e84f97760f",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-sunkenbirch_lighthouse"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "sunkenbirch_lighthouse",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 462
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "violetcairn_archive",
+        "case_id": "violetcairn_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 7,
+        "tool_calls": 6,
+        "user_clarifications": 0,
+        "input_tokens": 24516,
+        "output_tokens": 941,
+        "wall_time_ms": 69308
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "abf40daba9d2a7d2041c47dbc3412822f87245b9fcb1adf08f064a8fac26bfe8",
+        "response_sha256": "50740383af1de400339bb530e495274a4a9fe1e7e82f156989e7529e1e804be4",
+        "known_revision": 7,
+        "retained_store_bytes": 34275405,
+        "source_event_ids": [
+          "local-source-authority-v3-violetcairn_archive"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "violetcairn_archive",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 443
+        }
+      ]
+    }
+  ]
+}

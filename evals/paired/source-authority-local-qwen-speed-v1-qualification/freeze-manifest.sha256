@@ -1,0 +1,17 @@
+5b91bd2be4dda638e1640536c05e93b3a6614595a4167ff9f77626c32ffbbc56  evals/paired/source-authority-local-qwen-speed-v1-qualification/README.md
+dde2706bc62ab537793e908cfe4afe800c2db44569113e9e3c07533b947fb3ed  evals/paired/source-authority-local-qwen-speed-v1-qualification/fingerprints.json
+9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6  evals/paired/source-authority-local-qwen-speed-v1-qualification/host-policy.json
+d488ac1ab9dbf0fc6a3b33f1e5fb8493e313772090e8a2c11aedf1c3e1144067  evals/paired/source-authority-local-qwen-speed-v1-qualification/plan.json
+d7a0dbef259df29a79a5c6899b316b24671b9c7b28f0ca8dd6bb68815e5bd1fa  evals/paired/source-authority-local-qwen-speed-v1-qualification/pre-capture-audit.md
+89c6f06614b54e4b48f413828bd6f9c679327fd3e57540910a5870d2b5288d58  evals/paired/source-authority-local-qwen-speed-v1-qualification/preregistration.md
+dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12  evals/paired/source-authority-local-qwen-speed-v1-qualification/product-config.json
+50c2cbec4b3e0030a11f95067f6c37ad45e4466deba3180747428200b6969457  evals/paired/source-authority-local-qwen-speed-v1-qualification/prompts/agent-memory-formation-system-v1.txt
+da42250eafa2668350f845b78392cae462adf30bc8dace1cd27c9dc2cef743df  evals/paired/source-authority-local-qwen-speed-v1-qualification/prompts/agent-memory-formation-task-rules-v1.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/source-authority-local-qwen-speed-v1-qualification/prompts/memory-recall-system-v1.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/source-authority-local-qwen-speed-v1-qualification/prompts/memory-recall-task-rules-v1.txt
+5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a  evals/paired/source-authority-local-qwen-speed-v1-qualification/protocol-config.json
+81905333b7ae762e1fc0e7d64a93259066ac9ac92969588e5734d9271ba49df3  evals/paired/source-authority-local-qwen-speed-v1-qualification/provider-inventory.json
+7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642  evals/paired/source-authority-local-qwen-speed-v1-qualification/retry-policy.json
+4847b5155bf327ea8b105a03689cb25ff3b3fb68fe42e7f2507be90dcbb47ea1  evals/paired/source-authority-local-qwen-speed-v1-qualification/sampling-config.json
+acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34  evals/paired/source-authority-local-qwen-speed-v1-qualification/simulator.json
+378f8cc53c4fe7cf370b07bbbb7d638467a21a28af56a25834d0258022cac852  evals/paired/source-authority-local-qwen-speed-v1-qualification/tasks-v1.json

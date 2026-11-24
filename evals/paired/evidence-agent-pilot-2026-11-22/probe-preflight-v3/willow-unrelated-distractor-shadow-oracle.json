@@ -1,0 +1,12 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "willow-target"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [
+    "willow-distractor"
+  ]
+}

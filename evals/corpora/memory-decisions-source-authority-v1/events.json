@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "literal-source-reference",
+      "source_id": "operator-source-id-must-stay",
+      "source_type": "agent_note",
+      "content": "evals/corpora/memory-decisions-source-authority-v1/source-content.txt",
+      "t_ref": "2026-11-22T12:00:00Z"
+    }
+  ]
+}

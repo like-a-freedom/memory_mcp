@@ -1,0 +1,9 @@
+{
+  "input_sha256": "d93348227d5fe57c5e3ba97807646cd40378927e742a878671568ef2626fb21d",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "slate-review-start"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

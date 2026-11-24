@@ -62,7 +62,8 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 /// `lifecycle-*` entries are internal hidden subcommands consumed by hook
 /// scripts; `lifecycle` is the explicit operator-facing maintenance command
 /// authorized by ADR-0047. The SurrealDB v4 maintenance command is an explicit
-/// operator-facing storage migration command.
+/// operator-facing storage migration command. `import` is the explicit local
+/// operator source-import path; agent-facing MCP content remains literal.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
     "reembed",
@@ -76,6 +77,7 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "lifecycle-capture",
     "lifecycle-recall",
     "init",
+    "import",
     "surrealdb-v4-maintenance",
 ];
 

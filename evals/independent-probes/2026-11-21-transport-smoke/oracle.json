@@ -1,0 +1,12 @@
+{
+  "sufficient_evidence_alternatives": [
+    [
+      [
+        "source-a"
+      ]
+    ]
+  ],
+  "forbidden_event_ids": [
+    "source-b"
+  ]
+}

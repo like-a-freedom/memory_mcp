@@ -64,12 +64,6 @@ pub use helpers::{
 pub use queries::{active_edge_scan_batch_size, fact_embedding_dimension_placeholder};
 pub(crate) use queries::{build_upsert_query, validate_record_id};
 
-// `build_create_query` is called from `knowledge/fact_store.rs` under
-// `streamable-http`; without that feature the re-export has no user,
-// which the compiler reports. Gated to match its one caller.
-#[cfg(feature = "streamable-http")]
-pub(crate) use queries::build_create_query;
-
 pub use table_scope::{
     EmbeddingTables, KnowledgeTables, MemoryTables, OwnedTable, PlatformTables, ReleaseOwnedTable,
     TableOwner, table_owners,

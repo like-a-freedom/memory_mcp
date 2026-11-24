@@ -1,0 +1,123 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "willowmere_pump_house",
+        "case_id": "willowmere_pump_house-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Willowmere Pump House, the pressure ledger is stored in Cedar-52. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Willowmere Pump House, where is the pressure ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Willowmere Pump House, where is the pressure ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-willowmere-pressure-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["underdog-saluki-willowmere-pressure-ledger"]]],
+        "accepted_answers": ["Cedar-52"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "copperfield_museum",
+        "case_id": "copperfield_museum-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Copperfield Museum, the winter roster is stored in Linen-27. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Copperfield Museum, where is the winter roster stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Copperfield Museum, where is the winter roster stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-copperfield-winter-roster",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["underdog-saluki-copperfield-winter-roster"]]],
+        "accepted_answers": ["Linen-27"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "silverfen_archive",
+        "case_id": "silverfen_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Silverfen Archive, the flood map is stored in Opal-64. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Silverfen Archive, where is the flood map stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Silverfen Archive, where is the flood map stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-silverfen-flood-map",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["underdog-saluki-silverfen-flood-map"]]],
+        "accepted_answers": ["Opal-64"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Silverfen Archive before this phase. Use assemble_context to verify: At Silverfen Archive, where is the flood map stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "silverfen_archive",
+          "relative_path": "fixtures/silverfen_archive.txt",
+          "content": "Fact: At Silverfen Archive, the flood map is stored in Opal-64.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "underdog-saluki-silverfen-flood-map"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "rosebarrow_observatory",
+        "case_id": "rosebarrow_observatory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Rosebarrow Observatory, the dawn log is stored in Birch-31. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Rosebarrow Observatory, where is the dawn log stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Rosebarrow Observatory, where is the dawn log stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "underdog-saluki-rosebarrow-dawn-log",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["underdog-saluki-rosebarrow-dawn-log"]]],
+        "accepted_answers": ["Birch-31"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Rosebarrow Observatory before this phase. Use assemble_context to verify: At Rosebarrow Observatory, where is the dawn log stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "rosebarrow_observatory",
+          "relative_path": "fixtures/rosebarrow_observatory.txt",
+          "content": "Fact: At Rosebarrow Observatory, the dawn log is stored in Birch-31.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "underdog-saluki-rosebarrow-dawn-log"
+        }
+      ]
+    }
+  ]
+}

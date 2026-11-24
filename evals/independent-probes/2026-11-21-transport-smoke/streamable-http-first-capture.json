@@ -1,0 +1,83 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v1",
+  "transport": "streamable_http",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "8a99661eb5a8c2fd8145269d180cb0626f019bee07d15c07af81acd916a874ac",
+    "product_sha256": "0996b4f9d96ff8e23baed803408a982b65bbc2eb02bd61f3bdf165d67fbf5009",
+    "source_event_ids": [
+      "source-a"
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 5,
+    "compact": true,
+    "known_revision": 3,
+    "query": "Where is North Depot located?",
+    "valid_at": "2026-05-01T10:00:00+00:00"
+  },
+  "response": {
+    "id": 6,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-21T15:59:05.125645Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"North Depot is located in Oslo.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:a4afa61f643ed6ba517d64ee\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:a4afa61f643ed6ba517d64ee\",\"source_id\":\"depot-plan\",\"source_type\":\"conversation\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:a4afa61f643ed6ba517d64ee\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "resultType": "complete",
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations cannot be attached to episode-only evidence"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-21T15:59:05.125645Z",
+            "known_revision": 3,
+            "valid_at": "2026-05-01T10:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.85,
+            "content": "North Depot is located in Oslo.",
+            "evidence_status": "unknown",
+            "fact_id": "episode_fallback:episode:a4afa61f643ed6ba517d64ee",
+            "grounding": 1.0,
+            "provenance": {
+              "episode_fallback": true,
+              "known_revision": 3,
+              "reference_time": "2026-05-01T10:00:00Z",
+              "source_episode": "episode:a4afa61f643ed6ba517d64ee",
+              "source_id": "depot-plan",
+              "source_type": "conversation",
+              "valid_at": "2026-05-01T10:00:00+00:00"
+            },
+            "rationale": "tier=fallback",
+            "relevance": 1.0,
+            "retrieval_tier": "fallback",
+            "semantic_available": false,
+            "source_episode": "episode:a4afa61f643ed6ba517d64ee"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "claim_rollout_stage": "shadow"
+}

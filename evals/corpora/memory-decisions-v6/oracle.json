@@ -1,0 +1,159 @@
+{
+  "schema_version": "memory-decisions-oracle/v1",
+  "oracles": [
+    {
+      "probe_id": "absent-subject",
+      "disposition": "unknown",
+      "evidence_alternatives": [],
+      "expected_assertions": {},
+      "expected_roles": {},
+      "forbidden_event_ids": [
+        "absent-entry"
+      ]
+    },
+    {
+      "probe_id": "similar-name",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "east-entry"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "east-entry": "42 crates"
+      },
+      "expected_roles": {
+        "east-entry": "current"
+      },
+      "forbidden_event_ids": [
+        "west-entry"
+      ]
+    },
+    {
+      "probe_id": "single-current",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "sole-entry"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "sole-entry": "54 crates"
+      },
+      "expected_roles": {
+        "sole-entry": "current"
+      },
+      "forbidden_event_ids": []
+    },
+    {
+      "probe_id": "peer-conflict",
+      "disposition": "conflict",
+      "evidence_alternatives": [
+        [
+          [
+            "dispute-a"
+          ],
+          [
+            "dispute-b"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "dispute-a": "38 crates",
+        "dispute-b": "39 crates"
+      },
+      "expected_roles": {
+        "dispute-a": "conflicting",
+        "dispute-b": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "unverified-correction",
+      "disposition": "conflict",
+      "evidence_alternatives": [
+        [
+          [
+            "supported-entry"
+          ],
+          [
+            "forum-entry"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "supported-entry": "24 crates",
+        "forum-entry": "30 crates"
+      },
+      "expected_roles": {
+        "supported-entry": "conflicting",
+        "forum-entry": "conflicting"
+      },
+      "forbidden_event_ids": [],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "prior-knowledge",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "pre-report"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "pre-report": "11 crates"
+      },
+      "expected_roles": {
+        "pre-report": "current"
+      },
+      "forbidden_event_ids": [
+        "post-report"
+      ]
+    },
+    {
+      "probe_id": "valid-boundary",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "earlier-valid"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "earlier-valid": "14 crates"
+      },
+      "expected_roles": {
+        "earlier-valid": "current"
+      },
+      "forbidden_event_ids": [
+        "later-valid"
+      ]
+    },
+    {
+      "probe_id": "office-entry",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "office-entry"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "office-entry": "Dovetail Lane"
+      },
+      "expected_roles": {
+        "office-entry": "current"
+      },
+      "forbidden_event_ids": []
+    }
+  ]
+}

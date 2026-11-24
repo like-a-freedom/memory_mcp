@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-agent-managed-attempt-status/v1",
+  "status": "preflight_rejected_before_agent_invocation",
+  "failure": "paired product binary path must name an existing absolute file",
+  "cause": "The first launch supplied a relative path for the product binary.",
+  "model_turns": 0,
+  "tool_calls": 0,
+  "writes": 0,
+  "counted_as_trial": false
+}

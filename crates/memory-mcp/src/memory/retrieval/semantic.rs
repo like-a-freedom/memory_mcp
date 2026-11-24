@@ -67,7 +67,7 @@ pub(crate) async fn collect_semantic_facts(
                                     .provider_name()
                             ),
                         ),
-                        ("error".to_string(), serde_json::json!(err.to_string())),
+                        ("error_code".to_string(), serde_json::json!(err.code())),
                     ]),
                     err.log_level(),
                 );

@@ -1,0 +1,22 @@
+{
+  "endpoint": "http://127.0.0.1:1234/v1",
+  "model_id": "memory-local-eval-flint",
+  "model_path_reported_by_lms": "recursivesi/flint",
+  "model_family_reported_by_lms": "recursivesi/flint",
+  "reported_parameters": "39.8B total; approximately 2.5B active per token (official model card)",
+  "reported_quantization": "Q4_K_M",
+  "reported_model_size_bytes": 24167253484,
+  "estimated_memory_gib_at_16384_context": 24.02,
+  "reported_context_length_tokens": 16384,
+  "trained_for_tool_use": true,
+  "license": "Apache-2.0",
+  "model_card": "https://huggingface.co/RecursiveSI/flint",
+  "lm_studio_cli_commit": "dcefd5a",
+  "lm_studio_cli_sha256": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+  "model_weights_sha256": null,
+  "server_build_identity": null,
+  "observed_at_utc": "2026-11-23T18:45:38Z",
+  "reported_server_model_status": "installed; not loaded at preregistration",
+  "device_identifier": null,
+  "configured_parallelism_at_load": 1
+}

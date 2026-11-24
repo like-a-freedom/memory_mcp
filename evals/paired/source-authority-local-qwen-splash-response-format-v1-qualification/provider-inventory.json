@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-11-23",
+  "lms_cli_version": "dcefd5a",
+  "lms_cli_sha256": "370fd7e2f21e11dc9fed1af0bcd9fde515622a1cec82fc6bc20e79b5d926b21d",
+  "endpoint": "http://127.0.0.1:1234/v1",
+  "bearer_token_used": false,
+  "model": {
+    "model_key": "qwen3.8-27b-splash",
+    "indexed_identifier": "incoai/Qwen3.8-27B-Splash",
+    "format": "yuzu",
+    "size_bytes": 17382672684,
+    "quantization": "4bit",
+    "trained_for_tool_use": true,
+    "model_card_url": "https://huggingface.co/incoai/Qwen3.8-27B-Splash",
+    "model_weight_sha256": null,
+    "reported_by": "lms ls --json"
+  },
+  "server_build": null
+}

@@ -94,13 +94,6 @@ impl MemoryService {
         )
     }
 
-    /// The claim store behind the claim service. Present whenever the
-    /// claim pipeline is wired, which is the condition the
-    /// invalidation use case checks before closing derived claims.
-    pub(crate) fn claim_store(&self) -> Option<Arc<dyn crate::knowledge::claims::ClaimStore>> {
-        Some(self.claim_service.store.clone())
-    }
-
     /// Public helper for tool-level logging.
     #[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
     pub(crate) fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
@@ -931,10 +924,10 @@ mod tests {
             .await;
         match result {
             Err(crate::error::MemoryError::Validation(msg)) => {
-                // The refusal must name the exact id to pass back, not a
-                // `<table>:<id>` placeholder the caller still has to fill in.
-                assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
-                assert!(msg.contains("episode:474b2d8b81b3feabf832ef08"), "{msg}");
+                // A malformed caller-supplied ID is not reflected in the
+                // refusal, but the canonical owner table remains actionable.
+                assert!(!msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
+                assert!(msg.contains("episode:<id>"), "{msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }

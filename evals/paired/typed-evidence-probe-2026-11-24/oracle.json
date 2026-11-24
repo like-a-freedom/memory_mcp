@@ -1,0 +1,15 @@
+{
+  "sufficient_evidence_alternatives": [
+    [["asterline-correction"]]
+  ],
+  "forbidden_event_ids": [],
+  "required_claim_annotations": [
+    {
+      "source_event_id": "asterline-correction",
+      "evidence_status": "conflicting",
+      "relations": [
+        {"outcome": "contradiction", "role": "conflict"}
+      ]
+    }
+  ]
+}

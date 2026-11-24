@@ -1,0 +1,19 @@
+{
+  "schema_version": "memory-mcp-agent-managed-fingerprints/v1",
+  "corpus_sha256": "308c9eb75f0449cf4cf14afbb4eebc4386e7e87e227baa21d3236e603347520c",
+  "oracle_sha256": "6cdbe0be125c64e9d0dcc655995d711e6ac47952b383a412da2a26472d3c4c44",
+  "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+  "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+  "host_policy_sha256": "5d6e8fda0388fd242b1c0a9672a2b8929e4a4d9badaad3a24009ee247bd85",
+  "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+  "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+  "protocol_config_sha256": "6c75882bcebd52a32bb62ecaf878ab6398d2381a59dff3323fe69fed4d5d2490",
+  "task_count": 16,
+  "independent_family_count": 16,
+  "incumbent_tool_schema_sha256": "bbdbae2c07912a2c09a1d27a5998ec56e0e08ffe564164a559aac9c5ddf41877",
+  "candidate_tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "incumbent_binary_sha256": "4cc1c87ba52553db06fcbe2115b944f9e6a1320157439d2fbe3779baea7d189b",
+  "candidate_binary_sha256": "0c465a019c824602e1adc02c37b97f93ff3a6a5b98226d3007b7c3d93c990f25",
+  "codex_cli_sha256": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+  "memory_eval_cli_sha256": "7782c23102321adfaeec7a2af7e91db4dd3a9cf42a8e4c0fd6fd0b9189e0e301"
+}

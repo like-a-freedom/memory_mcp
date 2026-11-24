@@ -1,0 +1,127 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "birchglass_registry",
+        "case_id": "birchglass_registry-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Birchglass Registry, the duty roster is stored in Zircon-41. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Birchglass Registry, where is the duty roster stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Birchglass Registry, where is the duty roster stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-http-status-2026-11-24-birchglass-registry-duty-roster",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "local-source-authority-ornith-http-status-2026-11-24-birchglass-registry-duty-roster"
+        ]]],
+        "accepted_answers": ["Zircon-41"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "tallowmere_ledger",
+        "case_id": "tallowmere_ledger-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Tallowmere Ledger, the permit index is stored in Saffron-26. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Tallowmere Ledger, where is the permit index stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Tallowmere Ledger, where is the permit index stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-http-status-2026-11-24-tallowmere-ledger-permit-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "local-source-authority-ornith-http-status-2026-11-24-tallowmere-ledger-permit-index"
+        ]]],
+        "accepted_answers": ["Saffron-26"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "cloudbarrow_pier",
+        "case_id": "cloudbarrow_pier-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Cloudbarrow Pier, the survey map is stored in Beacon-87. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Cloudbarrow Pier, where is the survey map stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Cloudbarrow Pier, where is the survey map stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-http-status-2026-11-24-cloudbarrow-pier-survey-map",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "local-source-authority-ornith-http-status-2026-11-24-cloudbarrow-pier-survey-map"
+        ]]],
+        "accepted_answers": ["Beacon-87"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Cloudbarrow Pier before this phase. Use assemble_context to verify: At Cloudbarrow Pier, where is the survey map stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [{
+        "fixture_id": "cloudbarrow_pier",
+        "relative_path": "fixtures/cloudbarrow_pier.txt",
+        "content": "Fact: At Cloudbarrow Pier, the survey map is stored in Beacon-87.\n",
+        "source_type": "doc",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "event_id": "local-source-authority-ornith-http-status-2026-11-24-cloudbarrow-pier-survey-map"
+      }]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "mintvale_depot",
+        "case_id": "mintvale_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Mintvale Depot, the inspection log is stored in Indigo-53. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Mintvale Depot, where is the inspection log stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Mintvale Depot, where is the inspection log stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-ornith-http-status-2026-11-24-mintvale-depot-inspection-log",
+      "oracle": {
+        "sufficient_evidence_alternatives": [[[
+          "local-source-authority-ornith-http-status-2026-11-24-mintvale-depot-inspection-log"
+        ]]],
+        "accepted_answers": ["Indigo-53"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Mintvale Depot before this phase. Use assemble_context to verify: At Mintvale Depot, where is the inspection log stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [{
+        "fixture_id": "mintvale_depot",
+        "relative_path": "fixtures/mintvale_depot.txt",
+        "content": "Fact: At Mintvale Depot, the inspection log is stored in Indigo-53.\n",
+        "source_type": "doc",
+        "valid_at": "2026-11-22T00:00:00Z",
+        "event_id": "local-source-authority-ornith-http-status-2026-11-24-mintvale-depot-inspection-log"
+      }]
+    }
+  ]
+}

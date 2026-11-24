@@ -1,0 +1,710 @@
+[
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "northvale_depot",
+      "case_id": "northvale_depot-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What maintenance window was recorded for Northvale Orbital Depot on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "3e96fb4a36fdbba3f22dd277218292625af15d810fd9b551b2b2ee054810fde2",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "northvale_depot-record-a"
+          ]
+        ],
+        [
+          [
+            "northvale_depot-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "northvale_depot-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "northvale_depot-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "cindergate_hub",
+      "case_id": "cindergate_hub-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What crane safe load was recorded for Cindergate Fabrication Hub on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "17c5c96f1b7c111d578076cf7d52002110e8ddc48ca4e5826f8c55aec9c107db",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "cindergate_hub-record-a"
+          ]
+        ],
+        [
+          [
+            "cindergate_hub-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "cindergate_hub-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "cindergate_hub-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "mosslight_annex",
+      "case_id": "mosslight_annex-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What backup runtime was recorded for Mosslight Battery Annex on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "e945e1308c4f9a29862df2ec6570883b1aeaebfd872ef99d7c542802b741d11b",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "mosslight_annex-record-a"
+          ]
+        ],
+        [
+          [
+            "mosslight_annex-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "mosslight_annex-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "mosslight_annex-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "tidemark_archive",
+      "case_id": "tidemark_archive-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What retention period was recorded for Tidemark Archive on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "a318e893523562a12f1d4e8261f89c7d52d8b22615e286de68245f30e4bc1f8b",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "tidemark_archive-record-a"
+          ]
+        ],
+        [
+          [
+            "tidemark_archive-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "tidemark_archive-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "tidemark_archive-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "ivory_lantern_clinic",
+      "case_id": "ivory_lantern_clinic-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What night shift staffing was recorded for Ivory Lantern Research Clinic on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "fc0c7d24c18d0f89e30798c4c3b63b85f4ae6cc1999281ac112a750be9ec8eef",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "ivory_lantern_clinic-record-a"
+          ]
+        ],
+        [
+          [
+            "ivory_lantern_clinic-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "ivory_lantern_clinic-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "ivory_lantern_clinic-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "copperwind_quay",
+      "case_id": "copperwind_quay-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What ferry departure slot was recorded for Copperwind Quay on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "522374cd1a54d6331a329cbb10086a48ed9aa3f59b7e89384f0cbab977999c85",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "copperwind_quay-record-a"
+          ]
+        ],
+        [
+          [
+            "copperwind_quay-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "copperwind_quay-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "copperwind_quay-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "hollowcrest_observatory",
+      "case_id": "hollowcrest_observatory-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What mirror cleaning deadline was recorded for Hollowcrest Observatory on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "249769d62d3d575864f1906ed7931a543322aac3379834d31ca1d0e7b647bdbf",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "hollowcrest_observatory-record-a"
+          ]
+        ],
+        [
+          [
+            "hollowcrest_observatory-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "hollowcrest_observatory-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "hollowcrest_observatory-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "conflict_decisions",
+      "family_id": "junebrook_foundry",
+      "case_id": "junebrook_foundry-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What temperature alert threshold was recorded for Junebrook Foundry on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "ecbae1eb57c8bdd8e89a6a6cb3847866e98981c5128209cf6f9051c15cd24563",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "junebrook_foundry-record-a"
+          ]
+        ],
+        [
+          [
+            "junebrook_foundry-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "junebrook_foundry-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "junebrook_foundry-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_recall",
+      "family_id": "veloran_station",
+      "case_id": "veloran_station-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What calibration interval was recorded for Veloran Signal Station on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 7,
+      "context_budget": 1,
+      "history_sha256": "4a8af916cb7f45b4bdc2fb3736ebdbd05b5bf4c8d472530d0a117929e1b97f7d",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "veloran_station-record-a"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_recall",
+      "family_id": "opaline_workshop",
+      "case_id": "opaline_workshop-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What packaging code was recorded for Opaline Workshop on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 7,
+      "context_budget": 1,
+      "history_sha256": "f7fd9e24eeff16642c10de27382931db48b220abfa01fcb57fc52a96075d4eea",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "opaline_workshop-record-a"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_recall",
+      "family_id": "westmere_lab",
+      "case_id": "westmere_lab-decision",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What review time was recorded for Westmere Field Lab on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 7,
+      "context_budget": 1,
+      "history_sha256": "94e17ec0bc85309d63a6c66cfd4287f96f000bac62f18b5bcb05d6347c5c6aa5",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "westmere_lab-record-a"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary_recall",
+      "family_id": "brackenridge_depot",
+      "case_id": "brackenridge_depot-decision",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What inventory shelf was recorded for Brackenridge Depot on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 7,
+      "context_budget": 1,
+      "history_sha256": "dd9ec6c46702bf483a58966244fedaa9b0be1dd656197d5b9362dc951623f7d7",
+      "claim_rollout_stage": "shadow"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "brackenridge_depot-record-a"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]

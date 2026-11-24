@@ -1,0 +1,5 @@
+{
+  "binary_sha256": "f3b079afd89889151f34b20ee6a28ae06cf06df7c3bf1a98a6214aeaff085751",
+  "source_label": "1ae1da4a+authorized-dirty-master",
+  "purpose": "transport smoke only; not candidate acceptance"
+}

@@ -124,6 +124,9 @@ pub async fn owned_episode_scan(
 /// `policy_tags` uses the same any-of semantics as retrieval access filtering.
 pub(crate) struct TemporalRelationsQuery {
     pub fact_ids: Vec<crate::models::FactId>,
+    /// Exact committed transaction boundary. `None` preserves the legacy
+    /// timestamp selector used by current retrieval.
+    pub known_revision: Option<i64>,
     pub cutoff: chrono::DateTime<chrono::Utc>,
     pub policy_tags: Vec<String>,
     pub counterpart_limit: usize,
@@ -175,6 +178,7 @@ pub(crate) async fn temporal_relations_from_store(
         .min(TEMPORAL_RELATION_MAX_COUNTERPARTS);
     let depth_limit = query.max_relation_depth.min(TEMPORAL_RELATION_MAX_DEPTH);
     let cutoff = normalize_dt(query.cutoff);
+    let known_revision = query.known_revision;
     let request_truncated =
         query.counterpart_limit > counterpart_limit || query.max_relation_depth > depth_limit;
     let mut batch = TemporalRelationsBatch {
@@ -203,7 +207,12 @@ pub(crate) async fn temporal_relations_from_store(
         }
 
         let claims = store
-            .claims_by_facts_at(&frontier, &cutoff, TEMPORAL_RELATION_MAX_BATCH_ROWS)
+            .claims_by_facts_at(
+                &frontier,
+                &cutoff,
+                known_revision,
+                TEMPORAL_RELATION_MAX_BATCH_ROWS,
+            )
             .await?;
         if claims.len() >= TEMPORAL_RELATION_MAX_BATCH_ROWS {
             batch.truncated = true;
@@ -234,6 +243,7 @@ pub(crate) async fn temporal_relations_from_store(
             .relations_by_claim_ids_at(
                 &frontier_claim_ids,
                 &cutoff,
+                known_revision,
                 TEMPORAL_RELATION_MAX_BATCH_ROWS,
             )
             .await?;
@@ -264,6 +274,7 @@ pub(crate) async fn temporal_relations_from_store(
             .claims_by_ids_at(
                 &relation_claim_ids,
                 &cutoff,
+                known_revision,
                 TEMPORAL_RELATION_MAX_BATCH_ROWS,
             )
             .await?;
@@ -297,7 +308,12 @@ pub(crate) async fn temporal_relations_from_store(
         let mut newly_visible = Vec::new();
         if !candidate_fact_ids.is_empty() && remaining > 0 {
             let facts = store
-                .facts_by_ids_at(&candidate_fact_ids, &cutoff, fact_fetch_limit)
+                .facts_by_ids_at(
+                    &candidate_fact_ids,
+                    &cutoff,
+                    known_revision,
+                    fact_fetch_limit,
+                )
                 .await?;
             let mut allowed_facts = facts
                 .into_iter()
@@ -366,6 +382,19 @@ pub(crate) async fn temporal_relations_from_store(
             } else {
                 (None, None)
             };
+            // A contradiction describes two claims that are simultaneously
+            // relevant at the requested valid time. Relation rows are
+            // transaction-versioned, while claims are filtered by both the
+            // requested revision and their valid-time interval. If only one
+            // participant survives that valid-time filter, the relation must
+            // not make the remaining fact look conflicting. Access-filtered
+            // participants were recorded as unresolved above and keep the
+            // item's evidence status unknown.
+            if relation.outcome == crate::models::claim::ClaimRelationOutcome::Contradiction
+                && participants.len() < 2
+            {
+                continue;
+            }
             batch.relations.push(RelationForFact {
                 relation_id: relation.claim_relation_id.to_string(),
                 outcome: relation.outcome,
@@ -446,6 +475,71 @@ pub(crate) fn visible_temporal_relations_for_facts(
         relations,
         claims_by_fact,
     }
+}
+
+/// Derive snapshot-relative status only when the relation channel is complete
+/// for the selected fact. A missing relation is evidence of `current` only
+/// after a complete relation read; otherwise the status stays `unknown`.
+pub(crate) fn temporal_evidence_status_by_fact(
+    batch: &TemporalRelationsBatch,
+    fact_ids: &[crate::models::FactId],
+) -> std::collections::HashMap<String, crate::models::SnapshotEvidenceStatus> {
+    use crate::models::SnapshotEvidenceStatus;
+    use crate::models::claim::ClaimRelationOutcome;
+
+    fact_ids
+        .iter()
+        .map(|fact_id| {
+            let status = if !batch.evidence_available
+                || batch.unresolved_fact_ids.contains(fact_id)
+                || batch.truncated_fact_ids.contains(fact_id)
+            {
+                SnapshotEvidenceStatus::Unknown
+            } else {
+                let mut has_historical_role = false;
+                let mut status = None;
+                for relation in &batch.relations {
+                    if !relation
+                        .participants
+                        .iter()
+                        .any(|participant| &participant.fact_id == fact_id)
+                    {
+                        continue;
+                    }
+                    match relation.outcome {
+                        ClaimRelationOutcome::Contradiction => {
+                            status = Some(SnapshotEvidenceStatus::Conflicting);
+                            break;
+                        }
+                        ClaimRelationOutcome::TemporalAmbiguity => {
+                            status = Some(SnapshotEvidenceStatus::Unknown);
+                            break;
+                        }
+                        ClaimRelationOutcome::Supersession | ClaimRelationOutcome::Correction => {
+                            match (
+                                relation.predecessor_fact_id.as_ref() == Some(fact_id),
+                                relation.successor_fact_id.as_ref() == Some(fact_id),
+                            ) {
+                                (true, false) => has_historical_role = true,
+                                (false, true) => {}
+                                _ => {
+                                    status = Some(SnapshotEvidenceStatus::Unknown);
+                                    break;
+                                }
+                            }
+                        }
+                        ClaimRelationOutcome::Duplicate => {}
+                    }
+                }
+                status.unwrap_or(if has_historical_role {
+                    SnapshotEvidenceStatus::Historical
+                } else {
+                    SnapshotEvidenceStatus::Current
+                })
+            };
+            (fact_id.to_string(), status)
+        })
+        .collect()
 }
 
 /// Narrow port for reading the reconciliation relations of a set of facts.

@@ -49,20 +49,53 @@ impl crate::memory::api::IngestionPort for IngestionAdapter<'_> {
 }
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+    use std::sync::{Arc, Mutex};
+
     use crate::memory::capabilities::test_support::{
         make_service_base, make_service_with_rate_limit,
     };
     use crate::models::IngestRequest;
     use crate::service::mock_db::MockDbClient;
 
+    fn revisioned_episode_db() -> MockDbClient {
+        let committed = Arc::new(Mutex::new(HashSet::<String>::new()));
+        let committed_on_select = Arc::clone(&committed);
+        let committed_on_write = Arc::clone(&committed);
+        MockDbClient::new()
+            .expect_select_one_with(move |record_id| {
+                Ok(committed_on_select
+                    .lock()
+                    .expect("committed episode lock")
+                    .contains(record_id)
+                    .then(|| serde_json::json!({"episode_id": record_id})))
+            })
+            .expect_transaction_with(
+                |sql| sql.contains("UPDATE knowledge_revision_clock:active"),
+                move |_, variables| {
+                    let record_id = variables
+                        .and_then(|values| values.get("__knowledge_revision_record_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| {
+                            crate::error::MemoryError::Storage(
+                                "revision transaction omitted its episode id".into(),
+                            )
+                        })?;
+                    committed_on_write
+                        .lock()
+                        .expect("committed episode lock")
+                        .insert(record_id.to_owned());
+                    Ok(())
+                },
+            )
+    }
+
     #[tokio::test]
     async fn ingest_delegates_to_ingestion_service() {
         let t_ref = chrono::Utc::now();
         let expected_id =
             crate::shared::ids::deterministic_episode_id_v2("inline", "cap-ingest", t_ref);
-        let db = MockDbClient::new()
-            .expect_select_one(&expected_id, None)
-            .expect_create(&expected_id, serde_json::Value::Null);
+        let db = revisioned_episode_db();
         let svc = make_service_base(db);
 
         let result = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
@@ -85,7 +118,7 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_respects_rate_limit() {
-        let svc = make_service_with_rate_limit(MockDbClient::new(), 1, 1);
+        let svc = make_service_with_rate_limit(revisioned_episode_db(), 1, 1);
 
         let access = crate::models::AccessPayload {
             caller_id: Some("user-a".into()),
@@ -117,7 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_debits_one_token_per_successful_request() {
-        let svc = make_service_with_rate_limit(MockDbClient::new(), 1, 3);
+        let svc = make_service_with_rate_limit(revisioned_episode_db(), 1, 3);
         let access = crate::models::AccessPayload {
             caller_id: Some("one-token-user".into()),
             ..Default::default()

@@ -1,0 +1,9 @@
+{
+  "input_sha256": "ce49b3e0917a5e31acbf13910abb38a97abb23dd1e0b1add4f150b546f8c0880",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "source_event_ids": [
+    "juniper-initial"
+  ],
+  "budget_used": 1,
+  "completed": true
+}

@@ -74,6 +74,14 @@ impl ToolContext for crate::service::MemoryService {
         crate::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability::assemble_context_from_service(self, request).await
     }
 
+    async fn assemble_context_temporal(
+        &self,
+        request: AssembleContextRequest,
+        temporal: crate::models::TemporalContextQuery,
+    ) -> Result<crate::models::ContextAssemblyResult, MemoryError> {
+        crate::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability::assemble_context_temporal_from_service(self, request, temporal).await
+    }
+
     async fn find_episode(
         &self,
         episode_id: &str,

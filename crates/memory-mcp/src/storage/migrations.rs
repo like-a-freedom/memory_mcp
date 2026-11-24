@@ -175,6 +175,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "055_episode_source_context.surql",
             sql: include_str!("../../migrations/055_episode_source_context.surql"),
         },
+        MigrationScript {
+            file_name: "056_knowledge_revisions.surql",
+            sql: include_str!("../../migrations/056_knowledge_revisions.surql"),
+        },
         // NOTE: SaaS-specific migrations (040+) are NOT registered here.
         // They are applied separately by the HTTP profile's provisioning
         // path (SurrealRegistryStore::connect / connect_in_memory).
@@ -213,6 +217,7 @@ pub(crate) fn ready_schema_catalog_digest() -> String {
             "053_context_lookup_indexes.surql"
                 | "054_query_index_coverage.surql"
                 | "055_episode_source_context.surql"
+                | "056_knowledge_revisions.surql"
         )
     }) {
         hasher.update(migration.file_name.as_bytes());
@@ -425,6 +430,8 @@ pub const EXPECTED_SCHEMA_TABLES: &[&str] = &[
     "claim_policy",
     "entity_extraction_projection",
     "inbox_revision",
+    "knowledge_revision_clock",
+    "knowledge_revision",
 ];
 
 const EXPECTED_SCHEMA_ANALYZERS: &[&str] = &["memory_fts", "memory_fts_ru"];
@@ -1561,6 +1568,18 @@ mod tests {
                 .iter()
                 .any(|migration| { migration.file_name == "039_filesystem_ingestion.surql" })
         );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_056_knowledge_revisions() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "056_knowledge_revisions.surql")
+            .expect("knowledge revisions migration");
+
+        assert!(migration.sql.contains("knowledge_revision_clock"));
+        assert!(migration.sql.contains("known_revision ON fact"));
+        assert!(migration.sql.contains("closed_revision ON claim_relation"));
     }
 
     #[test]

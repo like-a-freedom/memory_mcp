@@ -1,0 +1,39 @@
+{
+  "schema_version": "memory-mcp-probe-snapshot-calibration/v1",
+  "case_id": "birch-valid-time-update",
+  "stage": "shadow",
+  "transport": "stdio",
+  "product_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+  "history_sha256": "f70a840d6aadba2a948eaf6ae9bcef8536030fa7d96e1cae07b634b02b3a813a",
+  "snapshot_request": {
+    "query": "",
+    "valid_at": "2026-06-11T08:00:00Z",
+    "budget": 1,
+    "known_revision": "latest-at-seed-completion"
+  },
+  "latest_snapshot": {
+    "known_at": "2026-11-22T03:38:00.975880Z",
+    "known_revision": 15,
+    "valid_at": "2026-06-11T08:00:00Z"
+  },
+  "seed_steps": [
+    {
+      "event_id": "birch-initial",
+      "episode_id": "episode:4347f47605f2246a6ba83ece",
+      "fact_ids": [
+        "fact:dfa374a5b56b61c6f928fd59"
+      ],
+      "reconciliation": null
+    },
+    {
+      "event_id": "birch-update",
+      "episode_id": "episode:831718fc5d9ccc40dc9d0ebc",
+      "fact_ids": [
+        "fact:23face4cce7d05e40ace3cb0"
+      ],
+      "reconciliation": null
+    }
+  ],
+  "extractor": "regex",
+  "embeddings_enabled": false
+}

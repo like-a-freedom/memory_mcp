@@ -91,13 +91,14 @@ impl EpisodeStoreClient {
     }
 
     pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db
-            .create(
-                record_id,
-                content,
-                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
-            )
-            .await
+        crate::knowledge::revisions::create(
+            &self.db,
+            record_id,
+            content,
+            crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            crate::knowledge::revisions::KnowledgeRevisionKind::Episode,
+        )
+        .await
     }
 
     /// Create an episode and publish its app invalidation in the same tenant
@@ -121,52 +122,15 @@ impl EpisodeStoreClient {
                 "episode record id has an invalid table prefix".into(),
             ));
         }
-        let object = content.as_object().ok_or_else(|| {
-            MemoryError::Validation("episode content must be a JSON object".into())
-        })?;
-        let required_string = |field: &str| {
-            object
-                .get(field)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| MemoryError::Validation(format!("episode content needs {field}")))
-        };
-        let episode_id = required_string("episode_id")?;
-        let source_type = required_string("source_type")?;
-        let source_id = required_string("source_id")?;
-        let episode_text = required_string("content")?;
-        let t_ref = required_string("t_ref")?;
-        let t_ingested = required_string("t_ingested")?;
-        let policy_tags = object
-            .get("policy_tags")
-            .cloned()
-            .ok_or_else(|| MemoryError::Validation("episode content needs policy_tags".into()))?;
-        let source_lineage = object.get("source_lineage").cloned();
-        let source_lineage_assignment = if source_lineage.is_some() {
-            ", source_lineage = $source_lineage"
-        } else {
-            ""
-        };
-        let mutation = crate::platform::persistence::outbox::TenantMutation::new(
-            format!(
-                "CREATE type::record('episode', $episode_key) SET \
-                 episode_id = $episode_id, source_type = $source_type, source_id = $source_id, \
-                 content = $episode_text, t_ref = type::datetime($t_ref), \
-                 t_ingested = type::datetime($t_ingested), policy_tags = $policy_tags{source_lineage_assignment}"
-            ),
-            json!({
-                "episode_key": key,
-                "episode_id": episode_id,
-                "source_type": source_type,
-                "source_id": source_id,
-                "episode_text": episode_text,
-                "t_ref": t_ref,
-                "t_ingested": t_ingested,
-                "policy_tags": policy_tags,
-                "source_lineage": source_lineage,
-            }),
+        let (mutation_sql, variables, revision) = crate::knowledge::revisions::prepare_create(
+            record_id,
+            content,
+            crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            crate::knowledge::revisions::KnowledgeRevisionKind::Episode,
         )?;
-        crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
+        let mutation =
+            crate::platform::persistence::outbox::TenantMutation::new(mutation_sql, variables)?;
+        crate::platform::persistence::outbox::commit_revisioned_tenant_mutation_with_event(
             &self.db,
             mutation,
             crate::platform::persistence::outbox::TenantChangeEvent {
@@ -176,6 +140,7 @@ impl EpisodeStoreClient {
                 change_kind: "episode_created".into(),
                 created_at: chrono::Utc::now(),
             },
+            revision,
             &self.db.fault_injector,
         )
         .await
@@ -355,25 +320,53 @@ mod tests {
 
     #[cfg(feature = "streamable-http")]
     #[tokio::test]
-    async fn create_with_event_commits_episode_and_invalidation_atomically() {
+    async fn create_with_event_commits_episode_revision_and_event_atomically() {
         let db_client = make_db().await;
         let store = EpisodeStoreClient::new(db_client.clone(), "org");
+        let content = json!({
+            "episode_id": "episode:outbox_test",
+            "source_type": "inline",
+            "source_id": "outbox_test",
+            "content": "hello",
+            "policy_tags": [],
+            "t_ref": "2026-11-21T00:00:00Z",
+            "t_ingested": "2026-11-21T00:00:00Z",
+        });
         store
+            .create_with_event(
+                "episode:outbox_test",
+                content.clone(),
+                "ui://memory/apps/ingestion_review",
+            )
+            .await
+            .expect("episode and event commit");
+        store
+            .create_with_event(
+                "episode:outbox_test",
+                content,
+                "ui://memory/apps/ingestion_review",
+            )
+            .await
+            .expect("repeat of the same episode commit is idempotent");
+        let conflicting = store
             .create_with_event(
                 "episode:outbox_test",
                 json!({
                     "episode_id": "episode:outbox_test",
                     "source_type": "inline",
                     "source_id": "outbox_test",
-                    "content": "hello",
+                    "content": "different committed content",
                     "policy_tags": [],
-                    "t_ref": chrono::Utc::now().to_rfc3339(),
-                    "t_ingested": chrono::Utc::now().to_rfc3339(),
+                    "t_ref": "2026-11-21T00:00:00Z",
+                    "t_ingested": "2026-11-21T00:00:00Z",
                 }),
                 "ui://memory/apps/ingestion_review",
             )
-            .await
-            .expect("episode and event commit");
+            .await;
+        assert!(
+            conflicting.is_err(),
+            "same record id cannot be rewritten as a new create"
+        );
 
         let episode = db_client
             .select_one("episode:outbox_test", "org")
@@ -381,6 +374,7 @@ mod tests {
             .expect("select episode")
             .expect("episode exists");
         assert_eq!(episode["content"], "hello");
+        assert_eq!(episode["known_revision"], 1);
         let events = db_client
             .query(
                 "SELECT * FROM tenant_change_event WHERE resource_id = $resource",
@@ -392,6 +386,29 @@ mod tests {
         let events: Vec<serde_json::Value> = serde_json::from_value(events).expect("parse events");
         assert_eq!(events.len(), 1);
         assert_eq!(events[0]["change_kind"], "episode_created");
+        let revisions = db_client
+            .query(
+                "SELECT revision, affected_record_ids FROM knowledge_revision",
+                None,
+                "org",
+            )
+            .await
+            .expect("read commit ledger");
+        assert_eq!(revisions.as_array().map(Vec::len), Some(1));
+        assert_eq!(revisions[0]["revision"], 1);
+        assert_eq!(
+            revisions[0]["affected_record_ids"],
+            json!(["episode:outbox_test"])
+        );
+        let clock = db_client
+            .query(
+                "SELECT VALUE latest_revision FROM knowledge_revision_clock:active LIMIT 1",
+                None,
+                "org",
+            )
+            .await
+            .expect("read revision clock");
+        assert_eq!(clock, json!([1]));
     }
 
     #[tokio::test]

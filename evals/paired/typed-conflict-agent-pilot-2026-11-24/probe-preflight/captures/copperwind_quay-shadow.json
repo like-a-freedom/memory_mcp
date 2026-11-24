@@ -1,0 +1,100 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "shadow",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:b300bfadaf25057e8a811d6a": "copperwind_quay-record-b",
+    "episode:fe21a232bec126ce181fc76c": "copperwind_quay-record-a"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "8a52e10e9d0cf56b87f220f33ee230b861378532e052d57e98145031ff0d3c88",
+    "product_sha256": "3f4506f9a512782f1c63da7209772ab9ac342be84b84285ef9339f5abf091586",
+    "source_event_ids": [
+      "copperwind_quay-record-a"
+    ],
+    "claim_annotations": [
+      {
+        "source_event_id": "copperwind_quay-record-a",
+        "evidence_status": "unknown"
+      }
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 1,
+    "compact": true,
+    "known_revision": 15,
+    "query": "What ferry departure slot was recorded for Copperwind Quay on July 15, 2026?",
+    "valid_at": "2026-07-15T12:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations and conflict projection are not enabled for this rollout\"],\"snapshot\":{\"known_at\":\"2026-11-24T06:45:58.564783Z\",\"known_revision\":15,\"valid_at\":\"2026-07-15T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Copperwind Quay\\ndimension: ferry_departure_slot\\nvalue: 14:20 UTC effective July 15, 2026\",\"evidence_status\":\"unknown\",\"fact_id\":\"fact:6ef9dc7415c82dd6c984c861\",\"grounding\":0.89,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:fe21a232bec126ce181fc76c\",\"source_id\":\"copperwind_quay-operations-log-a\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-07-15T12:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.89,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:fe21a232bec126ce181fc76c\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations and conflict projection are not enabled for this rollout"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-24T06:45:58.564783Z",
+            "known_revision": 15,
+            "valid_at": "2026-07-15T12:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Copperwind Quay\ndimension: ferry_departure_slot\nvalue: 14:20 UTC effective July 15, 2026",
+            "evidence_status": "unknown",
+            "fact_id": "fact:6ef9dc7415c82dd6c984c861",
+            "grounding": 0.89,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 15,
+              "source_episode_id": "episode:fe21a232bec126ce181fc76c",
+              "source_id": "copperwind_quay-operations-log-a",
+              "source_type": "owner-record",
+              "valid_at": "2026-07-15T12:00:00+00:00"
+            },
+            "rationale": "historical",
+            "relevance": 0.89,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:fe21a232bec126ce181fc76c"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f",
+  "claim_rollout_stage": "shadow"
+}

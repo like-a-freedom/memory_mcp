@@ -1,0 +1,50 @@
+{
+  "schema_version": "memory-mcp-tool-schema-change/v1",
+  "tool": "extract",
+  "incumbent_tool_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61",
+  "candidate_tool_schema_sha256": "9ecfa559499e708eb95b7d2fba953218029a970a6ecb1b9edc533b79bb36c0a9",
+  "observed_changes": [
+    {
+      "path": "inputSchema.properties.include_fact_evidence",
+      "before": "absent",
+      "after": {
+        "type": "boolean",
+        "default": false,
+        "required": false
+      }
+    },
+    {
+      "path": "outputSchema.$defs.ExtractedFact.properties.statement",
+      "before": "absent",
+      "after": {
+        "type": ["string", "null"],
+        "required": false,
+        "serialized_only_when_opted_in": true
+      }
+    },
+    {
+      "path": "outputSchema.$defs.ExtractedFact.properties.source_quote",
+      "before": "absent",
+      "after": {
+        "type": ["string", "null"],
+        "required": false,
+        "serialized_only_when_opted_in": true
+      }
+    }
+  ],
+  "unchanged": {
+    "tool_count": 8,
+    "tool_names": [
+      "app_command",
+      "assemble_context",
+      "explain",
+      "extract",
+      "ingest",
+      "invalidate",
+      "open_app",
+      "resolve"
+    ],
+    "other_tool_schemas": true,
+    "existing_request_default": "compact response without fact evidence"
+  }
+}

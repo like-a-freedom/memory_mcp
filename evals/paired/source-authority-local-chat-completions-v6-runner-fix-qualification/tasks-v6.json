@@ -1,0 +1,155 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "silverfen_observatory",
+        "case_id": "silverfen_observatory-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Silverfen Observatory, the calibration ledger is stored in Meridian-28. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Silverfen Observatory, where is the calibration ledger stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Silverfen Observatory, where is the calibration ledger stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v6-silverfen_observatory-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v6-silverfen_observatory-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Meridian-28"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "conversation_control",
+        "family_id": "wrenfall_market",
+        "case_id": "wrenfall_market-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Wrenfall Market, the festival register is stored in Blueglass-61. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Wrenfall Market, where is the festival register stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Wrenfall Market, where is the festival register stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v6-wrenfall_market-register",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v6-wrenfall_market-register"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Blueglass-61"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonpaper_archive",
+        "case_id": "moonpaper_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Moonpaper Archive, the survey index is stored in Atlas-54. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Moonpaper Archive, where is the survey index stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Moonpaper Archive, where is the survey index stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v6-moonpaper_archive-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v6-moonpaper_archive-index"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Atlas-54"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Moonpaper Archive before this phase. Use assemble_context to verify: At Moonpaper Archive, where is the survey index stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "moonpaper_archive",
+          "relative_path": "fixtures/moonpaper_archive.txt",
+          "content": "Fact: At Moonpaper Archive, the survey index is stored in Atlas-54.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-v6-moonpaper_archive-index"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "juniper_depot",
+        "case_id": "juniper_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact durable fact for a later session: At Juniper Vale Depot, the route manifest is stored in Cedar-87. Store only this fact using the configured memory tools, then confirm briefly.",
+      "recall_prompt": "At Juniper Vale Depot, where is the route manifest stored? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Juniper Vale Depot, where is the route manifest stored?",
+        "valid_at": "2026-11-23T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "local-source-authority-v6-juniper_depot-manifest",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "local-source-authority-v6-juniper_depot-manifest"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cedar-87"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source file for Juniper Vale Depot before this phase. Use assemble_context to verify: At Juniper Vale Depot, where is the route manifest stored? If stored memory does not support an answer, say unknown. Do not write or modify memory. Report a value only when returned memory evidence supports it and cite the exact source_episode ID; otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "juniper_depot",
+          "relative_path": "fixtures/juniper_depot.txt",
+          "content": "Fact: At Juniper Vale Depot, the route manifest is stored in Cedar-87.\n",
+          "source_type": "doc",
+          "valid_at": "2026-11-22T00:00:00Z",
+          "event_id": "local-source-authority-v6-juniper_depot-manifest"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "1ae1da4a4e3120f2de94753fc1a949caee3aced7",
+    "product_binary_sha256": "e9c15dc133e38252064e9814e35aa8af49f65f828b10c173f56857993aae5034",
+    "corpus_sha256": "e4c17dac7f8e563486425fc469b37a78ba8e4d392b6b3c83a74251d2f1274dc0",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "7b8c60a7d6bdc5d50a71b04e5d2d3dc514516dd69b46627f5b0481cd41c20e61"
+  },
+  "cases": [
+    {
+      "case_id": "literal-path-preservation",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-source-reference",
+            "role": "unknown",
+            "text": "Chunk 1/1\nThis private fixture must never be substituted for an agent-provided literal source reference."
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "literal-source-reference",
+            "role": "unknown",
+            "text": "Chunk 1/1\nThis private fixture must never be substituted for an agent-provided literal source reference."
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "reason_codes": [
+        "incorrect_disposition",
+        "missing_evidence"
+      ],
+      "receipt_path": "receipt-literal-path-preservation.json",
+      "receipt_sha256": "6bf7cde616e52ffb9be7d28645275e9079067e47589526e10680349eef0cc5d4"
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v2",
+  "arm": "candidate",
+  "run_id": "17592-1795451531787371000-0",
+  "identity_sha256": "2cd9eff94d94450a309ccdf30f2a856304281e7f3cfd035774b444d10cf4603a",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "lagoon_copper_archive",
+      "case_id": "lagoon_copper_archive-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "mosaic_pine_terminal",
+      "case_id": "mosaic_pine_terminal-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "opal_wind_atelier",
+      "case_id": "opal_wind_atelier-fact-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "tundra_blue_depot",
+      "case_id": "tundra_blue_depot-fact-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "lagoon_copper_archive",
+        "case_id": "lagoon_copper_archive-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 288
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "fc1371113ee96dcfed9a13b38a3ca122fcdb925ea66a7a6c26b1f961866d91b9",
+        "response_sha256": "12986c249de5fda1e8bf72f67dd564e213859611ed3367114d8630b9adc4a817",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-lagoon_copper_archive"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "lagoon_copper_archive",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 502
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "mosaic_pine_terminal",
+        "case_id": "mosaic_pine_terminal-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 301
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "7b5ef255347a114fb0207cdfe4a1f110deaf28ba9758358995765ce4a4cbb909",
+        "response_sha256": "b9417c24061e9e39443dd8e03c104349adfa67c3814a84bc730fb4f08bf601ae",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-mosaic_pine_terminal"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "mosaic_pine_terminal",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 499
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "opal_wind_atelier",
+        "case_id": "opal_wind_atelier-fact-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 1365
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "95d9e529e8833707ae40b862445b614ade82b04d6ccf033d4080653d50d3da5f",
+        "response_sha256": "55906d38234a879a9a12e9de33f3096618cf5a3a271bb6fff0abe458e0da27e7",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-opal_wind_atelier"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "opal_wind_atelier",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 476
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "tundra_blue_depot",
+        "case_id": "tundra_blue_depot-fact-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 328
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "dbef8ce0a2ba6dbc4641d0bfb0c9cad0ba52ee4f5873f8f03d217dc79ae57c51",
+        "response_sha256": "4ae14f203b0a79a26a412db1914ed6648870d86274f2491fccabc4379d2e99e4",
+        "known_revision": 7,
+        "retained_store_bytes": 34242637,
+        "source_event_ids": [
+          "diagnostic-source-tundra_blue_depot"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "operator_imports": [
+        {
+          "fixture_id": "tundra_blue_depot",
+          "import_succeeded": true,
+          "extraction_attempted": true,
+          "extraction_succeeded": true,
+          "elapsed_ms": 465
+        }
+      ],
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

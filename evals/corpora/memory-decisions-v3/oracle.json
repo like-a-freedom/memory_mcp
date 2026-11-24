@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-decisions-oracle/v1",
+  "oracles": [
+    {"probe_id":"cobalt-retroactive-correction","disposition":"conflict","evidence_alternatives":[[["cobalt-initial"],["cobalt-correction"]]],"expected_assertions":{"cobalt-initial":"14 tonnes","cobalt-correction":"11 tonnes"},"expected_roles":{"cobalt-initial":"conflicting","cobalt-correction":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"amber-before-correction","disposition":"answerable","evidence_alternatives":[[["amber-initial"]]],"expected_assertions":{"amber-initial":"21 Celsius"},"expected_roles":{"amber-initial":"current"},"forbidden_event_ids":["amber-correction"]},
+    {"probe_id":"birch-valid-time-update","disposition":"answerable","evidence_alternatives":[[["birch-initial"]]],"expected_assertions":{"birch-initial":"32 psi"},"expected_roles":{"birch-initial":"current"},"forbidden_event_ids":["birch-update"]},
+    {"probe_id":"opal-open-conflict","disposition":"conflict","evidence_alternatives":[[["opal-initial"],["opal-peer"]]],"expected_assertions":{"opal-initial":"8 people","opal-peer":"11 people"},"expected_roles":{"opal-initial":"conflicting","opal-peer":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"maple-reversed-conflict","disposition":"conflict","evidence_alternatives":[[["maple-initial"],["maple-peer"]]],"expected_assertions":{"maple-initial":"6 percent","maple-peer":"9 percent"},"expected_roles":{"maple-initial":"conflicting","maple-peer":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"juniper-unverified-correction","disposition":"conflict","evidence_alternatives":[[["juniper-initial"],["juniper-forum-correction"]]],"expected_assertions":{"juniper-initial":"30 seconds","juniper-forum-correction":"45 seconds"},"expected_roles":{"juniper-initial":"conflicting","juniper-forum-correction":"conflicting"},"forbidden_event_ids":[],"relation_outcome":"contradiction"},
+    {"probe_id":"unknown-target","disposition":"unknown","evidence_alternatives":[],"expected_assertions":{},"expected_roles":{},"forbidden_event_ids":["remote-drum"]},
+    {"probe_id":"willow-unrelated-distractor","disposition":"answerable","evidence_alternatives":[[["willow-target"]]],"expected_assertions":{"willow-target":"120 cycles"},"expected_roles":{"willow-target":"current"},"forbidden_event_ids":["willow-distractor"]},
+    {"probe_id":"stable-repeat","disposition":"answerable","evidence_alternatives":[[["stable-marsh-lab"]]],"expected_assertions":{"stable-marsh-lab":"West Annex"},"expected_roles":{"stable-marsh-lab":"current"},"forbidden_event_ids":[]}
+  ]
+}

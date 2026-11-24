@@ -88,8 +88,8 @@ async fn track_fact_accesses(
             ctx.logger.log(
                 log_event(
                     "assemble_context.access_track_error",
-                    json!({"fact_id": item.fact_id}),
-                    json!({"error": err.to_string()}),
+                    json!({}),
+                    json!({"error_code": err.code()}),
                     Some(access),
                     None,
                     None,
@@ -121,6 +121,25 @@ pub async fn assemble_context(
     .await
 }
 
+/// Enters the conservative revision-bounded read path. This path intentionally
+/// reports partial completeness because selectors without revisioned state are
+/// withheld rather than mixed into a historical snapshot.
+pub async fn assemble_context_temporal(
+    ctx: &AssembleContextDeps,
+    request: AssembleContextRequest,
+    temporal: crate::models::TemporalContextQuery,
+) -> Result<crate::models::ContextAssemblyResult, crate::error::MemoryError> {
+    let command = crate::memory::api::TemporalRecallCommand { request, temporal };
+    crate::memory::api::recall_temporal_context(
+        &TemporalRetrievalPort { ctx },
+        &crate::memory::retrieval_deps::RateLimitDeps {
+            rate_limiter: &ctx.rate_limiter,
+        },
+        &command,
+    )
+    .await
+}
+
 /// Adapts the multi-tier retrieval pipeline to the memory-owned
 /// recall port.
 ///
@@ -139,6 +158,21 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
         _command: &crate::memory::api::RecallCommand,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
         assemble_context_inner(self.ctx, self.request.clone()).await
+    }
+}
+
+struct TemporalRetrievalPort<'a> {
+    ctx: &'a AssembleContextDeps,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::TemporalContextRetrievalPort for TemporalRetrievalPort<'_> {
+    async fn retrieve_temporal(
+        &self,
+        request: &AssembleContextRequest,
+        temporal: crate::models::TemporalContextQuery,
+    ) -> Result<crate::models::ContextAssemblyResult, crate::error::MemoryError> {
+        pipeline::assemble_revision_bounded_context(self.ctx, request, temporal).await
     }
 }
 
@@ -171,7 +205,10 @@ async fn assemble_context_inner(
             ctx.logger.log(
                 log_event(
                     "assemble_context.cache_hit",
-                    json!({"namespace": params.namespace, "query": request.query}),
+                    json!({
+                        "namespace": params.namespace,
+                        "query_chars": request.query.chars().count()
+                    }),
                     json!({"count": cached.len()}),
                     Some(&params.access),
                     None,
@@ -199,7 +236,11 @@ async fn assemble_context_inner(
     ctx.logger.log(
         log_event(
             "assemble_context.cache_miss",
-            json!({"namespace": params.namespace, "query": request.query, "budget": request.budget}),
+            json!({
+                "namespace": params.namespace,
+                "query_chars": request.query.chars().count(),
+                "budget": request.budget
+            }),
             json!({"status": "computing"}),
             Some(&params.access),
             None,
@@ -213,7 +254,7 @@ async fn assemble_context_inner(
             "assemble_context.features",
             json!({
                 "namespace": params.namespace,
-                "query": request.query,
+                "query_chars": request.query.chars().count(),
                 "budget": request.budget,
                 "resolved_view_mode": params.resolved_view_mode_opt,
                 "fact_type_count": params.fact_types.len(),
@@ -304,7 +345,10 @@ async fn assemble_context_inner(
             ctx.logger.log(
                 log_event(
                     "assemble_context.experience_appended",
-                    json!({"namespace": params.namespace, "query": request.query}),
+                    json!({
+                        "namespace": params.namespace,
+                        "query_chars": request.query.chars().count()
+                    }),
                     json!({"count": appended}),
                     Some(&params.access),
                     None,
@@ -345,7 +389,7 @@ async fn assemble_context_inner(
             "assemble_context.results",
             json!({
                 "namespace": params.namespace,
-                "query": request.query,
+                "query_chars": request.query.chars().count(),
                 "view_mode": params.resolved_view_mode_opt,
             }),
             json!({
@@ -372,7 +416,11 @@ async fn assemble_context_inner(
     ctx.logger.log(
         log_event(
             "assemble_context.cache_set",
-            json!({"namespace": params.namespace, "query": request.query, "budget": request.budget}),
+            json!({
+                "namespace": params.namespace,
+                "query_chars": request.query.chars().count(),
+                "budget": request.budget
+            }),
             json!({"count": results.len(), "status": cache_status}),
             Some(&params.access),
             None,
@@ -438,6 +486,7 @@ async fn attach_reconciliation(
         &*ctx.relation_read,
         crate::knowledge::api::TemporalRelationsQuery {
             fact_ids: fact_ids.clone(),
+            known_revision: None,
             cutoff,
             policy_tags,
             counterpart_limit: crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS,
