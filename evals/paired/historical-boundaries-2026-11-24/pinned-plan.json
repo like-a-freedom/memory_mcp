@@ -1,0 +1,21 @@
+{
+  "schema_version": "memory-mcp-deterministic-acceptance/v1",
+  "corpus_sha256": "dceaded9e32fcc8fdb315a63ee75295723abeb0084fb112613e9f432b39d04aa",
+  "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+  "score_channel": "evidence_enabled_temporal",
+  "families": {
+    "old-subject": "old-subject",
+    "ordinary-subject": "ordinary-subject",
+    "absent-subject": "absent-subject"
+  },
+  "ordinary_cases": [
+    "ordinary-subject",
+    "absent-subject"
+  ],
+  "minimum_gain_basis_points": 3333,
+  "maximum_items": 5,
+  "cross_build_binary_sha256": {
+    "incumbent": "d2c93601c3ab3681354829a2f14b23b7980d730abeb860e19ab1b85f96c5df29",
+    "candidate": "3bb3c321e640d3205d938cedc0b9f34db6cea0f3203281854b931b0d435234ea"
+  }
+}

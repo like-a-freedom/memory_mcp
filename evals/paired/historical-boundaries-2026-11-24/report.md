@@ -63,3 +63,26 @@ The two focal reads went from 0/2 to 2/2. Completeness remained partial.
 The focal compact JSON response grew from 679 to 1316 bytes when it
 returned the missing item. The three families establish the registered
 regression result. The descriptive gain interval includes zero.
+
+## Repeat with separately pinned builds
+
+The [binary registration](pinned-plan.json) and [acceptance verdict](pinned-verdict.json)
+record a fresh Apple Silicon replay of the original historical comparison.
+The locked debug executables came from `4a5774d0` and `8b404755`.
+Freeze the corpus rule and actual executable SHA-256 values, use
+the capture and comparison commands above, and pass the pinned plan
+to `accept-memory-candidate`. Build different revisions in separate
+Cargo target directories to avoid reusing workspace artifacts. Rebuilt
+binaries may require a new local hash registration. The four raw captures
+are local under `target/evals/b5-native/`.
+
+Both pairs matched. Acceptance revalidated the raw receipts and recorded
+the same family gain (1/3 to 2/3), one `old-subject` win, no losses and no
+hard failures. Substituting a different registered candidate hash caused
+the CLI to reject the same receipts before writing a verdict.
+
+A [schema compatibility control](schema-guard.json) repeated the reads on
+the later `7689e736` build and observed matching candidate captures. The
+CLI rejected acceptance against `4a5774d0` because the public input schema
+had changed. The later build is qualified separately by the
+[native v9 rollout and B5 regressions](../../../docs/evals/LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md#b5-deterministic-retrieval-regressions).

@@ -1,0 +1,21 @@
+{
+  "incumbent": {
+    "suite_id": "memory-decisions",
+    "product_revision": "4a5774d0275a094713a96b7866f200485086a0fa",
+    "product_binary_sha256": "d2c93601c3ab3681354829a2f14b23b7980d730abeb860e19ab1b85f96c5df29",
+    "corpus_sha256": "dceaded9e32fcc8fdb315a63ee75295723abeb0084fb112613e9f432b39d04aa",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "9475b795bde1360eda3cf672b8c75d99ff1fa6cd0e91b219907a7fc81c71880f"
+  },
+  "later_candidate": {
+    "suite_id": "memory-decisions",
+    "product_revision": "7689e736d46ebcce356d5e3f9e570eb31802d06a",
+    "product_binary_sha256": "72ae1d9a9caa787405c52fc9e5200e1794a42b099cb02d52fa026a44ee6f2136",
+    "corpus_sha256": "dceaded9e32fcc8fdb315a63ee75295723abeb0084fb112613e9f432b39d04aa",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752"
+  },
+  "stage": "cross_build_acceptance",
+  "within_build_repeats_match": true,
+  "rejection": "public schema differs; requires separately reviewed compatibility protocol"
+}
