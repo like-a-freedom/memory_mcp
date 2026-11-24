@@ -168,6 +168,12 @@ cargo test -p eval-harness --test deterministic_quality_gate --locked -- --ignor
 
 The output path must be fresh. For an existing pair of captures use `memory-eval accept-memory-candidate --corpus-root <registered-directory> --plan <frozen-plan> --incumbent-first <index> --incumbent-second <index> --candidate-first <index> --candidate-second <index> --output <new-report>`. Successful standalone diagnostic execution is distinct from promotion; legacy/default channels may fail while the registered rich channel passes. Invalid execution never qualifies.
 
+For a new two-build temporal comparison, freeze
+`"cross_build_binary_sha256": {"incumbent": "<sha256>", "candidate": "<sha256>"}`
+with distinct lowercase SHA-256 digests. Each arm must match its registered
+binary across both captures. Use `product_binary_sha256` for a shared build
+pin. The frozen older registrations still replay with their original schema.
+
 ## Limits and remaining work
 
 These results prove improvement on the registered finite histories and deterministic controls. They do not prove arbitrary-language/entity resolution, general absence, production-scale recall or latency, semantic historical selectors, model-mediated agent benefit, authenticated source authority or an official LongMemEval-V2 score. A bounded 250-fact supplement can still miss older facts outside direct FTS hits; truncation is disclosed. Lowercase/ambiguous subjects retain the prior lexical policy.

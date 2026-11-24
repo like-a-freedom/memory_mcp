@@ -13,12 +13,21 @@ pub struct DeterministicAcceptancePlan {
     pub candidate_config_sha256: Option<String>,
     #[serde(default)]
     pub product_binary_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cross_build_binary_sha256: Option<CrossBuildBinaryPins>,
     #[serde(default)]
     pub score_channel: AcceptanceScoreChannel,
     pub families: BTreeMap<String, String>,
     pub ordinary_cases: BTreeSet<String>,
     pub minimum_gain_basis_points: u32,
     pub maximum_items: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CrossBuildBinaryPins {
+    pub incumbent: String,
+    pub candidate: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +227,29 @@ pub fn accept_candidate(
     }
     let left = incumbent[0];
     let right = candidate[0];
+    if let Some(pins) = &plan.cross_build_binary_sha256 {
+        let valid_hash = |hash: &str| {
+            hash.len() == 64 && hash.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+        };
+        if plan.score_channel != AcceptanceScoreChannel::EvidenceEnabledTemporal
+            || plan.product_binary_sha256.is_some()
+            || pins.incumbent == pins.candidate
+            || !valid_hash(&pins.incumbent)
+            || !valid_hash(&pins.candidate)
+        {
+            return Err(invalid("invalid cross-build binary registration"));
+        }
+        if left.identity.product_binary_sha256 != pins.incumbent {
+            return Err(invalid(
+                "incumbent product binary differs from frozen acceptance plan",
+            ));
+        }
+        if right.identity.product_binary_sha256 != pins.candidate {
+            return Err(invalid(
+                "candidate product binary differs from frozen acceptance plan",
+            ));
+        }
+    }
     if plan.score_channel == AcceptanceScoreChannel::Primary
         && (left.identity.product_revision != right.identity.product_revision
             || left.identity.product_binary_sha256 != right.identity.product_binary_sha256)
@@ -402,6 +434,7 @@ mod tests {
             config_sha256: "d".repeat(64),
             candidate_config_sha256: None,
             product_binary_sha256: None,
+            cross_build_binary_sha256: None,
             score_channel: AcceptanceScoreChannel::default(),
             families: BTreeMap::from([
                 ("case".into(), "family".into()),
@@ -421,6 +454,30 @@ mod tests {
         assert!(report.accepted);
         assert_eq!(report.wins, vec!["case"]);
     }
+    #[test]
+    fn cross_build_acceptance_enforces_both_registered_binary_hashes() {
+        let a = fixture(false, "a");
+        let b = fixture(true, "b");
+        let substituted = fixture(true, "c");
+        let mut registration = serde_json::to_value(plan()).unwrap();
+        registration["cross_build_binary_sha256"] = serde_json::json!({
+            "incumbent": "a".repeat(64),
+            "candidate": "b".repeat(64),
+        });
+        let frozen = serde_json::from_value(registration).expect("per-arm product registration");
+
+        let report = accept_candidate(&frozen, [&a, &repeated(&a)], [&b, &repeated(&b)])
+            .expect("registered binaries");
+        assert!(report.accepted);
+        let error = accept_candidate(
+            &frozen,
+            [&a, &repeated(&a)],
+            [&substituted, &repeated(&substituted)],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("candidate product binary"));
+    }
+
     #[test]
     fn explicitly_pinned_candidate_configuration_can_differ_from_incumbent() {
         let a = fixture(false, "a");
