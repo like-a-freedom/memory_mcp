@@ -171,8 +171,9 @@ class MemoryMcpBackend(Memory):
             "assemble-context",
             "--query", query,
         )
-        self._query_count += 1
-        self._query_time_secs += time.monotonic() - start
+        with self._store_lock:
+            self._query_count += 1
+            self._query_time_secs += time.monotonic() - start
         payload = json.loads(result)
         nested = payload.get("result")
         items = payload.get("items")
@@ -234,41 +235,43 @@ class MemoryMcpBackend(Memory):
             self.db_path = str(store)
 
     def _run_cli(self, subcommand: str, *args: str) -> str:
-        with self._store_lock:
-            cmd = [self.binary]
-            if not self.db_path:
-                raise ValueError("memory_mcp requires an explicit dedicated db_path")
-            env = {
-                name: os.environ[name]
-                for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
-                if name in os.environ
-            }
-            env.update({
-                "SURREALDB_EMBEDDED": "true",
-                "SURREALDB_DATA_DIR": self.db_path,
-                "EMBEDDINGS_ENABLED": "false",
-                "RUST_LOG": "error",
-            })
-            argv = list(args)
-            stdin_content = None
-            if subcommand == "ingest":
-                content_index = argv.index("--content")
-                stdin_content = argv[content_index + 1].encode("utf-8")
-                argv[content_index:content_index + 2] = ["--content-stdin"]
-            cmd += [subcommand, *argv]
-            read_workspace = (
-                TemporaryDirectory(prefix="longmemeval-mcp-read-")
-                if subcommand == "assemble-context" else nullcontext()
-            )
-            with read_workspace as directory:
-                if directory is not None:
-                    store = Path(directory) / "store"
-                    shutil.copytree(self.db_path, store)
-                    env["SURREALDB_DATA_DIR"] = str(store)
-                result = subprocess.run(
-                    cmd, input=stdin_content, capture_output=True, check=True, env=env
-                )
-                return result.stdout.decode("utf-8")
+        read_workspace = (
+            TemporaryDirectory(prefix="longmemeval-mcp-read-")
+            if subcommand == "assemble-context" else nullcontext()
+        )
+        with read_workspace as directory:
+            with self._store_lock:
+                if not self.db_path:
+                    raise ValueError("memory_mcp requires an explicit dedicated db_path")
+                if directory is None:
+                    return self._invoke_cli(self.db_path, subcommand, args)
+                copy = Path(directory) / "store"
+                shutil.copytree(self.db_path, copy)
+            return self._invoke_cli(str(copy), subcommand, args)
+
+    def _invoke_cli(self, store: str, subcommand: str, args: tuple[str, ...]) -> str:
+        env = {
+            name: os.environ[name]
+            for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
+            if name in os.environ
+        }
+        env.update({
+            "SURREALDB_EMBEDDED": "true",
+            "SURREALDB_DATA_DIR": store,
+            "EMBEDDINGS_ENABLED": "false",
+            "RUST_LOG": "error",
+        })
+        argv = list(args)
+        stdin_content = None
+        if subcommand == "ingest":
+            content_index = argv.index("--content")
+            stdin_content = argv[content_index + 1].encode("utf-8")
+            argv[content_index:content_index + 2] = ["--content-stdin"]
+        result = subprocess.run(
+            [self.binary, subcommand, *argv],
+            input=stdin_content, capture_output=True, check=True, env=env,
+        )
+        return result.stdout.decode("utf-8")
 
 
 def _smoke_test() -> None:

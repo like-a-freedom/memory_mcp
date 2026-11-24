@@ -1,8 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
+from threading import Barrier
 import unittest
 from unittest.mock import patch
 
@@ -168,6 +170,29 @@ class MemoryMcpBackendTests(unittest.TestCase):
             self.assertEqual(counter.read_text(), "0")
             self.assertEqual(len(used_stores), 4)
             self.assertFalse(any(store.exists() for store in used_stores))
+
+    def test_isolated_cli_reads_can_overlap(self):
+        both_reading = Barrier(2, timeout=3)
+
+        def read(argv, *, env, **kwargs):
+            store = Path(env["SURREALDB_DATA_DIR"])
+            marker = store / "marker"
+            marker.write_text(argv[-1])
+            both_reading.wait()
+            reply = {"result": {"items": [{"content": marker.read_text()}]}}
+            return subprocess.CompletedProcess([], 0, json.dumps(reply).encode())
+
+        with TemporaryDirectory() as directory, patch("subprocess.run", side_effect=read):
+            marker = Path(directory) / "marker"
+            marker.write_text("original")
+            backend = MemoryMcpBackend({"db_path": directory})
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                tea = executor.submit(backend.query, "tea")
+                coffee = executor.submit(backend.query, "coffee")
+                self.assertEqual(tea.result(), [{"type": "text", "value": "tea"}])
+                self.assertEqual(coffee.result(), [{"type": "text", "value": "coffee"}])
+            self.assertEqual(marker.read_text(), "original")
+            self.assertEqual(backend.stats["query_count"], 2)
 
     def test_blank_context_is_a_failed_read(self):
         backend = MemoryMcpBackend({}, runner=lambda *_: '{"result":{"items":[{"content":"  "}]}}')

@@ -131,10 +131,13 @@ def main():
     for name in ("questions", "haystack", "trajectories", "memory-state", "output"):
         parser.add_argument(f"--{name}", required=True, type=Path)
     parser.add_argument("--domain", required=True, choices=("web", "enterprise"))
+    parser.add_argument("--prompt-workers", type=int, default=1)
     for role in ("reader", "judge"):
         parser.add_argument(f"--{role}-url", required=True, type=loopback_endpoint)
         parser.add_argument(f"--{role}-model", required=True)
     args = parser.parse_args()
+    if args.prompt_workers < 1:
+        parser.error("--prompt-workers must be positive")
     questions = harness.load_questions(str(args.questions))
     case_ids = [row["id"] for row in questions]
     if not case_ids or len(set(case_ids)) != len(case_ids):
@@ -156,6 +159,7 @@ def main():
         "--evaluator-base-url", args.judge_url, "--evaluator-model", args.judge_model,
         "--api-key-env", "LME_LOCAL_READER_TOKEN", "--evaluator-api-key-env", "LME_LOCAL_JUDGE_TOKEN",
         "--reader-max-concurrent-requests", "1", "--memory-context-max-tokens", "4096",
+        "--prompt-build-max-workers", str(args.prompt_workers),
         "--temperature", "0", "--max-completion-tokens", "256", "--timeout-seconds", "30",
         "--evaluator-max-completion-tokens", "256", "--evaluator-timeout-seconds", "30",
     ], case_ids, args.output)

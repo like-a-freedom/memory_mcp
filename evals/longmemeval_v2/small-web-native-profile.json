@@ -26,14 +26,16 @@
     "reader_concurrency": 1,
     "max_completion_tokens": 256,
     "memory_context_max_tokens": 4096,
-    "scored_pass_wall_limit_seconds": 1200,
+    "scored_pass_wall_limit_seconds": 2700,
     "external_model_cost": 0,
     "upstream_python": {
       "python": "3.15.2",
       "torch": "2.15.0",
       "transformers": "5.24.0",
-      "huggingface_hub": "2.4.0"
-    }
+      "huggingface_hub": "2.4.0",
+      "torchvision": "0.29.2"
+    },
+    "prompt_build_workers": 3
   },
   "processor": {
     "checkpoint": "Qwen/Qwen3.5-9B",
@@ -109,5 +111,12 @@
   "qualification_debug_probe": {
     "binary_sha256": "2b338ba88f846c9638d05e958cf7f8b4acaa87d57da576a8e98d5fe3c73b2860",
     "decision": "Use release optimization for the acceptance run. A three-trajectory read took 23.375 seconds with the release binary; building the corresponding first prompt exceeded 224 seconds in the debug probe. This compare was run before any scored cohort output."
+  },
+  "qualification_full_store_preflight": {
+    "shared_trajectory_count": 100,
+    "shared_build_seconds_rounded": 4324,
+    "serial_prompt_preflight_seconds": 388.626,
+    "serial_prompt_preflight_scored_case_count": 0,
+    "decision": "The first full-store read exposed a missing pinned processor dependency before any reader or judge output. Verify the offline processor at startup, permit three concurrent reads on separate copies of the saved store, and allow a bounded 45-minute scored pass. The original ordered haystack and scoring parameters are preserved."
   }
 }

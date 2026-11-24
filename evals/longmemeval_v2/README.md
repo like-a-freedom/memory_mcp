@@ -209,24 +209,49 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -m evals.longmemeval_v2.scored_co
   --domain web --questions "$COHORT/questions.json" --haystack "$COHORT/haystack.json" \
   --trajectories "$COHORT/trajectories.json" --memory-state "$BUILD/memory_state" \
   --reader-url "$READER_URL" --reader-model "$READER_MODEL" \
-  --judge-url "$JUDGE_URL" --judge-model "$JUDGE_MODEL" --output "$SCORES"
+  --judge-url "$JUDGE_URL" --judge-model "$JUDGE_MODEL" --output "$SCORES" \
+  --prompt-workers 3
 ```
 
 Both endpoints must use explicit loopback HTTP addresses and implement
 the OpenAI Chat Completions protocol. A standalone MLX-LM server on Apple
-Silicon is one option. Run it with local weights and `HF_HUB_OFFLINE=1`.
-Before scoring, stage the pinned upstream Qwen3.5‑9B processor assets in
+Silicon is one option. For the recorded Apple Silicon profile, run one
+instance per model with the same flags and distinct ports.
+
+```bash
+HF_HUB_OFFLINE=1 mlx_lm.server --host 127.0.0.1 --port 18767 \
+  --model "$READER_WEIGHTS" --temp 0 --chat-template-args '{"enable_thinking":false}'
+HF_HUB_OFFLINE=1 mlx_lm.server --host 127.0.0.1 --port 18766 \
+  --model "$JUDGE_WEIGHTS" --temp 0 --chat-template-args '{"enable_thinking":false}'
+```
+
+For these servers, use the model path passed to each server as its model ID
+and append `/v1` to each base URL. Other local runners can supply their own
+model IDs and compatible endpoints.
+
+Before scoring, install the matching Torch and Torchvision versions and
+stage the pinned upstream Qwen3.5‑9B processor assets in
 an isolated `HF_HOME` cache and set its offline `refs/main` to the recorded
 revision in the [native run profile](small-web-native-profile.json). The Qwen processor measures input context. Reader and judge
-inference use the separately configured models.
+inference use the separately configured models. With that environment,
+check processor availability before launching a full-store read.
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
+  'from evaluation.harness import get_memory_context_processor; get_memory_context_processor()'
+```
+
+Each prompt worker reads a private copy of the saved store. Upstream
+restores the original question order before sending requests to the
+reader. Choose a worker count that fits available CPU, disk and RAM.
+The CLI defaults to one worker.
 
 The observer leaves upstream reader prompts, scoring, fallback behavior
 and artifacts intact. Its `score-coverage.json` records reader and judge
 errors or timeouts, partial rows and the full selection denominator. The
 `cases` field gives the first failing stage as the case status. The
 `failures` field lists every observed stage failure for each affected case.
-If
-upstream scores a fallback, its row remains in the native count and the
+If upstream scores a fallback, its row remains in the native count and the
 coverage calculation excludes it. If scoring aborts, the incomplete
 suffix remains unscored. When the aggregate exists the observer verifies
 its overall denominator and score from the native case rows. Treat
