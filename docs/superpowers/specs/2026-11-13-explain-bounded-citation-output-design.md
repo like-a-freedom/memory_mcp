@@ -10,6 +10,16 @@ This proposal remains pending. The current adapter has no `explain_budget` modul
 
 Ratify the compatibility change in a newly allocated ADR and amend ADR-0022 and the July 30 response specification. ADR-0083 now belongs to [revision-bounded temporal context](../../adr/0083-revision-bounded-temporal-context.md), so the historical ADR number proposed below is superseded. Current implementation must follow the workspace MSRV and repository-required feature/test checks.
 
+The native Apple Silicon public MCP preflight stored a 16,219-byte
+synthetic episode containing `Exact small quote. ` followed by 1,800
+repetitions of a double quote, a backslash, `é`, `🙂` and a space.
+It called `explain` with the episode ID and `Exact small quote.` as the
+quote. The compact UTF-8 JSON serialization of the returned
+`structuredContent` was 59,997 bytes in compact mode and 60,059 bytes
+in verbose mode. Both exceed 32,768 bytes. This measures the public
+payload before JSON-RPC framing and establishes the failing baseline
+for the adapter-level regression test.
+
 ## Intent
 
 Prevent one `explain` call from consuming hundreds of thousands of tokens while retaining enough evidence for an agent to cite a claim correctly and enough metadata to retrieve any omitted source text through the same tool.

@@ -1,0 +1,7 @@
+{
+  "trajectory_sha256": "363cec9a8e87aa8d9101ce4e600aadbf7031d674056ebe4f969e8424abc5f3c6",
+  "unique_small_trajectories": 200,
+  "max_adapter_content_bytes": 7600069,
+  "host_arg_max_bytes": 1048576,
+  "content_alone_exceeds_host_arg_max": 53
+}

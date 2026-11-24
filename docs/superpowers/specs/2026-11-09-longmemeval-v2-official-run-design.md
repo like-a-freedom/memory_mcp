@@ -19,11 +19,18 @@ The local adapter and eval package are unchanged since the November 9 specificat
 
 | Evidence | Consequence |
 | --- | --- |
-| Local [pins](../../../evals/longmemeval_v2/README.md) use upstream `ef67f10aacd9080c75aeb2dd527a0af25dc26f1b` and dataset `f152293e235517d504809563c833d7190b8c713b`. | The repository pin covers the upstream query metadata boundary. The dataset file hashes and launcher still require verification. |
+| Local [pins](../../../evals/longmemeval_v2/README.md) use upstream `ef67f10aacd9080c75aeb2dd527a0af25dc26f1b` and dataset `f152293e235517d504809563c833d7190b8c713b`. | The repository pin covers the upstream query metadata boundary. The three Small input files match the pinned SHA-256 values. A scored launcher still requires verification. |
 | Upstream [commit `ef67f10`](https://github.com/xiaowu0162/LongMemEval-V2/commit/ef67f10aacd9080c75aeb2dd527a0af25dc26f1b) removes question ID/type/raw record from backend query context and replaces them with a random run-local invocation ID. The pinned checkout was verified at that commit. | Exercise the metadata boundary through the actual registered backend before scoring. |
 | The pinned [dataset schema](https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/blob/f152293e235517d504809563c833d7190b8c713b/SCHEMA.md) has ordered states and trajectories, but no occurrence timestamps or transaction timestamps. | Order is evidence; a synthetic timestamp is only an implementation surrogate. This benchmark cannot validate real-world bi-temporal accuracy. |
 | The upstream [backend registry at the current pin](https://github.com/xiaowu0162/LongMemEval-V2/blob/ef67f10aacd9080c75aeb2dd527a0af25dc26f1b/memory_modules/memory.py) imports known backends explicitly. The local [adapter](../../../evals/longmemeval_v2/memory_mcp_backend.py) registers itself only when imported. | An official launcher must import the adapter into the same registry process before configuration resolution; current smoke does not prove that. |
 | The local [run script](../../../evals/longmemeval_v2/run_pinned.sh) only supports smoke modes. The adapter starts a CLI process for every ingest/extract/query, passes the entire serialized trajectory in one `--content` argument, inherits the parent environment, assigns counter IDs and wall-clock `t_ref`, does not pass `as_of`, and does not implement backend save/load hooks. | Complete lifecycle/isolation, preflight actual input limits and measure startup/extraction cost before selecting a full cohort. No present official result exists. |
+
+The [native Small preflight](../../../evals/longmemeval_v2/README.md#small-dataset-preflight)
+measured 53 of 200 unique trajectories above the current Apple Silicon
+argument budget. The largest serialized input is 7,600,069 bytes.
+The upstream synthetic build also reproduced that the exported backend
+state cannot restore memory independently of the original CLI store.
+These observations require transport and lifecycle changes before a scored run.
 
 ## Approaches and decision
 

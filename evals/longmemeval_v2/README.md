@@ -86,3 +86,32 @@ adapter tests, and the local CLI integration smoke passed. Importing the
 adapter alongside the actual pinned registry also resolved
 `memory_type=memory_mcp` and exposed only the opaque invocation ID in query
 context.
+
+## Small dataset preflight
+
+The [expected hashes](dataset-small.sha256) are from the pinned release.
+The question and Small haystack files matched their expected SHA-256
+values in a fresh download. The question IDs match the haystack keys
+exactly. All 240 web questions share one ordered 100-trajectory haystack.
+All 211 enterprise questions share a different ordered 100-trajectory
+haystack. Of those questions, 225 web and 197 enterprise have a null
+`image` field. They require per-question evidence adjudication before
+inclusion in the text-capable cohort. [Pinned schema](https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/blob/f152293e235517d504809563c833d7190b8c713b/SCHEMA.md)
+
+A synthetic single-question build also passed through the pinned
+`evaluation/harness.py` with the adapter registered in-process and
+`--save-memory --skip-evaluation`. Reloading reopened the original CLI
+store and retrieved the expected fact. Moving that store aside and
+loading the exported state produced an empty read. The saved directory
+contains only the adapter configuration, so a portable restore or a
+verified fresh-build policy is still required.
+
+Streaming the pinned trajectories verified the third file hash and
+resolved the 200 distinct Small trajectory IDs. The current JSON
+serialization reaches 7,600,069 bytes for one trajectory. In total,
+53 trajectories exceed the native Apple Silicon process argument
+budget of 1,048,576 bytes on content alone. A synthetic argument of the
+maximum size was rejected by macOS with `E2BIG`. The current
+`ingest --content` path therefore cannot complete the full Small input set without a transport change. The input
+preflight does not establish product parser or provider capacity.
+[Native aggregate](dataset-small-native-preflight.json)
