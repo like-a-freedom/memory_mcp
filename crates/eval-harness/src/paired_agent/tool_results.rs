@@ -123,3 +123,17 @@ fn episode_id_from_ingest_payload(value: &Value) -> Option<String> {
         .filter(|id| id.starts_with("episode:") && id.len() > "episode:".len())
         .map(str::to_owned)
 }
+
+pub(crate) fn read_result(result: &Value) -> (super::MemoryReadOutcome, Option<u32>) {
+    use super::MemoryReadOutcome;
+    let count = result
+        .pointer("/structuredContent/result")
+        .and_then(Value::as_array)
+        .and_then(|items| u32::try_from(items.len()).ok());
+    let outcome = match count {
+        Some(0) => MemoryReadOutcome::Empty,
+        Some(_) => MemoryReadOutcome::Nonempty,
+        None => MemoryReadOutcome::Unknown,
+    };
+    (outcome, count)
+}

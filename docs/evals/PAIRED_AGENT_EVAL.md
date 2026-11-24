@@ -429,6 +429,10 @@ without the new component fields; v5 requires its component fields for every
 attempted trial and rejects v6-only answer classifications; v6 requires the
 answer classification for every schema-valid final answer. V5 artifacts remain
 readable without migration. No response text is persisted in these diagnostics.
+Observation v4 adds `read_capture_status` and `memory_reads`. Each observed read references its request and terminal trace sequence. The offline scorer rejects mismatched call IDs, tools, terminal kinds and observed captures that omit a read. Capture status distinguishes observed, partial and unavailable capture. A text-only reply has an unknown result count.
+
+The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. Native captures with read observations use journal v5. Observation v1–v3 still replay to paired v6, and paired v2–v6 remain readable. Read diagnostics leave existing decision and independent-probe scores intact.
+
 The scorer writes
 `incumbent.json` and `candidate.json` into a new directory. The same frozen plan, task manifest
 and observations produce byte-identical artifacts, which feed

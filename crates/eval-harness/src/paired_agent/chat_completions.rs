@@ -668,21 +668,14 @@ impl ChatCompletionsAgent {
             )?;
             match tool_name {
                 "assemble_context" => {
-                    use super::MemoryReadOutcome;
                     super::tool_results::collect_source_episode_ids(&tool_result, &mut sources);
-                    let item_count = tool_result
-                        .pointer("/result/structuredContent/result")
-                        .and_then(Value::as_array)
-                        .and_then(|items| u32::try_from(items.len()).ok());
+                    let (outcome, item_count) =
+                        super::tool_results::read_result(&tool_result["result"]);
                     if let Some(reads) = observation.memory_reads.as_mut() {
                         reads.push(super::MemoryReadObservation {
                             request_sequence,
                             response_sequence: Some(response_sequence),
-                            outcome: match item_count {
-                                Some(0) => MemoryReadOutcome::Empty,
-                                Some(_) => MemoryReadOutcome::Nonempty,
-                                None => MemoryReadOutcome::Unknown,
-                            },
+                            outcome,
                             item_count,
                         });
                     }

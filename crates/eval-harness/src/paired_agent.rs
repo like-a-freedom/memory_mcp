@@ -199,7 +199,10 @@ pub(crate) fn validate_read_associations(
             .find(|event| event.sequence == read.request_sequence)
             .filter(|event| {
                 event.kind == TraceEventKind::MemoryRead
-                    && event.tool_name.as_deref() == Some("assemble_context")
+                    && matches!(
+                        event.tool_name.as_deref(),
+                        Some("assemble_context" | "memory_decisions/assemble_context")
+                    )
             })
             .ok_or_else(invalid)?;
         if !requests.insert(read.request_sequence) {

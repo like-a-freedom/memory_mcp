@@ -159,6 +159,27 @@ exec /bin/sleep 2
 }
 
 #[test]
+fn text_only_tool_reply_has_unknown_read_outcome() {
+    let directory = tempfile::tempdir().unwrap();
+    let config = fake_config(
+        directory.path(),
+        r#"#!/bin/sh
+cat >/dev/null
+printf '%s\n' '{"type":"turn.started"}' \
+ '{"type":"item.started","item":{"id":"read","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"Cedar"}}}' \
+ '{"type":"item.completed","item":{"id":"read","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","result":{"content":[{"type":"text","text":"UNRECOGNIZED_REPLY_SENTINEL"}]}}}' \
+ '{"type":"turn.completed","usage":{"input_tokens":9,"output_tokens":4}}'
+"#,
+        Duration::from_secs(5),
+    );
+    let captured =
+        serde_json::to_value(run_codex_agent(&config, "Where is Cedar?").unwrap()).unwrap();
+    assert_eq!(captured["memory_reads"][0]["outcome"], "unknown");
+    assert!(captured["memory_reads"][0]["item_count"].is_null());
+    assert!(!captured.to_string().contains("UNRECOGNIZED_REPLY_SENTINEL"));
+}
+
+#[test]
 fn launches_fake_codex_with_isolated_mcp_and_removes_temporary_schema() {
     let directory = tempfile::tempdir().expect("temporary runner directory");
     let config = fake_config(

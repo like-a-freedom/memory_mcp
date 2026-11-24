@@ -280,6 +280,16 @@ fn read_error_does_not_become_empty_memory() {
 }
 
 #[test]
+fn text_only_loopback_reply_has_unknown_read_outcome() {
+    let captured = capture_read_reply(json!({"result":{"content":[
+        {"type":"text","text":"UNRECOGNIZED_REPLY_SENTINEL"}
+    ]}}));
+    assert_eq!(captured["memory_reads"][0]["outcome"], "unknown");
+    assert!(captured["memory_reads"][0]["item_count"].is_null());
+    assert!(!captured.to_string().contains("UNRECOGNIZED_REPLY_SENTINEL"));
+}
+
+#[test]
 fn empty_read_reports_zero_items() {
     let captured = capture_read_reply(json!({"result":{"structuredContent":{"result":[]}}}));
     let read = &captured["memory_reads"][0];
@@ -351,6 +361,9 @@ fn chat_completions_agent_executes_an_allowed_mcp_tool_and_records_only_receipt_
         eval_harness::paired::TrialStatus::Completed
     );
     assert_eq!(observation.final_answer.as_deref(), Some(final_answer));
+    let capture = serde_json::to_value(&observation).unwrap();
+    assert_eq!(capture["memory_reads"][0]["outcome"], "nonempty");
+    assert_eq!(capture["memory_reads"][0]["item_count"], 1);
     assert_eq!(observation.memory_source_episode_ids, ["episode:cedar"]);
     assert_eq!(observation.turns_used, 2);
     assert_eq!(observation.tool_calls, 1);

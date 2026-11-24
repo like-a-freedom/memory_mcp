@@ -1192,6 +1192,10 @@ fn parse_codex_jsonl_with_terminal_status(
     let mut extract_fact_evidence = Vec::new();
     let mut completed = BTreeSet::<String>::new();
     let mut final_answer = None;
+    use crate::paired_agent::{MemoryReadObservation, MemoryReadOutcome, ReadCaptureStatus};
+    let mut memory_reads = Vec::<MemoryReadObservation>::new();
+    let mut pending_reads = BTreeMap::new();
+    let mut read_capture_status = ReadCaptureStatus::Observed;
     let mut memory_source_episode_ids = BTreeSet::new();
     let mut memory_write_episode_ids = BTreeSet::new();
     let mut turns_used = 0_u32;
@@ -1318,6 +1322,27 @@ fn parse_codex_jsonl_with_terminal_status(
                                 pending_extract_fact_evidence
                                     .insert(call_id.clone(), evidence_index);
                             }
+                            if tool == "assemble_context" {
+                                if event_type == "item.started" {
+                                    let request_sequence = trace
+                                        .last()
+                                        .ok_or_else(|| {
+                                            EvalError::InvalidInput(
+                                                "Codex read request was not recorded".into(),
+                                            )
+                                        })?
+                                        .sequence;
+                                    pending_reads.insert(call_id.clone(), memory_reads.len());
+                                    memory_reads.push(MemoryReadObservation {
+                                        request_sequence,
+                                        response_sequence: None,
+                                        outcome: MemoryReadOutcome::Unknown,
+                                        item_count: None,
+                                    });
+                                } else {
+                                    read_capture_status = ReadCaptureStatus::Partial;
+                                }
+                            }
                             pending.insert(call_id.clone(), tool_name.clone());
                         }
                         if event_type == "item.completed" {
@@ -1366,6 +1391,12 @@ fn parse_codex_jsonl_with_terminal_status(
                                         None,
                                         None,
                                     )?;
+                                    if let Some(index) = pending_reads.remove(&call_id) {
+                                        let read = &mut memory_reads[index];
+                                        read.response_sequence =
+                                            trace.last().map(|event| event.sequence);
+                                        read.outcome = MemoryReadOutcome::Failed;
+                                    }
                                     record_extract_fact_evidence_response(
                                         &mut extract_fact_evidence,
                                         &mut pending_extract_fact_evidence,
@@ -1400,6 +1431,15 @@ fn parse_codex_jsonl_with_terminal_status(
                                         Some(serialized_response_bytes(result)?),
                                     );
                                     if tool == "assemble_context" {
+                                        if let Some(index) = pending_reads.remove(&call_id) {
+                                            let read = &mut memory_reads[index];
+                                            read.response_sequence =
+                                                trace.last().map(|event| event.sequence);
+                                            (read.outcome, read.item_count) =
+                                                crate::paired_agent::tool_results::read_result(
+                                                    result,
+                                                );
+                                        }
                                         collect_source_episode_ids(
                                             result,
                                             &mut memory_source_episode_ids,
@@ -1654,8 +1694,8 @@ fn parse_codex_jsonl_with_terminal_status(
         trace,
         final_answer,
         memory_source_episode_ids: memory_source_episode_ids.into_iter().collect(),
-        memory_reads: None,
-        read_capture_status: None,
+        memory_reads: Some(memory_reads),
+        read_capture_status: Some(read_capture_status),
         memory_write_episode_ids: memory_write_episode_ids.into_iter().collect(),
         extract_fact_evidence,
         extract_fact_evidence_telemetry_complete: true,
