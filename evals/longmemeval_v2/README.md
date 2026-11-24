@@ -100,11 +100,18 @@ inclusion in the text-capable cohort. [Pinned schema](https://huggingface.co/dat
 
 A synthetic single-question build also passed through the pinned
 `evaluation/harness.py` with the adapter registered in-process and
-`--save-memory --skip-evaluation`. Reloading reopened the original CLI
-store and retrieved the expected fact. Moving that store aside and
-loading the exported state produced an empty read. The saved directory
-contains only the adapter configuration, so a portable restore or a
-verified fresh-build policy is still required.
+`--save-memory --skip-evaluation`. The first restore failed after the original store was moved. The adapter
+now snapshots the quiescent embedded store and restores into a fresh private
+working directory. The pinned upstream save/restore smoke passed on Apple
+Silicon after moving the original store, using the expected retrieved fact
+as its oracle. An existing destination is refused and the snapshot can be
+loaded independently of the original storage path.
+
+To repeat the optional upstream smoke, point `PYTHONPATH` at the pinned
+upstream checkout and this repository, and set
+`LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY` to the native product binary. Run
+`python -m unittest evals.longmemeval_v2.test_upstream_restore` with the
+upstream test requirements and the local embedding cache available.
 
 Streaming the pinned trajectories verified the third file hash and
 resolved the 200 distinct Small trajectory IDs. The current JSON

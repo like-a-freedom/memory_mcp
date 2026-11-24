@@ -16,7 +16,11 @@ assemble_context surfaces. It does not seed facts directly.
 import json
 import argparse
 import os
+from pathlib import Path
+import shutil
 import subprocess
+from tempfile import TemporaryDirectory
+from threading import RLock
 import time
 from typing import Any, Callable, Optional
 
@@ -45,6 +49,8 @@ class MemoryMcpBackend(Memory):
         binary = memory_params.get("binary", binary)
         self.db_path = memory_params.get("db_path")
         self.binary = binary
+        self._store_lock = RLock()
+        self._restored_store: Optional[TemporaryDirectory] = None
         self._runner = runner or self._run_cli
         self._insert_count = 0
         self._query_count = 0
@@ -53,6 +59,10 @@ class MemoryMcpBackend(Memory):
 
     def insert(self, trajectory: Any) -> None:
         """Insert a trajectory into memory via ingest + extract."""
+        with self._store_lock:
+            self._insert(trajectory)
+
+    def _insert(self, trajectory: Any) -> None:
         start = time.monotonic()
         content = json.dumps(trajectory, ensure_ascii=False)
         source_id = f"longmemeval_v2_trajectory_{self._insert_count}"
@@ -119,19 +129,54 @@ class MemoryMcpBackend(Memory):
             "query_time_secs": round(self._query_time_secs, 3),
         }
 
+    def _save_backend(self, output_dir: Path) -> None:
+        """Snapshot the dedicated, quiescent CLI store into the upstream save."""
+        with self._store_lock:
+            if not self.db_path or not Path(self.db_path).is_dir():
+                raise RuntimeError("saving memory_mcp requires a built dedicated CLI store")
+            store = Path(self.db_path).resolve()
+            destination = output_dir.resolve() / "store"
+            if destination.is_relative_to(store):
+                raise ValueError("memory snapshot must be outside the active CLI store")
+            if destination.exists():
+                raise FileExistsError(destination)
+            with TemporaryDirectory(prefix=".snapshot-", dir=output_dir) as staging:
+                staged_store = Path(staging) / "store"
+                shutil.copytree(store, staged_store)
+                staged_store.rename(destination)
+
+    def _load_backend(self, input_dir: Path) -> None:
+        """Clone the snapshot so each restore gets its own mutable store."""
+        with self._store_lock:
+            source = input_dir / "store"
+            if not source.is_dir():
+                raise RuntimeError("saved memory_mcp state is missing its store snapshot")
+            workspace = TemporaryDirectory(prefix="longmemeval-mcp-restore-")
+            try:
+                store = Path(workspace.name) / "store"
+                shutil.copytree(source, store)
+            except BaseException:
+                workspace.cleanup()
+                raise
+            if self._restored_store is not None:
+                self._restored_store.cleanup()
+            self._restored_store = workspace
+            self.db_path = str(store)
+
     def _run_cli(self, subcommand: str, *args: str) -> str:
-        cmd = [self.binary]
-        env = os.environ.copy()
-        if self.db_path:
-            # The CLI exposes embedded storage through the documented
-            # environment contract; `--db` is not a global option.
-            env["SURREALDB_EMBEDDED"] = "true"
-            env["SURREALDB_DATA_DIR"] = self.db_path
-        cmd += [subcommand, *args]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, env=env
-        )
-        return result.stdout
+        with self._store_lock:
+            cmd = [self.binary]
+            env = os.environ.copy()
+            if self.db_path:
+                # The CLI exposes embedded storage through the documented
+                # environment contract; `--db` is not a global option.
+                env["SURREALDB_EMBEDDED"] = "true"
+                env["SURREALDB_DATA_DIR"] = self.db_path
+            cmd += [subcommand, *args]
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, check=True, env=env
+            )
+            return result.stdout
 
 
 def _smoke_test() -> None:
