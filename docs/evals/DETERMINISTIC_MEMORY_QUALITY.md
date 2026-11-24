@@ -152,6 +152,11 @@ Strict workspace clippy passed with `fs-watch,mcp-apps,streamable-http,test-fixt
 
 The `evaluation` job now builds the public executable, explicitly runs `deterministic_quality_gate` with a fresh output directory, and uploads both raw repeated captures and its acceptance report even on failure. The exact gate has been proven locally on this laptop. A hosted Linux CI run has not been triggered or claimed.
 
+After ADR-0084 changed the public `explain` schema, the native gate
+replayed all 32 registered v9 trials and retained the same acceptance
+outcome. Both modes also passed the 62-case public response-size profile.
+[Acceptance and replay data](../../evals/paired/native-rollout-v9-explain-2026-11-24/report.md)
+
 To re-evaluate a built product without an agent or provider account:
 
 ```sh
