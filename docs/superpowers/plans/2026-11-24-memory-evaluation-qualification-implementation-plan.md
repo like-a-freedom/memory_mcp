@@ -203,23 +203,41 @@ and the [A10 implementation record](2026-11-24-agent-read-diagnostics-implementa
   Apple Silicon; stop after capture 02 failed its frozen task gate. The
   implementation, focused tests and review are in the [A10 plan](2026-11-24-agent-read-diagnostics-implementation-plan.md).
 
+The separate [A11 maintenance-v7 screen](../../../evals/paired/agent-maintenance-v7-snapshot-retry-screen-2026-11-25/capture-01/REPORT.md)
+then measured the corrected snapshot-retry prompt on four new synthetic
+families. Retry compliance was 4/4 per arm, but agent-facing reads were empty
+and exact task success was 0/4 per arm despite 4/4 independent probes. This
+does not qualify C2 or isolate a deterministic memory retrieval defect; raw
+queries were not retained. No follow-up capture is registered.
+
 ## Task C2. Design confirmation only for an eligible workflow
 
 **Files.** `evals/paired/`, `crates/eval-harness/tests/paired_comparison_cli.rs`, and if a missing validator is reproduced, `src/{paired,paired_power}.rs`.
 
 **Interfaces.** `plan-paired-power` reports power for a single registered paired binary endpoint. `compare-paired` validates a frozen confirmatory plan and emits a decision. Reports from differently scoped endpoints remain separate.
 
-**Eligibility result (2026-11-25):** No workflow currently qualifies for C2.
+**Cycle closed NO-GO (2026-11-26):** No workflow currently qualifies for C2.
 The ordinary positive control is a same-product control, while typed-conflict,
 operator-import, and agent-managed-correction each missed the frozen 3/4 task
 floor. Do not run a confirmatory capture or calculate power for a nonexistent
 eligible treatment. Reopen C2 only after a materially changed and independently
 qualified workflow passes the C1 gate on fresh families.
 
-- [ ] Freeze the eligible workflow, new disjoint families, minimum useful effect, ordinary non-inferiority margin, primary and resource guards, joint power target and hard sample/time/token ceilings. Only use C1 data for design calibration. Preserve the old typed-conflict 123-family calculation as planning evidence.
+- [x] Close workflow eligibility as NO-GO: no treatment workflow passed the preregistered C1 task floor. No confirmatory workflow or thresholds were frozen; the ordinary v3 positive control remains process-only. Keep the historical typed-conflict 123-family result as planning evidence, not as power for an eligible treatment.
 - [x] Keep the existing `cargo test -p eval-harness --locked --test paired_comparison_cli plan_paired_power_cli_uses_family_discordance_from_validated_pilot_summary`; it passed. The CLI report counts two discordant independent families and returns `promotion_decision == "not_produced"`. This covers the existing family-level validation, so the conditional duplicate-family test was not added. No power/promotion claim is made without an eligible C1 workflow.
-- [ ] Use `plan-paired-power --pilot-report <summary> --stratum-id <stratum> --target-risk-difference <effect> --minimum-point-effect <margin> --one-sided-alpha <alpha> --target-power <power> --confidence-level <confidence> --maximum-sample-size <cap> --output <fresh-report>` only for the endpoint it sizes. For a joint claim, freeze an independently checked power simulation of the actual paired family-level decision including ordinary and resource guards. Add deterministic cases for disjoint families, no variation, and a primary win with an ordinary/resource regression. Confirm that the latter never counts as joint success. If calibration or joint power is insufficient, leave promotion open.
-- [ ] Only after the whole gate is eligible, complete capture under the fixed cap and run `compare-paired --plan <confirmatory-plan> --incumbent <i> --candidate <c> --output <fresh-report>`. Exit 0 promotes, 1 rejects, 3 is insufficient evidence and 2 is invalid input. Preserve all decision outcomes; replay and compare the archived output. Commit the evidence and state exactly which claim the registration supports.
+- [x] Strengthen the deterministic ordinary-resource regression so it asserts all three primary promotion checks pass while the ordinary-workflow wall-time guard fails and the final decision rejects. This closes the specific false-positive gap where the test could previously reject for an unrelated primary failure. Focused `eval-harness` test passed.
+- [x] Close this cycle without a treatment power estimate or `compare-paired` capture, as required by the failed eligibility gate. Preserve all C1 outcomes and make no promotion or memory-treatment claim.
+
+**Reopen requirements:** On a newly qualified workflow and fresh disjoint families,
+freeze the minimum useful effect, ordinary non-inferiority margin, primary and
+resource guards, joint power target, and hard sample/time/token ceilings before
+capture. Use `plan-paired-power` only for the endpoint it sizes. Independently
+check joint power for the actual paired family-level decision, with deterministic
+cases for disjoint families, no variation, and primary wins accompanied by an
+ordinary/resource regression; the latter must never count as joint success.
+If calibration or joint power is insufficient, do not promote. Only then run
+`compare-paired`; preserve and replay its report, where exit 0 promotes, 1
+rejects, 3 is insufficient evidence, and 2 is invalid input.
 
 ## Task C3. Verify the native gate and add fresh histories
 
@@ -376,13 +394,14 @@ effect.
 
 ## Task D2. Measure extraction on the deployed revision
 
-- [ ] Use aggregate measurements from comparable windows and the fixed [extract baseline](../specs/2026-11-02-extract-quality-and-cost.md). Match revision/configuration, eligible traffic and denominator. Measure false relations, eligible entity recall and per-stage query/latency cost.
-- [ ] If a stored misattribution is reproduced, add its public ingest → extract → assemble-context case as a native B5 guard before any product change. For repair follow B6. Record missing evidence when equivalent windows or access are unavailable.
+- [x] Capture the currently available production aggregates read-only and retain the exact query window and denominators in the [2026-11-25 observation](../../performance/extract-quality-production-observation-2026-11-25.md). It records two successful extracts in five days, a 1.295 s mean, 28 facts, 54 entities, 54 links and zero warnings; only the `embedding_provider` stage series was present. This is a low-volume operational snapshot, not a before/after or semantic-quality result.
+- [ ] Establish a qualified production comparison against the fixed [extract baseline](../specs/2026-11-02-extract-quality-and-cost.md): attest the deployed image/source digest and non-sensitive configuration fingerprint, use comparable revision/configuration windows with adequate eligible-operation denominators, and measure per-stage query/latency cost. Production reported 1.41.0, a tag descending from local fix `3baafb94`, but its metric label does not attest the deployed artifact/configuration; the Nov 2 window and current Nov 25 snapshot are also not matched and contain 9 versus 2 calls. Aggregate counters cannot label false relations or eligible entity misses; those quality gates must use the fixed source-grounded deterministic eval corpus. Any population claim about production semantic quality also needs an approved reviewed sample.
+- [x] Preserve the fresh-write side of the reproduced dated-record misattribution with a fixed-time `ingest → extract → assemble_context` integration case. It first requires each extraction to return evidence containing its independent expected date and duration, then asserts zero contradiction relations and exact direct source coverage for both records. The targeted test passed; a negative control that removes the first extraction's returned facts fails at the new assertion. This does not hide or repair the separately reproduced stale derived rows in the restored legacy snapshot.
+- [ ] Obtain an approved read-only inventory for any affected historical rows. Follow the append-only B6 recovery design only if a repair is separately approved; preserve the existing append-only history and source facts.
 
-No matched aggregate deployment windows and affected-record inventory
-were available in this checkout. The existing local extraction baseline is
-the evidence ceiling. No deployed measurement or historical repair is
-claimed.
+The current checkout now contains a dated production aggregate snapshot, but
+no qualified matched comparison or approved historical-record inventory. No
+deployed semantic-quality gain or historical repair is claimed.
 
 ## Task D3. Re-establish the latency baseline
 

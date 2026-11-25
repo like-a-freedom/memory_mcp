@@ -786,20 +786,7 @@ pub fn run_agent_managed_paired_evaluation<B: AgentManagedTrialBackend>(
         }
     }
 
-    let paired_manifest = super::PairedTaskManifest {
-        schema_version: super::PAIRED_TASK_MANIFEST_SCHEMA_V1.into(),
-        tasks: manifest
-            .tasks
-            .iter()
-            .map(|task| super::PairedTaskDefinition {
-                key: task.key.clone(),
-                prompt: task.recall_prompt.clone(),
-                knowledge_before_event_id: None,
-                seed_episodes: task.seed_episodes.clone(),
-                oracle: task.oracle.clone(),
-            })
-            .collect(),
-    };
+    let paired_manifest = paired_task_manifest(manifest);
     let mut managed_backend = ManagedPairedBackend {
         manifest,
         backend,
@@ -830,6 +817,42 @@ pub fn run_agent_managed_paired_evaluation<B: AgentManagedTrialBackend>(
         incumbent_supplement,
         candidate_supplement,
     ))
+}
+
+fn paired_task_manifest(manifest: &AgentManagedTaskManifest) -> super::PairedTaskManifest {
+    let has_snapshot_bound_retry = manifest.tasks.iter().any(|task| {
+        task.oracle
+            .read_expectation
+            .as_ref()
+            .is_some_and(|expectation| expectation.snapshot_bound_retry.is_some())
+    });
+    let has_read_expectation = manifest
+        .tasks
+        .iter()
+        .any(|task| task.oracle.read_expectation.is_some());
+    let schema_version = if has_snapshot_bound_retry {
+        super::PAIRED_TASK_MANIFEST_SCHEMA_V3
+    } else if has_read_expectation {
+        super::PAIRED_TASK_MANIFEST_SCHEMA_V2
+    } else {
+        super::PAIRED_TASK_MANIFEST_SCHEMA_V1
+    };
+    // This projection is consumed by the validated internal runner: managed
+    // validation authorizes the runtime target event that is not a seed event.
+    super::PairedTaskManifest {
+        schema_version: schema_version.into(),
+        tasks: manifest
+            .tasks
+            .iter()
+            .map(|task| super::PairedTaskDefinition {
+                key: task.key.clone(),
+                prompt: task.recall_prompt.clone(),
+                knowledge_before_event_id: None,
+                seed_episodes: task.seed_episodes.clone(),
+                oracle: task.oracle.clone(),
+            })
+            .collect(),
+    }
 }
 
 impl AgentManagedRunSupplement {
@@ -1977,6 +2000,51 @@ mod tests {
     use crate::paired::TrialStatus;
 
     #[test]
+    fn managed_runner_publishes_registered_snapshot_retry_artifacts() {
+        let managed: AgentManagedTaskManifest = serde_json::from_str(include_str!(
+            "../../../../evals/paired/agent-maintenance-v7-snapshot-retry-screen-2026-11-25/tasks.json"
+        ))
+        .expect("frozen synthetic snapshot-retry task manifest");
+        let plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
+            "../../../../evals/paired/agent-maintenance-v7-snapshot-retry-screen-2026-11-25/plan.json"
+        ))
+        .expect("frozen synthetic paired plan");
+        let directory = tempfile::tempdir().expect("paired output directory");
+        let mut backend = ArtifactBackend;
+
+        let (incumbent, candidate, _, _) =
+            run_agent_managed_paired_evaluation(&plan, &managed, &mut backend, directory.path())
+                .expect("public managed runner validates and publishes registered artifacts");
+
+        assert_eq!(
+            candidate.schema_version,
+            crate::paired::PAIRED_ARTIFACT_SCHEMA_V11
+        );
+        assert!(incumbent.receipts.iter().all(|receipt| {
+            receipt
+                .snapshot_retry_diagnostic
+                .as_ref()
+                .is_some_and(|diagnostic| diagnostic.expectation_registered)
+        }));
+        assert!(candidate.receipts.iter().all(|receipt| {
+            receipt
+                .snapshot_retry_diagnostic
+                .as_ref()
+                .is_some_and(|diagnostic| diagnostic.expectation_registered)
+        }));
+        for journal_name in ["incumbent-receipts.jsonl", "candidate-receipts.jsonl"] {
+            let journal = std::fs::read_to_string(directory.path().join(journal_name))
+                .expect("durable receipt journal");
+            assert_eq!(journal.lines().count(), managed.tasks.len());
+            assert!(journal.lines().all(|line| {
+                serde_json::from_str::<serde_json::Value>(line)
+                    .expect("receipt journal JSON")["schema_version"]
+                    == super::super::RECEIPT_JOURNAL_SCHEMA_V9
+            }));
+        }
+    }
+
+    #[test]
     fn maintenance_v6_fingerprints_pin_partial_read_recovery_and_portable_host_policy() {
         let manifest: AgentManagedTaskManifest = serde_json::from_str(include_str!(
             "../../../../evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/tasks.json"
@@ -2097,20 +2165,134 @@ mod tests {
         calls: Vec<&'static str>,
     }
 
+    struct ArtifactBackend;
+
+    impl AgentManagedTrialBackend for ArtifactBackend {
+        type State = BTreeMap<String, String>;
+
+        fn start_trial(
+            &mut self,
+            _arm: RunArm,
+            task: &AgentManagedTaskInput,
+        ) -> Result<(Self::State, BTreeMap<String, String>), EvalError> {
+            let bindings = task
+                .seed_episodes
+                .iter()
+                .map(|seed| (format!("episode:{}", seed.event_id), seed.event_id.clone()))
+                .collect::<BTreeMap<_, _>>();
+            Ok((bindings.clone(), bindings))
+        }
+
+        fn form_memory(
+            &mut self,
+            _state: &mut Self::State,
+            _prompt: &str,
+        ) -> Result<AgentObservation, EvalError> {
+            Ok(artifact_observation())
+        }
+
+        fn recall_in_fresh_session(
+            &mut self,
+            _state: &mut Self::State,
+            _prompt: &str,
+        ) -> Result<AgentObservation, EvalError> {
+            Ok(artifact_observation())
+        }
+
+        fn independent_probe(
+            &mut self,
+            state: &mut Self::State,
+            _probe: &AgentManagedProbeRequest,
+        ) -> Result<AgentManagedProbeObservation, EvalError> {
+            Ok(AgentManagedProbeObservation {
+                source_episode_ids: state.keys().take(1).cloned().collect(),
+                known_revision: Some(2),
+                retained_store_bytes: 0,
+                request_sha256: "a".repeat(64),
+                response_sha256: "b".repeat(64),
+            })
+        }
+    }
+
+    fn artifact_observation() -> AgentObservation {
+        AgentObservation {
+            trace: vec![
+                crate::paired::AgentTraceEvent {
+                    sequence: 1,
+                    turn: 1,
+                    kind: crate::paired::TraceEventKind::AgentTurnStarted,
+                    call_id: None,
+                    tool_name: None,
+                    error_class: None,
+                    payload_sha256: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                },
+                crate::paired::AgentTraceEvent {
+                    sequence: 2,
+                    turn: 1,
+                    kind: crate::paired::TraceEventKind::FinalAnswer,
+                    call_id: None,
+                    tool_name: None,
+                    error_class: None,
+                    payload_sha256: Some("c".repeat(64)),
+                    input_tokens: None,
+                    output_tokens: None,
+                },
+                crate::paired::AgentTraceEvent {
+                    sequence: 3,
+                    turn: 1,
+                    kind: crate::paired::TraceEventKind::AgentTurn,
+                    call_id: None,
+                    tool_name: None,
+                    error_class: None,
+                    payload_sha256: None,
+                    input_tokens: Some(1),
+                    output_tokens: Some(1),
+                },
+            ],
+            final_answer: Some(
+                r#"{"answer":"unknown","citations":[],"needs_clarification":true}"#.into(),
+            ),
+            memory_source_episode_ids: Vec::new(),
+            memory_reads: None,
+            read_capture_status: None,
+            memory_write_episode_ids: Vec::new(),
+            observed_fact_sources: Vec::new(),
+            invalidation_fact_ids: Vec::new(),
+            extract_fact_evidence: Vec::new(),
+            extract_fact_evidence_telemetry_complete: false,
+            terminal_http_status_code: None,
+            terminal_transport_stage: None,
+            turns_used: 1,
+            tool_calls: 0,
+            user_clarifications: 0,
+            input_tokens: 1,
+            output_tokens: 1,
+            wall_time_ms: 1,
+            status: TrialStatus::Completed,
+        }
+    }
+
     impl AgentManagedTrialBackend for ControlledBackend {
         type State = State;
 
         fn start_trial(
             &mut self,
             _arm: RunArm,
-            _task: &AgentManagedTaskInput,
+            task: &AgentManagedTaskInput,
         ) -> Result<(Self::State, BTreeMap<String, String>), EvalError> {
             self.calls.push("start");
+            let bindings = task
+                .seed_episodes
+                .iter()
+                .map(|seed| (format!("episode:{}", seed.event_id), seed.event_id.clone()))
+                .collect();
             Ok((
                 State {
                     formed_episode_id: "episode:formed".into(),
                 },
-                BTreeMap::new(),
+                bindings,
             ))
         }
 

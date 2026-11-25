@@ -279,7 +279,7 @@ replayed byte-identically. Selector normalization tests passed (10); the full
 `paired_comparison_cli` target passed (15), the v7 standalone evaluator tests
 passed (29), formatting passed, and workspace Clippy passed without warnings.
 
-The fresh [C1 v7 cross-capture review](../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
+The fresh [C1 v7 cross-capture review](../../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
 has a NO-GO workflow result: capture 01 passed 4/4 exact cited tasks in both
 arms, while the single allowed repeat fell to 0/4 in both. Independent probes,
 correction and invalidation checks stayed 4/4. Capture 02 had six empty reads
@@ -322,27 +322,66 @@ corrected prompt opt in under a new profile.
   separation and retain the v6 conflicting prompt/fingerprint path for replay.
 - [x] Document the profile and qualification limit in the
   [paired evaluation guide](../../evals/PAIRED_AGENT_EVAL.md#snapshot-consistent-retry--maintenance-v7).
-- [ ] Run a preregistered model-backed v7 screen on disjoint synthetic
-  families before claiming an improvement in agent behavior or task metrics.
-  The C1 v7 selector-diagnostics cohort does not satisfy this task: it ran
-  `agent_maintenance_v6`, as recorded in its frozen `run-command.txt` and
-  `fingerprints.json`.
-  No memory product change is justified by this prompt defect alone.
+- [x] Extend the registered read scorer to model the initial eligible empty
+  partial read and its one possible retry as a state transition. Verify the
+  exact returned snapshot cutoff, query-only change, absent legacy temporal
+  selectors, preserved remaining selectors, and the retry limit with negative
+  artifact tests.
+- [x] Freeze a new four-family synthetic cohort and run one model-backed v7
+  screen locally on Apple Silicon without LM Studio. Record read evidence,
+  exact answers, probes, write/invalidation outcomes and total recall-phase
+  latency separately. The earlier C1 selector-diagnostics cohort remains
+  ineligible for A11: its frozen runner used `agent_maintenance_v6`.
+- [x] Add content-free per-read elapsed timing at the observation boundary.
+  Observation v8, paired artifact v12, and native receipt journal v10 carry
+  the new per-read timing contract. Validation requires a measured duration
+  for every completed read, forbids one for an interrupted read, preserves
+  exact request/response pairing, and replays the duration byte-for-byte.
+  Codex measures the interval between reading its matching `item.started` and
+  terminal `item.completed` events; Chat Completions measures only the
+  synchronous memory-tool call. The two adapter timings include different
+  transport overhead and must not be compared as if they were the same
+  population. The A11 frozen capture contains only total recall-phase latency
+  and cannot satisfy this preregistered per-read measure retroactively.
+- [x] Verify the new contract through Codex and Chat Completions runner tests,
+  out-of-order concurrent-read pairing, offline scorer rejection of missing
+  timing, v12 artifact and v10 journal propagation, legacy-schema rejection,
+  and byte-identical replay. Final native Apple Silicon verification on
+  2026-11-26 passed 877 eval-harness tests (23 ignored) and 2,796 memory_mcp
+  tests (45 ignored); workspace Clippy, formatting, and diff checks were clean.
+  Latency remains diagnostic and does not establish memory quality or agent
+  benefit.
 
-**Disposition.** The instruction mismatch is fixed and deterministically
-checked. No model-backed v7 result is claimed; its effect on agent behavior
-and task metrics remains unmeasured. Before that screen can make a retry-compliance
-claim, extend the registered evaluator to represent the initial read and its
-possible retry as a state transition: a retry after an empty partial response
-must change only the query, set `valid_at` and `known_revision` from the
-preceding response snapshot, omit `as_of` and `known_at`, and preserve the
-remaining selectors. The current `ReadExpectation` applies one static selector
-oracle to every read and cannot prove that relationship. A standalone v7
-feasibility result may report task success and observed selector hashes, but it
-must not claim v6-to-v7 improvement or verified snapshot-bound retry behavior.
-A future comparative prompt experiment also needs arm-specific prompt/profile
-identity; paired Codex runs currently require both arms to share one memory-tool
-profile and one shared prompt identity. Any follow-up must use fresh families
-and obey the existing workflow gates.
+**Disposition — capture executed with one preregistered measurement missing;
+downstream workflow NO-GO.** The deterministic transition scorer and v11
+retry-diagnostic artifact validation are implemented and tested. In
+the disjoint [A11 capture](../../../evals/paired/agent-maintenance-v7-snapshot-retry-screen-2026-11-25/capture-01/REPORT.md),
+all four tasks per arm had eligible empty partial reads and compliant
+snapshot-bound retries (4/4); the paired reads still returned no evidence and
+exact answer-plus-citation success was 0/4 per arm. Independent fixed-query
+probes, correction extraction, evidence-before-invalidation checks and exact
+invalidation passed 4/4 per arm. Mean recall latency was 18.128 s for incumbent
+and 19.199 s for candidate. Both arms used the same memory binary, so these
+numbers do not estimate a product effect or v6-to-v7 improvement. The result
+isolates that retry instruction adherence alone did not recover evidence for
+the agent in this cohort; hashed queries and selector telemetry do not reveal
+the exact query choice, so they do not yet establish a memory retrieval defect.
+The preregistered per-read elapsed-time measure was not captured; only total
+recall-phase latency is available, as documented in the immutable capture
+report. Observation v8, paired artifact v12, and native receipt journal v10
+now carry validated per-read timing for future captures, but the frozen A11
+evidence remains incomplete for latency attribution and cannot be backfilled.
+No repeat was run because the registered one-capture stop rule remains binding.
+
+The C1 v7-selector-diagnostics cross-capture screen remains NO-GO and its repeat
+stop rule is exhausted. Do not run C2 against it. A future agent workflow
+qualification needs a materially changed procedure and fresh families. Any
+memory change needs a separate deterministic product-level reproduction.
+Production D2 remains gated on matched deployment aggregate windows and an
+approved read-only inventory of affected historical records; no production
+metric or historical repair is inferred from this local synthetic screen. A
+future comparative prompt experiment also needs arm-specific prompt/profile
+identity; current paired Codex runs require both arms to share one profile and
+prompt identity.
 
 Next independent plans: [Historical retrieval and identity](2026-11-24-historical-memory-implementation-plan.md) · [Qualification and remaining evaluations](2026-11-24-memory-evaluation-qualification-implementation-plan.md).

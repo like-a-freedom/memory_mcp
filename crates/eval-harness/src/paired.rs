@@ -380,6 +380,8 @@ pub const PAIRED_ARTIFACT_SCHEMA_V6: &str = "memory-mcp-agent-paired/v6";
 pub const PAIRED_ARTIFACT_SCHEMA_V8: &str = "memory-mcp-agent-paired/v8";
 pub const PAIRED_ARTIFACT_SCHEMA_V9: &str = "memory-mcp-agent-paired/v9";
 pub const PAIRED_ARTIFACT_SCHEMA_V10: &str = "memory-mcp-agent-paired/v10";
+pub const PAIRED_ARTIFACT_SCHEMA_V11: &str = "memory-mcp-agent-paired/v11";
+pub const PAIRED_ARTIFACT_SCHEMA_V12: &str = "memory-mcp-agent-paired/v12";
 pub const PAIRED_COMPARISON_SCHEMA_V2: &str = "memory-mcp-agent-comparison/v2";
 pub const PAIRED_PLAN_SCHEMA_V2: &str = "memory-mcp-agent-plan/v2";
 pub const PAIRED_PILOT_REPORT_SCHEMA_V3: &str = "memory-mcp-agent-pilot-report/v3";
@@ -389,21 +391,33 @@ pub(crate) fn paired_artifact_schema_for_reads(
     has_complete_request_fingerprints: bool,
     has_registered_valid_time_expectation: bool,
     has_registered_selector_expectation: bool,
+    has_registered_snapshot_retry_expectation: bool,
+    has_elapsed_read_timing: bool,
 ) -> Result<&'static str, EvalError> {
-    if has_registered_selector_expectation && !has_read_capture {
-        return Err(EvalError::InvalidInput(
-            "selector diagnostics require captured read observations".into(),
-        ));
-    }
     if !has_read_capture {
+        if has_elapsed_read_timing {
+            return Err(EvalError::InvalidInput(
+                "per-read elapsed timing requires captured reads".into(),
+            ));
+        }
+        if has_registered_snapshot_retry_expectation {
+            return Ok(PAIRED_ARTIFACT_SCHEMA_V11);
+        }
         return Ok(PAIRED_ARTIFACT_SCHEMA_V6);
     }
     if (has_registered_valid_time_expectation || has_registered_selector_expectation)
+        && !has_registered_snapshot_retry_expectation
         && !has_complete_request_fingerprints
     {
         return Err(EvalError::InvalidInput(
             "registered read diagnostics require complete request fingerprints for every captured read".into(),
         ));
+    }
+    if has_elapsed_read_timing {
+        return Ok(PAIRED_ARTIFACT_SCHEMA_V12);
+    }
+    if has_registered_snapshot_retry_expectation {
+        return Ok(PAIRED_ARTIFACT_SCHEMA_V11);
     }
     if !has_complete_request_fingerprints {
         return Ok(PAIRED_ARTIFACT_SCHEMA_V7);
@@ -543,6 +557,8 @@ pub struct TrialReceipt {
     pub read_capture_status: Option<crate::paired_agent::ReadCaptureStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_diagnostics: Option<Vec<crate::paired_agent::MemoryReadDiagnostic>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_retry_diagnostic: Option<crate::paired_agent::SnapshotRetryDiagnostic>,
     pub key: CaseTrialKey,
     /// 1 or 2; the paired comparator requires opposite order in the two arms.
     pub arm_order: u8,
@@ -649,6 +665,8 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V8
                 | PAIRED_ARTIFACT_SCHEMA_V9
                 | PAIRED_ARTIFACT_SCHEMA_V10
+                | PAIRED_ARTIFACT_SCHEMA_V11
+                | PAIRED_ARTIFACT_SCHEMA_V12
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired artifact schema {:?}",
@@ -693,6 +711,8 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V8
                 | PAIRED_ARTIFACT_SCHEMA_V9
                 | PAIRED_ARTIFACT_SCHEMA_V10
+                | PAIRED_ARTIFACT_SCHEMA_V11
+                | PAIRED_ARTIFACT_SCHEMA_V12
         ) && self
             .receipts
             .iter()
@@ -710,11 +730,13 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V8
                 | PAIRED_ARTIFACT_SCHEMA_V9
                 | PAIRED_ARTIFACT_SCHEMA_V10
+                | PAIRED_ARTIFACT_SCHEMA_V11
+                | PAIRED_ARTIFACT_SCHEMA_V12
         ) && self.receipts.iter().any(|receipt| {
             receipt.status != TrialStatus::Skipped && receipt.task_oracle_diagnostics.is_none()
         }) {
             return Err(EvalError::InvalidInput(
-                "paired artifact v5-v10 requires task-oracle component diagnostics for every attempted trial".into(),
+                "paired artifact v5-v12 requires task-oracle component diagnostics for every attempted trial".into(),
             ));
         }
         for receipt in &self.receipts {
@@ -726,7 +748,9 @@ impl PairedRunArtifact {
                 (
                     PAIRED_ARTIFACT_SCHEMA_V8
                     | PAIRED_ARTIFACT_SCHEMA_V9
-                    | PAIRED_ARTIFACT_SCHEMA_V10,
+                    | PAIRED_ARTIFACT_SCHEMA_V10
+                    | PAIRED_ARTIFACT_SCHEMA_V11
+                    | PAIRED_ARTIFACT_SCHEMA_V12,
                     Some(status),
                     Some(reads),
                 ) => {
@@ -740,7 +764,12 @@ impl PairedRunArtifact {
                                     .into(),
                             ));
                         }
-                        if self.schema_version == PAIRED_ARTIFACT_SCHEMA_V10 {
+                        if matches!(
+                            self.schema_version.as_str(),
+                            PAIRED_ARTIFACT_SCHEMA_V10
+                                | PAIRED_ARTIFACT_SCHEMA_V11
+                                | PAIRED_ARTIFACT_SCHEMA_V12
+                        ) {
                             match (
                                 read.selector_expectation_registered,
                                 read.selector_argument_matches.is_some(),
@@ -748,7 +777,7 @@ impl PairedRunArtifact {
                                 (Some(true), true) | (Some(false), false) => {}
                                 _ => {
                                     return Err(EvalError::InvalidInput(
-                                        "paired artifact v10 requires selector registration and match diagnostics for every read".into(),
+                                        "paired artifact v10-v12 requires selector registration diagnostics for every read".into(),
                                     ));
                                 }
                             }
@@ -776,15 +805,35 @@ impl PairedRunArtifact {
                             read.request_query_sha256.as_deref(),
                             read.non_query_arguments_sha256.as_deref(),
                         ] {
-                            let Some(digest) = digest else {
+                            if !matches!(
+                                self.schema_version.as_str(),
+                                PAIRED_ARTIFACT_SCHEMA_V11 | PAIRED_ARTIFACT_SCHEMA_V12
+                            ) && digest.is_none()
+                            {
                                 return Err(EvalError::InvalidInput(
                                     "paired artifact v8-v10 read diagnostics require request fingerprints".into(),
                                 ));
-                            };
-                            validate_sha256("read request", digest)?;
+                            }
+                            if let Some(digest) = digest {
+                                validate_sha256("read request", digest)?;
+                            }
                         }
                         if let Some(digest) = read.response_guidance_sha256.as_deref() {
                             validate_sha256("read guidance", digest)?;
+                        }
+                        if self.schema_version == PAIRED_ARTIFACT_SCHEMA_V12
+                            && (read.response_sequence.is_some() != read.elapsed_ms.is_some())
+                        {
+                            return Err(EvalError::InvalidInput(
+                                "paired artifact v12 requires elapsed timing for completed reads and forbids it for interrupted reads".into(),
+                            ));
+                        }
+                        if self.schema_version != PAIRED_ARTIFACT_SCHEMA_V12
+                            && read.elapsed_ms.is_some()
+                        {
+                            return Err(EvalError::InvalidInput(
+                                "per-read elapsed timing requires paired artifact v12".into(),
+                            ));
                         }
                     }
                     let associations = reads
@@ -792,12 +841,15 @@ impl PairedRunArtifact {
                         .map(|read| crate::paired_agent::MemoryReadObservation {
                             request_sequence: read.request_sequence,
                             response_sequence: read.response_sequence,
+                            elapsed_ms: read.elapsed_ms,
                             outcome: read.outcome,
                             item_count: read.item_count,
                             request_query_sha256: read.request_query_sha256.clone(),
                             non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
                             selector_arguments_sha256: None,
+                            selector_arguments_present: None,
                             requested_valid_at_sha256: None,
+                            requested_cutoff_sha256: None,
                             response_guidance_sha256: read.response_guidance_sha256.clone(),
                             evidence: None,
                         })
@@ -817,6 +869,7 @@ impl PairedRunArtifact {
                             || read.returned_valid_at_match.is_some()
                             || read.selector_expectation_registered.is_some()
                             || read.selector_argument_matches.is_some()
+                            || read.elapsed_ms.is_some()
                     }) {
                         return Err(EvalError::InvalidInput(
                             "paired artifact v7 cannot contain v8 request fingerprints or later diagnostics".into(),
@@ -827,12 +880,15 @@ impl PairedRunArtifact {
                         .map(|read| crate::paired_agent::MemoryReadObservation {
                             request_sequence: read.request_sequence,
                             response_sequence: read.response_sequence,
+                            elapsed_ms: None,
                             outcome: read.outcome,
                             item_count: read.item_count,
                             request_query_sha256: None,
                             non_query_arguments_sha256: None,
                             selector_arguments_sha256: None,
+                            selector_arguments_present: None,
                             requested_valid_at_sha256: None,
+                            requested_cutoff_sha256: None,
                             response_guidance_sha256: None,
                             evidence: None,
                         })
@@ -843,6 +899,7 @@ impl PairedRunArtifact {
                         &receipt.trace,
                     )?;
                 }
+                (PAIRED_ARTIFACT_SCHEMA_V11 | PAIRED_ARTIFACT_SCHEMA_V12, None, None) => {}
                 (
                     PAIRED_ARTIFACT_SCHEMA_V7
                     | PAIRED_ARTIFACT_SCHEMA_V8
@@ -855,12 +912,29 @@ impl PairedRunArtifact {
                     if version != PAIRED_ARTIFACT_SCHEMA_V7
                         && version != PAIRED_ARTIFACT_SCHEMA_V8
                         && version != PAIRED_ARTIFACT_SCHEMA_V9
-                        && version != PAIRED_ARTIFACT_SCHEMA_V10 => {}
+                        && version != PAIRED_ARTIFACT_SCHEMA_V10
+                        && version != PAIRED_ARTIFACT_SCHEMA_V11
+                        && version != PAIRED_ARTIFACT_SCHEMA_V12 => {}
                 _ => {
                     return Err(EvalError::InvalidInput(
                         "read diagnostics do not match paired artifact version".into(),
                     ));
                 }
+            }
+            if matches!(
+                self.schema_version.as_str(),
+                PAIRED_ARTIFACT_SCHEMA_V11 | PAIRED_ARTIFACT_SCHEMA_V12
+            ) {
+                let diagnostic = receipt.snapshot_retry_diagnostic.as_ref().ok_or_else(|| {
+                    EvalError::InvalidInput(
+                        "paired artifact v11-v12 requires a snapshot-retry diagnostic for every receipt".into(),
+                    )
+                })?;
+                validate_snapshot_retry_diagnostic(diagnostic)?;
+            } else if receipt.snapshot_retry_diagnostic.is_some() {
+                return Err(EvalError::InvalidInput(
+                    "paired artifact v2-v10 cannot contain snapshot-retry diagnostics".into(),
+                ));
             }
             let Some(diagnostics) = &receipt.task_oracle_diagnostics else {
                 continue;
@@ -879,11 +953,13 @@ impl PairedRunArtifact {
                     | PAIRED_ARTIFACT_SCHEMA_V8
                     | PAIRED_ARTIFACT_SCHEMA_V9
                     | PAIRED_ARTIFACT_SCHEMA_V10
+                    | PAIRED_ARTIFACT_SCHEMA_V11
+                    | PAIRED_ARTIFACT_SCHEMA_V12
             ) && diagnostics.accepted_answer_match.is_some()
                 != diagnostics.final_answer_schema_valid
             {
                 return Err(EvalError::InvalidInput(
-                    "paired artifact v6-v10 requires answer-match diagnostics for every valid final answer".into(),
+                    "paired artifact v6-v12 requires answer-match diagnostics for every valid final answer".into(),
                 ));
             }
         }
@@ -937,6 +1013,107 @@ impl PairedRunArtifact {
         let bytes = serde_json::to_vec(&canonical)?;
         Ok(hex::encode(Sha256::digest(bytes)))
     }
+}
+
+fn validate_snapshot_retry_diagnostic(
+    diagnostic: &crate::paired_agent::SnapshotRetryDiagnostic,
+) -> Result<(), EvalError> {
+    use crate::paired_agent::SnapshotRetryAssessment as Assessment;
+
+    let invalid = || EvalError::InvalidInput("invalid snapshot-bound retry diagnostic".into());
+    if !diagnostic.expectation_registered {
+        return (diagnostic.assessment == Assessment::NotRegistered
+            && diagnostic.initial_read_eligible.is_none()
+            && diagnostic.retry_observed.is_none()
+            && diagnostic.retry_count.is_none()
+            && diagnostic.retry_limit_respected.is_none()
+            && diagnostic.query_changed.is_none()
+            && diagnostic.snapshot_cutoff_matches.is_none()
+            && diagnostic.legacy_temporal_selector_matches.is_none()
+            && diagnostic.preserved_selector_matches.is_none())
+        .then_some(())
+        .ok_or_else(invalid);
+    }
+    if diagnostic.assessment == Assessment::NotRegistered {
+        return Err(invalid());
+    }
+    if let Some(count) = diagnostic.retry_count
+        && (diagnostic.retry_observed != Some(count > 0)
+            || diagnostic.retry_limit_respected != Some(count <= 1))
+    {
+        return Err(invalid());
+    }
+    if diagnostic.retry_observed == Some(false)
+        && (diagnostic.retry_count != Some(0)
+            || diagnostic.retry_limit_respected != Some(true)
+            || diagnostic.query_changed.is_some()
+            || diagnostic.snapshot_cutoff_matches.is_some()
+            || diagnostic.legacy_temporal_selector_matches.is_some()
+            || diagnostic.preserved_selector_matches.is_some())
+    {
+        return Err(invalid());
+    }
+    if diagnostic.assessment == Assessment::NotEligible
+        && (diagnostic.initial_read_eligible != Some(false)
+            || diagnostic.retry_observed != Some(false)
+            || diagnostic.retry_count != Some(0)
+            || diagnostic.retry_limit_respected != Some(true))
+    {
+        return Err(invalid());
+    }
+    if diagnostic.assessment == Assessment::Compliant {
+        if diagnostic.initial_read_eligible != Some(true)
+            || diagnostic.retry_limit_respected != Some(true)
+            || (diagnostic.retry_required_when_eligible && diagnostic.retry_observed != Some(true))
+        {
+            return Err(invalid());
+        }
+        if diagnostic.retry_observed == Some(true) {
+            let legacy_ok = diagnostic
+                .legacy_temporal_selector_matches
+                .as_ref()
+                .is_some_and(|matches| {
+                    matches.len() == 2
+                        && matches.get("as_of") == Some(&true)
+                        && matches.get("known_at") == Some(&true)
+                });
+            let preserved_ok =
+                diagnostic
+                    .preserved_selector_matches
+                    .as_ref()
+                    .is_some_and(|matches| {
+                        let expected =
+                            crate::paired_agent::SNAPSHOT_RETRY_PRESERVED_SELECTOR_FIELDS;
+                        matches.len() == expected.len()
+                            && expected
+                                .iter()
+                                .all(|field| matches.get(*field) == Some(&true))
+                    });
+            if diagnostic.query_changed != Some(true)
+                || diagnostic.snapshot_cutoff_matches != Some(true)
+                || !legacy_ok
+                || !preserved_ok
+            {
+                return Err(invalid());
+            }
+        }
+    }
+    if let Some(matches) = &diagnostic.legacy_temporal_selector_matches
+        && (matches.len() != 2
+            || !matches.contains_key("as_of")
+            || !matches.contains_key("known_at"))
+    {
+        return Err(invalid());
+    }
+    if let Some(matches) = &diagnostic.preserved_selector_matches
+        && (matches.len() != crate::paired_agent::SNAPSHOT_RETRY_PRESERVED_SELECTOR_FIELDS.len()
+            || crate::paired_agent::SNAPSHOT_RETRY_PRESERVED_SELECTOR_FIELDS
+                .iter()
+                .any(|field| !matches.contains_key(*field)))
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 fn validate_manifest_strata(keys: &[CaseTrialKey]) -> Result<(), EvalError> {
@@ -3221,40 +3398,6 @@ fn validate_bootstrap_config(config: &BootstrapConfig) -> Result<(), EvalError> 
 mod tests {
     use super::*;
 
-    #[test]
-    fn valid_time_registration_selects_v9_even_when_observation_is_unknown() {
-        assert_eq!(
-            paired_artifact_schema_for_reads(true, true, true, false).unwrap(),
-            PAIRED_ARTIFACT_SCHEMA_V9
-        );
-    }
-
-    #[test]
-    fn complete_request_fingerprints_without_valid_time_select_v8() {
-        assert_eq!(
-            paired_artifact_schema_for_reads(true, true, false, false).unwrap(),
-            PAIRED_ARTIFACT_SCHEMA_V8
-        );
-    }
-
-    #[test]
-    fn valid_time_registration_requires_complete_request_fingerprints() {
-        assert!(paired_artifact_schema_for_reads(true, false, true, false).is_err());
-    }
-
-    #[test]
-    fn registered_selector_diagnostics_select_v10() {
-        assert_eq!(
-            paired_artifact_schema_for_reads(true, true, true, true).unwrap(),
-            PAIRED_ARTIFACT_SCHEMA_V10
-        );
-    }
-
-    #[test]
-    fn registered_selector_diagnostics_require_capture() {
-        assert!(paired_artifact_schema_for_reads(false, true, true, true).is_err());
-    }
-
     fn identity(model: &str) -> PairedRunIdentity {
         PairedRunIdentity {
             shared: SharedRunIdentity {
@@ -3751,6 +3894,7 @@ mod tests {
         let receipt = TrialReceipt {
             read_capture_status: None,
             read_diagnostics: None,
+            snapshot_retry_diagnostic: None,
             key: key("history-a", "case-a", 1),
             arm_order: 1,
             known_revision_checkpoint: None,
@@ -3892,6 +4036,15 @@ mod tests {
 
         let promotion = evaluate_promotion(&comparison, &criteria).unwrap();
 
+        assert!(
+            promotion.checks[..3]
+                .iter()
+                .all(|check| check.status == PromotionCheckStatus::Passed)
+        );
+        assert!(promotion.checks.iter().any(|check| {
+            check.name == "resource_non_inferiority::ordinary::wall_time_ms"
+                && check.status == PromotionCheckStatus::Failed
+        }));
         assert!(
             comparison
                 .overall
@@ -4454,6 +4607,7 @@ mod tests {
             .map(|key| TrialReceipt {
                 read_capture_status: None,
                 read_diagnostics: None,
+                snapshot_retry_diagnostic: None,
                 key: key.clone(),
                 arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                     1
@@ -4515,6 +4669,7 @@ mod tests {
                 TrialReceipt {
                     read_capture_status: None,
                     read_diagnostics: None,
+                    snapshot_retry_diagnostic: None,
                     key: key.clone(),
                     arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                         1

@@ -416,9 +416,53 @@ pub fn agent_maintenance_v4_simulator_sha256() -> String {
 }
 
 enum StdoutMessage {
-    Chunk(Vec<u8>),
-    Eof,
+    Chunk(Vec<u8>, u64),
+    Eof(u64),
     Error,
+}
+
+#[derive(Default)]
+struct CodexStdoutCapture {
+    jsonl: Vec<u8>,
+    line: Vec<u8>,
+    line_elapsed_ms: Vec<u64>,
+    output_bytes: usize,
+    monitor: BudgetMonitor,
+}
+
+impl CodexStdoutCapture {
+    fn append_chunk(
+        &mut self,
+        chunk: &[u8],
+        observed_ms: u64,
+        config: &CodexAgentConfig,
+    ) -> Option<TrialStatus> {
+        self.output_bytes = self.output_bytes.saturating_add(chunk.len());
+        if self.output_bytes > config.max_jsonl_bytes {
+            return Some(TrialStatus::BudgetExceeded);
+        }
+        for byte in chunk {
+            self.line.push(*byte);
+            if *byte == b'\n' {
+                self.append_line(observed_ms, config);
+                if self.monitor.exceeded {
+                    return Some(TrialStatus::BudgetExceeded);
+                }
+            }
+        }
+        None
+    }
+
+    fn append_final_line(&mut self, observed_ms: u64, config: &CodexAgentConfig) {
+        self.append_line(observed_ms, config);
+    }
+
+    fn append_line(&mut self, observed_ms: u64, config: &CodexAgentConfig) {
+        self.jsonl.extend_from_slice(&self.line);
+        self.line_elapsed_ms.push(observed_ms);
+        self.monitor.observe_line(&self.line, config);
+        self.line.clear();
+    }
 }
 
 #[derive(Default)]
@@ -500,7 +544,7 @@ pub fn run_codex_agent(
         .take()
         .ok_or_else(|| EvalError::Suite("Codex CLI stderr was not piped".into()))?;
     let (stdout_sender, stdout_receiver) = mpsc::sync_channel(8);
-    let stdout_reader = thread::spawn(move || stream_stdout(stdout, stdout_sender));
+    let stdout_reader = thread::spawn(move || stream_stdout(stdout, stdout_sender, started));
     let stderr_reader = thread::spawn(move || drain_stderr(stderr));
 
     let prompt = compose_task_prompt(task_prompt, config.memory_tool_profile);
@@ -528,10 +572,7 @@ pub fn run_codex_agent(
         )));
     }
 
-    let mut jsonl = Vec::new();
-    let mut line = Vec::new();
-    let mut output_bytes = 0_usize;
-    let mut monitor = BudgetMonitor::default();
+    let mut stdout_capture = CodexStdoutCapture::default();
     let mut stdout_done = false;
     let mut exit_status = None;
     let mut terminal_status = None;
@@ -541,27 +582,19 @@ pub fn run_codex_agent(
             .saturating_duration_since(Instant::now())
             .min(Duration::from_millis(10));
         match stdout_receiver.recv_timeout(wait) {
-            Ok(StdoutMessage::Chunk(chunk)) if terminal_status.is_none() => {
-                terminal_status = append_stdout_chunk(
-                    &chunk,
-                    &mut jsonl,
-                    &mut line,
-                    &mut output_bytes,
-                    config,
-                    &mut monitor,
-                );
+            Ok(StdoutMessage::Chunk(chunk, observed_ms)) if terminal_status.is_none() => {
+                terminal_status = stdout_capture.append_chunk(&chunk, observed_ms, config);
             }
-            Ok(StdoutMessage::Chunk(_)) => {}
-            Ok(StdoutMessage::Eof) => {
+            Ok(StdoutMessage::Chunk(_, _)) => {}
+            Ok(StdoutMessage::Eof(observed_ms)) => {
                 stdout_done = true;
-                if terminal_status.is_none() && !line.is_empty() {
-                    jsonl.extend_from_slice(&line);
-                    monitor.observe_line(&line, config);
-                    if monitor.exceeded {
+                if terminal_status.is_none() && !stdout_capture.line.is_empty() {
+                    stdout_capture.append_final_line(observed_ms, config);
+                    if stdout_capture.monitor.exceeded {
                         terminal_status = Some(TrialStatus::BudgetExceeded);
                     }
                 }
-                line.clear();
+                stdout_capture.line.clear();
             }
             Ok(StdoutMessage::Error) => {
                 stdout_done = true;
@@ -606,13 +639,21 @@ pub fn run_codex_agent(
     let terminal_status = terminal_status.or_else(|| {
         (!exit_status.is_some_and(|status| status.success())).then_some(TrialStatus::ModelFailure)
     });
-    let jsonl = String::from_utf8(jsonl)
+    let jsonl = String::from_utf8(std::mem::take(&mut stdout_capture.jsonl))
         .map_err(|_| EvalError::InvalidInput("Codex CLI JSONL output was not UTF-8".into()))?;
     let mut observation = match terminal_status {
-        Some(status) => {
-            parse_codex_jsonl_attempt_with_profile(&jsonl, status, config.memory_tool_profile)?
-        }
-        None => parse_codex_jsonl_with_profile(&jsonl, config.memory_tool_profile)?,
+        Some(status) => parse_codex_jsonl_with_line_timings(
+            &jsonl,
+            Some(status),
+            config.memory_tool_profile.enabled_tools(),
+            &stdout_capture.line_elapsed_ms,
+        )?,
+        None => parse_codex_jsonl_with_line_timings(
+            &jsonl,
+            None,
+            config.memory_tool_profile.enabled_tools(),
+            &stdout_capture.line_elapsed_ms,
+        )?,
     };
     observation.wall_time_ms = elapsed_ms;
     if process_observation_failed && observation.status == TrialStatus::Completed {
@@ -1195,7 +1236,7 @@ impl Drop for TemporaryInputFilesGuard {
     }
 }
 
-fn stream_stdout(mut stdout: impl Read, sender: mpsc::SyncSender<StdoutMessage>) {
+fn stream_stdout(mut stdout: impl Read, sender: mpsc::SyncSender<StdoutMessage>, started: Instant) {
     let mut chunk = [0_u8; STDOUT_CHUNK_BYTES];
     loop {
         let count = match stdout.read(&mut chunk) {
@@ -1206,11 +1247,14 @@ fn stream_stdout(mut stdout: impl Read, sender: mpsc::SyncSender<StdoutMessage>)
             }
         };
         if count == 0 {
-            let _ = sender.send(StdoutMessage::Eof);
+            let _ = sender.send(StdoutMessage::Eof(elapsed_millis(started)));
             break;
         }
         if sender
-            .send(StdoutMessage::Chunk(chunk[..count].to_vec()))
+            .send(StdoutMessage::Chunk(
+                chunk[..count].to_vec(),
+                elapsed_millis(started),
+            ))
             .is_err()
         {
             break;
@@ -1218,30 +1262,12 @@ fn stream_stdout(mut stdout: impl Read, sender: mpsc::SyncSender<StdoutMessage>)
     }
 }
 
-fn append_stdout_chunk(
-    chunk: &[u8],
-    jsonl: &mut Vec<u8>,
-    line: &mut Vec<u8>,
-    output_bytes: &mut usize,
-    config: &CodexAgentConfig,
-    monitor: &mut BudgetMonitor,
-) -> Option<TrialStatus> {
-    *output_bytes = output_bytes.saturating_add(chunk.len());
-    if *output_bytes > config.max_jsonl_bytes {
-        return Some(TrialStatus::BudgetExceeded);
-    }
-    for byte in chunk {
-        line.push(*byte);
-        if *byte == b'\n' {
-            jsonl.extend_from_slice(line);
-            monitor.observe_line(line, config);
-            line.clear();
-            if monitor.exceeded {
-                return Some(TrialStatus::BudgetExceeded);
-            }
-        }
-    }
-    None
+fn elapsed_millis(started: Instant) -> u64 {
+    started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+fn elapsed_since(started_ms: Option<u64>, completed_ms: Option<u64>) -> Option<u64> {
+    completed_ms?.checked_sub(started_ms?)
 }
 
 fn kill_and_reap(child: &mut Child) -> Option<ExitStatus> {
@@ -1349,6 +1375,29 @@ fn parse_codex_jsonl_with_terminal_status(
     terminal_status: Option<TrialStatus>,
     enabled_tools: &[&str],
 ) -> Result<CodexAgentObservation, EvalError> {
+    parse_codex_jsonl_with_optional_line_timings(jsonl, terminal_status, enabled_tools, None)
+}
+
+fn parse_codex_jsonl_with_line_timings(
+    jsonl: &str,
+    terminal_status: Option<TrialStatus>,
+    enabled_tools: &[&str],
+    line_elapsed_ms: &[u64],
+) -> Result<CodexAgentObservation, EvalError> {
+    parse_codex_jsonl_with_optional_line_timings(
+        jsonl,
+        terminal_status,
+        enabled_tools,
+        Some(line_elapsed_ms),
+    )
+}
+
+fn parse_codex_jsonl_with_optional_line_timings(
+    jsonl: &str,
+    terminal_status: Option<TrialStatus>,
+    enabled_tools: &[&str],
+    line_elapsed_ms: Option<&[u64]>,
+) -> Result<CodexAgentObservation, EvalError> {
     let mut trace = Vec::new();
     let mut pending = BTreeMap::<String, String>::new();
     let mut pending_extract_fact_evidence = BTreeMap::<String, usize>::new();
@@ -1374,7 +1423,15 @@ fn parse_codex_jsonl_with_terminal_status(
     let mut saw_terminal_failure = false;
 
     let lines = jsonl.lines().collect::<Vec<_>>();
+    if line_elapsed_ms.is_some_and(|timings| timings.len() != lines.len()) {
+        return Err(EvalError::InvalidInput(
+            "Codex event timing count does not match the captured JSONL lines".into(),
+        ));
+    }
     for (index, line) in lines.iter().enumerate() {
+        let event_elapsed_ms = line_elapsed_ms
+            .and_then(|timings| timings.get(index))
+            .copied();
         if line.trim().is_empty() {
             continue;
         }
@@ -1519,19 +1576,23 @@ fn parse_codex_jsonl_with_terminal_status(
                                         crate::paired_agent::tool_results::read_request_fingerprints(
                                             arguments,
                                         )?;
+                                    let requested_cutoff =
+                                        crate::paired_agent::tool_results::requested_cutoff(
+                                            arguments,
+                                        );
                                     pending_reads.insert(
                                         call_id.clone(),
                                         (
                                             memory_reads.len(),
-                                            crate::paired_agent::tool_results::requested_cutoff(
-                                                arguments,
-                                            ),
+                                            requested_cutoff.clone(),
                                             request_fingerprints.clone(),
+                                            event_elapsed_ms,
                                         ),
                                     );
                                     memory_reads.push(MemoryReadObservation {
                                         request_sequence,
                                         response_sequence: None,
+                                        elapsed_ms: None,
                                         outcome: MemoryReadOutcome::Unknown,
                                         item_count: None,
                                         request_query_sha256: request_fingerprints.query_sha256,
@@ -1541,7 +1602,11 @@ fn parse_codex_jsonl_with_terminal_status(
                                         selector_arguments_sha256: Some(
                                             request_fingerprints.selector_arguments_sha256,
                                         ),
+                                        selector_arguments_present: Some(
+                                            request_fingerprints.selector_arguments_present,
+                                        ),
                                         requested_valid_at_sha256: crate::paired_agent::tool_results::requested_valid_at_sha256(arguments),
+                                        requested_cutoff_sha256: requested_cutoff,
                                         response_guidance_sha256: None,
                                         evidence: None,
                                     });
@@ -1597,10 +1662,14 @@ fn parse_codex_jsonl_with_terminal_status(
                                         None,
                                         None,
                                     )?;
-                                    if let Some((index, _, _)) = pending_reads.remove(&call_id) {
+                                    if let Some((index, _, _, started_ms)) =
+                                        pending_reads.remove(&call_id)
+                                    {
                                         let read = &mut memory_reads[index];
                                         read.response_sequence =
                                             trace.last().map(|event| event.sequence);
+                                        read.elapsed_ms =
+                                            elapsed_since(started_ms, event_elapsed_ms);
                                         read.outcome = MemoryReadOutcome::Failed;
                                     }
                                     record_extract_fact_evidence_response(
@@ -1652,11 +1721,13 @@ fn parse_codex_jsonl_with_terminal_status(
                                                     (fact_id, episode_id, response_sequence)
                                                 }),
                                         );
-                                        if let Some((index, requested_cutoff, _)) =
+                                        if let Some((index, requested_cutoff, _, started_ms)) =
                                             pending_reads.remove(&call_id)
                                         {
                                             let read = &mut memory_reads[index];
                                             read.response_sequence = Some(response_sequence);
+                                            read.elapsed_ms =
+                                                elapsed_since(started_ms, event_elapsed_ms);
                                             (read.outcome, read.item_count) =
                                                 crate::paired_agent::tool_results::read_result(
                                                     result,
@@ -2159,8 +2230,49 @@ mod tests {
                 .as_ref()
                 .is_some_and(|hash| hash.len() == 64)
         );
+        assert_eq!(
+            read.selector_arguments_present
+                .as_ref()
+                .map(|fields| fields["valid_at"]),
+            Some(true)
+        );
+        assert_eq!(
+            read.selector_arguments_present
+                .as_ref()
+                .map(|fields| fields["as_of"]),
+            Some(false)
+        );
         assert!(!serialized.contains("PRIVATE QUERY"));
         assert!(!serialized.contains("PRIVATE GUIDANCE"));
+    }
+
+    #[test]
+    fn failed_memory_read_retains_request_snapshot_cutoff_without_response_evidence() {
+        let jsonl = concat!(
+            r#"{"type":"turn.started"}"#,
+            "\n",
+            r#"{"type":"item.started","item":{"id":"read-1","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE QUERY","valid_at":"2026-11-21T12:00:00Z","known_revision":17}}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"read-1","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE QUERY","valid_at":"2026-11-21T12:00:00Z","known_revision":17},"result":{"isError":true,"content":[{"type":"text","text":"temporary read failure"}]},"error":{"message":"read failed"},"status":"failed"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":"{\"answer\":\"unknown\",\"citations\":[],\"needs_clarification\":true}"}}"#,
+            "\n",
+            r#"{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":5}}"#
+        );
+
+        let actual = parse_codex_jsonl(jsonl).expect("well-formed failed Codex tool call");
+        let reads = actual.memory_reads.as_ref().expect("captured read request");
+        let read = &reads[0];
+        assert_eq!(
+            actual.read_capture_status,
+            Some(ReadCaptureStatus::Observed)
+        );
+        assert_eq!(read.outcome, MemoryReadOutcome::Failed);
+        assert!(read.evidence.is_none());
+        assert_eq!(
+            read.requested_cutoff_sha256,
+            Some("1cdc0210eca388c99874ac566f3b895850cfef65e4d6fb3bcd8cb451ab81c698".into())
+        );
     }
 
     #[test]

@@ -192,6 +192,9 @@ pub(crate) struct ReadRequestFingerprints {
     pub query_sha256: Option<String>,
     pub non_query_arguments_sha256: String,
     pub selector_arguments_sha256: BTreeMap<String, String>,
+    /// Whether each selector key was present in the exact request object.
+    /// This distinguishes an omitted legacy selector from an explicit null.
+    pub selector_arguments_present: BTreeMap<String, bool>,
 }
 
 pub(crate) const ASSEMBLE_CONTEXT_SELECTOR_FIELDS: [&str; 10] = [
@@ -226,6 +229,10 @@ pub(crate) fn read_request_fingerprints(
         query_sha256,
         non_query_arguments_sha256,
         selector_arguments_sha256: selector_argument_fingerprints(arguments)?,
+        selector_arguments_present: ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+            .into_iter()
+            .map(|field| (field.to_owned(), arguments.get(field).is_some()))
+            .collect(),
     })
 }
 
@@ -672,6 +679,9 @@ mod tests {
             first.selector_arguments_sha256["budget"],
             retry.selector_arguments_sha256["budget"]
         );
+        assert!(!first.selector_arguments_present["as_of"]);
+        assert!(!retry.selector_arguments_present["as_of"]);
+        assert!(retry.selector_arguments_present["valid_at"]);
         assert_ne!(
             retry.selector_arguments_sha256["budget"],
             broadened.selector_arguments_sha256["budget"]

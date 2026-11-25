@@ -734,6 +734,7 @@ fn chat_completions_agent_executes_an_allowed_mcp_tool_and_records_only_receipt_
     assert_eq!(observation.final_answer.as_deref(), Some(final_answer));
     let capture = serde_json::to_value(&observation).unwrap();
     assert_eq!(capture["memory_reads"][0]["outcome"], "nonempty");
+    assert!(capture["memory_reads"][0]["elapsed_ms"].as_u64().is_some());
     assert_eq!(capture["memory_reads"][0]["item_count"], 1);
     assert_eq!(observation.memory_source_episode_ids, ["episode:cedar"]);
     assert_eq!(observation.turns_used, 2);

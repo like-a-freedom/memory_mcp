@@ -1,0 +1,282 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "incumbent",
+  "run_id": "54885-1795636049844263000-0",
+  "identity_sha256": "84999a3f7186d21877886d54a87030ba45baec2c040cb5532f1b62e0b3628ede",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "brackwater-salinity-sampler-calibration-history",
+      "case_id": "brackwater-current-salinity-sampler-calibration-preset",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "morrowfen-seed-vault-humidity-history",
+      "case_id": "morrowfen-current-seed-vault-humidity-relay",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "sablehaven-prism-gate-telemetry-history",
+      "case_id": "sablehaven-current-prism-gate-telemetry-code",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "ternfall-reedbed-weather-uplink-history",
+      "case_id": "ternfall-current-reedbed-weather-uplink-code",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "brackwater-salinity-sampler-calibration-history",
+        "case_id": "brackwater-current-salinity-sampler-calibration-preset",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50868,
+        "output_tokens": 341,
+        "wall_time_ms": 23928
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "c10696d785f103f349c805aba9d0a465728793744e945e07419443c0e1f9badb",
+        "response_sha256": "1f7a8741056db584c9b20cca1aae59a7efe67870e782bcd5372f7b4abddec38b",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "a11-snapshot-v7-fernwick-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3099,
+          "maximum_wire_bytes": 3099
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "morrowfen-seed-vault-humidity-history",
+        "case_id": "morrowfen-current-seed-vault-humidity-relay",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50769,
+        "output_tokens": 347,
+        "wall_time_ms": 27526
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "38a06b208f89bb18a3ec0af7f4fb6f20f39364b12d560118e2c753b26e1534f1",
+        "response_sha256": "7404c8df2dec4f9ae1a18448bd8551d6d11ae1852d00cbe6daa67f9229f7fcb0",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "a11-snapshot-v7-rillbank-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3083,
+          "maximum_wire_bytes": 3083
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "sablehaven-prism-gate-telemetry-history",
+        "case_id": "sablehaven-current-prism-gate-telemetry-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50739,
+        "output_tokens": 340,
+        "wall_time_ms": 25750
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "2736226e1e8d9ce2150ac7e5eb9f642e643bc35252f0dbd251198231653094bc",
+        "response_sha256": "2fc33ac70cccdb8bff5c646429a308051cac6150fe491944c7de66f8b01557c0",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "a11-snapshot-v7-highmere-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3113,
+          "maximum_wire_bytes": 3113
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "ternfall-reedbed-weather-uplink-history",
+        "case_id": "ternfall-current-reedbed-weather-uplink-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50757,
+        "output_tokens": 337,
+        "wall_time_ms": 24411
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b2ff06566cb677422ec142ff0f703a3006d5886fca3412cbc940cc73bd50754d",
+        "response_sha256": "247e06f7d2cfd7652220fcc27858840e5b131039b4e1198c7afe77c1ef4f0775",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "a11-snapshot-v7-caldera-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3115,
+          "maximum_wire_bytes": 3115
+        }
+      }
+    }
+  ]
+}

@@ -98,6 +98,13 @@ claim reconciliation 41/41, retrieval quality 37/37, and two matching
 source-authority v4 captures. These are fixed-fixture controls, not an effect
 estimate for the response-default change.
 
+The latest local Apple Silicon `pr` profile run is archived at
+[`2026-11-26-pr-local-candle`](../../evals/results/2026-11-26-pr-local-candle/README.md).
+It passed 150/150 cases and all 10 configured gates. Only three gates had
+baseline values; the external answer-presence and six retrieval-quality gates
+were checked against their hard floors. The archived report explains the
+baseline cohort mismatch and does not claim a full-cohort no-regression result.
+
 The separate `extract` fact-evidence response defaults to bounded evidence;
 its compact-response opt-out and narrow deterministic no-regression record are
 documented in the
@@ -115,8 +122,8 @@ suite-scoped cases.
 
 | Profile | Command | Scope | Status |
 |---|---|---|---|
-| `pr` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/pr.json --artifact target/evals/pr.json` | local retrieval, extraction, claims, external mini-corpus | blocking |
-| `release` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/release.json --artifact target/evals/release.json` | PR suites plus lifecycle checks | blocking |
+| `pr` | `cargo run -p eval-harness --locked --bin memory-eval -- run --profile evals/profiles/pr.json --baseline evals/baselines/one-active-namespace-pr.json --artifact target/evals/pr.json` | local retrieval, extraction, claims, external mini-corpus, native retrieval-quality | blocking |
+| `release` | `cargo run -p eval-harness --locked --bin memory-eval -- run --profile evals/profiles/release.json --baseline evals/baselines/one-active-namespace-release.json --artifact target/evals/release.json` | PR suites plus lifecycle checks | blocking |
 | `nightly` | `cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/nightly.json --artifact target/evals/nightly.json` | scheduled breadth | blocking when scheduled |
 | `memory_decisions` | Set `MEMORY_DECISIONS_SERVER_BIN`, `MEMORY_DECISIONS_PRODUCT_REVISION`, and `MEMORY_DECISIONS_ARTIFACT_ROOT`, then run `cargo run -p eval-harness --bin memory-eval --locked -- run --profile evals/profiles/memory_decisions.json --artifact /tmp/memory-decisions.json` | pinned public-MCP diagnostic for late corrections, conflicting sources, temporal limits and abstention | manual/nightly diagnostic; deliberately gate-free and not blocking |
 | `memory_decisions_v10` | Run `memory_decisions_v10_default.json` and `memory_decisions_v10_shadow.json` twice each with distinct artifact roots; compare each arm with `compare-decision-replays` | eight new synthetic families; current/historical/conflicting roles are graded only on explicit valid-time + known-revision snapshots; ordinary retrieval remains a separate no-role control | repeated deterministic baseline: default 8/8 primary decisions and 7/8 temporal decisions vs shadow 2/8 and 1/8; evidence 8/8 in both. Finite fixture result, not powered agent benefit; see [`MEMORY_DECISION_BASELINE.md`](MEMORY_DECISION_BASELINE.md#corrected-temporal-role-baseline-v10-2026-11-23) |
@@ -131,6 +138,63 @@ suite-scoped cases.
 The `pr`, `release`, `nightly`, and `external_*` profiles have no Make
 target — run the `cargo run` command above directly. CI inlines the same
 invocation.
+
+### Reproduce the native PR profile locally
+
+The `pr` and `release` profiles include `retrieval-quality`, which requires the
+two checksum-pinned local models documented in the
+[native retrieval-quality guide](../../evals/corpora/retrieval-quality-v1/README.md).
+The harness runs them through the Rust `local-candle` provider; it does not
+require LM Studio, an LLM service, or an API key. Model preparation downloads
+the pinned weights once unless verified bundles are already cached:
+
+```sh
+cargo run -p eval-harness --locked --bin memory-eval -- prepare-model --manifest evals/models/multilingual-e5-small.json --output-root target/eval-models
+cargo run -p eval-harness --locked --bin memory-eval -- prepare-model --manifest evals/models/mmarco-minilm.json --output-root target/eval-models
+```
+
+On macOS/Linux, set the native provider configuration and run the profile with
+its registered regression baseline:
+
+```sh
+export EMBEDDINGS_ENABLED=true
+export EMBEDDINGS_PROVIDER=local-candle
+export EMBEDDINGS_MODEL=intfloat/multilingual-e5-small
+export EMBEDDINGS_MODEL_DIR="$PWD/target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3"
+export RETRIEVAL_RERANKER_MODEL_DIR="$PWD/target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825"
+export RETRIEVAL_RERANKER_ADMISSION_FLOOR=0
+export MEMORY_CLAIM_ROLLOUT_STAGE=evidence
+
+mkdir -p target/evals
+cargo run -p eval-harness --locked --bin memory-eval -- run \
+  --profile evals/profiles/pr.json \
+  --baseline evals/baselines/one-active-namespace-pr.json \
+  --artifact target/evals/pr.json
+```
+
+PowerShell uses the same profile and model bundles; only environment-variable
+syntax differs:
+
+```powershell
+$modelRoot = Join-Path $PWD.Path 'target/eval-models'
+$env:EMBEDDINGS_ENABLED = 'true'
+$env:EMBEDDINGS_PROVIDER = 'local-candle'
+$env:EMBEDDINGS_MODEL = 'intfloat/multilingual-e5-small'
+$env:EMBEDDINGS_MODEL_DIR = Join-Path $modelRoot 'intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3'
+$env:RETRIEVAL_RERANKER_MODEL_DIR = Join-Path $modelRoot 'cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825'
+$env:RETRIEVAL_RERANKER_ADMISSION_FLOOR = '0'
+$env:MEMORY_CLAIM_ROLLOUT_STAGE = 'evidence'
+
+New-Item -ItemType Directory -Force -Path 'target/evals' | Out-Null
+cargo run -p eval-harness --locked --bin memory-eval -- run `
+  --profile evals/profiles/pr.json `
+  --baseline evals/baselines/one-active-namespace-pr.json `
+  --artifact target/evals/pr.json
+```
+
+The recorded local run was verified on Apple Silicon; CI runs the profile on
+Linux. The commands are Rust/Cargo based and avoid a vendor-specific runner,
+but this report does not claim a Windows execution result.
 
 Response-size reports separate `assemble_*` and `explain_*` metrics. It is
 intentionally gate-free: the design target is diagnostic, while missing or

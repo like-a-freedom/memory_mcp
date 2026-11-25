@@ -215,9 +215,11 @@ mod tests {
             .with_timezone(&chrono::Utc)
     }
 
-    struct TruncatedHistoricalContext;
+    struct PartialHistoricalContext {
+        candidate_scan_truncated: bool,
+    }
 
-    impl ToolContext for TruncatedHistoricalContext {
+    impl ToolContext for PartialHistoricalContext {
         fn record(&self, _event: ToolEvent) {}
 
         async fn ingest(
@@ -282,7 +284,7 @@ mod tests {
                         known_revision: 0,
                     },
                     completeness: crate::models::ContextCompleteness::Partial,
-                    candidate_scan_truncated: true,
+                    candidate_scan_truncated: self.candidate_scan_truncated,
                     omitted_channels: vec!["historical fact scan".into()],
                 }),
             })
@@ -302,15 +304,44 @@ mod tests {
         params.valid_at = Some("2026-11-21T00:00:00Z".into());
         params.known_revision = Some(0);
 
-        let response = assemble_context(&TruncatedHistoricalContext, params)
-            .await
-            .expect("return the bounded historical result");
+        let response = assemble_context(
+            &PartialHistoricalContext {
+                candidate_scan_truncated: true,
+            },
+            params,
+        )
+        .await
+        .expect("return the bounded historical result");
 
         assert!(response.result.as_array().is_some_and(Vec::is_empty));
         assert_eq!(
             response.guidance.as_deref(),
             Some(
                 "The historical candidate scan was truncated and returned no items. You may retry once with a narrower query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. An empty retry still does not establish absence; verify against the source."
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn empty_partial_historical_read_authorizes_one_query_refinement() {
+        let mut params = params();
+        params.valid_at = Some("2026-11-21T00:00:00Z".into());
+        params.known_revision = Some(0);
+
+        let response = assemble_context(
+            &PartialHistoricalContext {
+                candidate_scan_truncated: false,
+            },
+            params,
+        )
+        .await
+        .expect("return the bounded historical result");
+
+        assert!(response.result.as_array().is_some_and(Vec::is_empty));
+        assert_eq!(
+            response.guidance.as_deref(),
+            Some(
+                "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source."
             )
         );
     }

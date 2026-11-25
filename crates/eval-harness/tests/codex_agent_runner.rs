@@ -175,8 +175,80 @@ printf '%s\n' '{"type":"turn.started"}' \
     let captured =
         serde_json::to_value(run_codex_agent(&config, "Where is Cedar?").unwrap()).unwrap();
     assert_eq!(captured["memory_reads"][0]["outcome"], "unknown");
+    assert!(captured["memory_reads"][0]["elapsed_ms"].as_u64().is_some());
     assert!(captured["memory_reads"][0]["item_count"].is_null());
     assert!(!captured.to_string().contains("UNRECOGNIZED_REPLY_SENTINEL"));
+}
+
+#[test]
+fn concurrent_reads_keep_elapsed_timing_with_the_matching_response() {
+    let directory = tempfile::tempdir().expect("temporary runner directory");
+    let config = fake_config(
+        directory.path(),
+        r##"#!/bin/sh
+cat >/dev/null
+printf '%s\n' \
+ '{"type":"turn.started"}' \
+ '{"type":"item.started","item":{"id":"read-first","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE FIRST QUERY"}}}' \
+ '{"type":"item.started","item":{"id":"read-second","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE SECOND QUERY"}}}' \
+ '{"type":"item.completed","item":{"id":"read-second","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","result":{"structuredContent":{"result":[]}}}}' \
+ '{"type":"item.completed","item":{"id":"read-first","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","result":{"structuredContent":{"result":[]}}}}' \
+ '{"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"{\"answer\":\"unknown\",\"citations\":[],\"needs_clarification\":true}"}}' \
+ '{"type":"turn.completed","usage":{"input_tokens":9,"output_tokens":4}}'
+"##,
+        Duration::from_secs(5),
+    );
+
+    let observation = run_codex_agent(&config, "Find either recorded value.")
+        .expect("interleaved tool calls produce a complete observation");
+    let reads = observation
+        .memory_reads
+        .as_ref()
+        .expect("captured read observations");
+
+    assert_eq!(reads.len(), 2);
+    for read in reads {
+        assert!(read.elapsed_ms.is_some());
+        let request = observation
+            .trace
+            .iter()
+            .find(|event| event.sequence == read.request_sequence)
+            .expect("read request is present in trace");
+        let response = observation
+            .trace
+            .iter()
+            .find(|event| Some(event.sequence) == read.response_sequence)
+            .expect("read response is present in trace");
+        assert_eq!(request.call_id, response.call_id);
+    }
+    let captured = serde_json::to_string(&observation).expect("serialize content-free telemetry");
+    assert!(!captured.contains("PRIVATE FIRST QUERY"));
+    assert!(!captured.contains("PRIVATE SECOND QUERY"));
+}
+
+#[test]
+fn completion_without_observed_start_does_not_fabricate_read_timing() {
+    let directory = tempfile::tempdir().expect("temporary runner directory");
+    let config = fake_config(
+        directory.path(),
+        r##"#!/bin/sh
+cat >/dev/null
+printf '%s\n' '{"type":"turn.started"}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"read","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE QUERY"},"result":{"structuredContent":{"result":[]}}}}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"{\"answer\":\"unknown\",\"citations\":[],\"needs_clarification\":true}"}}'
+printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":9,"output_tokens":4}}'
+"##,
+        Duration::from_secs(5),
+    );
+
+    let observation = run_codex_agent(&config, "Where is Cedar?")
+        .expect("the process runner records completion-only telemetry as partial");
+
+    assert_eq!(
+        observation.read_capture_status,
+        Some(eval_harness::paired_agent::ReadCaptureStatus::Partial)
+    );
+    assert!(observation.memory_reads.unwrap_or_default().is_empty());
 }
 
 #[test]
@@ -342,6 +414,11 @@ printf '%s\n' \
     assert_eq!(
         observation.trace[1].kind,
         eval_harness::paired::TraceEventKind::MemoryRead
+    );
+    assert!(
+        observation.memory_reads.as_ref().unwrap()[0]
+            .elapsed_ms
+            .is_none()
     );
     assert_eq!(
         observation.trace[2].kind,

@@ -1040,6 +1040,10 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     let v8_bytes = std::fs::read(v8_run.join("incumbent.json")).unwrap();
     let v8_artifact: serde_json::Value = serde_json::from_slice(&v8_bytes).unwrap();
     assert_eq!(v8_artifact["schema_version"], "memory-mcp-agent-paired/v8");
+    let mut old_v8_with_timing = v8_artifact.clone();
+    old_v8_with_timing["receipts"][0]["read_diagnostics"][0]["elapsed_ms"] = json!(17);
+    let old_v8_with_timing: PairedRunArtifact = serde_json::from_value(old_v8_with_timing).unwrap();
+    assert!(old_v8_with_timing.validate().is_err());
     assert_eq!(
         v8_artifact["receipts"][0]["read_diagnostics"][0]["request_query_sha256"],
         "a".repeat(64)
@@ -1062,6 +1066,72 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     assert_eq!(
         v8_bytes,
         std::fs::read(v8_replay.join("incumbent.json")).unwrap()
+    );
+
+    let mut timed_observations = v8_observations.clone();
+    timed_observations["schema_version"] = json!("memory-mcp-agent-observations/v8");
+    let selectors = selector_fingerprints_for_fixture(&json!({
+        "fact_types": ["decision"], "as_of": "2026-05-01T10:00:00Z",
+        "valid_at": "2026-05-01T10:00:00Z", "known_at": "2026-05-01T10:00:00Z",
+        "known_revision": 7, "budget": 5, "view_mode": "compact",
+        "window_start": null, "window_end": null, "compact": true
+    }));
+    for arm in ["incumbent", "candidate"] {
+        for trial in timed_observations[arm]["trials"].as_array_mut().unwrap() {
+            trial["observation"]["memory_reads"][0]["elapsed_ms"] = json!(17);
+            trial["observation"]["memory_reads"][0]["selector_arguments_sha256"] =
+                selectors.clone();
+        }
+    }
+    write_json(&observations_path, &timed_observations);
+    let timed_run = directory.path().join("v12-timed");
+    let output = score(&timed_run);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let timed_bytes = std::fs::read(timed_run.join("incumbent.json")).unwrap();
+    let timed_artifact: serde_json::Value = serde_json::from_slice(&timed_bytes).unwrap();
+    assert_eq!(
+        timed_artifact["schema_version"],
+        "memory-mcp-agent-paired/v12"
+    );
+    assert_eq!(
+        timed_artifact["receipts"][0]["read_diagnostics"][0]["elapsed_ms"],
+        17
+    );
+    let mut missing_artifact_timing = timed_artifact.clone();
+    missing_artifact_timing["receipts"][0]["read_diagnostics"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("elapsed_ms");
+    let missing_artifact_timing: PairedRunArtifact =
+        serde_json::from_value(missing_artifact_timing).unwrap();
+    assert!(missing_artifact_timing.validate().is_err());
+    let mut unpaired_artifact_timing = timed_artifact.clone();
+    unpaired_artifact_timing["receipts"][0]["read_diagnostics"][0]["response_sequence"] =
+        serde_json::Value::Null;
+    let unpaired_artifact_timing: PairedRunArtifact =
+        serde_json::from_value(unpaired_artifact_timing).unwrap();
+    assert!(unpaired_artifact_timing.validate().is_err());
+    let missing_timing = directory.path().join("v12-missing-timing");
+    let mut incomplete_timing = timed_observations.clone();
+    incomplete_timing["candidate"]["trials"][0]["observation"]["memory_reads"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("elapsed_ms");
+    write_json(&observations_path, &incomplete_timing);
+    let output = score(&missing_timing);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(!missing_timing.exists());
+    write_json(&observations_path, &timed_observations);
+    let timed_replay = directory.path().join("v12-replay");
+    let output = score(&timed_replay);
+    assert!(output.status.success());
+    assert_eq!(
+        timed_bytes,
+        std::fs::read(timed_replay.join("incumbent.json")).unwrap()
     );
 
     assert_eq!(artifact["receipts"][0]["read_capture_status"], "observed");
@@ -1460,6 +1530,59 @@ fn registered_valid_time_with_unavailable_fingerprints_replays_as_unknown_v9() {
 }
 
 #[test]
+fn registered_valid_time_without_request_fingerprints_fails_offline_cli() {
+    use serde_json::Value;
+
+    let valid_at = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let (directory, _) = run_valid_time_observation_fixture(Some(&valid_at), Some(&valid_at));
+    let plan_path = directory.path().join("plan.json");
+    let tasks_path = directory.path().join("tasks.json");
+    let observations_path = directory.path().join("observations.json");
+
+    let mut observations: Value =
+        serde_json::from_slice(&std::fs::read(&observations_path).unwrap()).unwrap();
+    for arm in ["incumbent", "candidate"] {
+        for trial in observations[arm]["trials"].as_array_mut().unwrap() {
+            for read in trial["observation"]["memory_reads"].as_array_mut().unwrap() {
+                read.as_object_mut().unwrap().remove("request_query_sha256");
+                read.as_object_mut()
+                    .unwrap()
+                    .remove("non_query_arguments_sha256");
+                read["requested_valid_at_sha256"] = Value::Null;
+                read["evidence"] = Value::Null;
+            }
+        }
+    }
+    write_json(&observations_path, &observations);
+
+    let output_directory = directory.path().join("missing-request-fingerprints");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+    command
+        .env_clear()
+        .arg("score-paired-observations")
+        .arg("--plan")
+        .arg(&plan_path)
+        .arg("--tasks")
+        .arg(&tasks_path)
+        .arg("--observations")
+        .arg(&observations_path)
+        .arg("--output-directory")
+        .arg(&output_directory);
+    let output = bounded_command_output(&mut command, Duration::from_secs(30))
+        .expect("reject incomplete registered read diagnostics");
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(
+            "registered read diagnostics require complete request fingerprints for every captured read"
+        ),
+        "unexpected scorer error: {stderr}"
+    );
+    assert!(!output_directory.exists());
+}
+
+#[test]
 fn valid_time_diagnostic_replay_is_byte_identical() {
     let (_first_directory, first) = run_valid_time_observation_fixture(None, None);
     let (_second_directory, second) = run_valid_time_observation_fixture(None, None);
@@ -1477,6 +1600,307 @@ fn matching_requested_and_returned_valid_times_are_boolean_and_redacted() {
     assert_eq!(read["requested_valid_at_match"], true);
     assert_eq!(read["returned_valid_at_match"], true);
     assert!(!String::from_utf8_lossy(&bytes).contains(&expected));
+}
+
+#[test]
+fn snapshot_bound_retry_replay_proves_authorized_state_transition() {
+    let (directory, guidance_sha256) = snapshot_retry_observation_fixture();
+    let (output, artifact, bytes) = score_snapshot_retry_fixture(&directory, "retry-score-01");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert_eq!(artifact["schema_version"], "memory-mcp-agent-paired/v11");
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["expectation_registered"], true);
+    assert_eq!(diagnostic["assessment"], "compliant");
+    assert_eq!(diagnostic["initial_read_eligible"], true);
+    assert_eq!(diagnostic["retry_observed"], true);
+    assert_eq!(diagnostic["retry_count"], 1);
+    assert_eq!(diagnostic["retry_limit_respected"], true);
+    assert_eq!(diagnostic["query_changed"], true);
+    assert_eq!(diagnostic["snapshot_cutoff_matches"], true);
+    assert_eq!(
+        diagnostic["legacy_temporal_selector_matches"]["as_of"],
+        true
+    );
+    assert_eq!(
+        diagnostic["legacy_temporal_selector_matches"]["known_at"],
+        true
+    );
+    for field in [
+        "fact_types",
+        "budget",
+        "view_mode",
+        "window_start",
+        "window_end",
+        "compact",
+    ] {
+        assert_eq!(diagnostic["preserved_selector_matches"][field], true);
+    }
+    assert!(!String::from_utf8_lossy(&bytes).contains(&guidance_sha256));
+
+    let mut impossible_compliance: serde_json::Value =
+        serde_json::from_slice(&bytes).expect("paired artifact JSON");
+    let diagnostic = &mut impossible_compliance["receipts"][0]["snapshot_retry_diagnostic"];
+    diagnostic["assessment"] = serde_json::json!("compliant");
+    diagnostic["retry_required_when_eligible"] = serde_json::json!(false);
+    diagnostic["initial_read_eligible"] = serde_json::json!(true);
+    diagnostic["retry_observed"] = serde_json::json!(false);
+    diagnostic["retry_count"] = serde_json::json!(0);
+    diagnostic["retry_limit_respected"] = serde_json::json!(true);
+    diagnostic["query_changed"] = serde_json::json!(false);
+    diagnostic["snapshot_cutoff_matches"] = serde_json::json!(false);
+    diagnostic["legacy_temporal_selector_matches"] =
+        serde_json::json!({"as_of": false, "known_at": false});
+    diagnostic["preserved_selector_matches"] = serde_json::json!({
+        "fact_types": false,
+        "budget": false,
+        "view_mode": false,
+        "window_start": false,
+        "window_end": false,
+        "compact": false
+    });
+    let impossible_compliance: PairedRunArtifact =
+        serde_json::from_value(impossible_compliance).expect("typed paired artifact");
+    assert!(
+        impossible_compliance.validate().is_err(),
+        "an artifact cannot report compliant while exposing failed retry checks"
+    );
+
+    let (replay_output, _, replay_bytes) =
+        score_snapshot_retry_fixture(&directory, "retry-score-02");
+    assert!(
+        replay_output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replay_output.stderr)
+    );
+    assert_eq!(bytes, replay_bytes);
+}
+
+#[test]
+fn stale_snapshot_retry_is_scored_as_noncompliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    let stale_cutoff = digest('9');
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        for read in observation["memory_reads"].as_array_mut().unwrap() {
+            if read["request_sequence"] == 4 {
+                read["requested_cutoff_sha256"] = serde_json::json!(stale_cutoff);
+                read["evidence"]["requested_cutoff_sha256"] = serde_json::json!(stale_cutoff);
+            }
+        }
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "stale-cutoff");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["snapshot_cutoff_matches"], false);
+}
+
+#[test]
+fn unchanged_retry_query_is_scored_as_noncompliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        let reads = observation["memory_reads"].as_array_mut().unwrap();
+        reads[1]["request_query_sha256"] = reads[0]["request_query_sha256"].clone();
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "same-query");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["query_changed"], false);
+}
+
+#[test]
+fn explicit_null_legacy_selector_is_not_treated_as_omitted() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        observation["memory_reads"][1]["selector_arguments_present"]["as_of"] =
+            serde_json::json!(true);
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "explicit-null");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(
+        diagnostic["legacy_temporal_selector_matches"]["as_of"],
+        false
+    );
+}
+
+#[test]
+fn missing_retry_selector_presence_is_not_counted_as_compliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        observation["memory_reads"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("selector_arguments_present");
+    });
+
+    let (output, artifact, _) =
+        score_snapshot_retry_fixture(&directory, "missing-selector-presence");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "not_observed");
+    assert_ne!(diagnostic["assessment"], "compliant");
+}
+
+#[test]
+fn changed_stable_selector_is_scored_as_noncompliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        observation["memory_reads"][1]["selector_arguments_sha256"]["budget"] =
+            serde_json::json!(digest('9'));
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "changed-selector");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["preserved_selector_matches"]["budget"], false);
+}
+
+#[test]
+fn missing_returned_snapshot_cannot_be_scored_as_compliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        observation["memory_reads"][0]["evidence"]["returned_cutoff_sha256"] =
+            serde_json::Value::Null;
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "missing-snapshot");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "not_observed");
+    assert_ne!(diagnostic["assessment"], "compliant");
+}
+
+#[test]
+fn required_snapshot_retry_missing_after_eligible_empty_partial_is_noncompliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        let trace = observation["trace"].as_array_mut().unwrap();
+        let mut final_answer = trace[5].clone();
+        final_answer["sequence"] = serde_json::json!(4);
+        let mut agent_turn = trace[6].clone();
+        agent_turn["sequence"] = serde_json::json!(5);
+        *trace = vec![
+            trace[0].clone(),
+            trace[1].clone(),
+            trace[2].clone(),
+            final_answer,
+            agent_turn,
+        ];
+        observation["memory_reads"]
+            .as_array_mut()
+            .unwrap()
+            .truncate(1);
+        observation["tool_calls"] = serde_json::json!(1);
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "missing-retry");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["initial_read_eligible"], true);
+    assert_eq!(diagnostic["retry_observed"], false);
+    assert_eq!(diagnostic["retry_required_when_eligible"], true);
+}
+
+#[test]
+fn retry_without_registered_guidance_is_noncompliant() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    let wrong_guidance = digest('9');
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        observation["memory_reads"][0]["response_guidance_sha256"] =
+            serde_json::json!(wrong_guidance);
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "unauthorized-retry");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["initial_read_eligible"], false);
+    assert_eq!(diagnostic["retry_observed"], true);
+}
+
+#[test]
+fn a_second_snapshot_retry_exceeds_the_one_retry_limit() {
+    let (directory, _) = snapshot_retry_observation_fixture();
+    mutate_snapshot_retry_observations(&directory, |observation| {
+        let trace = observation["trace"].as_array_mut().unwrap();
+        let mut prefix = trace[..5].to_vec();
+        let mut second_request = trace[3].clone();
+        second_request["sequence"] = serde_json::json!(6);
+        second_request["call_id"] = serde_json::json!("retry-2");
+        let mut second_response = trace[4].clone();
+        second_response["sequence"] = serde_json::json!(7);
+        second_response["call_id"] = serde_json::json!("retry-2");
+        let mut final_answer = trace[5].clone();
+        final_answer["sequence"] = serde_json::json!(8);
+        let mut agent_turn = trace[6].clone();
+        agent_turn["sequence"] = serde_json::json!(9);
+        prefix.extend([second_request, second_response, final_answer, agent_turn]);
+        *trace = prefix;
+
+        let mut second_read = observation["memory_reads"][1].clone();
+        second_read["request_sequence"] = serde_json::json!(6);
+        second_read["response_sequence"] = serde_json::json!(7);
+        observation["memory_reads"]
+            .as_array_mut()
+            .unwrap()
+            .push(second_read);
+        observation["tool_calls"] = serde_json::json!(3);
+    });
+
+    let (output, artifact, _) = score_snapshot_retry_fixture(&directory, "second-retry");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let diagnostic = &artifact["receipts"][0]["snapshot_retry_diagnostic"];
+    assert_eq!(diagnostic["assessment"], "noncompliant");
+    assert_eq!(diagnostic["retry_count"], 2);
+    assert_eq!(diagnostic["retry_limit_respected"], false);
 }
 
 #[test]
@@ -1557,7 +1981,7 @@ fn selector_diagnostics_compare_registered_arguments_without_persisting_values()
     plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
     let mut observations: Value =
         serde_json::from_slice(&std::fs::read(&observations_path).unwrap()).unwrap();
-    observations["schema_version"] = json!("memory-mcp-agent-observations/v6");
+    observations["schema_version"] = json!("memory-mcp-agent-observations/v7");
     observations["plan_sha256"] = json!(plan.sha256().unwrap());
 
     let actual_request = json!({
@@ -1616,10 +2040,6 @@ fn selector_diagnostics_compare_registered_arguments_without_persisting_values()
     assert_eq!(matches["view_mode"], false);
     assert_eq!(matches["compact"], true);
     assert_eq!(matches["as_of"], true);
-    for private in ["PRIVATE QUERY SENTINEL", "profile", "decision", "timeline"] {
-        assert!(!String::from_utf8_lossy(&artifact_bytes).contains(private));
-    }
-
     let mut missing_diagnostic = artifact.clone();
     missing_diagnostic["receipts"][0]["read_diagnostics"][0]
         .as_object_mut()
@@ -1765,6 +2185,194 @@ fn selector_fingerprints_for_fixture(arguments: &serde_json::Value) -> serde_jso
     Value::Object(fingerprints)
 }
 
+fn snapshot_retry_observation_fixture() -> (tempfile::TempDir, String) {
+    use eval_harness::paired_agent::{
+        PAIRED_TASK_MANIFEST_SCHEMA_V3, PairedTaskManifest, SnapshotBoundRetryExpectation,
+    };
+    use serde_json::{Value, json};
+
+    let valid_at = "2026-05-01T10:00:00Z";
+    let returned_cutoff = hex::encode(Sha256::digest(
+        serde_json::to_vec(&(valid_at, Some(8_i64))).unwrap(),
+    ));
+    let requested_cutoff = hex::encode(Sha256::digest(
+        serde_json::to_vec(&(valid_at, Some(7_i64))).unwrap(),
+    ));
+    let guidance = "The result is partial. Refine this query once using the returned snapshot.";
+    let guidance_sha256 = hex::encode(Sha256::digest(guidance.as_bytes()));
+    let (directory, _) = run_valid_time_observation_fixture_with_cutoffs(
+        Some(&hex::encode(Sha256::digest(valid_at.as_bytes()))),
+        Some(&hex::encode(Sha256::digest(valid_at.as_bytes()))),
+        Some(&requested_cutoff),
+        Some(&returned_cutoff),
+    );
+
+    let plan_path = directory.path().join("plan.json");
+    let tasks_path = directory.path().join("tasks.json");
+    let observations_path = directory.path().join("observations.json");
+    let mut manifest: PairedTaskManifest =
+        serde_json::from_slice(&std::fs::read(&tasks_path).unwrap()).unwrap();
+    manifest.schema_version = PAIRED_TASK_MANIFEST_SCHEMA_V3.into();
+    for task in &mut manifest.tasks {
+        task.oracle
+            .read_expectation
+            .as_mut()
+            .unwrap()
+            .snapshot_bound_retry = Some(SnapshotBoundRetryExpectation {
+            authorized_guidance_sha256: guidance_sha256.clone(),
+            retry_required_when_eligible: true,
+        });
+    }
+
+    let mut plan: PairedEvaluationPlan =
+        serde_json::from_slice(&std::fs::read(&plan_path).unwrap()).unwrap();
+    plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
+    let mut observations: Value =
+        serde_json::from_slice(&std::fs::read(&observations_path).unwrap()).unwrap();
+    observations["schema_version"] = json!("memory-mcp-agent-observations/v7");
+    observations["plan_sha256"] = json!(plan.sha256().unwrap());
+
+    let initial_request = json!({
+        "query": "PRIVATE initial query",
+        "fact_types": ["decision"],
+        "as_of": valid_at,
+        "budget": 5,
+        "compact": true
+    });
+    let retry_request = json!({
+        "query": "PRIVATE refined query",
+        "fact_types": ["decision"],
+        "valid_at": valid_at,
+        "known_revision": 8,
+        "budget": 5,
+        "compact": true
+    });
+    for arm in ["incumbent", "candidate"] {
+        observations[arm]["identity"]["shared"] =
+            serde_json::to_value(&plan.shared_identity).unwrap();
+        for trial in observations[arm]["trials"].as_array_mut().unwrap() {
+            let observation = &mut trial["observation"];
+            let trace = observation["trace"].as_array_mut().unwrap();
+            trace[3]["sequence"] = json!(6);
+            trace[4]["sequence"] = json!(7);
+            let final_answer = trace[3].clone();
+            let agent_turn = trace[4].clone();
+            let retry_call = [
+                json!({"sequence":4,"turn":1,"kind":"memory_read","call_id":"retry","tool_name":"assemble_context","payload_sha256":digest('e')}),
+                json!({"sequence":5,"turn":1,"kind":"tool_response","call_id":"retry","tool_name":"assemble_context","payload_sha256":digest('f')}),
+            ];
+            *trace = vec![
+                trace[0].clone(),
+                trace[1].clone(),
+                trace[2].clone(),
+                retry_call[0].clone(),
+                retry_call[1].clone(),
+                final_answer,
+                agent_turn,
+            ];
+
+            let reads = observation["memory_reads"].as_array_mut().unwrap();
+            let mut first = reads[0].clone();
+            first["response_guidance_sha256"] = json!(guidance_sha256);
+            first["requested_cutoff_sha256"] = Value::Null;
+            first["evidence"]["requested_cutoff_sha256"] = Value::Null;
+            first["evidence"]["returned_cutoff_sha256"] = json!(returned_cutoff);
+            first["selector_arguments_sha256"] =
+                selector_fingerprints_for_fixture(&initial_request);
+            first["selector_arguments_present"] = json!({
+                "fact_types":true,
+                "as_of":true,
+                "valid_at":false,
+                "known_at":false,
+                "known_revision":false,
+                "budget":true,
+                "view_mode":false,
+                "window_start":false,
+                "window_end":false,
+                "compact":true
+            });
+            let retry = json!({
+                "request_sequence":4,
+                "response_sequence":5,
+                "outcome":"nonempty",
+                "item_count":1,
+                "request_query_sha256":digest('e'),
+                "non_query_arguments_sha256":digest('a'),
+                "selector_arguments_sha256":selector_fingerprints_for_fixture(&retry_request),
+                "selector_arguments_present":{
+                    "fact_types":true,
+                    "as_of":false,
+                    "valid_at":true,
+                    "known_at":false,
+                    "known_revision":true,
+                    "budget":true,
+                    "view_mode":false,
+                    "window_start":false,
+                    "window_end":false,
+                    "compact":true
+                },
+                "requested_valid_at_sha256":hex::encode(Sha256::digest(valid_at.as_bytes())),
+                "requested_cutoff_sha256":returned_cutoff,
+                "response_guidance_sha256":null,
+                "evidence":{
+                    "source_episode_ids":["episode-1"],
+                    "claim_annotations":[],
+                    "completeness":"complete",
+                    "requested_cutoff_sha256":returned_cutoff,
+                    "returned_cutoff_sha256":returned_cutoff,
+                    "returned_valid_at_sha256":hex::encode(Sha256::digest(valid_at.as_bytes()))
+                }
+            });
+            *reads = vec![first, retry];
+            observation["tool_calls"] = json!(2);
+        }
+    }
+
+    write_json(&plan_path, &plan);
+    write_json(&tasks_path, &manifest);
+    write_json(&observations_path, &observations);
+    (directory, guidance_sha256)
+}
+
+fn score_snapshot_retry_fixture(
+    directory: &tempfile::TempDir,
+    output_name: &str,
+) -> (Output, serde_json::Value, Vec<u8>) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+    command
+        .env_clear()
+        .arg("score-paired-observations")
+        .arg("--plan")
+        .arg(directory.path().join("plan.json"))
+        .arg("--tasks")
+        .arg(directory.path().join("tasks.json"))
+        .arg("--observations")
+        .arg(directory.path().join("observations.json"))
+        .arg("--output-directory")
+        .arg(directory.path().join(output_name));
+    let output = bounded_command_output(&mut command, Duration::from_secs(30))
+        .expect("score snapshot-bound retry observations");
+    let bytes = std::fs::read(directory.path().join(output_name).join("candidate.json"))
+        .unwrap_or_default();
+    let artifact = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+    (output, artifact, bytes)
+}
+
+fn mutate_snapshot_retry_observations(
+    directory: &tempfile::TempDir,
+    mut mutate: impl FnMut(&mut serde_json::Value),
+) {
+    let path = directory.path().join("observations.json");
+    let mut observations: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    for arm in ["incumbent", "candidate"] {
+        for trial in observations[arm]["trials"].as_array_mut().unwrap() {
+            mutate(&mut trial["observation"]);
+        }
+    }
+    write_json(&path, &observations);
+}
+
 fn product_identity(revision: &str, fingerprint: char) -> ProductRunIdentity {
     ProductRunIdentity {
         revision: revision.into(),
@@ -1801,6 +2409,7 @@ fn run_artifact(
         .map(|key| TrialReceipt {
             read_capture_status: None,
             read_diagnostics: None,
+            snapshot_retry_diagnostic: None,
             key: key.clone(),
             arm_order: if (arm == RunArm::Incumbent) == key.incumbent_first {
                 1

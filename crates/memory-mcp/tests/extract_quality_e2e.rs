@@ -18,15 +18,34 @@ async fn extract_with_source_type(
     source_type: &str,
     content: &str,
 ) -> ExtractResult {
+    extract_with_source_details(
+        service,
+        source_type,
+        "quality-corpus",
+        content,
+        chrono::Utc::now(),
+        None,
+    )
+    .await
+}
+
+async fn extract_with_source_details(
+    service: &MemoryService,
+    source_type: &str,
+    source_id: &str,
+    content: &str,
+    t_ref: chrono::DateTime<chrono::Utc>,
+    t_ingested: Option<chrono::DateTime<chrono::Utc>>,
+) -> ExtractResult {
     let id = IngestCapability::ingest_from_service(
         service,
         IngestRequest {
             source_context: None,
             source_type: source_type.into(),
-            source_id: "quality-corpus".into(),
+            source_id: source_id.into(),
             content: content.into(),
-            t_ref: chrono::Utc::now(),
-            t_ingested: None,
+            t_ref,
+            t_ingested,
             policy_tags: vec![],
         },
         None,
@@ -255,6 +274,107 @@ async fn genuine_conflicts_are_all_returned() {
             .iter()
             .all(|w| !w.existing_content.is_empty() && !w.new_content.is_empty())
     );
+}
+
+#[tokio::test]
+async fn distinct_dated_workout_records_do_not_create_conflicts_or_cross_source_context() {
+    let tm = common::TestMemory::new(false).await;
+    let reference_time = "2026-11-01T00:00:00Z"
+        .parse()
+        .expect("fixed reference time");
+    let first_ingested = "2026-11-01T00:00:01Z"
+        .parse()
+        .expect("fixed first transaction time");
+    let second_ingested = "2026-11-01T00:00:02Z"
+        .parse()
+        .expect("fixed second transaction time");
+
+    let first = extract_with_source_details(
+        &tm.service,
+        "doc",
+        "workout-oct24",
+        "Facts:\n- Historical record: {\"date\":\"2026-10-24\",\"duration\":95}",
+        reference_time,
+        Some(first_ingested),
+    )
+    .await;
+    let second = extract_with_source_details(
+        &tm.service,
+        "doc",
+        "workout-oct29",
+        "Facts:\n- Historical record: {\"date\":\"2026-10-29\",\"duration\":30}",
+        reference_time,
+        Some(second_ingested),
+    )
+    .await;
+
+    assert!(first.warnings.is_empty(), "first extraction: {first:?}");
+    assert!(second.warnings.is_empty(), "second extraction: {second:?}");
+    assert_eq!(first.reconciliation.as_ref().unwrap().active_relations, 0);
+    assert_eq!(second.reconciliation.as_ref().unwrap().active_relations, 0);
+    assert!(
+        first.facts.iter().any(|fact| {
+            let evidence = format!(
+                "{} {}",
+                fact.statement.as_deref().unwrap_or_default(),
+                fact.source_quote.as_deref().unwrap_or_default()
+            );
+            evidence.contains("2026-10-24") && evidence.contains("95")
+        }),
+        "first extraction must preserve its dated record and duration: {first:?}"
+    );
+    assert!(
+        second.facts.iter().any(|fact| {
+            let evidence = format!(
+                "{} {}",
+                fact.statement.as_deref().unwrap_or_default(),
+                fact.source_quote.as_deref().unwrap_or_default()
+            );
+            evidence.contains("2026-10-29") && evidence.contains("30")
+        }),
+        "second extraction must preserve its dated record and duration: {second:?}"
+    );
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &tm.service,
+        AssembleContextRequest {
+            query: "Historical record duration".into(),
+            as_of: None,
+            budget: 5,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("assemble context");
+
+    let expected_fact_sources: std::collections::BTreeMap<_, _> = first
+        .facts
+        .iter()
+        .map(|fact| (fact.fact_id.as_str(), first.episode_id.as_str()))
+        .chain(
+            second
+                .facts
+                .iter()
+                .map(|fact| (fact.fact_id.as_str(), second.episode_id.as_str())),
+        )
+        .collect();
+    let recalled_fact_sources: std::collections::BTreeMap<_, _> = items
+        .iter()
+        .map(|item| (item.fact_id.as_str(), item.source_episode.as_str()))
+        .collect();
+
+    assert_eq!(items.len(), expected_fact_sources.len());
+    assert_eq!(recalled_fact_sources, expected_fact_sources);
+    assert!(items.iter().all(|item| {
+        item.reconciliation
+            .as_ref()
+            .is_none_or(|reconciliation| reconciliation.relations.is_empty())
+    }));
 }
 
 /// Reproducible local workload; run separately with `--ignored --nocapture`.

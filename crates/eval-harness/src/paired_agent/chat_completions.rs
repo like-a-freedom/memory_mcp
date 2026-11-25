@@ -833,7 +833,11 @@ impl ChatCompletionsAgent {
                         response_wire_bytes: None,
                     });
             }
-            let tool_result = match memory.call_tool(tool_name, arguments.clone()) {
+            let read_started = (tool_name == "assemble_context").then(Instant::now);
+            let call_result = memory.call_tool(tool_name, arguments.clone());
+            let read_elapsed_ms = read_started
+                .map(|started| started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64);
+            let tool_result = match call_result {
                 Ok(result)
                     if result.pointer("/result/isError").and_then(Value::as_bool) != Some(true) =>
                 {
@@ -857,6 +861,7 @@ impl ChatCompletionsAgent {
                         reads.push(super::MemoryReadObservation {
                             request_sequence,
                             response_sequence: Some(response_sequence),
+                            elapsed_ms: read_elapsed_ms,
                             outcome: super::MemoryReadOutcome::Failed,
                             item_count: None,
                             request_query_sha256: read_request_fingerprints
@@ -868,8 +873,14 @@ impl ChatCompletionsAgent {
                             selector_arguments_sha256: read_request_fingerprints
                                 .as_ref()
                                 .map(|fingerprints| fingerprints.selector_arguments_sha256.clone()),
+                            selector_arguments_present: read_request_fingerprints.as_ref().map(
+                                |fingerprints| fingerprints.selector_arguments_present.clone(),
+                            ),
                             requested_valid_at_sha256:
                                 super::tool_results::requested_valid_at_sha256(&arguments),
+                            requested_cutoff_sha256: super::tool_results::requested_cutoff(
+                                &arguments,
+                            ),
                             response_guidance_sha256: None,
                             evidence: None,
                         });
@@ -907,6 +918,7 @@ impl ChatCompletionsAgent {
                         reads.push(super::MemoryReadObservation {
                             request_sequence,
                             response_sequence: Some(response_sequence),
+                            elapsed_ms: read_elapsed_ms,
                             outcome,
                             item_count,
                             request_query_sha256: read_request_fingerprints
@@ -918,8 +930,14 @@ impl ChatCompletionsAgent {
                             selector_arguments_sha256: read_request_fingerprints
                                 .as_ref()
                                 .map(|fingerprints| fingerprints.selector_arguments_sha256.clone()),
+                            selector_arguments_present: read_request_fingerprints.as_ref().map(
+                                |fingerprints| fingerprints.selector_arguments_present.clone(),
+                            ),
                             requested_valid_at_sha256:
                                 super::tool_results::requested_valid_at_sha256(&arguments),
+                            requested_cutoff_sha256: super::tool_results::requested_cutoff(
+                                &arguments,
+                            ),
                             response_guidance_sha256: super::tool_results::response_guidance_sha256(
                                 &tool_result,
                             ),

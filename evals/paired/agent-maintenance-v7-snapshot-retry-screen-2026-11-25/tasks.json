@@ -1,0 +1,205 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "sablehaven-prism-gate-telemetry-history",
+        "case_id": "sablehaven-current-prism-gate-telemetry-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Sablehaven Glass Observatory uses Aster-73 as its prism gate telemetry code. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://a11-snapshot-v7/highmere/sablehaven-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Sablehaven Glass Observatory's current prism gate telemetry code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Sablehaven Glass Observatory's current prism gate telemetry code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "a11-snapshot-v7-highmere-prior-01",
+          "source_id": "conversation://a11-snapshot-v7/highmere/sablehaven-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Sablehaven Glass Observatory uses Vesper-21 as its prism gate telemetry code.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "a11-snapshot-v7-highmere-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "a11-snapshot-v7-highmere-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Aster-73"
+        ],
+        "forbidden_event_ids": [
+          "a11-snapshot-v7-highmere-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "snapshot_bound_retry": {
+            "authorized_guidance_sha256": "3537c8cc8e2ecbfccaa168828967ec48ef56fbe13aeba910cffc72ac57b3735b",
+            "retry_required_when_eligible": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "morrowfen-seed-vault-humidity-history",
+        "case_id": "morrowfen-current-seed-vault-humidity-relay",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Morrowfen Lotus Archive uses Beryl-46 as its seed vault humidity relay. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://a11-snapshot-v7/rillbank/morrowfen-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Morrowfen Lotus Archive's current seed vault humidity relay? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Morrowfen Lotus Archive's current seed vault humidity relay? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "a11-snapshot-v7-rillbank-prior-01",
+          "source_id": "conversation://a11-snapshot-v7/rillbank/morrowfen-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Morrowfen Lotus Archive uses Indigo-31 as its seed vault humidity relay.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "a11-snapshot-v7-rillbank-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "a11-snapshot-v7-rillbank-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Beryl-46"
+        ],
+        "forbidden_event_ids": [
+          "a11-snapshot-v7-rillbank-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "snapshot_bound_retry": {
+            "authorized_guidance_sha256": "3537c8cc8e2ecbfccaa168828967ec48ef56fbe13aeba910cffc72ac57b3735b",
+            "retry_required_when_eligible": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "ternfall-reedbed-weather-uplink-history",
+        "case_id": "ternfall-current-reedbed-weather-uplink-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Ternfall Marsh Observatory uses Cobalt-19 as its reedbed weather uplink code. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://a11-snapshot-v7/caldera/ternfall-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T18:00:00+02:00, what is Ternfall Marsh Observatory's current reedbed weather uplink code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T18:00:00+02:00, what is Ternfall Marsh Observatory's current reedbed weather uplink code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T18:00:00+02:00",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "a11-snapshot-v7-caldera-prior-01",
+          "source_id": "conversation://a11-snapshot-v7/caldera/ternfall-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Ternfall Marsh Observatory uses Amber-63 as its reedbed weather uplink code.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "a11-snapshot-v7-caldera-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "a11-snapshot-v7-caldera-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-19"
+        ],
+        "forbidden_event_ids": [
+          "a11-snapshot-v7-caldera-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T18:00:00+02:00",
+          "required_claim_annotation_alternatives": [],
+          "snapshot_bound_retry": {
+            "authorized_guidance_sha256": "3537c8cc8e2ecbfccaa168828967ec48ef56fbe13aeba910cffc72ac57b3735b",
+            "retry_required_when_eligible": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "brackwater-salinity-sampler-calibration-history",
+        "case_id": "brackwater-current-salinity-sampler-calibration-preset",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Brackwater Salt Lab uses Lapis-28 as its salinity sampler calibration preset. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://a11-snapshot-v7/fernwick/brackwater-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Brackwater Salt Lab's current salinity sampler calibration preset? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Brackwater Salt Lab's current salinity sampler calibration preset? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "a11-snapshot-v7-fernwick-prior-01",
+          "source_id": "conversation://a11-snapshot-v7/fernwick/brackwater-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Brackwater Salt Lab uses Topaz-52 as its salinity sampler calibration preset.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "a11-snapshot-v7-fernwick-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "a11-snapshot-v7-fernwick-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lapis-28"
+        ],
+        "forbidden_event_ids": [
+          "a11-snapshot-v7-fernwick-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "snapshot_bound_retry": {
+            "authorized_guidance_sha256": "3537c8cc8e2ecbfccaa168828967ec48ef56fbe13aeba910cffc72ac57b3735b",
+            "retry_required_when_eligible": true
+          }
+        }
+      }
+    }
+  ]
+}

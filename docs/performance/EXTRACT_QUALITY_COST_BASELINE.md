@@ -1,13 +1,21 @@
 # Extract quality and cost baseline
 
-Status: local implementation verified, 2026-11-03. The production figures are a
-historical baseline; controlled tables compare the implemented policy with
-pristine `8d148440`. No production rollout or historical repair was performed.
+Status: local implementation verified, 2026-11-03. The production figures below
+are the pre-fix historical baseline; controlled tables compare the implemented
+policy with pristine `8d148440`. Production later reported version 1.41.0, but
+no qualified production quality comparison or historical repair is established.
+See the [2026-11-25 production observation](extract-quality-production-observation-2026-11-25.md).
 
-Production: Grafana context `grafana-pushkino`, VictoriaMetrics datasource
+Historical production baseline: Grafana context `grafana-pushkino`, VictoriaMetrics datasource
 `edr4onptd6hogd`, `job="memory_mcp"`, evaluation time
 `2026-11-02T10:55:00Z`. The following are Prometheus `increase` estimates;
 the 24-hour population is small and counters can reset.
+
+A fresh read-only snapshot of the production aggregate metrics was captured on
+2026-11-25. It contains only two successful extracts in five days and cannot
+establish semantic quality or a matched before/after change. See the [dated
+observation](extract-quality-production-observation-2026-11-25.md) for exact
+window bounds, metrics, reproduction queries and limits.
 
 | Observation | Window | Value |
 | --- | --- | ---: |

@@ -1,0 +1,265 @@
+{
+  "source": "read-only aggregate VictoriaMetrics query via gcx",
+  "context": "grafana-pushkino",
+  "datasource": "edr4onptd6hogd",
+  "captured_date": "2026-11-26",
+  "redactions": [
+    {
+      "field": "metric.instance",
+      "replacement": "<redacted>"
+    }
+  ],
+  "window": {
+    "start": "2026-11-20T18:00:00Z",
+    "end": "2026-11-25T18:00:00Z"
+  },
+  "queries": [
+    {
+      "id": "extract_outcomes",
+      "expression": "sum by (outcome) (increase(memory_operation_duration_seconds_count{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "outcome": "success"
+              },
+              "value": [
+                1795629600,
+                "2"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "extract_mean_duration",
+      "expression": "sum(increase(memory_operation_duration_seconds_sum{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d])) / sum(increase(memory_operation_duration_seconds_count{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {},
+              "value": [
+                1795629600,
+                "1.2947536400000001"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "extract_result_counts",
+      "expression": "sum by (result) (increase(memory_operation_results_total{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "result": "entities"
+              },
+              "value": [
+                1795629600,
+                "54"
+              ]
+            },
+            {
+              "metric": {
+                "result": "facts"
+              },
+              "value": [
+                1795629600,
+                "28"
+              ]
+            },
+            {
+              "metric": {
+                "result": "links"
+              },
+              "value": [
+                1795629600,
+                "54"
+              ]
+            },
+            {
+              "metric": {
+                "result": "warnings"
+              },
+              "value": [
+                1795629600,
+                "0"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stage_counts",
+      "expression": "sum by (stage) (increase(memory_pipeline_stage_duration_seconds_count{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "stage": "embedding_provider"
+              },
+              "value": [
+                1795629600,
+                "1776"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stage_mean_duration",
+      "expression": "sum by (stage) (increase(memory_pipeline_stage_duration_seconds_sum{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d])) / sum by (stage) (increase(memory_pipeline_stage_duration_seconds_count{job=\"memory_mcp\",env=\"prod\",operation=\"extract\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "stage": "embedding_provider"
+              },
+              "value": [
+                1795629600,
+                "0.027191174207770275"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "reconciliation_outcomes",
+      "expression": "sum by (outcome) (increase(memory_claim_pipeline_total{job=\"memory_mcp\",env=\"prod\",stage=\"reconcile\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": []
+        }
+      }
+    },
+    {
+      "id": "candidate_counts",
+      "expression": "sum by (schema,match_mode) (increase(memory_claim_candidates_considered_count{job=\"memory_mcp\",env=\"prod\"}[5d]))",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": []
+        }
+      }
+    },
+    {
+      "id": "scrape_availability_mean",
+      "expression": "avg_over_time(up{job=\"memory_mcp\",env=\"prod\"}[5d])",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "env": "prod",
+                "instance": "<redacted>",
+                "job": "memory_mcp",
+                "service": "memory_mcp"
+              },
+              "value": [
+                1795629600,
+                "0.9990277777777777"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "scrape_availability_min",
+      "expression": "min_over_time(up{job=\"memory_mcp\",env=\"prod\"}[5d])",
+      "evaluation_time": "2026-11-25T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "__name__": "up",
+                "env": "prod",
+                "instance": "<redacted>",
+                "job": "memory_mcp",
+                "service": "memory_mcp"
+              },
+              "value": [
+                1795629600,
+                "0"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "build_info_at_window_start",
+      "expression": "memory_build_info{job=\"memory_mcp\",env=\"prod\"}",
+      "evaluation_time": "2026-11-20T18:00:00Z",
+      "exit_code": 0,
+      "response": {
+        "status": "success",
+        "data": {
+          "resultType": "vector",
+          "result": [
+            {
+              "metric": {
+                "__name__": "memory_build_info",
+                "env": "prod",
+                "instance": "<redacted>",
+                "job": "memory_mcp",
+                "service": "memory_mcp",
+                "version": "1.41.0"
+              },
+              "value": [
+                1795197600,
+                "1"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

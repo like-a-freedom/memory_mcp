@@ -1,0 +1,18 @@
+{
+  "schema_version": "memory-mcp-agent-maintenance-v7-screen-criteria/v1",
+  "scope": "single synthetic feasibility screen; no promotion or population inference",
+  "required_per_arm": {
+    "paired_trials": 4,
+    "registered_retry_diagnostic_trials": 4,
+    "hard_violations": 0,
+    "timeouts_or_resource_exits": 0,
+    "unsupported_or_prohibited_source_uses": 0
+  },
+  "retry_interpretation": {
+    "eligible_exposure": "report compliant/noncompliant; any eligible required retry must be observed and compliant",
+    "no_eligible_exposure": "inconclusive for model adherence to the snapshot-bound retry contract",
+    "not_observed": "does not count as a pass when an eligible trigger was observed"
+  },
+  "repeat_policy": "no repeat capture under this registration; any follow-up requires a newly frozen disjoint cohort",
+  "claims": "This same-product, four-family synthetic screen cannot establish a memory treatment effect or general usability improvement."
+}

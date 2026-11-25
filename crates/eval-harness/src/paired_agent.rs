@@ -29,12 +29,23 @@ pub(crate) mod tool_results;
 
 pub const PAIRED_TASK_MANIFEST_SCHEMA_V1: &str = "memory-mcp-agent-tasks/v1";
 pub const PAIRED_TASK_MANIFEST_SCHEMA_V2: &str = "memory-mcp-agent-tasks/v2";
+pub const PAIRED_TASK_MANIFEST_SCHEMA_V3: &str = "memory-mcp-agent-tasks/v3";
 pub const PAIRED_KNOWN_REVISION_PLACEHOLDER: &str = "{{KNOWN_REVISION}}";
 const RECEIPT_JOURNAL_SCHEMA_V4: &str = "memory-mcp-agent-trial-receipt/v4";
 const RECEIPT_JOURNAL_SCHEMA_V5: &str = "memory-mcp-agent-trial-receipt/v5";
 const RECEIPT_JOURNAL_SCHEMA_V6: &str = "memory-mcp-agent-trial-receipt/v6";
 const RECEIPT_JOURNAL_SCHEMA_V7: &str = "memory-mcp-agent-trial-receipt/v7";
 const RECEIPT_JOURNAL_SCHEMA_V8: &str = "memory-mcp-agent-trial-receipt/v8";
+const RECEIPT_JOURNAL_SCHEMA_V9: &str = "memory-mcp-agent-trial-receipt/v9";
+const RECEIPT_JOURNAL_SCHEMA_V10: &str = "memory-mcp-agent-trial-receipt/v10";
+pub(crate) const SNAPSHOT_RETRY_PRESERVED_SELECTOR_FIELDS: [&str; 6] = [
+    "fact_types",
+    "budget",
+    "view_mode",
+    "window_start",
+    "window_end",
+    "compact",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -120,6 +131,51 @@ pub struct ReadExpectation {
         Vec<Vec<crate::independent_probe::ProbeClaimAnnotation>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_arguments: Option<BTreeMap<String, Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_bound_retry: Option<SnapshotBoundRetryExpectation>,
+}
+
+/// Private registration for a retry that must use the snapshot returned by
+/// the immediately preceding authorized empty partial read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SnapshotBoundRetryExpectation {
+    /// Hash of the exact guidance text that authorizes one query refinement.
+    pub authorized_guidance_sha256: String,
+    /// Require one retry when its trigger and complete snapshot are observed.
+    #[serde(default)]
+    pub retry_required_when_eligible: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SnapshotRetryAssessment {
+    NotRegistered,
+    NotObserved,
+    NotEligible,
+    Compliant,
+    Noncompliant,
+}
+
+/// Content-free state-transition result for the registered snapshot retry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SnapshotRetryDiagnostic {
+    pub expectation_registered: bool,
+    pub assessment: SnapshotRetryAssessment,
+    pub retry_required_when_eligible: bool,
+    pub initial_read_eligible: Option<bool>,
+    pub retry_observed: Option<bool>,
+    pub retry_count: Option<u32>,
+    pub retry_limit_respected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_changed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_cutoff_matches: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_temporal_selector_matches: Option<BTreeMap<String, bool>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preserved_selector_matches: Option<BTreeMap<String, bool>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,6 +241,11 @@ pub struct AgentObservation {
 pub struct MemoryReadObservation {
     pub request_sequence: u32,
     pub response_sequence: Option<u32>,
+    /// Monotonic elapsed time between the observed request and its terminal
+    /// response. Interrupted reads have no duration; zero is a valid measured
+    /// duration at millisecond precision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elapsed_ms: Option<u64>,
     pub outcome: MemoryReadOutcome,
     pub item_count: Option<u32>,
     /// SHA-256 of the exact JSON query argument; query text is not retained.
@@ -196,9 +257,16 @@ pub struct MemoryReadObservation {
     /// Per-field hashes of the effective `assemble_context` selector values.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_arguments_sha256: Option<BTreeMap<String, String>>,
+    /// Per-field presence in the request, preserving omitted versus explicit null.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_arguments_present: Option<BTreeMap<String, bool>>,
     /// SHA-256 of normalized requested valid time; the timestamp is not retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_valid_at_sha256: Option<String>,
+    /// Hash of the requested valid-time and revision pair, retained even when
+    /// the corresponding tool call fails before returning evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_cutoff_sha256: Option<String>,
     /// SHA-256 of returned guidance text; guidance itself is not retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_guidance_sha256: Option<String>,
@@ -232,6 +300,8 @@ pub enum ReadCompleteness {
 pub struct MemoryReadDiagnostic {
     pub request_sequence: u32,
     pub response_sequence: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elapsed_ms: Option<u64>,
     pub outcome: MemoryReadOutcome,
     pub item_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -315,6 +385,7 @@ pub(crate) fn validate_read_associations(
         if request.call_id.is_none()
             || terminals.next().is_some()
             || terminal.map(|event| event.sequence) != read.response_sequence
+            || (read.response_sequence.is_none() && read.elapsed_ms.is_some())
             || terminal.is_some_and(|event| {
                 event.sequence <= request.sequence || event.tool_name != request.tool_name
             })
@@ -401,15 +472,7 @@ pub trait PairedTrialBackend {
 impl PairedTaskManifest {
     pub fn validate(&self, plan: &PairedEvaluationPlan) -> Result<(), EvalError> {
         plan.validate()?;
-        if !matches!(
-            self.schema_version.as_str(),
-            PAIRED_TASK_MANIFEST_SCHEMA_V1 | PAIRED_TASK_MANIFEST_SCHEMA_V2
-        ) {
-            return Err(EvalError::InvalidInput(format!(
-                "unsupported paired task manifest schema {:?}",
-                self.schema_version
-            )));
-        }
+        self.validate_schema_contract()?;
         let manifest_keys = self
             .tasks
             .iter()
@@ -421,13 +484,6 @@ impl PairedTaskManifest {
             &manifest_keys,
         )?;
         for task in &self.tasks {
-            if task.oracle.read_expectation.is_some()
-                && self.schema_version == PAIRED_TASK_MANIFEST_SCHEMA_V1
-            {
-                return Err(EvalError::InvalidInput(
-                    "read expectations require task manifest v2".into(),
-                ));
-            }
             validate_task(task)?;
         }
         if self.corpus_sha256()? != plan.shared_identity.corpus_sha256 {
@@ -439,6 +495,41 @@ impl PairedTaskManifest {
             return Err(EvalError::InvalidInput(
                 "paired task manifest does not match the oracle hash in the plan".into(),
             ));
+        }
+        Ok(())
+    }
+
+    fn validate_schema_contract(&self) -> Result<(), EvalError> {
+        if !matches!(
+            self.schema_version.as_str(),
+            PAIRED_TASK_MANIFEST_SCHEMA_V1
+                | PAIRED_TASK_MANIFEST_SCHEMA_V2
+                | PAIRED_TASK_MANIFEST_SCHEMA_V3
+        ) {
+            return Err(EvalError::InvalidInput(format!(
+                "unsupported paired task manifest schema {:?}",
+                self.schema_version
+            )));
+        }
+        for task in &self.tasks {
+            if task.oracle.read_expectation.is_some()
+                && self.schema_version == PAIRED_TASK_MANIFEST_SCHEMA_V1
+            {
+                return Err(EvalError::InvalidInput(
+                    "read expectations require task manifest v2".into(),
+                ));
+            }
+            if task
+                .oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.snapshot_bound_retry.is_some())
+                && self.schema_version != PAIRED_TASK_MANIFEST_SCHEMA_V3
+            {
+                return Err(EvalError::InvalidInput(
+                    "snapshot-bound retry requires paired task manifest v3".into(),
+                ));
+            }
         }
         Ok(())
     }
@@ -541,6 +632,17 @@ fn validate_task(task: &PairedTaskDefinition) -> Result<(), EvalError> {
         }
     }
     if let Some(expectation) = &task.oracle.read_expectation {
+        if let Some(retry) = &expectation.snapshot_bound_retry {
+            crate::paired::validate_sha256(
+                "authorized retry guidance",
+                &retry.authorized_guidance_sha256,
+            )?;
+            if expectation.selector_arguments.is_some() {
+                return Err(EvalError::InvalidInput(
+                    "snapshot-bound retry cannot use a static selector oracle".into(),
+                ));
+            }
+        }
         if let Some(selector_arguments) = &expectation.selector_arguments {
             tool_results::validate_expected_selector_arguments(selector_arguments)?;
             if let Some(expected_valid_at) = expectation.valid_at {
@@ -612,6 +714,7 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
     backend: &mut B,
     output_directory: &Path,
 ) -> Result<(PairedRunArtifact, PairedRunArtifact), EvalError> {
+    manifest.validate_schema_contract()?;
     validate_output_directory(output_directory)?;
     let plan_sha256 = plan.sha256()?;
     let incumbent_journal = output_directory.join("incumbent-receipts.jsonl");
@@ -667,6 +770,18 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
         .iter()
         .map(|task| (task.key.clone(), task))
         .collect::<BTreeMap<_, _>>();
+    let snapshot_retry_requirements = manifest
+        .tasks
+        .iter()
+        .filter_map(|task| {
+            task.oracle
+                .read_expectation
+                .as_ref()
+                .and_then(|expectation| expectation.snapshot_bound_retry.as_ref())
+                .map(|retry| (task.key.clone(), retry.retry_required_when_eligible))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let snapshot_retry_registered = !snapshot_retry_requirements.is_empty();
 
     let mut expected = plan.expected_trials.clone();
     expected.sort();
@@ -692,12 +807,21 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                 shared: plan.shared_identity.clone(),
                 product: product_identity.clone(),
             };
-            let receipt = score_trial(
+            let mut receipt = score_trial(
                 task,
                 arm_order_for(arm, key.incumbent_first),
                 prepared_task.expected_known_revision,
                 &execution,
             )?;
+            if snapshot_retry_registered && receipt.snapshot_retry_diagnostic.is_none() {
+                receipt.snapshot_retry_diagnostic = Some(
+                    snapshot_retry_requirements
+                        .get(&receipt.key)
+                        .copied()
+                        .map(not_observed_snapshot_retry_diagnostic)
+                        .unwrap_or_else(unregistered_snapshot_retry_diagnostic),
+                );
+            }
             crate::paired::validate_trial_receipt(&receipt, &identity.shared)?;
             let journal_path = match arm {
                 RunArm::Incumbent => &incumbent_journal,
@@ -720,6 +844,7 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                 &receipt,
                 valid_time_registered,
                 selector_expectation_registered,
+                snapshot_retry_registered,
             )?;
             let artifact = match arm {
                 RunArm::Incumbent => &mut incumbent,
@@ -749,6 +874,19 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                     })
                 })
             });
+        let has_complete_elapsed_read_timing = has_read_capture
+            && artifact
+                .receipts
+                .iter()
+                .filter(|receipt| receipt.read_capture_status.is_some())
+                .all(|receipt| {
+                    receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+                        reads.iter().all(|read| {
+                            (read.response_sequence.is_some() && read.elapsed_ms.is_some())
+                                || (read.response_sequence.is_none() && read.elapsed_ms.is_none())
+                        })
+                    })
+                });
         let valid_time_registered = manifest.tasks.iter().any(|task| {
             task.oracle
                 .read_expectation
@@ -761,16 +899,20 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                 .as_ref()
                 .is_some_and(|expectation| expectation.selector_arguments.is_some())
         });
-        if has_read_capture {
+        let snapshot_retry_registered = !snapshot_retry_requirements.is_empty();
+        if has_read_capture || snapshot_retry_registered {
             artifact.schema_version = crate::paired::paired_artifact_schema_for_reads(
                 has_read_capture,
                 has_complete_request_fingerprints,
                 valid_time_registered,
                 selector_expectation_registered,
+                snapshot_retry_registered,
+                has_complete_elapsed_read_timing,
             )?
             .into();
         }
         complete_selector_registration_diagnostics(artifact);
+        complete_snapshot_retry_registration_diagnostics(artifact, &snapshot_retry_requirements);
     }
 
     let run_completed_at = Utc::now();
@@ -796,7 +938,12 @@ fn new_run_id() -> Result<String, EvalError> {
 pub(crate) fn complete_selector_registration_diagnostics(
     artifact: &mut crate::paired::PairedRunArtifact,
 ) {
-    if artifact.schema_version != crate::paired::PAIRED_ARTIFACT_SCHEMA_V10 {
+    if !matches!(
+        artifact.schema_version.as_str(),
+        crate::paired::PAIRED_ARTIFACT_SCHEMA_V10
+            | crate::paired::PAIRED_ARTIFACT_SCHEMA_V11
+            | crate::paired::PAIRED_ARTIFACT_SCHEMA_V12
+    ) {
         return;
     }
     for read in artifact
@@ -806,6 +953,61 @@ pub(crate) fn complete_selector_registration_diagnostics(
         .flatten()
     {
         read.selector_expectation_registered.get_or_insert(false);
+    }
+}
+
+pub(crate) fn complete_snapshot_retry_registration_diagnostics(
+    artifact: &mut crate::paired::PairedRunArtifact,
+    registered_tasks: &BTreeMap<CaseTrialKey, bool>,
+) {
+    if !matches!(
+        artifact.schema_version.as_str(),
+        crate::paired::PAIRED_ARTIFACT_SCHEMA_V11 | crate::paired::PAIRED_ARTIFACT_SCHEMA_V12
+    ) {
+        return;
+    }
+    for receipt in &mut artifact.receipts {
+        receipt.snapshot_retry_diagnostic.get_or_insert_with(|| {
+            if let Some(retry_required) = registered_tasks.get(&receipt.key) {
+                not_observed_snapshot_retry_diagnostic(*retry_required)
+            } else {
+                unregistered_snapshot_retry_diagnostic()
+            }
+        });
+    }
+}
+
+fn unregistered_snapshot_retry_diagnostic() -> SnapshotRetryDiagnostic {
+    SnapshotRetryDiagnostic {
+        expectation_registered: false,
+        assessment: SnapshotRetryAssessment::NotRegistered,
+        retry_required_when_eligible: false,
+        initial_read_eligible: None,
+        retry_observed: None,
+        retry_count: None,
+        retry_limit_respected: None,
+        query_changed: None,
+        snapshot_cutoff_matches: None,
+        legacy_temporal_selector_matches: None,
+        preserved_selector_matches: None,
+    }
+}
+
+fn not_observed_snapshot_retry_diagnostic(
+    retry_required_when_eligible: bool,
+) -> SnapshotRetryDiagnostic {
+    SnapshotRetryDiagnostic {
+        expectation_registered: true,
+        assessment: SnapshotRetryAssessment::NotObserved,
+        retry_required_when_eligible,
+        initial_read_eligible: None,
+        retry_observed: None,
+        retry_count: None,
+        retry_limit_respected: None,
+        query_changed: None,
+        snapshot_cutoff_matches: None,
+        legacy_temporal_selector_matches: None,
+        preserved_selector_matches: None,
     }
 }
 
@@ -840,6 +1042,7 @@ fn score_read(
     checkpoint: Option<i64>,
     execution: &PairedTrialExecution,
     citations: Option<&[String]>,
+    redact_guidance_fingerprint: bool,
 ) -> Result<MemoryReadDiagnostic, EvalError> {
     let selector_expectation = oracle
         .read_expectation
@@ -858,13 +1061,16 @@ fn score_read(
     let mut diagnostic = MemoryReadDiagnostic {
         request_sequence: read.request_sequence,
         response_sequence: read.response_sequence,
+        elapsed_ms: read.elapsed_ms,
         outcome: read.outcome,
         item_count: read.item_count,
         request_query_sha256: read.request_query_sha256.clone(),
         non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
         selector_expectation_registered: selector_expectation.map(|_| true),
         selector_argument_matches: None,
-        response_guidance_sha256: read.response_guidance_sha256.clone(),
+        response_guidance_sha256: (!redact_guidance_fingerprint)
+            .then(|| read.response_guidance_sha256.clone())
+            .flatten(),
         requested_valid_at_match: None,
         returned_valid_at_match: None,
         requested_cutoff_match: None,
@@ -876,6 +1082,9 @@ fn score_read(
     };
     if let Some(digest) = read.requested_valid_at_sha256.as_deref() {
         crate::paired::validate_sha256("requested valid_at", digest)?;
+    }
+    if let Some(digest) = read.requested_cutoff_sha256.as_deref() {
+        crate::paired::validate_sha256("requested cutoff", digest)?;
     }
     if let Some(fingerprints) = &read.selector_arguments_sha256 {
         if fingerprints.len() != tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
@@ -890,6 +1099,9 @@ fn score_read(
         for digest in fingerprints.values() {
             crate::paired::validate_sha256("read selector", digest)?;
         }
+    }
+    if let Some(presence) = &read.selector_arguments_present {
+        validate_selector_presence(presence)?;
     }
     if let Some(valid_at) = oracle
         .read_expectation
@@ -930,6 +1142,7 @@ fn score_read(
         return Err(invalid());
     }
     for digest in [
+        &read.requested_cutoff_sha256,
         &evidence.requested_cutoff_sha256,
         &evidence.returned_cutoff_sha256,
         &evidence.returned_valid_at_sha256,
@@ -938,6 +1151,14 @@ fn score_read(
     .flatten()
     {
         crate::paired::validate_sha256("read cutoff", digest)?;
+    }
+    if read
+        .requested_cutoff_sha256
+        .as_ref()
+        .zip(evidence.requested_cutoff_sha256.as_ref())
+        .is_some_and(|(request, evidence_request)| request != evidence_request)
+    {
+        return Err(invalid());
     }
     let episode_ids: BTreeSet<_> = evidence
         .source_episode_ids
@@ -1017,6 +1238,221 @@ fn score_read(
         }
     }
     Ok(diagnostic)
+}
+
+fn score_snapshot_bound_retry(
+    task: &PairedTaskDefinition,
+    observation: &AgentObservation,
+) -> Result<Option<SnapshotRetryDiagnostic>, EvalError> {
+    use SnapshotRetryAssessment as Assessment;
+
+    let Some(policy) = task
+        .oracle
+        .read_expectation
+        .as_ref()
+        .and_then(|expectation| expectation.snapshot_bound_retry.as_ref())
+    else {
+        return Ok(None);
+    };
+
+    let initial_diagnostic =
+        || not_observed_snapshot_retry_diagnostic(policy.retry_required_when_eligible);
+
+    let (Some(ReadCaptureStatus::Observed), Some(reads)) = (
+        observation.read_capture_status,
+        observation.memory_reads.as_ref(),
+    ) else {
+        return Ok(Some(initial_diagnostic()));
+    };
+    let mut ordered = reads.iter().collect::<Vec<_>>();
+    ordered.sort_by_key(|read| read.request_sequence);
+    let Some(initial) = ordered.first().copied() else {
+        let mut diagnostic = initial_diagnostic();
+        diagnostic.retry_observed = Some(false);
+        diagnostic.retry_count = Some(0);
+        diagnostic.retry_limit_respected = Some(true);
+        return Ok(Some(diagnostic));
+    };
+    let retry_count = u32::try_from(ordered.len().saturating_sub(1))
+        .map_err(|_| EvalError::InvalidInput("snapshot retry count overflowed".into()))?;
+    let retry_observed = retry_count > 0;
+    let retry_limit_respected = retry_count <= 1;
+    let mut diagnostic = initial_diagnostic();
+    diagnostic.retry_observed = Some(retry_observed);
+    diagnostic.retry_count = Some(retry_count);
+    diagnostic.retry_limit_respected = Some(retry_limit_respected);
+
+    let eligibility = match (initial.outcome, initial.evidence.as_ref()) {
+        (MemoryReadOutcome::Failed | MemoryReadOutcome::Nonempty, _) => Some(false),
+        (MemoryReadOutcome::Unknown, _) => None,
+        (MemoryReadOutcome::Empty, Some(evidence)) => match evidence.completeness {
+            Some(ReadCompleteness::Complete) => Some(false),
+            Some(ReadCompleteness::Unknown) | None => None,
+            Some(ReadCompleteness::Partial) => {
+                let (Some(guidance), Some(returned_cutoff)) = (
+                    initial.response_guidance_sha256.as_deref(),
+                    evidence.returned_cutoff_sha256.as_deref(),
+                ) else {
+                    return Ok(Some(diagnostic));
+                };
+                crate::paired::validate_sha256("authorized retry guidance", guidance)?;
+                crate::paired::validate_sha256("returned snapshot cutoff", returned_cutoff)?;
+                Some(guidance == policy.authorized_guidance_sha256)
+            }
+        },
+        (MemoryReadOutcome::Empty, None) => None,
+    };
+
+    let Some(eligible) = eligibility else {
+        return Ok(Some(diagnostic));
+    };
+    if !eligible {
+        diagnostic.assessment = if retry_observed {
+            Assessment::Noncompliant
+        } else {
+            Assessment::NotEligible
+        };
+        diagnostic.initial_read_eligible = Some(false);
+        return Ok(Some(diagnostic));
+    }
+
+    if !retry_observed {
+        diagnostic.assessment = if policy.retry_required_when_eligible {
+            Assessment::Noncompliant
+        } else {
+            Assessment::Compliant
+        };
+        diagnostic.initial_read_eligible = Some(true);
+        return Ok(Some(diagnostic));
+    }
+
+    let Some(retry) = ordered.get(1).copied() else {
+        return Err(EvalError::InvalidInput(
+            "snapshot retry count and observations disagree".into(),
+        ));
+    };
+    let Some(initial_response_sequence) = initial.response_sequence else {
+        diagnostic.initial_read_eligible = Some(true);
+        return Ok(Some(diagnostic));
+    };
+    if initial_response_sequence >= retry.request_sequence {
+        diagnostic.assessment = Assessment::Noncompliant;
+        diagnostic.initial_read_eligible = Some(true);
+        return Ok(Some(diagnostic));
+    }
+
+    let (Some(initial_query), Some(retry_query)) = (
+        initial.request_query_sha256.as_deref(),
+        retry.request_query_sha256.as_deref(),
+    ) else {
+        diagnostic.initial_read_eligible = Some(true);
+        return Ok(Some(diagnostic));
+    };
+    crate::paired::validate_sha256("initial retry query", initial_query)?;
+    crate::paired::validate_sha256("retry query", retry_query)?;
+    let query_changed = initial_query != retry_query;
+
+    let (Some(returned_cutoff), Some(requested_cutoff)) = (
+        initial
+            .evidence
+            .as_ref()
+            .and_then(|evidence| evidence.returned_cutoff_sha256.as_deref()),
+        retry.requested_cutoff_sha256.as_deref(),
+    ) else {
+        diagnostic.initial_read_eligible = Some(true);
+        diagnostic.query_changed = Some(query_changed);
+        return Ok(Some(diagnostic));
+    };
+    crate::paired::validate_sha256("returned snapshot cutoff", returned_cutoff)?;
+    crate::paired::validate_sha256("requested retry cutoff", requested_cutoff)?;
+    let snapshot_cutoff_matches = returned_cutoff == requested_cutoff;
+
+    let Some(presence) = retry.selector_arguments_present.as_ref() else {
+        diagnostic.initial_read_eligible = Some(true);
+        diagnostic.query_changed = Some(query_changed);
+        diagnostic.snapshot_cutoff_matches = Some(snapshot_cutoff_matches);
+        return Ok(Some(diagnostic));
+    };
+    validate_selector_presence(presence)?;
+    let legacy_temporal_selector_matches = BTreeMap::from([
+        ("as_of".to_owned(), presence.get("as_of") == Some(&false)),
+        (
+            "known_at".to_owned(),
+            presence.get("known_at") == Some(&false),
+        ),
+    ]);
+
+    let (Some(initial_selectors), Some(retry_selectors)) = (
+        initial.selector_arguments_sha256.as_ref(),
+        retry.selector_arguments_sha256.as_ref(),
+    ) else {
+        diagnostic.initial_read_eligible = Some(true);
+        diagnostic.query_changed = Some(query_changed);
+        diagnostic.snapshot_cutoff_matches = Some(snapshot_cutoff_matches);
+        diagnostic.legacy_temporal_selector_matches = Some(legacy_temporal_selector_matches);
+        return Ok(Some(diagnostic));
+    };
+    validate_selector_fingerprints(initial_selectors)?;
+    validate_selector_fingerprints(retry_selectors)?;
+    let preserved_selector_matches = SNAPSHOT_RETRY_PRESERVED_SELECTOR_FIELDS
+        .into_iter()
+        .map(|field| {
+            (
+                field.to_owned(),
+                initial_selectors.get(field) == retry_selectors.get(field),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let compliant = retry_limit_respected
+        && query_changed
+        && snapshot_cutoff_matches
+        && legacy_temporal_selector_matches
+            .values()
+            .all(|matches| *matches)
+        && preserved_selector_matches.values().all(|matches| *matches);
+    diagnostic.assessment = if compliant {
+        Assessment::Compliant
+    } else {
+        Assessment::Noncompliant
+    };
+    diagnostic.initial_read_eligible = Some(true);
+    diagnostic.query_changed = Some(query_changed);
+    diagnostic.snapshot_cutoff_matches = Some(snapshot_cutoff_matches);
+    diagnostic.legacy_temporal_selector_matches = Some(legacy_temporal_selector_matches);
+    diagnostic.preserved_selector_matches = Some(preserved_selector_matches);
+    Ok(Some(diagnostic))
+}
+
+fn validate_selector_presence(presence: &BTreeMap<String, bool>) -> Result<(), EvalError> {
+    if presence.len() != tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
+        || tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+            .iter()
+            .any(|field| !presence.contains_key(*field))
+    {
+        return Err(EvalError::InvalidInput(
+            "read selector presence does not match the fixed field set".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_selector_fingerprints(
+    fingerprints: &BTreeMap<String, String>,
+) -> Result<(), EvalError> {
+    if fingerprints.len() != tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
+        || tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+            .iter()
+            .any(|field| !fingerprints.contains_key(*field))
+    {
+        return Err(EvalError::InvalidInput(
+            "read selector fingerprints do not match the fixed field set".into(),
+        ));
+    }
+    for digest in fingerprints.values() {
+        crate::paired::validate_sha256("read selector", digest)?;
+    }
+    Ok(())
 }
 
 fn score_trial(
@@ -1170,11 +1606,18 @@ fn score_trial(
                             final_answer
                                 .as_ref()
                                 .map(|answer| answer.citations.as_slice()),
+                            task.oracle
+                                .read_expectation
+                                .as_ref()
+                                .is_some_and(|expectation| {
+                                    expectation.snapshot_bound_retry.is_some()
+                                }),
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
             .transpose()?,
+        snapshot_retry_diagnostic: score_snapshot_bound_retry(task, observation)?,
         key: task.key.clone(),
         arm_order,
         known_revision_checkpoint,
@@ -1327,6 +1770,7 @@ fn append_receipt_journal(
     receipt: &TrialReceipt,
     valid_time_registered: bool,
     selector_expectation_registered: bool,
+    snapshot_retry_registered: bool,
 ) -> Result<(), EvalError> {
     #[derive(Serialize)]
     struct JournalRecord<'a> {
@@ -1342,6 +1786,7 @@ fn append_receipt_journal(
             receipt,
             valid_time_registered,
             selector_expectation_registered,
+            snapshot_retry_registered,
         ),
         plan_sha256,
         arm,
@@ -1370,13 +1815,27 @@ fn receipt_journal_schema(
     receipt: &TrialReceipt,
     valid_time_registered: bool,
     selector_expectation_registered: bool,
+    snapshot_retry_registered: bool,
 ) -> &'static str {
+    let has_complete_elapsed_read_timing = receipt.read_capture_status.is_some()
+        && receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+            reads.iter().all(|read| {
+                (read.response_sequence.is_some() && read.elapsed_ms.is_some())
+                    || (read.response_sequence.is_none() && read.elapsed_ms.is_none())
+            })
+        });
+    if has_complete_elapsed_read_timing {
+        return RECEIPT_JOURNAL_SCHEMA_V10;
+    }
     let has_complete_request_fingerprints =
         receipt.read_diagnostics.as_ref().is_some_and(|reads| {
             reads.iter().all(|read| {
                 read.request_query_sha256.is_some() && read.non_query_arguments_sha256.is_some()
             })
         });
+    if snapshot_retry_registered {
+        return RECEIPT_JOURNAL_SCHEMA_V9;
+    }
     if selector_expectation_registered {
         return RECEIPT_JOURNAL_SCHEMA_V8;
     }
@@ -1551,12 +2010,15 @@ mod tests {
             execution.observation.memory_reads = Some(vec![MemoryReadObservation {
                 request_sequence: 2,
                 response_sequence: Some(3),
+                elapsed_ms: Some(12),
                 outcome: MemoryReadOutcome::Nonempty,
                 item_count: Some(1),
                 request_query_sha256: Some("b".repeat(64)),
                 non_query_arguments_sha256: Some("c".repeat(64)),
                 selector_arguments_sha256: None,
+                selector_arguments_present: None,
                 requested_valid_at_sha256: None,
+                requested_cutoff_sha256: None,
                 response_guidance_sha256: None,
                 evidence: None,
             }]);
@@ -1799,6 +2261,7 @@ mod tests {
             &journal_read_receipt(false),
             false,
             false,
+            false,
         )
         .expect("write legacy read receipt");
 
@@ -1820,6 +2283,7 @@ mod tests {
             &journal_read_receipt(true),
             false,
             false,
+            false,
         )
         .expect("write v6 read receipt");
 
@@ -1838,7 +2302,7 @@ mod tests {
     }
 
     #[test]
-    fn registered_valid_time_publishes_v7_journal_with_unknown_match() {
+    fn registered_valid_time_publishes_timed_journal_with_unknown_match() {
         let directory = tempfile::tempdir().expect("paired output directory");
         let mut manifest = manifest();
         manifest.schema_version = PAIRED_TASK_MANIFEST_SCHEMA_V2.into();
@@ -1851,6 +2315,7 @@ mod tests {
                 ),
                 required_claim_annotation_alternatives: Vec::new(),
                 selector_arguments: None,
+                snapshot_bound_retry: None,
             });
         }
         let plan = plan(&manifest);
@@ -1869,8 +2334,9 @@ mod tests {
         assert_eq!(journal.lines().count(), 2);
         for line in journal.lines() {
             let record: serde_json::Value = serde_json::from_str(line).expect("journal JSON");
-            assert_eq!(record["schema_version"], RECEIPT_JOURNAL_SCHEMA_V7);
+            assert_eq!(record["schema_version"], RECEIPT_JOURNAL_SCHEMA_V10);
             let read = &record["receipt"]["read_diagnostics"][0];
+            assert!(read["elapsed_ms"].as_u64().is_some());
             assert!(read.get("requested_valid_at_match").is_none());
             assert!(read.get("returned_valid_at_match").is_none());
         }
@@ -1882,6 +2348,7 @@ mod tests {
             read_diagnostics: Some(vec![MemoryReadDiagnostic {
                 request_sequence: 1,
                 response_sequence: Some(2),
+                elapsed_ms: None,
                 outcome: MemoryReadOutcome::Empty,
                 item_count: Some(0),
                 request_query_sha256: with_fingerprints.then(|| "b".repeat(64)),
@@ -1898,6 +2365,7 @@ mod tests {
                 completeness: None,
                 cited_returned_source_count: None,
             }]),
+            snapshot_retry_diagnostic: None,
             key: CaseTrialKey {
                 stratum_id: "test".into(),
                 family_id: "family".into(),
@@ -2262,6 +2730,32 @@ mod tests {
         assert!(
             matches!(result, Err(EvalError::InvalidInput(message)) if message.contains("accepted answer"))
         );
+    }
+
+    #[test]
+    fn manifest_rejects_snapshot_retry_expectation_before_schema_v3() {
+        let mut manifest = manifest();
+        manifest.schema_version = PAIRED_TASK_MANIFEST_SCHEMA_V2.into();
+        for task in &mut manifest.tasks {
+            task.oracle.read_expectation = Some(ReadExpectation {
+                valid_at: None,
+                required_claim_annotation_alternatives: Vec::new(),
+                selector_arguments: None,
+                snapshot_bound_retry: Some(SnapshotBoundRetryExpectation {
+                    authorized_guidance_sha256: "a".repeat(64),
+                    retry_required_when_eligible: true,
+                }),
+            });
+        }
+        let plan = plan(&manifest);
+
+        let result = manifest.validate(&plan);
+
+        assert!(matches!(
+            result,
+            Err(EvalError::InvalidInput(message))
+                if message.contains("snapshot-bound retry requires paired task manifest v3")
+        ));
     }
 
     #[test]

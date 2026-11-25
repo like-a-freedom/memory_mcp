@@ -1,0 +1,19 @@
+{
+  "schema_version": "memory-mcp-agent-evaluation-environment/v1",
+  "host": "aarch64-apple-darwin",
+  "architecture": "arm64",
+  "rustc": "1.100.0 (0ef1bc386 2026-11-09)",
+  "agent_runner": "codex-cli",
+  "agent_version": "0.171.0-alpha.13",
+  "model_alias": "gpt-6.1-sol",
+  "model_identity_scope": "same_alias_within_invocation",
+  "memory_transport": "stdio",
+  "claim_rollout_stage": "evidence",
+  "embeddings_enabled": false,
+  "extractor": "regex",
+  "lm_studio_used": false,
+  "remote_inference_data_scope": "only the four synthetic A11 histories and fixed prompts",
+  "codex_home": "private_temporary_copy_for_run",
+  "codex_user_config_used": false,
+  "user_codex_state_written": false
+}

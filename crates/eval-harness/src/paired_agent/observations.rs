@@ -22,6 +22,8 @@ pub const OBSERVATIONS_SCHEMA_V4: &str = "memory-mcp-agent-observations/v4";
 pub const OBSERVATIONS_SCHEMA_V3: &str = "memory-mcp-agent-observations/v3";
 pub const OBSERVATIONS_SCHEMA_V5: &str = "memory-mcp-agent-observations/v5";
 pub const OBSERVATIONS_SCHEMA_V6: &str = "memory-mcp-agent-observations/v6";
+pub const OBSERVATIONS_SCHEMA_V7: &str = "memory-mcp-agent-observations/v7";
+pub const OBSERVATIONS_SCHEMA_V8: &str = "memory-mcp-agent-observations/v8";
 
 /// Export the plan-bound inputs a runner needs without exposing expected outcomes.
 pub fn export_paired_inputs(
@@ -99,6 +101,8 @@ impl RecordedPair {
                 | OBSERVATIONS_SCHEMA_V4
                 | OBSERVATIONS_SCHEMA_V5
                 | OBSERVATIONS_SCHEMA_V6
+                | OBSERVATIONS_SCHEMA_V7
+                | OBSERVATIONS_SCHEMA_V8
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired observations schema {:?}",
@@ -140,6 +144,77 @@ impl RecordedPair {
             ));
         }
         manifest.validate(plan)?;
+        let has_request_cutoff_fingerprint = self
+            .incumbent
+            .trials
+            .iter()
+            .chain(&self.candidate.trials)
+            .filter_map(|trial| trial.observation.memory_reads.as_ref())
+            .flatten()
+            .any(|read| read.requested_cutoff_sha256.is_some());
+        let has_selector_presence = self
+            .incumbent
+            .trials
+            .iter()
+            .chain(&self.candidate.trials)
+            .filter_map(|trial| trial.observation.memory_reads.as_ref())
+            .flatten()
+            .any(|read| read.selector_arguments_present.is_some());
+        if !matches!(
+            self.schema_version.as_str(),
+            OBSERVATIONS_SCHEMA_V7 | OBSERVATIONS_SCHEMA_V8
+        ) && (has_request_cutoff_fingerprint || has_selector_presence)
+        {
+            return Err(EvalError::InvalidInput(
+                "cutoff fingerprints and selector presence require paired observations v7 or v8"
+                    .into(),
+            ));
+        }
+        let captured_reads = self
+            .incumbent
+            .trials
+            .iter()
+            .chain(&self.candidate.trials)
+            .filter_map(|trial| trial.observation.memory_reads.as_ref())
+            .flatten();
+        if self.schema_version == OBSERVATIONS_SCHEMA_V8
+            && captured_reads
+                .clone()
+                .any(|read| read.response_sequence.is_some() != read.elapsed_ms.is_some())
+        {
+            return Err(EvalError::InvalidInput(
+                "paired observations v8 require elapsed timing for every completed read and forbid it for interrupted reads".into(),
+            ));
+        }
+        if self.schema_version != OBSERVATIONS_SCHEMA_V8
+            && captured_reads.clone().any(|read| read.elapsed_ms.is_some())
+        {
+            return Err(EvalError::InvalidInput(
+                "per-read elapsed timing requires paired observations v8".into(),
+            ));
+        }
+        let snapshot_retry_requirements = manifest
+            .tasks
+            .iter()
+            .filter_map(|task| {
+                task.oracle
+                    .read_expectation
+                    .as_ref()
+                    .and_then(|expectation| expectation.snapshot_bound_retry.as_ref())
+                    .map(|retry| (task.key.clone(), retry.retry_required_when_eligible))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let has_registered_snapshot_retry = !snapshot_retry_requirements.is_empty();
+        if has_registered_snapshot_retry
+            && !matches!(
+                self.schema_version.as_str(),
+                OBSERVATIONS_SCHEMA_V7 | OBSERVATIONS_SCHEMA_V8
+            )
+        {
+            return Err(EvalError::InvalidInput(
+                "snapshot-bound retry scoring requires paired observations v7 or v8".into(),
+            ));
+        }
         if self.plan_sha256 != plan.sha256()? {
             return Err(EvalError::InvalidInput(
                 "recorded observations do not match the paired plan hash".into(),
@@ -195,14 +270,20 @@ impl RecordedPair {
                 &trial.observation.memory_reads,
             ) {
                 (
-                    OBSERVATIONS_SCHEMA_V4 | OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6,
+                    OBSERVATIONS_SCHEMA_V4
+                    | OBSERVATIONS_SCHEMA_V5
+                    | OBSERVATIONS_SCHEMA_V6
+                    | OBSERVATIONS_SCHEMA_V7
+                    | OBSERVATIONS_SCHEMA_V8,
                     Some(_),
                     Some(_),
                 ) => {}
                 (version, None, None)
                     if version != OBSERVATIONS_SCHEMA_V4
                         && version != OBSERVATIONS_SCHEMA_V5
-                        && version != OBSERVATIONS_SCHEMA_V6 => {}
+                        && version != OBSERVATIONS_SCHEMA_V6
+                        && version != OBSERVATIONS_SCHEMA_V7
+                        && version != OBSERVATIONS_SCHEMA_V8 => {}
                 _ => {
                     return Err(EvalError::InvalidInput(
                         "read capture fields do not match observation version".into(),
@@ -259,15 +340,75 @@ impl RecordedPair {
                     "paired observations v6 require selector fingerprints for every read".into(),
                 ));
             }
+            if matches!(
+                self.schema_version.as_str(),
+                OBSERVATIONS_SCHEMA_V7 | OBSERVATIONS_SCHEMA_V8
+            )
+                && trial
+                    .observation
+                    .memory_reads
+                    .as_ref()
+                    .is_some_and(|reads| {
+                        reads.iter().any(|read| {
+                            (task
+                                .oracle
+                                .read_expectation
+                                .as_ref()
+                                .and_then(|expectation| expectation.snapshot_bound_retry.as_ref())
+                                .is_none()
+                                && read.selector_arguments_sha256.is_none())
+                                || read.requested_cutoff_sha256.as_ref().is_some_and(|digest| {
+                                    crate::paired::validate_sha256("requested cutoff", digest)
+                                        .is_err()
+                                })
+                                || read.selector_arguments_present.as_ref().is_some_and(|presence| {
+                                    presence.len()
+                                        != crate::paired_agent::tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
+                                        || crate::paired_agent::tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+                                            .iter()
+                                            .any(|field| !presence.contains_key(*field))
+                                })
+                                || read.evidence.as_ref().is_some_and(|evidence| {
+                                    read.requested_cutoff_sha256.as_ref().is_some_and(|request| {
+                                        evidence
+                                            .requested_cutoff_sha256
+                                            .as_ref()
+                                            .is_some_and(|nested| nested != request)
+                                    })
+                                })
+                        })
+                    })
+            {
+                return Err(EvalError::InvalidInput(
+                    "paired observations v7-v8 contains invalid cutoff or selector fingerprints".into(),
+                ));
+            }
             if task
                 .oracle
                 .read_expectation
                 .as_ref()
                 .is_some_and(|expectation| expectation.selector_arguments.is_some())
-                && self.schema_version != OBSERVATIONS_SCHEMA_V6
+                && !matches!(
+                    self.schema_version.as_str(),
+                    OBSERVATIONS_SCHEMA_V6 | OBSERVATIONS_SCHEMA_V7 | OBSERVATIONS_SCHEMA_V8
+                )
             {
                 return Err(EvalError::InvalidInput(
-                    "registered selector expectations require paired observations v6".into(),
+                    "registered selector expectations require paired observations v6-v8".into(),
+                ));
+            }
+            if task
+                .oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.snapshot_bound_retry.is_some())
+                && !matches!(
+                    self.schema_version.as_str(),
+                    OBSERVATIONS_SCHEMA_V7 | OBSERVATIONS_SCHEMA_V8
+                )
+            {
+                return Err(EvalError::InvalidInput(
+                    "snapshot-bound retry scoring requires paired observations v7 or v8".into(),
                 ));
             }
             receipts.push(score_trial(
@@ -296,7 +437,10 @@ impl RecordedPair {
             });
         let valid_time_registered = matches!(
             self.schema_version.as_str(),
-            OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6
+            OBSERVATIONS_SCHEMA_V5
+                | OBSERVATIONS_SCHEMA_V6
+                | OBSERVATIONS_SCHEMA_V7
+                | OBSERVATIONS_SCHEMA_V8
         ) && tasks.values().any(|task| {
             task.oracle
                 .read_expectation
@@ -309,9 +453,24 @@ impl RecordedPair {
                 .as_ref()
                 .is_some_and(|expectation| expectation.selector_arguments.is_some())
         });
+        let snapshot_retry_requirements = tasks
+            .values()
+            .filter_map(|task| {
+                task.oracle
+                    .read_expectation
+                    .as_ref()
+                    .and_then(|expectation| expectation.snapshot_bound_retry.as_ref())
+                    .map(|retry| (task.key.clone(), retry.retry_required_when_eligible))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let snapshot_retry_registered = !snapshot_retry_requirements.is_empty();
         let artifact_schema = if matches!(
             self.schema_version.as_str(),
-            OBSERVATIONS_SCHEMA_V4 | OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6
+            OBSERVATIONS_SCHEMA_V4
+                | OBSERVATIONS_SCHEMA_V5
+                | OBSERVATIONS_SCHEMA_V6
+                | OBSERVATIONS_SCHEMA_V7
+                | OBSERVATIONS_SCHEMA_V8
         ) {
             crate::paired::paired_artifact_schema_for_reads(
                 receipts
@@ -320,6 +479,8 @@ impl RecordedPair {
                 request_fingerprints_complete,
                 valid_time_registered,
                 selector_expectation_registered,
+                snapshot_retry_registered,
+                self.schema_version == OBSERVATIONS_SCHEMA_V8,
             )?
             .into()
         } else {
@@ -336,6 +497,10 @@ impl RecordedPair {
             receipts,
         };
         super::complete_selector_registration_diagnostics(&mut artifact);
+        super::complete_snapshot_retry_registration_diagnostics(
+            &mut artifact,
+            &snapshot_retry_requirements,
+        );
         artifact.validate()?;
         Ok(artifact)
     }

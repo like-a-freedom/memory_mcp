@@ -499,10 +499,11 @@ the private task registers a complete selector expectation, paired v10 adds
 captured read. The validator requires the complete ten-field map when the
 registration marker is true. The normalizer resolves product defaults and
 equivalent timestamps before hashing. Native receipt journals use v8 when
-selector expectations are registered; historical observations and artifacts
-replay without migration.
+selector expectations are registered and v10 when the read-capture timing
+contract is satisfied. Observation bundles v1–v8 remain scoreable, and paired
+artifacts v2–v12 remain valid without migration.
 
-The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. When a runner supplies query and non-query argument fingerprints for every captured read, the scorer writes paired v8; response-guidance fingerprints are recorded when available. V8 validates the required request digests and preserves them for deterministic retry analysis. When a v5 capture has the required v8 request fingerprints and the private task registers an expected `valid_at`, the scorer writes paired v9 with independent `requested_valid_at_match` and `returned_valid_at_match` booleans. These checks deliberately do not depend on `known_revision`; full-cutoff-pair diagnostics are emitted only when the task also pins a transaction revision. A missing echo or unregistered revision remains unknown. When a v6 observation and private task register selector expectations, the scorer writes paired v10 with registration status and the complete per-field match map. Native journals use v5 for read capture, v6 for request fingerprints, v7 for registered valid-time expectations, and v8 for selector expectations. Historical observations still replay to compatible paired schemas, and paired v2–v10 artifacts remain readable without migration. Read diagnostics leave existing decision and independent-probe scores intact.
+The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. When a runner supplies query and non-query argument fingerprints for every captured read, the scorer writes paired v8; response-guidance fingerprints are recorded when available. V8 validates the required request digests and preserves them for deterministic retry analysis. When a v5 capture has the required v8 request fingerprints and the private task registers an expected `valid_at`, the scorer writes paired v9 with independent `requested_valid_at_match` and `returned_valid_at_match` booleans. These checks deliberately do not depend on `known_revision`; full-cutoff-pair diagnostics are emitted only when the task also pins a transaction revision. A missing echo or unregistered revision remains unknown. When a v6 observation and private task register selector expectations, the scorer writes paired v10 with registration status and the complete per-field match map. When a private task registers a snapshot-bound retry, the scorer writes paired v11 with a content-free state-transition diagnostic: eligibility, retry count, query change, returned-snapshot cutoff match, legacy temporal-selector absence, and preservation of all other registered selectors. Observation v7 and native journal v9 carry the additional retry fields. Historical observation bundles v1–v8 remain scoreable; paired artifacts v2–v12 validate without migration. Read diagnostics leave existing decision and independent-probe scores intact.
 
 When a v5 observation and private oracle register a valid time, the scorer
 uses paired v9 even if one or both timestamp fingerprints are unavailable;
@@ -829,10 +830,35 @@ product behavior change.
 The older `agent_maintenance_v6` prompt and fingerprints remain pinned for
 historical replay. Its instruction to preserve every request argument
 conflicts with B5's snapshot fields, so new B5-aligned screens should use v7.
-Deterministic contract tests verify the prompt, phase, CLI registration, and
-fingerprint separation. They do not demonstrate that a model follows the
-instruction or improves answer quality; that requires a disjoint synthetic
-workflow screen.
+Deterministic contract tests verify the prompt, phase, CLI registration,
+fingerprint separation, and retry state-transition scorer. They do not
+demonstrate that a model follows the instruction or improves answer quality;
+that requires a disjoint synthetic workflow screen.
+
+The one-capture [A11 screen](../../evals/paired/agent-maintenance-v7-snapshot-retry-screen-2026-11-25/README.md)
+used four new synthetic families on native Apple Silicon without LM Studio.
+All four tasks per arm produced eligible empty partial reads; every retry was
+snapshot-consistent and compliant. Both reads still returned no evidence in
+all tasks, and exact answer-plus-citation success was 0/4 per arm, while the
+independent probes, correction writes and exact invalidations were 4/4. This
+shows retry-instruction adherence in this cohort, not improved memory quality
+or general agent usability. No repeat is registered; task outcomes and
+content-free read evidence are in the capture report.
+
+New agent observations use schema v8 to record `elapsed_ms` for each completed
+memory read; paired artifacts use schema v12 and native receipt journals use
+schema v10. Older observation, artifact, and journal schemas remain unchanged.
+Codex timing spans the runner's
+observation of the matching MCP `item.started` and terminal `item.completed`
+events, while Chat Completions timing spans the direct memory-tool call. These
+boundary measurements include different transport overhead, so compare them
+only within a pinned runner/transport. Interrupted reads retain no duration;
+zero milliseconds is a valid measured value. The offline scorer rejects a
+completed read without timing and replay preserves the recorded duration
+without consulting the clock. Timing is diagnostic telemetry, not a
+deterministic quality score or evidence of a memory improvement. The immutable
+A11 capture predates this field and cannot be backfilled; its latency remains
+available only at recall-phase level.
 
 ### Current v6 maintenance feasibility — 2026-11-23
 
