@@ -79,7 +79,9 @@ pub(super) fn normalize_observation(
 
     relation_outcomes.sort();
     relation_outcomes.dedup();
-    let disposition = if relation_outcomes
+    let disposition = if responses.is_empty() {
+        ObservedDisposition::Unobservable
+    } else if relation_outcomes
         .iter()
         .any(|outcome| outcome == "contradiction")
     {
@@ -89,17 +91,13 @@ pub(super) fn normalize_observation(
         .any(|outcome| matches!(outcome.as_str(), "correction" | "supersession"))
     {
         ObservedDisposition::Correction
-    } else if sources.is_empty()
-        && guidance.as_deref().is_some_and(|text| {
-            text.to_lowercase()
-                .contains("no sufficient matching context")
-        })
-    {
+    } else if sources.is_empty() {
+        // An empty successful read supports an unknown answer, not a global
+        // absence claim. Keep partial-snapshot guidance as separate metadata;
+        // the classification must not depend on its prose.
         ObservedDisposition::Unknown
-    } else if !sources.is_empty() {
-        ObservedDisposition::Supported
     } else {
-        ObservedDisposition::Unobservable
+        ObservedDisposition::Supported
     };
     let item_count = sources.len();
 
@@ -260,6 +258,46 @@ mod tests {
         let actual = normalize_observation(&[raw], &bindings()).unwrap();
 
         assert_eq!(actual.sources[0].role, EvidenceRole::Current);
+    }
+
+    #[test]
+    fn empty_partial_snapshot_is_unknown_without_matching_guidance_text() {
+        let raw = json!({
+            "jsonrpc":"2.0",
+            "id":3,
+            "result":{"structuredContent":{
+                "status":"success",
+                "result":[],
+                "guidance":"Historical snapshot is partial; omitted channels may contain context.",
+                "context":{
+                    "snapshot":{
+                        "valid_at":"2026-08-01T09:00:00Z",
+                        "known_at":"2026-11-25T00:00:00Z",
+                        "known_revision":12
+                    },
+                    "completeness":"partial",
+                    "candidate_scan_truncated":false,
+                    "omitted_channels":["claim relations"]
+                }
+            }}
+        });
+
+        let actual = normalize_observation(&[raw], &bindings()).unwrap();
+
+        assert_eq!(actual.disposition, ObservedDisposition::Unknown);
+        assert_eq!(actual.item_count, 0);
+        assert_eq!(
+            actual.guidance.as_deref(),
+            Some("Historical snapshot is partial; omitted channels may contain context.")
+        );
+    }
+
+    #[test]
+    fn no_memory_responses_are_unobservable_not_unknown() {
+        let actual = normalize_observation(&[], &bindings()).unwrap();
+
+        assert_eq!(actual.disposition, ObservedDisposition::Unobservable);
+        assert_eq!(actual.item_count, 0);
     }
 
     #[test]

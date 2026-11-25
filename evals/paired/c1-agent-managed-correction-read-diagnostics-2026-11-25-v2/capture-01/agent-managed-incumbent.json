@@ -1,0 +1,198 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "95064-1795577967424077000-0",
+  "identity_sha256": "40387a6fd92deeb3c40a61fb2ced45c60538d2eff324f9b0f37fea08ec5d5f9a",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "ironvale-ceramic-works-history",
+      "case_id": "ironvale-ceramic-works-current-annealing-kiln-docket",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "meadowline-harbor-services-history",
+      "case_id": "meadowline-harbor-services-current-ferry-engine-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "morrowglass-observatory-history",
+      "case_id": "morrowglass-observatory-current-dome-seal-register",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "tidepeak-seed-laboratory-history",
+      "case_id": "tidepeak-seed-laboratory-current-cold-room-stock-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "ironvale-ceramic-works-history",
+        "case_id": "ironvale-ceramic-works-current-annealing-kiln-docket",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 508
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "d4b87552ed1aa7e3b3e9f687bbb34dd267b42adb594f75c98801c625b1f9fd97",
+        "response_sha256": "f4505e2f7ec3f20a00f5b99f12a3e73f03ff0238b49673af4b6c52170b32ad03",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-read-normalization-2026-11-25-ironvale-ceramic-works-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "meadowline-harbor-services-history",
+        "case_id": "meadowline-harbor-services-current-ferry-engine-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 281
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "ece673a0861e1b51693d33379d01e63f1e5dbfd87a75ef0f46e997d03a013570",
+        "response_sha256": "d09420c90aa7ecd3d399de7f5d0c1cf2f96945fbf15584786668bdaf5e522309",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-read-normalization-2026-11-25-meadowline-harbor-services-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "morrowglass-observatory-history",
+        "case_id": "morrowglass-observatory-current-dome-seal-register",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 292
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b521be696a95335f7da1660dff81710384ab0aac3e989c8bb3d73c95fdbd295e",
+        "response_sha256": "ed488bc7b8dfe58057b4ad80bf05aeef786c1600e2ad04061ef8e8b644c3f6a1",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-read-normalization-2026-11-25-morrowglass-observatory-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "tidepeak-seed-laboratory-history",
+        "case_id": "tidepeak-seed-laboratory-current-cold-room-stock-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 272
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "aac9bd0572158d1f055a29675141930ff594cdc5e363530cc2d474c8b5585556",
+        "response_sha256": "2127604da5a6d2580e7e4f8dbfa6a7072ec8b87210f2348ca54b79335da8c742",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-read-normalization-2026-11-25-tidepeak-seed-laboratory-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

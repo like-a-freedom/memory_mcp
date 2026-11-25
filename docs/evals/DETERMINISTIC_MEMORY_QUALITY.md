@@ -2,6 +2,24 @@
 
 Status: development and frozen-candidate confirmation both accepted. This report concerns deterministic public-MCP memory behavior in explicitly selected temporal/evidence mode. It does not claim improved agent productivity or an official external-benchmark score.
 
+> **Evaluator and C3 update (2026-11-25):** A TDD review found that the
+> historical absent-subject score depended on one exact phrase in `guidance`.
+> The normalizer now classifies a structurally valid, successful empty result
+> as `unknown` regardless of guidance prose; no read response is `unobservable`,
+> and malformed responses remain invalid input. The paired runner also unwraps
+> standard JSON-RPC `result` and adapter `payload` envelopes before classifying
+> read evidence. Content-only replies remain unknown. The product rollout gate
+> was rerun against the native arm64 binary: default scored 5/8 decisions and
+> 8/8 evidence, shadow scored 1/8 decisions and 8/8 evidence, repeated receipts
+> matched, and there were no decision losses or evidence regressions. The
+> separate C3 query-boundary cohort passed 4/4 twice; a 252-event historical
+> scale control passed 3/3 twice with matching decision replays. These are
+> finite deterministic outcomes, not population or agent-utility claims. See
+> the [C3 characterization](../../evals/paired/c3-history-characterization-2026-11-25-v6/report.md),
+> [scale registration](../../evals/paired/c3-historical-scale-2026-11-25/registration.json),
+> [rollout acceptance](../../evals/paired/native-quality-candidate-2026-11-25/claim-rollout-default-acceptance.json),
+> and [qualification plan](../superpowers/plans/2026-11-24-memory-evaluation-qualification-implementation-plan.md).
+
 > **Later rollout update (2026-11-21):** This report's statement that the
 > default remained `shadow` was accurate at its capture. The product default
 > has since become `evidence`; see the
@@ -118,7 +136,15 @@ The development gain is +75 percentage points; descriptive family bootstrap 95% 
 
 Confirmation: [acceptance report](../../evals/paired/deterministic-quality-2026-11-21/reviewed-v5-acceptance.json), [first replay](../../evals/paired/deterministic-quality-2026-11-21/reviewed-v5-1/index.json), [second replay](../../evals/paired/deterministic-quality-2026-11-21/reviewed-v5-2/index.json). Gain 75 percentage points; descriptive 95% family interval [37.5, 100] percentage points. Both independent captures agree semantically, with distinct per-case raw receipts. There were no losses, hard violations or invalid cases. The candidate and all 425 frozen source hashes were unchanged before opening confirmation outcomes.
 
-The remaining `absent-subject` failure has correct empty evidence but unobservable global-absence decision. Historical reads disclose omitted unversioned channels and remain partial. Removing this disclosure merely to earn an abstention point would produce an unsupported guarantee; the case remains a visible failure. There is no claim of 100% complete-decision success.
+At the historical capture, `absent-subject` returned correct empty evidence from
+a partial snapshot, while the evaluator classified the decision as
+unobservable because it relied on guidance prose. The 2026-11-25 normalizer
+correction makes this response shape score as unknown, without asserting global
+absence. The tool still discloses omitted unversioned channels and the snapshot
+remains partial. The frozen historical score is unchanged; the later v9 public
+gate passed for its separately registered finite configurations, as recorded
+above. That result does not retroactively rescore this historical suite. There
+is no claim of 100% complete-decision success.
 
 ## Rollout-stage scope
 

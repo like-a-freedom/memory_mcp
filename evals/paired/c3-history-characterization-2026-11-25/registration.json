@@ -1,0 +1,83 @@
+{
+  "schema_version": "memory-mcp-c3-history-registration/v1",
+  "registration_id": "c3-history-characterization-2026-11-25",
+  "status": "frozen-before-capture",
+  "frozen_at_utc": "2026-11-25T04:18:51Z",
+  "product_revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+  "product_source_tree_clean": true,
+  "host_requirement": "aarch64-apple-darwin",
+  "runner": "memory-eval run over public MCP stdio",
+  "provider_requirement": "none; no model, vendor login, or API key",
+  "capture_policy": {
+    "repetitions_per_profile": 2,
+    "fresh_artifact_root_per_capture": true,
+    "same_product_binary_for_repeats": true,
+    "decision_replays_must_match": true,
+    "quality_failures_remain_in_denominator": true
+  },
+  "profiles": [
+    {
+      "path": "evals/profiles/memory_decisions_c3_updates.json",
+      "sha256": "916d194e940c8a9034fbe3d2c784cce8ba2311dfa6350193f7187cc3dfb493ff",
+      "corpus_root": "evals/corpora/memory-decisions-c3-updates",
+      "corpus_file_sha256": {
+        "events.json": "1ed30994dc0a45dc9234f114986d5ba26456697fc13906aaab1fc035ac862985",
+        "probes.json": "6207b806af7e362a9507677d83ceb36a27722d7769e99509479a947069c578aa",
+        "oracle.json": "c01f4ffc305f8082037bebf1051c845f83e6f13746cf73fccc7cf04338f1b835"
+      },
+      "focal_families": [
+        "north-canal-gauge-correction-history",
+        "numbered-gauge-identity-with-lexical-distractors"
+      ]
+    },
+    {
+      "path": "evals/profiles/memory_decisions_historical_boundaries.json",
+      "sha256": "9ef79b26fb44b438282af67f656f49fcf711ecf243aa630f03afcba94cb30d30",
+      "corpus_root": "evals/corpora/memory-decisions-historical-boundaries",
+      "corpus_file_sha256": {
+        "events.json": "f0efb213c6145cfbaf9a7de6d7762a666d8581ed6c08bc04fb74fb3f56c3dbcc",
+        "probes.json": "5a58a25f0a8c3483b756ed4700bedba0153c401a3f6d66489b510b956277d78f",
+        "oracle.json": "5ffa4d17ac0b8fce3fa910e69f247557e7c2502af44d6891e851688fcd74162b"
+      },
+      "purpose": "B5 historical scale and old-target replay control"
+    },
+    {
+      "path": "evals/profiles/memory_decisions_v10_default.json",
+      "sha256": "3cb72b4cece52519aa0a7225660c47fcbe3ec2106b84d44026da526a6892a22e",
+      "corpus_root": "evals/corpora/memory-decisions-v10",
+      "corpus_file_sha256": {
+        "events.json": "748a2c0db295cca96a92a00c680131a07648671fb116a03378be6a2ef6c75338",
+        "probes.json": "6e99974895dca1a591bfbc197e83e16882605029ad59c52b3bbf1333d0790343",
+        "oracle.json": "24ff7c94c5ed4fa1782e5d158bac236856b5281ea64d0373f6e2e6cabe23a397"
+      },
+      "purpose": "v10 contradiction, identity, and temporal regression control"
+    }
+  ],
+  "frozen_acceptance": {
+    "expected_case_counts": {
+      "memory_decisions_c3_updates": 3,
+      "memory_decisions_historical_boundaries": 3,
+      "memory_decisions_v10_default": 8
+    },
+    "public_read_budget_per_case": 5,
+    "maximum_returned_items_per_case": 5,
+    "byte_policy": "Record compact serialized JSON-RPC response bytes per scored read. assemble_context has no separately enforced fixed output-byte ceiling in the inspected public contract; do not invent one.",
+    "latency_policy": "Record scored assemble_context round-trip latency in microseconds and whole-case runtime in milliseconds. Summarize each distribution separately from decision scores.",
+    "decision_policy": "Score the frozen source set, assertions, disposition, roles, relation outcome, valid-time cutoff, and knowledge-revision boundary from each oracle. Do not modify expectations after opening captures.",
+    "interpretation": "Characterization and repeatability only. No population claim, no agent-utility claim, and no product-change claim unless a frozen oracle fails on current master."
+  },
+  "implementation_fingerprints": {
+    "server_binary_sha256": "71108d8f2eb3b9646f24bbde73d1020cce629ce81f4f927915e07041503c2812",
+    "evaluator_binary_sha256": "9223c446e8d3f1f21e6e5fdfab5179e7bea91ec4f71d5f8adf0bbd657921fef6",
+    "server_binary_format": "Mach-O arm64",
+    "evaluator_binary_format": "Mach-O arm64",
+    "measurement_fields": [
+      "scored_query_latency_us",
+      "scored_query_compact_jsonrpc_bytes",
+      "scored_query_item_count",
+      "scored_query_budget_used",
+      "scored_query_requested_budget",
+      "case duration_ms"
+    ]
+  }
+}

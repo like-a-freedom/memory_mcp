@@ -1,0 +1,7 @@
+{
+  "ordinary_stratum_id": "typed_conflict",
+  "expected_trial_count": 4,
+  "minimum_task_successes": 3,
+  "minimum_direct_memory_successes": 3,
+  "minimum_probe_successes": 4
+}

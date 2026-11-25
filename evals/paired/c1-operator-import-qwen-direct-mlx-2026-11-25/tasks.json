@@ -1,0 +1,177 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v3",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "evershade_observatory",
+        "case_id": "evershade_observatory-calibration-ledger-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact source text for a later session. Use the configured memory tools to store exactly this text, without adding or removing any characters: At Evershade Observatory, the calibration ledger is Vesper-62. Confirm briefly after the memory write and extraction succeed.",
+      "recall_prompt": "At Evershade Observatory, where is the calibration ledger recorded? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Evershade Observatory, where is the calibration ledger recorded?",
+        "valid_at": "2026-11-25T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "c1-operator-import-evershade_observatory-calibration-ledger",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-operator-import-evershade_observatory-calibration-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Vesper-62"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source for Evershade Observatory before this phase. Use assemble_context to verify: At Evershade Observatory, where is the calibration ledger recorded? Do not write or modify memory. Report a value only when returned memory evidence supports it, cite the exact source_episode ID, and otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "evershade_observatory",
+          "relative_path": "fixtures/evershade_observatory.txt",
+          "content": "At Evershade Observatory, the calibration ledger is Vesper-62.",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "c1-operator-import-evershade_observatory-calibration-ledger"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "greydock_archive",
+        "case_id": "greydock_archive-incident-index-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact source text for a later session. Use the configured memory tools to store exactly this text, without adding or removing any characters: At Greydock Archive, the incident index is Kestrel-43. Confirm briefly after the memory write and extraction succeed.",
+      "recall_prompt": "At Greydock Archive, where is the incident index recorded? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Greydock Archive, where is the incident index recorded?",
+        "valid_at": "2026-11-25T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "c1-operator-import-greydock_archive-incident-index",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-operator-import-greydock_archive-incident-index"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Kestrel-43"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source for Greydock Archive before this phase. Use assemble_context to verify: At Greydock Archive, where is the incident index recorded? Do not write or modify memory. Report a value only when returned memory evidence supports it, cite the exact source_episode ID, and otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "greydock_archive",
+          "relative_path": "fixtures/greydock_archive.txt",
+          "content": "At Greydock Archive, the incident index is Kestrel-43.",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "c1-operator-import-greydock_archive-incident-index"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonlit_reservoir",
+        "case_id": "moonlit_reservoir-pump-schedule-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please remember this exact source text for a later session. Use the configured memory tools to store exactly this text, without adding or removing any characters: At Moonlit Reservoir, the pump schedule is Harbor-26. Confirm briefly after the memory write and extraction succeed.",
+      "recall_prompt": "At Moonlit Reservoir, where is the pump schedule recorded? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Moonlit Reservoir, where is the pump schedule recorded?",
+        "valid_at": "2026-11-25T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "c1-operator-import-moonlit_reservoir-pump-schedule",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-operator-import-moonlit_reservoir-pump-schedule"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Harbor-26"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source for Moonlit Reservoir before this phase. Use assemble_context to verify: At Moonlit Reservoir, where is the pump schedule recorded? Do not write or modify memory. Report a value only when returned memory evidence supports it, cite the exact source_episode ID, and otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "moonlit_reservoir",
+          "relative_path": "fixtures/moonlit_reservoir.txt",
+          "content": "At Moonlit Reservoir, the pump schedule is Harbor-26.",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "c1-operator-import-moonlit_reservoir-pump-schedule"
+        }
+      ]
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "briarwave_station",
+        "case_id": "briarwave_station-equipment-register-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please remember this exact source text for a later session. Use the configured memory tools to store exactly this text, without adding or removing any characters: At Briarwave Station, the equipment register is Quill-91. Confirm briefly after the memory write and extraction succeed.",
+      "recall_prompt": "At Briarwave Station, where is the equipment register recorded? If stored memory does not support an answer, say unknown.",
+      "independent_probe": {
+        "query": "At Briarwave Station, where is the equipment register recorded?",
+        "valid_at": "2026-11-25T00:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [],
+      "target_write_event_id": "c1-operator-import-briarwave_station-equipment-register",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-operator-import-briarwave_station-equipment-register"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quill-91"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      },
+      "candidate_formation_prompt": "An operator imported and extracted the source for Briarwave Station before this phase. Use assemble_context to verify: At Briarwave Station, where is the equipment register recorded? Do not write or modify memory. Report a value only when returned memory evidence supports it, cite the exact source_episode ID, and otherwise say unknown.",
+      "candidate_operator_imports": [
+        {
+          "fixture_id": "briarwave_station",
+          "relative_path": "fixtures/briarwave_station.txt",
+          "content": "At Briarwave Station, the equipment register is Quill-91.",
+          "source_type": "doc",
+          "valid_at": "2026-11-24T00:00:00Z",
+          "event_id": "c1-operator-import-briarwave_station-equipment-register"
+        }
+      ]
+    }
+  ]
+}

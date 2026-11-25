@@ -1,0 +1,145 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-c3-recheck/v1",
+  "run_id": "2026-11-25-c3-final-query-fix/run-01",
+  "started_at_utc": "2026-11-25T05:43:50.522220Z",
+  "completed_at_utc": "2026-11-25T06:14:41.861073Z",
+  "host": {
+    "platform": "aarch64-apple-darwin",
+    "execution": "local Apple Silicon"
+  },
+  "repository": {
+    "head": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "product_binary": "target/release/memory_mcp",
+    "product_binary_sha256": "cba1a6b69de0a32188a1b2b5509b1b752be2b2b3b803ac515a35226d31a292e8",
+    "product_binary_format": "Mach-O arm64",
+    "c3_registration": "evals/paired/c3-history-characterization-2026-11-25-v6/registration.json",
+    "memory_source_change_under_test": "query clause selection and explicit-subject boundary handling"
+  },
+  "cohort": {
+    "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+    "dataset_manifest_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+    "text_cohort_manifest_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+    "frozen_case_ids": [
+      "0c6b0c60",
+      "6d975a08",
+      "89a20f48",
+      "922a0c56",
+      "d6da3938",
+      "f43926d9",
+      "f61a096f"
+    ],
+    "ordered_haystack_count": 100,
+    "staged_input_sha256": {
+      "questions.json": "7f5beb79700ad9670b81b423777f60c643bbdcba4eeb65fb6fbb0586a938afec",
+      "haystack.json": "9b751199062ea7db2edc472a4f362aca7af5eb113f7ddf2f39c0b6d3d5eba1ac",
+      "trajectories.json": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+      "selection.json": "3749af6c58ec5886a71ba5eaf72ea2d86dca344675bbc4ab09d21fc1e7d0aca8"
+    },
+    "staged_inputs_match_b5_recheck": true,
+    "shared_memory_snapshot": "target/c4-native/build/memory_state",
+    "snapshot_digest": "97740bee54fbff313865ced6aab3bac17666d1cca8e4c6efc29502376c7e105e",
+    "snapshot_build_coverage_sha256": "33d3712e0abad5b5624bf4ece1e1b897fe018e37b1e669dfee6630fe15009a27"
+  },
+  "models": {
+    "runtime": "standalone MLX-LM server on loopback; no LM Studio application, server, or CLI",
+    "mlx_lm": "0.32.2",
+    "mlx": "0.32.4",
+    "profile_path": "evals/longmemeval_v2/small-web-native-profile.json",
+    "profile_sha256": "495cec02ff18302331ae6ca5d123a0ed494814a548a1f7b7cce1b68ba2e18582",
+    "model_files": "same pinned files and paths as verified for the B5 recheck; reused but not re-hashed for this run",
+    "reader": {
+      "profile_id": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "endpoint": "http://127.0.0.1:18767/v1",
+      "temperature": 0,
+      "max_completion_tokens": 256,
+      "thinking_enabled": true
+    },
+    "judge": {
+      "profile_id": "ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+      "endpoint": "http://127.0.0.1:18766/v1",
+      "temperature": 0,
+      "reasoning_effort": "medium",
+      "max_completion_tokens": 256
+    },
+    "processor": {
+      "checkpoint": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "offline_cache": true
+    }
+  },
+  "execution": {
+    "network": "inference limited to local loopback endpoints; Hugging Face offline mode enabled",
+    "prompt_workers": 3,
+    "reader_request_concurrency": 1,
+    "selected_cases": 7,
+    "native_scored_cases": 7,
+    "covered_cases": 7,
+    "reader_failures": 0,
+    "judge_failures": 0,
+    "scorer_failures": 0,
+    "context_truncated_cases": 0,
+    "wall_seconds": 1853.987,
+    "stage_seconds": {
+      "reader": 189.319,
+      "judge_scoring": 19.867
+    },
+    "official_exact_match": "3/7",
+    "non_abstention": {
+      "correct": 3,
+      "total": 4
+    },
+    "abstention": {
+      "correct": 0,
+      "total": 3
+    },
+    "reviewed_full_span": {
+      "correctly_hashed_cases_present": 2,
+      "selected_cases": 7,
+      "receipt": "run-01/reviewed-span-coverage.json"
+    },
+    "memory_query_seconds": {
+      "min": 292.3297023330015,
+      "median": 433.96716341700085,
+      "mean": 598.8471708214284,
+      "p95": 1008.2459250419997,
+      "max": 1008.2459250419997,
+      "sum": 4191.930195749999
+    },
+    "run_arguments": "run-01/run_args.json",
+    "coverage_receipt": "run-01/score-coverage.json",
+    "aggregate_metrics": "run-01/aggregated_metrics.json",
+    "per_question_outputs": "run-01/per_question.jsonl",
+    "reviewed_span_coverage": "run-01/reviewed-span-coverage.json"
+  },
+  "artifact_sha256": {
+    "run-01/per_question.jsonl": "64739c120f62ce75636be21a8ea4b7856864840193d1d20c0d7bf3f794e3e3be",
+    "run-01/run_args.json": "bedae8a253e6d18f68a477cfda6ad9cb1e8f3fe2125de43d9163f0ab1ddcca24",
+    "run-01/prompt_build_summary.json": "e04d007335e03a02fe45480693ef7576e44db5102fd5a86eeb253a4dd2c09bdd",
+    "run-01/prompt_rows.jsonl": "4855572a343b192d33067c03dd576c2953ee3e4c2c454edfd62693e430e7e158",
+    "run-01/score-coverage.json": "55ef6ca68427af8acfb597ddc1c009c6cb58e87d4e5dc3797077c8c2029d58ae",
+    "run-01/aggregated_metrics.json": "630c2222f2336b46f116daf5569c2eafc0e04ed905f213d17bece026caaa4cdb",
+    "run-01/reviewed-span-coverage.json": "6e0e343816ff891f6a7ec365272f07f4bdb6338ed0dd3f0ecc0c77f2c7536be3",
+    "reviewed_span_coverage.py": "07ac4af003ccd0de6469f4686aaa4a564a5b840c0b1cbfd285426db5b64639ca",
+    "test_reviewed_span_coverage.py": "288868ac0b131bb925f94dac29adc53a6cc0539fed66846b2a7bf3106fb65234",
+    "text_cohort.py": "cc750e4361266bd98dd8acfb365a7d0b286a56ac8e0ad005e9044345ec20c391"
+  },
+  "baseline_comparison": {
+    "run": "evals/longmemeval_v2/results/2026-11-25-b5-recheck/run-02",
+    "product_binary_sha256": "9c9b24b757a948eae3299313dd1a0a14c6cd4ddd62f033580bc27a7edf06213d",
+    "same_frozen_cases_and_staged_inputs": true,
+    "same_shared_snapshot": true,
+    "official_exact_match": "1/7",
+    "reviewed_full_span": "1/7",
+    "mean_query_seconds": 630.4063079402861,
+    "median_query_seconds": 437.6712041669962,
+    "max_query_seconds": 1011.490362291006,
+    "wall_seconds": 1838.294
+  },
+  "interpretation_limits": [
+    "This is the reviewed seven-case subset, not the full LongMemEval-V2 benchmark.",
+    "Only one post-C3 model capture was run; exact-match changes are not yet repeat-confirmed.",
+    "One exact-match pass is unsupported by its retrieved context.",
+    "The reviewed-span metric requires a complete frozen span and can miss narrower sufficient evidence.",
+    "The sample does not establish a stable latency improvement or general agent utility."
+  ]
+}

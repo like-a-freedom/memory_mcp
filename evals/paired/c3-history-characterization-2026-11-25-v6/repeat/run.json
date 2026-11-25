@@ -1,0 +1,352 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1795584625",
+  "profile": "nightly",
+  "started_at": "2026-11-25T05:30:25.349377Z",
+  "duration_ms": 91177,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "independent-source-open-conflict-v3"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "numeric-neighbor-exact-identity-v3"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "overlapping-measurements-without-correction-evidence"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "prior-knowledge-before-third-measurement"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "independent-source-open-conflict-v3"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "scored_query_budget_used": 2.0,
+        "scored_query_compact_jsonrpc_bytes": 4758.0,
+        "scored_query_item_count": 2.0,
+        "scored_query_latency_us": 6331.0,
+        "scored_query_requested_budget": 5.0
+      },
+      "evidence": {
+        "decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 21352,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "numeric-neighbor-exact-identity-v3"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "scored_query_budget_used": 1.0,
+        "scored_query_compact_jsonrpc_bytes": 2856.0,
+        "scored_query_item_count": 1.0,
+        "scored_query_latency_us": 21169.0,
+        "scored_query_requested_budget": 5.0
+      },
+      "evidence": {
+        "decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 24129,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "overlapping-measurements-without-correction-evidence"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "scored_query_budget_used": 3.0,
+        "scored_query_compact_jsonrpc_bytes": 7172.0,
+        "scored_query_item_count": 3.0,
+        "scored_query_latency_us": 17350.0,
+        "scored_query_requested_budget": 5.0
+      },
+      "evidence": {
+        "decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 24635,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "prior-knowledge-before-third-measurement"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "scored_query_budget_used": 2.0,
+        "scored_query_compact_jsonrpc_bytes": 4795.0,
+        "scored_query_item_count": 2.0,
+        "scored_query_latency_us": 7107.0,
+        "scored_query_requested_budget": 5.0
+      },
+      "evidence": {
+        "decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 21054,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "memory-decisions",
+      "mode": "end_to_end",
+      "total": 4,
+      "passed": 4,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "decision_success_rate": 1.0,
+        "evidence_stage_temporal_decision_success_rate": 1.0,
+        "evidence_stage_temporal_evidence_success_rate": 1.0,
+        "evidence_stage_temporal_probe_success_rate": 1.0,
+        "evidence_success_rate": 1.0,
+        "probe_success_rate": 1.0,
+        "temporal_decision_success_rate": 1.0,
+        "temporal_evidence_success_rate": 1.0,
+        "temporal_probe_success_rate": 1.0
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "da8ddb815b062e30ef7df68ecab952ba5123126fd843d6b916640f954bf32d74",
+    "git_commit": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "memory-decisions": {
+        "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+        "corpus_sha256": "1d1c0f11cd3cc32c0cea565aacda125e0151bc5017facc7172ada6ccd9077b5b",
+        "input_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+        "product_binary": "/Users/solovey/Documents/dev/memory_mcp/target/debug/memory_mcp",
+        "product_binary_sha256": "23d49b598fb6b92585931dfeb5524b2ab3a53df9b754663d8094f2b9e23a448b",
+        "product_revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+        "provider_profile": "storage=embedded-surreal-local;namespace=main;embeddings=disabled;retrieval=lexical-fallback;ner=regex-builtin;primary_claim_rollout=product_default;evidence_diagnostic_claim_rollout=evidence;transaction_time=server-assigned;scoring_protocol=temporal-cutoff-v2",
+        "receipt_index": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/c3-history-characterization-2026-11-25-v6/repeat/receipts/index.json",
+        "receipt_index_sha256": "1c4e4b0876463e3b9036515a2be1aa9ebf34c7df76c5508d23118a0558101c48",
+        "replay_cases": "4",
+        "replay_elapsed_ms": "91177"
+      }
+    },
+    "profile_digest": "6e7b2012b8387447d0905c3897ce020b37cf67a90b9225b37537829ab9f97a91"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "memory-mcp-independent-probe/v1",
+  "query": "Which synthetic registry value is current?",
+  "principal": "fixture-reader",
+  "valid_at": "2026-11-21T12:00:00Z",
+  "known_revision": 0,
+  "context_budget": 4,
+  "history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "claim_rollout_stage": "evidence"
+}

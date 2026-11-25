@@ -1,0 +1,383 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "product_binary_sha256": "6df7ada05526d3eb5e7da96cbeb0a15b18fb1c4d40a69d9ee9c4c2d1ba1d9fad",
+    "corpus_sha256": "1d1c0f11cd3cc32c0cea565aacda125e0151bc5017facc7172ada6ccd9077b5b",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752"
+  },
+  "cases": [
+    {
+      "case_id": "overlapping-measurements-without-correction-evidence",
+      "source_order": [
+        "sb-update-two",
+        "sb-update-one",
+        "sb-initial"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-two",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 4.1\nunit: metres"
+          },
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-two",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 4.1\nunit: metres"
+          },
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-two",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 4.1\nunit: metres"
+          },
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-overlapping-measurements-without-correction-evidence.json",
+      "receipt_sha256": "a076fe18ff050ea5cbe9a051950e5f3dd5dc14a25eb4450f4bb95578b635022f"
+    },
+    {
+      "case_id": "prior-knowledge-before-third-measurement",
+      "source_order": [
+        "sb-update-one",
+        "sb-initial"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "sb-update-one",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres"
+          },
+          {
+            "event_id": "sb-initial",
+            "role": "conflicting",
+            "text": "subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-prior-knowledge-before-third-measurement.json",
+      "receipt_sha256": "56af2938cc78e526c684b502b5fe3648676491f0bd4aa0caaadc3b3e44507496"
+    },
+    {
+      "case_id": "numeric-neighbor-exact-identity-v3",
+      "source_order": [
+        "sb-spillway-580"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sb-spillway-580",
+            "role": "current",
+            "text": "subject: Slate Basin Spillway 580\nmeasure: clearance\nvalue: 41.0\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sb-spillway-580",
+            "role": "current",
+            "text": "subject: Slate Basin Spillway 580\nmeasure: clearance\nvalue: 41.0\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "sb-spillway-580",
+            "role": "current",
+            "text": "subject: Slate Basin Spillway 580\nmeasure: clearance\nvalue: 41.0\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-numeric-neighbor-exact-identity-v3.json",
+      "receipt_sha256": "3c8daf8e8db93e70956581b0675281606df105521035dcb17c5156eca2de6f94"
+    },
+    {
+      "case_id": "independent-source-open-conflict-v3",
+      "source_order": [
+        "rl-official-b",
+        "rl-official-a"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "rl-official-b",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          },
+          {
+            "event_id": "rl-official-a",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "rl-official-b",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          },
+          {
+            "event_id": "rl-official-a",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "rl-official-b",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          },
+          {
+            "event_id": "rl-official-a",
+            "role": "conflicting",
+            "text": "subject: Redwood Lock 8\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "reason_codes": [],
+      "receipt_path": "receipt-independent-source-open-conflict-v3.json",
+      "receipt_sha256": "6df7e97b78c1b85a8dd373513684e5148aebf8a27c087ddcf09c85c14161d73e"
+    }
+  ]
+}

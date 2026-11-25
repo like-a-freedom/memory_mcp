@@ -211,9 +211,24 @@ impl RecordedPair {
         receipts.sort_by(|left, right| left.key.cmp(&right.key));
         let mut expected_trials = plan.expected_trials.clone();
         expected_trials.sort();
+        let request_fingerprints_complete = receipts
+            .iter()
+            .filter(|receipt| receipt.read_capture_status.is_some())
+            .all(|receipt| {
+                receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+                    reads.iter().all(|read| {
+                        read.request_query_sha256.is_some()
+                            && read.non_query_arguments_sha256.is_some()
+                    })
+                })
+            });
         let artifact = PairedRunArtifact {
             schema_version: if self.schema_version == OBSERVATIONS_SCHEMA_V4 {
-                crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
+                if request_fingerprints_complete {
+                    crate::paired::PAIRED_ARTIFACT_SCHEMA_V8.into()
+                } else {
+                    crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
+                }
             } else {
                 PAIRED_ARTIFACT_SCHEMA_V6.into()
             },

@@ -38,7 +38,7 @@ use self::scoring::{
     Observed, ProbeScore, ScoreReason, ScoringObservationSource, score_probe,
     select_scoring_observation,
 };
-use self::stdio::StdioSession;
+use self::stdio::{MeasuredToolResponse, StdioSession};
 
 pub struct MemoryDecisionsSuite {
     corpus: DecisionCorpus,
@@ -377,6 +377,7 @@ fn run_corpus(
         let mut evidence_stage_temporal_score_for_outcome = None;
         let mut temporal_observation_for_replay = None;
         let mut evidence_stage_temporal_observation_for_replay = None;
+        let mut scored_read_metrics = None;
         let (mut status, mut score, receipt_value, mut observed_for_index, mut failure) =
             if let Some(reason) = &preflight_failure {
                 (
@@ -438,6 +439,31 @@ fn run_corpus(
                                 );
                                 let score_source =
                                     scoring_observation.map(|selected| selected.source);
+                                scored_read_metrics = score_source.and_then(|source| {
+                                    let measurement = match source {
+                                        ScoringObservationSource::TemporalRevision => {
+                                            primary.temporal_read_measurement.as_ref()
+                                        }
+                                        ScoringObservationSource::Primary => {
+                                            primary.assemble_read_measurements.first()
+                                        }
+                                    }?;
+                                    let observed = match source {
+                                        ScoringObservationSource::TemporalRevision => {
+                                            primary.temporal_observation.as_ref()
+                                        }
+                                        ScoringObservationSource::Primary => {
+                                            primary.observations.first()
+                                        }
+                                    }?;
+                                    Some(ScoredReadMetrics {
+                                        elapsed_us: measurement.elapsed_us,
+                                        compact_jsonrpc_bytes: measurement.compact_jsonrpc_bytes,
+                                        item_count: observed.item_count,
+                                        budget_used: observed.budget_used,
+                                        requested_budget: probe.budget,
+                                    })
+                                });
                                 let mut score = scoring_observation.and_then(|selected| {
                                     oracle.map(|oracle| {
                                         let mut score = score_probe(
@@ -603,6 +629,26 @@ fn run_corpus(
             failure,
             case_started.elapsed().as_millis() as u64,
         );
+        if let Some(metrics) = scored_read_metrics {
+            outcome
+                .metrics
+                .insert("scored_query_latency_us".into(), metrics.elapsed_us as f64);
+            outcome.metrics.insert(
+                "scored_query_compact_jsonrpc_bytes".into(),
+                metrics.compact_jsonrpc_bytes as f64,
+            );
+            outcome
+                .metrics
+                .insert("scored_query_item_count".into(), metrics.item_count as f64);
+            outcome.metrics.insert(
+                "scored_query_budget_used".into(),
+                metrics.budget_used as f64,
+            );
+            outcome.metrics.insert(
+                "scored_query_requested_budget".into(),
+                metrics.requested_budget as f64,
+            );
+        }
         if status == CaseStatus::Invalid {
             outcome.invalid_reason = outcome.failures.first().cloned();
         }
@@ -696,7 +742,33 @@ struct VariantTrace {
     temporal_response: Option<Value>,
     temporal_observation: Option<Observed>,
     temporal_snapshot_valid: bool,
+    temporal_read_measurement: Option<ReadMeasurement>,
+    assemble_read_measurements: Vec<ReadMeasurement>,
     stderr_excerpt: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReadMeasurement {
+    elapsed_us: u64,
+    compact_jsonrpc_bytes: usize,
+}
+
+impl From<&MeasuredToolResponse> for ReadMeasurement {
+    fn from(measured: &MeasuredToolResponse) -> Self {
+        Self {
+            elapsed_us: measured.elapsed_us,
+            compact_jsonrpc_bytes: measured.compact_jsonrpc_bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ScoredReadMetrics {
+    elapsed_us: u64,
+    compact_jsonrpc_bytes: usize,
+    item_count: usize,
+    budget_used: usize,
+    requested_budget: usize,
 }
 
 struct VariantFailure {
@@ -815,6 +887,7 @@ fn execute_variant(
         }
     }
 
+    let mut temporal_read_measurement = None;
     let (temporal_request, temporal_response, temporal_observation, temporal_snapshot_valid) =
         if captures_revision_checkpoints {
             let known_revision = temporal_revision_for_probe(probe, &revision_checkpoints)?;
@@ -825,9 +898,11 @@ fn execute_variant(
                 "budget":probe.budget,
                 "compact":true
             });
-            let response = session
-                .call_tool("assemble_context", request.clone())
+            let measured = session
+                .call_tool_measured("assemble_context", request.clone())
                 .map_err(|error| product_failure("temporal_assemble_context", error))?;
+            temporal_read_measurement = Some(ReadMeasurement::from(&measured));
+            let response = measured.response;
             let observation = normalize_observation(std::slice::from_ref(&response), &bindings)
                 .map_err(|error| VariantFailure {
                     preflight_passed: true,
@@ -858,11 +933,14 @@ fn execute_variant(
     let request_as_of = if verbose { None } else { as_of_override };
     let mut assemble_responses = Vec::new();
     let mut observations = Vec::new();
+    let mut assemble_read_measurements = Vec::new();
     for _ in 0..probe.repeat_read {
         let arguments = assemble_arguments(probe, verbose, request_as_of);
-        let response = session
-            .call_tool("assemble_context", arguments)
+        let measured = session
+            .call_tool_measured("assemble_context", arguments)
             .map_err(|error| product_failure("assemble_context", error))?;
+        assemble_read_measurements.push(ReadMeasurement::from(&measured));
+        let response = measured.response;
         let observation = normalize_observation(std::slice::from_ref(&response), &bindings)
             .map_err(|error| VariantFailure {
                 preflight_passed: true,
@@ -922,6 +1000,8 @@ fn execute_variant(
         temporal_response,
         temporal_observation,
         temporal_snapshot_valid,
+        temporal_read_measurement,
+        assemble_read_measurements,
         stderr_excerpt,
     })
 }
@@ -1757,6 +1837,8 @@ mod diagnostic_helper_tests {
             temporal_response: None,
             temporal_observation: None,
             temporal_snapshot_valid: false,
+            temporal_read_measurement: None,
+            assemble_read_measurements: vec![],
             stderr_excerpt: String::new(),
         };
 

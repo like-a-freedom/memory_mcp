@@ -65,12 +65,84 @@ remain available for their distinct analyses.
 - [x] Produce the v3 `qualify-agent-workflow` report and descriptive pilot
   summary. Preserve all outcomes and report latency as inconclusive; the
   same-binary arms do not estimate a memory treatment effect.
-- [ ] Freeze and evaluate the remaining typed-contradiction,
-  agent-managed-correction and operator-import populations on fresh synthetic
-  families. The ordinary workflow is now eligible for a separately frozen
-  study, but that does not transfer eligibility to these distinct workflows.
-  Keep the previous 0/4 response-format screen and v2 budget exits in their
-  original denominators and do not reuse exposed families as holdouts.
+- [x] Screen typed contradiction on four fresh synthetic families with
+  current direct MLX and the provider-neutral Chat Completions runner. The
+  independent typed-evidence probes passed 4/4 in each arm and direct reads
+  returned the expected sources 4/4, but exact task success was 0/4 in each
+  arm (`final_answer_not_json`: 2; `unauthorized`: 2). The preregistered 3/4
+  task floor failed, so the second capture was correctly not run. This is a
+  workflow no-go for that exact agent setup, not evidence of a memory treatment
+  effect. See the [typed-conflict screen](../../../evals/paired/c1-typed-conflict-qwen-2026-11-25/README.md).
+- [x] Screen operator import on four fresh synthetic source-file families
+  using identical registered source bytes in the literal prompt and imported
+  file. Both arms passed direct memory and independent evidence checks 4/4;
+  exact task success was 0/4 in both, and candidate formation used 31 agent
+  tool calls versus 8 for incumbent. The 3/4 task gate failed, so no repeat
+  was run. Import and extraction succeeded 4/4; this is a workflow no-go, not
+  evidence of memory treatment effect. See the
+  [operator-import screen](../../../evals/paired/c1-operator-import-qwen-direct-mlx-2026-11-25/README.md).
+- [x] Freeze and evaluate agent-managed correction on fresh synthetic
+  families. The first Codex attempt exited before any model turn; it is
+  retained as an invalid setup artifact, not a scored workflow failure. A
+  separate synthetic CLI preflight succeeded with the local Codex state
+  available, then a fresh disjoint four-family cohort ran. All four corrections
+  were extracted and invalidated in both arms, all evidence responses arrived
+  before invalidation, and all independent memory probes passed. Exact task
+  success was 3/4 incumbent and 2/4 candidate, below the frozen 3/4 per-arm
+  gate, so no repeat ran and C2 is not eligible. Both arms used the same
+  product; this is a workflow no-go, not a memory treatment effect. The
+  receipts also leave agent-read completeness unknown. See the [C1 correction
+  screen](../../../evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/README.md)
+  and [archived setup attempt](../../../evals/paired/c1-agent-managed-correction-codex-2026-11-25/README.md).
+
+- [x] Close the content-free read-normalization gap found in C1: the Codex
+  adapter can receive the standard JSON-RPC `result` wrapper, while the
+  normalizer previously recognized only a bare `CallToolResult`. RED → GREEN
+  tests verify item count, source IDs and completeness through the wrapper,
+  while an unrecognized content-only payload remains `unknown`. The frozen
+  C1 receipts remain unchanged and still omit raw tool output.
+- [x] Verify the wrapper and read diagnostics on a fresh disjoint Codex C1
+  cohort after B5. Capture 01 produced 13 structured reads: all had recognized
+  empty/nonempty outcomes and counts; all five nonempty reads had source
+  coverage. Four reads reported partial completeness and nine reported
+  unknown. The captured content-free contract cannot distinguish an absent
+  completeness field from an unrecognized value, and does not persist raw
+  source IDs. Candidate task success was 2/4 against the frozen 3/4 floor
+  (incumbent 3/4); all independent probes, extraction, invalidation, and
+  evidence-before-invalidation checks passed 4/4 in both arms. The stop rule
+  forbids capture 02. The registration also over-specified completeness for
+  reads that may not carry temporal metadata and requested raw IDs in
+  content-free receipts. Preserve the no-go and correct those assumptions in
+  a new registration; do not infer product quality or latency changes from
+  these same-binary arms. See the [C1 read-diagnostics report](../../../evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/README.md).
+
+**Current C1 result (2026-11-25):** The archived correction workflow remains
+NO-GO at 2/4 candidate task success. C1 recovery v1 was an invalid setup: the
+Codex sandbox exited before a model turn. A fresh disjoint v2 synthetic cohort
+then completed capture 01 on native Apple Silicon. In both same-product arms,
+all four corrections were extracted, verified and invalidated with the exact
+stale target; independent probes found the new source 4/4; no hard or resource
+violations occurred. Yet every agent read was empty and task success was 0/4,
+so the task floor failed and capture 02 correctly did not run. This is a
+workflow no-go, not a memory treatment estimate. The v2 evaluation also exposed
+a preregistration defect: it required at least one authorized query retry,
+while all results were partial and the frozen recall instructions forbid retry
+on partial reads. Correct that in a new registration. The receipts contain
+only hashes of model-issued query and selector arguments, so the exact source
+of empty agent reads is not yet identified. Add privacy-preserving query-shape
+diagnostics before choosing a retrieval change. C2 remains ineligible. See the
+[v1 setup record](../../../evals/paired/c1-agent-managed-correction-recovery-v1-2026-11-25/README.md)
+and [v2 result](../../../evals/paired/c1-agent-managed-correction-recovery-v2-2026-11-25/README.md).
+
+- [x] Freeze the corrected C1 registration and fresh disjoint families before
+  capture. Keep exact fact IDs transient, persist only the evaluator's boolean
+  stale-target check, and treat missing read capture as an explicit failure.
+- [x] Run C1 recovery v2 capture 01 on native Apple Silicon; preserve both
+  arms and every outcome. The frozen evaluator failed the task and retry-exposure
+  gates, so capture 02 was not run. The separate result identifies successful
+  correction writes and probes but empty agent reads; see the v2 report. A new
+  registration must first fix the unreachable retry gate and add safe query
+  diagnostics before any retrieval change is selected.
 
 ## Task C2. Design confirmation only for an eligible workflow
 
@@ -78,8 +150,15 @@ remain available for their distinct analyses.
 
 **Interfaces.** `plan-paired-power` reports power for a single registered paired binary endpoint. `compare-paired` validates a frozen confirmatory plan and emits a decision. Reports from differently scoped endpoints remain separate.
 
+**Eligibility result (2026-11-25):** No workflow currently qualifies for C2.
+The ordinary positive control is a same-product control, while typed-conflict,
+operator-import, and agent-managed-correction each missed the frozen 3/4 task
+floor. Do not run a confirmatory capture or calculate power for a nonexistent
+eligible treatment. Reopen C2 only after a materially changed and independently
+qualified workflow passes the C1 gate on fresh families.
+
 - [ ] Freeze the eligible workflow, new disjoint families, minimum useful effect, ordinary non-inferiority margin, primary and resource guards, joint power target and hard sample/time/token ceilings. Only use C1 data for design calibration. Preserve the old typed-conflict 123-family calculation as planning evidence.
-- [ ] Keep the existing `cargo test -p eval-harness --locked --test paired_comparison_cli plan_paired_power_cli_uses_family_discordance_from_validated_pilot_summary`. If family-count coverage is missing, write `pilot_retests_do_not_inflate_independent_family_count`, two captures of four identical families, and assert `independent_family_count == 4` and `promotion_decision == "not_produced"` using the actual report's field paths. Run it before modifying counting logic.
+- [x] Keep the existing `cargo test -p eval-harness --locked --test paired_comparison_cli plan_paired_power_cli_uses_family_discordance_from_validated_pilot_summary`; it passed. The CLI report counts two discordant independent families and returns `promotion_decision == "not_produced"`. This covers the existing family-level validation, so the conditional duplicate-family test was not added. No power/promotion claim is made without an eligible C1 workflow.
 - [ ] Use `plan-paired-power --pilot-report <summary> --stratum-id <stratum> --target-risk-difference <effect> --minimum-point-effect <margin> --one-sided-alpha <alpha> --target-power <power> --confidence-level <confidence> --maximum-sample-size <cap> --output <fresh-report>` only for the endpoint it sizes. For a joint claim, freeze an independently checked power simulation of the actual paired family-level decision including ordinary and resource guards. Add deterministic cases for disjoint families, no variation, and a primary win with an ordinary/resource regression. Confirm that the latter never counts as joint success. If calibration or joint power is insufficient, leave promotion open.
 - [ ] Only after the whole gate is eligible, complete capture under the fixed cap and run `compare-paired --plan <confirmatory-plan> --incumbent <i> --candidate <c> --output <fresh-report>`. Exit 0 promotes, 1 rejects, 3 is insufficient evidence and 2 is invalid input. Preserve all decision outcomes; replay and compare the archived output. Commit the evidence and state exactly which claim the registration supports.
 
@@ -100,9 +179,10 @@ cargo test -p eval-harness --locked --test deterministic_quality_gate -- --ignor
 ```
 
 - [x] Require `host: aarch64-apple-darwin` and a native arm64 product binary. Use the corresponding absolute binary path if Cargo uses a custom target directory. Save the toolchain identity, exact commands, seed/profile identity and `claim-rollout-default-acceptance.json`. A skipped test is missing evidence.
-- [ ] Freeze new families that exercise multiple corrections, contradictory sources, lexical distractors, and longer histories. Reuse the historical scale family from B5. Keep exposed v4–v10 data as replay controls. Start with one family where a public expected answer and source set are specified and assert its observed hard-violation count, disposition and sources. Run incumbent and candidate with B5's public replay commands. Only introduce a product change on a frozen RED; otherwise commit the characterization.
-- [ ] Measure query time distributions separately from deterministic decisions and actual public read/item/byte limits. Record the native command as the default contributor reproduction path and commit the registrations and receipts.
-- [ ] Before shipping changes across crates, run the workspace-required Clippy command from `AGENTS.md` and `cargo fmt --all --check` on the same target. During Red → Green use the named focused tests first.
+- [x] Freeze fresh histories covering overlapping measurements, independent-source conflict, numeric lexical neighbors and prior-knowledge cutoff. The v3 baseline failed the overlapping-measurement decision in both captures; after the clause-local retrieval fix, the v6 candidate passed all four cases in both captures with identical normalized decisions. The [v6 report](../../../evals/paired/c3-history-characterization-2026-11-25-v6/report.md) records the exact oracle and result. Multiple corrections remain covered by the [existing three-capture fixture](../../../evals/paired/multiple-corrections-2026-11-24/report.md); the v6 overlap case deliberately has no correction marker and is not evidence for an explicit correction workflow.
+- [x] Reuse and capture the B5 historical-scale profile: 252 events, including a target among 250 lexical distractors, plus ordinary and absent controls. Two fresh captures passed 3/3 and the decision-replay comparator matched. See the [scale registration](../../../evals/paired/c3-historical-scale-2026-11-25/registration.json) and [comparison receipt](../../../evals/paired/c3-historical-scale-2026-11-25/replay-comparison.json).
+- [x] Measure per-query latency separately from decision correctness and record returned items, budget and compact JSON-RPC bytes. The v6 and historical-scale reports give per-cohort min/median/max and case timings; native Apple Silicon reproduction commands and hashes are frozen in both registrations.
+- [x] Before shipping the cross-crate evaluator measurement change, run the focused fixture regression, the retrieval test filter, the workspace-required strict Clippy command from `AGENTS.md`, `cargo fmt --all --check`, and `git diff --check`. All passed on native `aarch64-apple-darwin`.
 
 The native v9 gate passed with four matching-stage captures. See the
 [v9 rollout report](../../../evals/paired/native-rollout-v9-2026-11-24/report.md).
@@ -113,8 +193,32 @@ Its snapshot precedes both corrections and all three captures passed.
 
 The focused paired CLI, chat-completions runner and public response-size
 targets reran on native Apple Silicon with 39 passing tests and one
-opt-in skip. Broader holdout histories and live confirmation retain their
-separate acceptance criteria.
+opt-in skip. The later C3 closeout below adds the fresh deterministic
+historical and scale controls. Real-provider workflow qualification remains a
+separate C1/C2 gate and does not inherit C3 eligibility.
+
+**Evaluator review follow-up (2026-11-25):** The decision normalizer used to
+map an empty successful partial read to `unknown` only when `guidance` included
+one exact phrase; otherwise the same response was scored `unobservable`. RED →
+GREEN tests now distinguish a valid empty result (`unknown`) from no captured
+read response (`unobservable`) and preserve malformed responses as errors.
+The 11 normalization tests, 18 stdio/replay tests, `cargo fmt --all --check`,
+and the required strict workspace Clippy command passed on native
+`aarch64-apple-darwin`. A fresh ignored public v9 gate subsequently completed
+with four matching-stage captures. Its frozen acceptance report records default
+5/8 decisions and 8/8 evidence, shadow 1/8 decisions and 8/8 evidence, no
+decision losses or evidence regressions, and byte-identical repeat captures.
+This is finite rollout-gate evidence for the registered configurations, not a
+memory-treatment or agent-utility claim. See the [acceptance artifact](../../../evals/paired/native-quality-candidate-2026-11-25/claim-rollout-default-acceptance.json).
+
+**C3 closeout (2026-11-25):** The frozen four-case v6 candidate passed 4/4 in
+both captures and the replay comparator matched. The 252-event historical
+scale control passed 3/3 in two fresh captures with matching decisions. The
+reports record read-time distributions and output budgets independently from
+quality scores. The query-boundary change is supported for these finite
+fixtures; its heuristic clause parser is not a multilingual or arbitrary
+punctuation guarantee. See the [v6 report](../../../evals/paired/c3-history-characterization-2026-11-25-v6/report.md)
+and [scale registration](../../../evals/paired/c3-historical-scale-2026-11-25/registration.json).
 
 ## Task C4. Qualify official LongMemEval-V2 in its own slice
 
@@ -153,6 +257,47 @@ The final reader prompts and case scores matched. Raw context sizes varied
 on six cases and every memory item was discarded by the upstream token cap
 in both runs. The bounded-read and stability findings are recorded for B5.
 [Baseline report](../../evals/LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
+
+The post-B5 Apple Silicon recheck reused the same frozen seven cases,
+100-trajectory order, saved snapshot, release binary, and model files, all
+verified against the recorded profile. The valid run scored 7/7 cases with
+official exact match 1/7. Its contexts match the prior B5 run-02 for all
+cases; the complete reviewed source span is present in 1/7, including one
+case whose answer remains wrong. The only exact-match pass lacks that reviewed
+span and is unsupported in the response. Across three valid B5 runs the
+official score and source-span count are stable at 1/7; average memory-query
+latency is 678.2 s versus 678.5 s across the two baseline runs, so neither
+answer-quality nor latency improvement is established. The first 2026-11-25
+attempt is retained but excluded: it stopped before inference because the
+pinned context processor was not found in the default cache. A processor
+preflight and explicit offline cache fixed that harness failure before the
+valid retry. See the [recheck report](../../../evals/longmemeval_v2/results/2026-11-25-b5-recheck/RECHECK.md)
+and [execution manifest](../../../evals/longmemeval_v2/results/2026-11-25-b5-recheck/execution-manifest.json).
+
+The post-C3 recheck then repeated the same seven frozen cases, 100 ordered
+trajectories, saved snapshot, reader/judge profiles and local MLX-LM runtime
+with the C3 release binary. It scored 7/7 cases without reader, judge or
+scorer failures and without context truncation. Exact match was 3/7, compared
+with 1/7 in the immediately preceding B5 run; the strict full reviewed-span
+check rose from 1/7 to 2/7. One exact match (`0c6b0c60`) is explicitly
+unsupported by its context; another (`d6da3938`) has the exact adjacent
+`Create Order` / `Reset Password` evidence although the strict whole-span
+check does not count it. Thus the single post-C3 capture is a promising result
+on this seven-case sample, not a confirmed general memory-quality gain. Mean
+query time was 598.8 s vs 630.4 s in the prior run, while wall time moved from
+1,838.3 s to 1,854.0 s; do not claim a stable speedup. The exact source-span
+scorer is now reproducible without a model/provider. See the [post-C3 report](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/RECHECK.md),
+[execution manifest](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/execution-manifest.json),
+and [reviewed-span coverage receipt](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-01/reviewed-span-coverage.json).
+
+The ordinary agent-control gate was replayed offline and remained eligible for
+its exact configuration: two captures each passed task, direct-read, and
+independent-probe criteria 4/4 with no violations or resource exits. The
+offline qualification report replayed byte-identically. The subsequent fresh
+Codex C1 correction/read-diagnostics cohort is a separate synthetic workflow
+screen and failed its candidate task floor; its report records the exact
+diagnostics and limits. Neither screen qualifies C2 or demonstrates a memory
+treatment effect.
 
 ## Task D1. Bound and reconstruct public explain citations
 

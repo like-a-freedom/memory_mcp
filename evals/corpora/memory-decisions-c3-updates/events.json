@@ -1,0 +1,103 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {
+      "id": "gauge-original",
+      "source_id": "gauge-inspection-2026-01",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17\ndimension: clearance\nvalue: 3.8 metres for North Canal Gauge 17; initial certified measurement",
+      "t_ref": "2026-01-05T09:00:00Z"
+    },
+    {
+      "id": "gauge-correction-1",
+      "source_id": "gauge-inspection-2026-02",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17\ndimension: clearance\nvalue: 4.0 metres for North Canal Gauge 17; first signed correction to the inspection ledger",
+      "t_ref": "2026-02-05T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-170",
+      "source_id": "north-gauge-170-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 170\ndimension: clearance\nvalue: 47.0 metres for North Canal Gauge 170; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-08T09:00:00Z"
+    },
+    {
+      "id": "south-gauge-17",
+      "source_id": "south-gauge-17-source",
+      "source_type": "inspection-record",
+      "content": "subject: South Canal Gauge 17\ndimension: clearance\nvalue: 7.1 metres for South Canal Gauge 17; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-09T09:00:00Z"
+    },
+    {
+      "id": "north-pump-17",
+      "source_id": "north-pump-17-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Pump 17\ndimension: pressure\nvalue: 820 kPa for North Canal Pump 17; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-10T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-17-housing",
+      "source_id": "north-gauge-17-housing-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17 Housing\ndimension: height\nvalue: 1.2 metres for North Canal Gauge 17 Housing; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-11T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-71",
+      "source_id": "north-gauge-71-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 71\ndimension: clearance\nvalue: 6.4 metres for North Canal Gauge 71; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-12T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-017",
+      "source_id": "north-gauge-017-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 017\ndimension: clearance\nvalue: 8.3 metres for North Canal Gauge 017; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-13T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-17-east",
+      "source_id": "north-gauge-17-east-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17 East\ndimension: clearance\nvalue: 9.5 metres for North Canal Gauge 17 East; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-14T09:00:00Z"
+    },
+    {
+      "id": "north-gauge-17-west",
+      "source_id": "north-gauge-17-west-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17 West\ndimension: clearance\nvalue: 10.6 metres for North Canal Gauge 17 West; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-15T09:00:00Z"
+    },
+    {
+      "id": "north-canal-gauge-17-archive",
+      "source_id": "north-canal-gauge-17-archive-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17 Archive\ndimension: clearance\nvalue: 2.1 metres for North Canal Gauge 17 Archive; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-16T09:00:00Z"
+    },
+    {
+      "id": "north-canal-gauge-17-reference",
+      "source_id": "north-canal-gauge-17-reference-source",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17 Reference\ndimension: clearance\nvalue: 5.7 metres for North Canal Gauge 17 Reference; reference station on the North Canal inspection route",
+      "t_ref": "2026-02-17T09:00:00Z"
+    },
+    {
+      "id": "gauge-correction-2",
+      "source_id": "gauge-inspection-final-2026-03",
+      "source_type": "inspection-record",
+      "content": "subject: North Canal Gauge 17\ndimension: clearance\nvalue: 4.2 metres for North Canal Gauge 17; final signed correction after a recheck of North Canal Gauge 17",
+      "t_ref": "2026-03-05T09:00:00Z"
+    },
+    {
+      "id": "gauge-forum-dispute",
+      "source_id": "community-forum-post-2026-03",
+      "source_type": "forum-report",
+      "content": "subject: North Canal Gauge 17\ndimension: clearance\nvalue: unverified correction of 4.8 metres for North Canal Gauge 17; unverified correction reported on a forum for North Canal Gauge 17",
+      "t_ref": "2026-03-06T09:00:00Z"
+    }
+  ]
+}

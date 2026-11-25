@@ -6,7 +6,7 @@ use crate::models::AccessPayload;
 use crate::shared::search::search_query_terms;
 
 use super::filtering::{fact_allowed_by_access, fact_is_active_at};
-use super::query_mode::QueryFlags;
+use super::query_mode::{QueryFlags, query_clauses};
 use super::types::{AdmissionBasis, RankedContextFact};
 
 const ACQUISITION_INTENT_TERMS: &[&str] = &[
@@ -198,7 +198,6 @@ pub(super) fn build_query_evidence(
                 .collect(),
         )
     };
-
     QueryEvidence {
         content_terms,
         requires_self_reported_relief: query_requests_shared_personal_relief(raw, &subject_terms),
@@ -267,6 +266,15 @@ fn is_subject_word(token: &str, allow_uppercase: bool) -> bool {
 }
 
 fn inferred_subject_terms_with_case(query: &str, allow_uppercase: bool) -> Vec<String> {
+    unique_terms(
+        query_clauses(query)
+            .into_iter()
+            .flat_map(|clause| inferred_subject_terms_in_clause(clause, allow_uppercase))
+            .collect(),
+    )
+}
+
+fn inferred_subject_terms_in_clause(query: &str, allow_uppercase: bool) -> Vec<String> {
     const SUBJECT_QUERY_FRAME_TERMS: &[&str] = &[
         "what",
         "which",
@@ -352,41 +360,58 @@ fn inferred_subject_terms_with_case(query: &str, allow_uppercase: bool) -> Vec<S
 
 /// A single explicit subject, using the same admission rule as historical reads.
 pub(super) fn explicit_query_subject(query: &str) -> Option<String> {
-    let tokens = query
-        .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>();
-    // A run of uppercase words can be a named subject in a mixed-case
-    // question. Keep standalone acronyms and all-caps queries ambiguous.
-    let allow_uppercase = query.chars().any(char::is_lowercase)
-        && tokens
-            .windows(2)
-            .any(|pair| pair.iter().all(|token| is_uppercase_subject_word(token)));
-    let inferred = inferred_subject_terms_with_case(query, allow_uppercase);
-    let proper = |token: &str| is_subject_word(token, allow_uppercase);
-    let numeric = |token: &str| token.chars().all(|c| c.is_ascii_digit());
-    let direct = inferred.is_empty()
-        && tokens.iter().any(|s| proper(s))
-        && tokens.iter().all(|s| proper(s) || numeric(s));
-    let mut spans = Vec::new();
-    let mut span = Vec::new();
-    for token in tokens {
-        let named = proper(token)
-            && (direct
-                || search_query_terms(token)
-                    .iter()
-                    .any(|t| inferred.contains(t)));
-        if named || (!span.is_empty() && numeric(token)) {
-            span.push(token);
-        } else if !span.is_empty() {
-            spans.push(std::mem::take(&mut span));
+    let mut subjects = Vec::new();
+    let mut ambiguous_clause = false;
+
+    for clause in query_clauses(query) {
+        let tokens = clause
+            .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        // A run of uppercase words can be a named subject in a mixed-case
+        // question. Keep standalone acronyms and all-caps queries ambiguous.
+        let allow_uppercase = clause.chars().any(char::is_lowercase)
+            && tokens
+                .windows(2)
+                .any(|pair| pair.iter().all(|token| is_uppercase_subject_word(token)));
+        let inferred = inferred_subject_terms_in_clause(clause, allow_uppercase);
+        let proper = |token: &str| is_subject_word(token, allow_uppercase);
+        let numeric = |token: &str| token.chars().all(|c| c.is_ascii_digit());
+        let direct = inferred.is_empty()
+            && tokens.iter().any(|s| proper(s))
+            && tokens.iter().all(|s| proper(s) || numeric(s));
+        let mut spans = Vec::new();
+        let mut span = Vec::new();
+        for token in tokens {
+            let named = proper(token)
+                && (direct
+                    || search_query_terms(token)
+                        .iter()
+                        .any(|t| inferred.contains(t)));
+            if named || (!span.is_empty() && numeric(token)) {
+                span.push(token);
+            } else if !span.is_empty() {
+                spans.push(std::mem::take(&mut span));
+            }
+        }
+        if !span.is_empty() {
+            spans.push(span);
+        }
+        match spans.as_slice() {
+            [subject] => subjects.push(subject.join(" ")),
+            [] => {}
+            _ => ambiguous_clause = true,
         }
     }
-    if !span.is_empty() {
-        spans.push(span);
+
+    if ambiguous_clause || subjects.is_empty() {
+        return None;
     }
-    // Multiple names need entity-aware query semantics.
-    (spans.len() == 1).then(|| spans[0].join(" "))
+    let first = subjects.first()?;
+    subjects
+        .iter()
+        .all(|subject| subject.eq_ignore_ascii_case(first))
+        .then(|| first.clone())
 }
 
 /// A lexical match on a predicate alone cannot establish a named subject.
@@ -2679,6 +2704,25 @@ mod tests {
         let query = query("Delta Enrollment");
 
         assert!(query.subject_terms.is_empty());
+    }
+
+    #[test]
+    fn explicit_subject_does_not_absorb_a_proper_noun_from_a_later_sentence() {
+        let raw = "Which conflicting clearance measurements are recorded for Slate Basin Spillway 58? No source identifies an explicit correction.";
+
+        assert_eq!(
+            explicit_query_subject(raw).as_deref(),
+            Some("Slate Basin Spillway 58")
+        );
+        assert_eq!(query(raw).subject_terms, vec!["slate", "basin", "spillway"]);
+    }
+
+    #[test]
+    fn explicit_subject_remains_ambiguous_when_separate_clauses_name_different_entities() {
+        assert_eq!(
+            explicit_query_subject("Which records mention Redwood Lock? Does Slate Basin differ?"),
+            None
+        );
     }
 
     #[test]

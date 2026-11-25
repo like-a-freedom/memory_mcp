@@ -1,0 +1,198 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "86374-1795568992005339000-0",
+  "identity_sha256": "b1b4d16d7ac9053b64dba05ebad86146df9444f5d8b09f1a7343e83317f3123b",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "morrowglass-ferry-history",
+      "case_id": "morrowglass-ferry-current-route-cache-namespace",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "oriel-threadworks-history",
+      "case_id": "oriel-threadworks-current-loom-calibration-vault",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "valewick-signal-foundry-history",
+      "case_id": "valewick-signal-foundry-current-burn-in-archive-tag",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "wrenfold-bathymetry-history",
+      "case_id": "wrenfold-bathymetry-current-survey-snapshot-shelf",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "morrowglass-ferry-history",
+        "case_id": "morrowglass-ferry-current-route-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 451
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b63b7e16065fed6132bd1af8af6696b0582b1789aae5f57c010c34c6da810e6d",
+        "response_sha256": "4d97de763ba01bcb13ba26dbff0bcc6234cc9efd578bd178937803fb50a786ca",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-correction-morrowglass-ferry-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "oriel-threadworks-history",
+        "case_id": "oriel-threadworks-current-loom-calibration-vault",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 291
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "29f95ede646de03244594948526fb0c69fb5a31edadc9c975955f51d4016b9e0",
+        "response_sha256": "c8e0fc00b157afccebaec877d6b6216af0550e1edc9ebf89ace45f288b5c0d5f",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-correction-oriel-threadworks-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "valewick-signal-foundry-history",
+        "case_id": "valewick-signal-foundry-current-burn-in-archive-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 278
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "c640942d1955e539e8065724c84f9969edc8c22c8219b84f01e35bd9b4b38d3f",
+        "response_sha256": "7e718b9082713de27d1c25b3c410509e21ec3a153fdf27c3955ade1cadc60494",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-correction-valewick-signal-foundry-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "wrenfold-bathymetry-history",
+        "case_id": "wrenfold-bathymetry-current-survey-snapshot-shelf",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 304
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "79fc0962f024aa568d3d9b5627216cf72dc3aae98549c7dbc6f88a561f093e5b",
+        "response_sha256": "5396350ac1bbdb76ccdc16482c58ca375741ab408466082400cbb08521bd28a9",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-correction-wrenfold-bathymetry-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

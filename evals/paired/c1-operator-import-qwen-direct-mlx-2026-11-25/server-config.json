@@ -1,0 +1,15 @@
+{
+  "runtime": "mlx-lm.server",
+  "version": "0.32.2",
+  "host": "127.0.0.1",
+  "port": 18768,
+  "max_tokens": 512,
+  "server_temperature": 0,
+  "chat_template_args": {
+    "enable_thinking": false
+  },
+  "decode_concurrency": 1,
+  "prompt_concurrency": 1,
+  "hf_hub_offline": true,
+  "transformers_offline": true
+}

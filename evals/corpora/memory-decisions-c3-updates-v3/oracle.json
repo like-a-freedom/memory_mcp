@@ -1,0 +1,39 @@
+{
+  "schema_version":"memory-decisions-oracle/v2",
+  "oracles":[
+    {
+      "probe_id":"overlapping-measurements-without-correction-evidence",
+      "disposition":"conflict",
+      "evidence_alternatives":[[["sb-initial"],["sb-update-one"],["sb-update-two"]]],
+      "expected_assertions":{"sb-initial":"value: 3.6\nunit: metres","sb-update-one":"value: 3.9\nunit: metres","sb-update-two":"value: 4.1\nunit: metres"},
+      "expected_roles":{"sb-initial":"conflicting","sb-update-one":"conflicting","sb-update-two":"conflicting"},
+      "forbidden_event_ids":["sb-spillway-580","sb-spillway-85","sb-spillway-058","sb-east","sb-west","sb-south","sb-pump","sb-gatehouse","sb-archive","sb-reference"],
+      "relation_outcome":"contradiction"
+    },
+    {
+      "probe_id":"prior-knowledge-before-third-measurement",
+      "disposition":"conflict",
+      "evidence_alternatives":[[["sb-initial"],["sb-update-one"]]],
+      "expected_assertions":{"sb-initial":"value: 3.6\nunit: metres","sb-update-one":"value: 3.9\nunit: metres"},
+      "expected_roles":{"sb-initial":"conflicting","sb-update-one":"conflicting"},
+      "forbidden_event_ids":["sb-update-two"]
+    },
+    {
+      "probe_id":"numeric-neighbor-exact-identity-v3",
+      "disposition":"answerable",
+      "evidence_alternatives":[[["sb-spillway-580"]]],
+      "expected_assertions":{"sb-spillway-580":"value: 41.0\nunit: metres"},
+      "expected_roles":{"sb-spillway-580":"current"},
+      "forbidden_event_ids":["sb-initial","sb-update-one","sb-update-two","sb-spillway-85","sb-spillway-058","sb-east","sb-west","sb-south","sb-gatehouse","sb-archive","sb-reference"]
+    },
+    {
+      "probe_id":"independent-source-open-conflict-v3",
+      "disposition":"conflict",
+      "evidence_alternatives":[[["rl-official-a"],["rl-official-b"]]],
+      "expected_assertions":{"rl-official-a":"value: 18\nunit: tonnes","rl-official-b":"value: 23\nunit: tonnes"},
+      "expected_roles":{"rl-official-a":"conflicting","rl-official-b":"conflicting"},
+      "forbidden_event_ids":[],
+      "relation_outcome":"contradiction"
+    }
+  ]
+}

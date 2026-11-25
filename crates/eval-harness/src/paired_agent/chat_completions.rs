@@ -380,6 +380,8 @@ impl ChatCompletionsAgent {
             memory_reads: Some(Vec::new()),
             read_capture_status: Some(super::ReadCaptureStatus::Observed),
             memory_write_episode_ids: Vec::new(),
+            observed_fact_sources: Vec::new(),
+            invalidation_fact_ids: Vec::new(),
             extract_fact_evidence: Vec::new(),
             extract_fact_evidence_telemetry_complete: matches!(
                 profile,
@@ -669,6 +671,15 @@ impl ChatCompletionsAgent {
                 break 'turns;
             }
             observation.tool_calls += 1;
+            let invalidation_fact_id = (tool_name == "invalidate")
+                .then(|| {
+                    arguments
+                        .get("fact_id")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                        .map(str::to_owned)
+                })
+                .flatten();
             let request_kind = if tool_name == "assemble_context" {
                 TraceEventKind::MemoryRead
             } else {
@@ -684,6 +695,16 @@ impl ChatCompletionsAgent {
                 Some(hash_json(&arguments)?),
                 None,
             )?;
+            if let Some(fact_id) = invalidation_fact_id {
+                observation
+                    .invalidation_fact_ids
+                    .push((fact_id, request_sequence));
+            }
+            let read_request_fingerprints = if tool_name == "assemble_context" {
+                Some(super::tool_results::read_request_fingerprints(&arguments)?)
+            } else {
+                None
+            };
             if tool_name == "extract" {
                 observation
                     .extract_fact_evidence
@@ -724,6 +745,13 @@ impl ChatCompletionsAgent {
                             response_sequence: Some(response_sequence),
                             outcome: super::MemoryReadOutcome::Failed,
                             item_count: None,
+                            request_query_sha256: read_request_fingerprints
+                                .as_ref()
+                                .and_then(|fingerprints| fingerprints.query_sha256.clone()),
+                            non_query_arguments_sha256: read_request_fingerprints.as_ref().map(
+                                |fingerprints| fingerprints.non_query_arguments_sha256.clone(),
+                            ),
+                            response_guidance_sha256: None,
                             evidence: None,
                         });
                     }
@@ -749,6 +777,11 @@ impl ChatCompletionsAgent {
             match tool_name {
                 "assemble_context" => {
                     super::tool_results::collect_source_episode_ids(&tool_result, &mut sources);
+                    observation.observed_fact_sources.extend(
+                        super::tool_results::successful_read_fact_source_pairs(&tool_result)
+                            .into_iter()
+                            .map(|(fact_id, episode_id)| (fact_id, episode_id, response_sequence)),
+                    );
                     let (outcome, item_count) =
                         super::tool_results::read_result(&tool_result["result"]);
                     if let Some(reads) = observation.memory_reads.as_mut() {
@@ -757,6 +790,15 @@ impl ChatCompletionsAgent {
                             response_sequence: Some(response_sequence),
                             outcome,
                             item_count,
+                            request_query_sha256: read_request_fingerprints
+                                .as_ref()
+                                .and_then(|fingerprints| fingerprints.query_sha256.clone()),
+                            non_query_arguments_sha256: read_request_fingerprints.as_ref().map(
+                                |fingerprints| fingerprints.non_query_arguments_sha256.clone(),
+                            ),
+                            response_guidance_sha256: super::tool_results::response_guidance_sha256(
+                                &tool_result,
+                            ),
                             evidence: super::tool_results::read_evidence(
                                 &tool_result["result"],
                                 super::tool_results::requested_cutoff(&arguments),

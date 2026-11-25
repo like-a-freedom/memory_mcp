@@ -1,0 +1,278 @@
+[
+  {
+    "key": {
+      "stratum_id": "typed_conflict",
+      "family_id": "cinderbell_calibration_lab",
+      "case_id": "cinderbell_calibration_interval",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What calibration interval was recorded for Cinderbell Calibration Lab on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "23c3602bc16c8ca68f2e5c0c196d183861dd746aead3a8fdf04f12d690d423f2",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "c1-cinderbell-record-a"
+          ]
+        ],
+        [
+          [
+            "c1-cinderbell-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "c1-cinderbell-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "c1-cinderbell-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "typed_conflict",
+      "family_id": "rillmark_orbital_yard",
+      "case_id": "rillmark_maintenance_window",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What maintenance window was recorded for Rillmark Orbital Yard on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "96efe6d66384dc66792576ff9fc10a2242d8b6d1fb63836b7b6bdad4c040343b",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "c1-rillmark-record-a"
+          ]
+        ],
+        [
+          [
+            "c1-rillmark-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "c1-rillmark-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "c1-rillmark-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "typed_conflict",
+      "family_id": "sabletide_archives",
+      "case_id": "sabletide_retention_period",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What retention period was recorded for Sabletide Archives on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "6ff9a1595626fff8ec858f7c44917aefb0a6f52a815d9432dead8729492c5af2",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "c1-sabletide-record-a"
+          ]
+        ],
+        [
+          [
+            "c1-sabletide-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "c1-sabletide-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "c1-sabletide-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "typed_conflict",
+      "family_id": "wrenmere_survey_station",
+      "case_id": "wrenmere_payload_limit",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "What payload limit was recorded for Wrenmere Survey Station on July 15, 2026?",
+      "principal": "fixture-reader",
+      "valid_at": "2026-07-15T12:00:00Z",
+      "known_revision": 15,
+      "context_budget": 1,
+      "history_sha256": "7b50f8ee9f12f76898112d66ffd58994e7f238aa57eab8eadd4134fdb472d4ca",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "NER_EXTRACTOR": "regex",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "c1-wrenmere-record-a"
+          ]
+        ],
+        [
+          [
+            "c1-wrenmere-record-b"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": [
+        [
+          {
+            "source_event_id": "c1-wrenmere-record-a",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "source_event_id": "c1-wrenmere-record-b",
+            "evidence_status": "conflicting",
+            "relations": [
+              {
+                "outcome": "contradiction",
+                "role": "conflict"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  }
+]

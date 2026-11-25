@@ -1,0 +1,92 @@
+{
+  "schema_version": "memory-mcp-c3-history-registration/v1",
+  "registration_id": "c3-history-characterization-2026-11-25-v2",
+  "status": "frozen-before-capture",
+  "frozen_at_utc": "2026-11-25T04:37:29Z",
+  "product_revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+  "product_source_tree_clean": true,
+  "host_requirement": "aarch64-apple-darwin",
+  "runner": "memory-eval run over public MCP stdio",
+  "provider_requirement": "none; local embedded database, no model, LM Studio, vendor login, API key, or network access",
+  "capture_policy": {
+    "repetitions_per_profile": 2,
+    "fresh_artifact_root_per_capture": true,
+    "same_product_binary_for_repeats": true,
+    "decision_replays_must_match": true,
+    "quality_failures_remain_in_denominator": true,
+    "capture_order": ["memory_decisions_c3_updates_v2", "memory_decisions_historical_boundaries", "memory_decisions_v10_default"]
+  },
+  "profiles": [
+    {
+      "path": "evals/profiles/memory_decisions_c3_updates_v2.json",
+      "sha256": "1897284cb1459332db93749c30b84f7e15a489c836b54d7c34a933d780c0e92d",
+      "corpus_root": "evals/corpora/memory-decisions-c3-updates-v2",
+      "corpus_file_sha256": {
+        "events.json": "ce1e3f4c78404e73320331699ee3b77789eba2856fcb460345c4797c44309621",
+        "probes.json": "3f70ad14e458782a286f685bf6c0788eae6e422c8ff04f8bd01f4a4fef3243d5",
+        "oracle.json": "6f0a56bf22425a705d80546e31987cdb150026c8c381a417371a04af0a5aacc5"
+      },
+      "expected_case_count": 4,
+      "focal_families": [
+        "copper-ridge-gate-correction-history-v2",
+        "copper-ridge-gate-numeric-neighbors-v2",
+        "silver-valley-lock-independent-source-conflict-v2"
+      ],
+      "purpose": "Fresh valid-schema characterization: successive owner corrections, separate knowledge cutoff, lexical/numeric identity distractors, independent-source conflict, and bounded public read cost."
+    },
+    {
+      "path": "evals/profiles/memory_decisions_historical_boundaries.json",
+      "sha256": "9ef79b26fb44b438282af67f656f49fcf711ecf243aa630f03afcba94cb30d30",
+      "corpus_root": "evals/corpora/memory-decisions-historical-boundaries",
+      "corpus_file_sha256": {
+        "events.json": "f0efb213c6145cfbaf9a7de6d7762a666d8581ed6c08bc04fb74fb3f56c3dbcc",
+        "probes.json": "5a58a25f0a8c3483b756ed4700bedba0153c401a3f6d66489b510b956277d78f",
+        "oracle.json": "5ffa4d17ac0b8fce3fa910e69f247557e7c2502af44d6891e851688fcd74162b"
+      },
+      "expected_case_count": 3,
+      "purpose": "Previously frozen B5 historical-scale and old-target replay control."
+    },
+    {
+      "path": "evals/profiles/memory_decisions_v10_default.json",
+      "sha256": "3cb72b4cece52519aa0a7225660c47fcbe3ec2106b84d44026da526a6892a22e",
+      "corpus_root": "evals/corpora/memory-decisions-v10",
+      "corpus_file_sha256": {
+        "events.json": "748a2c0db295cca96a92a00c680131a07648671fb116a03378be6a2ef6c75338",
+        "probes.json": "6e99974895dca1a591bfbc197e83e16882605029ad59c52b3bbf1333d0790343",
+        "oracle.json": "24ff7c94c5ed4fa1782e5d158bac236856b5281ea64d0373f6e2e6cabe23a397"
+      },
+      "expected_case_count": 8,
+      "purpose": "Existing contradiction, identity, and temporal regression control."
+    }
+  ],
+  "frozen_acceptance": {
+    "public_read_budget_per_case": 5,
+    "maximum_returned_items_per_case": 5,
+    "byte_policy": "Record compact serialized JSON-RPC response bytes per scored read; the public contract has no separate fixed assemble_context output-byte ceiling.",
+    "latency_policy": "Report each scored assemble_context round-trip latency in microseconds and each whole-case runtime in milliseconds; summarize distributions independently from correctness.",
+    "decision_policy": "Score registered source set, assertions, disposition, roles, contradiction outcome, valid-time cutoff, knowledge-revision boundary, and exact identity. Do not change the oracle after opening captures.",
+    "repeatability_policy": "Compare normalized decision replays for every first/repeat pair; elapsed timing is descriptive and is not part of replay equality.",
+    "interpretation": "Local deterministic characterization only. No population claim, agent-utility claim, or product-change claim unless a valid frozen oracle fails on the unchanged product binary. Preserve the malformed v1 capture but exclude it from product-defect scoring."
+  },
+  "preflight_note": "An initial invocation was rejected during input validation because the independent conflict probe declared expected conflict roles without requires_separate_time_cutoffs. It reported no suites to run and wrote no capture. The missing field was added, the probe hash updated, and this registration re-frozen before the first scored run.",
+  "implementation_fingerprints": {
+    "server_binary_sha256": "71108d8f2eb3b9646f24bbde73d1020cce629ce81f4f927915e07041503c2812",
+    "evaluator_binary_sha256": "9223c446e8d3f1f21e6e5fdfab5179e7bea91ec4f71d5f8adf0bbd657921fef6",
+    "server_binary_format": "Mach-O arm64",
+    "evaluator_binary_format": "Mach-O arm64",
+    "measurement_fields": [
+      "scored_query_latency_us",
+      "scored_query_compact_jsonrpc_bytes",
+      "scored_query_item_count",
+      "scored_query_budget_used",
+      "scored_query_requested_budget",
+      "case duration_ms"
+    ]
+  },
+  "capture_commands": [
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=$(git rev-parse HEAD) MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/<fresh-root>/first/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_c3_updates_v2.json --artifact $PWD/<fresh-root>/first/run.json",
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=$(git rev-parse HEAD) MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/<fresh-root>/repeat/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_c3_updates_v2.json --artifact $PWD/<fresh-root>/repeat/run.json",
+    "target/debug/memory-eval compare-decision-replays --left $PWD/<fresh-root>/first/receipts/index.json --right $PWD/<fresh-root>/repeat/receipts/index.json"
+  ],
+  "preflight_note": "Before any valid capture, two unscored runner preflights were rejected. The first had malformed probe metadata and ran no suites; the corrected probe was re-frozen with its updated checksum. The next invocation wrote only an INVALID report because product revision and absolute artifact root environment variables were missing; all four cases were invalid and no scored replay ran. The actual capture commands above include both required variables and each uses a fresh root."
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version":"memory-decisions-probes/v1",
+  "probes":[
+    {
+      "id":"overlapping-measurements-without-correction-evidence",
+      "family_id":"slate-basin-overlapping-measurements-v3",
+      "event_ids":["sb-initial","sb-update-one","sb-update-two","sb-spillway-580","sb-spillway-85","sb-spillway-058","sb-east","sb-west","sb-south","sb-pump","sb-gatehouse","sb-archive","sb-reference"],
+      "query":"Which conflicting clearance measurements are recorded for Slate Basin Spillway 58? No source identifies an explicit correction.",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"prior-knowledge-before-third-measurement",
+      "family_id":"slate-basin-overlapping-measurements-v3",
+      "event_ids":["sb-initial","sb-update-one","sb-update-two"],
+      "knowledge_before_event_id":"sb-update-two",
+      "query":"What clearance measurements for Slate Basin Spillway 58 were known before the third record?",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"numeric-neighbor-exact-identity-v3",
+      "family_id":"slate-basin-spillway-numeric-neighbors-v3",
+      "event_ids":["sb-initial","sb-update-one","sb-update-two","sb-spillway-580","sb-spillway-85","sb-spillway-058","sb-east","sb-west","sb-south","sb-gatehouse","sb-archive","sb-reference"],
+      "query":"What clearance was recorded for Slate Basin Spillway 580?",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"independent-source-open-conflict-v3",
+      "family_id":"redwood-lock-independent-source-conflict-v3",
+      "event_ids":["rl-official-a","rl-official-b"],
+      "query":"Which conflicting capacities were recorded for Redwood Lock 8 on February 20?",
+      "valid_at":"2026-02-20T12:00:00Z",
+      "temporal_diagnostic_as_of":"2026-02-20T12:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    }
+  ]
+}

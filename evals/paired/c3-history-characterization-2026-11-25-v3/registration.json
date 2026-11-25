@@ -1,0 +1,74 @@
+{
+  "schema_version":"memory-mcp-c3-history-registration/v1",
+  "registration_id":"c3-history-characterization-2026-11-25-v3",
+  "status":"frozen-before-capture",
+  "frozen_at_utc":"2026-11-25T04:47:32Z",
+  "product_revision":"0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+  "product_source_tree_clean":true,
+  "host_requirement":"aarch64-apple-darwin",
+  "runner":"memory-eval run over public MCP stdio",
+  "provider_requirement":"none; local embedded database, no model, LM Studio, vendor login, API key, or network access",
+  "capture_policy":{
+    "repetitions":2,
+    "fresh_artifact_root_per_capture":true,
+    "same_product_binary_for_repeats":true,
+    "decision_replays_must_match":true,
+    "quality_failures_remain_in_denominator":true
+  },
+  "profile":{
+    "path":"evals/profiles/memory_decisions_c3_updates_v3.json",
+    "sha256":"6e7b2012b8387447d0905c3897ce020b37cf67a90b9225b37537829ab9f97a91",
+    "corpus_root":"evals/corpora/memory-decisions-c3-updates-v3",
+    "corpus_file_sha256":{
+      "events.json":"62f031bba5c8d3543c94900cfbc01846eae926f08b656728da63d31f549e5367",
+      "probes.json":"c237208250fa83416bc8d314d916cc5d0e6cb086bfcb76bdf25b26d0355cbcaf",
+      "oracle.json":"c355e7efb02e37ad42929344e8b8f2c10db212bb02ae1dd610cd877a83ab4b08"
+    },
+    "expected_case_count":4,
+    "families":[
+      "slate-basin-overlapping-measurements-v3",
+      "slate-basin-spillway-numeric-neighbors-v3",
+      "redwood-lock-independent-source-conflict-v3"
+    ]
+  },
+  "oracle_rationale":{
+    "assertions":"Each expected assertion is an exact multiline substring in the public returned source content (`value` followed by `unit`), matching the current deterministic scorer contract.",
+    "correction_boundary":"The episodes contain repeated values but no explicit claim-level correction marker. The public ingest adapter sends source_type, source_id, content, and t_ref; correction_of is evaluator metadata and is not sent to the product. Therefore overlapping values are expected to remain a conflict. This corpus does not test an explicit correction workflow.",
+    "time":"The prior-knowledge probe uses the runner's recorded revision checkpoint before the third event, independently from the valid-time cutoff."
+  },
+  "frozen_acceptance":{
+    "public_read_budget_per_case":5,
+    "maximum_returned_items_per_case":5,
+    "required_checks":[
+      "exact bound source IDs and no forbidden source IDs",
+      "complete returned value and unit assertions",
+      "expected supported/conflict disposition and typed roles",
+      "contradiction relation for the two independently sourced conflicting records",
+      "prior-knowledge cutoff excludes the third event",
+      "exact numeric-neighbor identity",
+      "hard-violation count remains zero",
+      "first/repeat normalized decision replay equality"
+    ],
+    "timing":"Record each scored assemble_context MCP round trip in microseconds and whole-case duration in milliseconds; report min/median/max for the four-case cohort separately from decisions.",
+    "interpretation":"Small synthetic characterization only. A pass establishes these fixtures and boundaries on the pinned local setup, not population quality, model-agent utility, or a correction feature. Any product change needs a new test exposing an explicit correction in content or through an existing supported workflow."
+  },
+  "implementation_fingerprints":{
+    "server_binary_sha256":"71108d8f2eb3b9646f24bbde73d1020cce629ce81f4f927915e07041503c2812",
+    "evaluator_binary_sha256":"9223c446e8d3f1f21e6e5fdfab5179e7bea91ec4f71d5f8adf0bbd657921fef6",
+    "server_binary_format":"Mach-O arm64",
+    "evaluator_binary_format":"Mach-O arm64",
+    "measurements":[
+      "scored_query_latency_us",
+      "scored_query_compact_jsonrpc_bytes",
+      "scored_query_item_count",
+      "scored_query_budget_used",
+      "scored_query_requested_budget",
+      "case duration_ms"
+    ]
+  },
+  "capture_commands":[
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=0f8ca42d194891ff5f431fb003f63fcdeb4db504 MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/<capture>/first/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_c3_updates_v3.json --artifact $PWD/<capture>/first/run.json",
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=0f8ca42d194891ff5f431fb003f63fcdeb4db504 MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/<capture>/repeat/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_c3_updates_v3.json --artifact $PWD/<capture>/repeat/run.json",
+    "target/debug/memory-eval compare-decision-replays --left $PWD/<capture>/first/receipts/index.json --right $PWD/<capture>/repeat/receipts/index.json"
+  ]
+}

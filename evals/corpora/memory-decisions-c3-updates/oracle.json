@@ -1,0 +1,94 @@
+{
+  "schema_version": "memory-decisions-oracle/v2",
+  "oracles": [
+    {
+      "probe_id": "latest-correction-conflict",
+      "disposition": "conflict",
+      "evidence_alternatives": [
+        [
+          [
+            "gauge-correction-2"
+          ],
+          [
+            "gauge-forum-dispute"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "gauge-correction-2": "4.2 metres",
+        "gauge-forum-dispute": "4.8 metres"
+      },
+      "expected_roles": {
+        "gauge-correction-2": "conflicting",
+        "gauge-forum-dispute": "conflicting"
+      },
+      "forbidden_event_ids": [
+        "gauge-original",
+        "gauge-correction-1",
+        "north-gauge-170",
+        "south-gauge-17",
+        "north-pump-17",
+        "north-gauge-17-housing",
+        "north-gauge-71",
+        "north-gauge-017",
+        "north-gauge-17-east",
+        "north-gauge-17-west",
+        "north-canal-gauge-17-archive",
+        "north-canal-gauge-17-reference"
+      ],
+      "relation_outcome": "contradiction"
+    },
+    {
+      "probe_id": "before-final-correction",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "gauge-correction-1"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "gauge-correction-1": "4.0 metres"
+      },
+      "expected_roles": {
+        "gauge-correction-1": "current"
+      },
+      "forbidden_event_ids": [
+        "gauge-correction-2",
+        "gauge-forum-dispute"
+      ]
+    },
+    {
+      "probe_id": "numeric-neighbor-identity",
+      "disposition": "answerable",
+      "evidence_alternatives": [
+        [
+          [
+            "north-gauge-170"
+          ]
+        ]
+      ],
+      "expected_assertions": {
+        "north-gauge-170": "47.0 metres"
+      },
+      "expected_roles": {
+        "north-gauge-170": "current"
+      },
+      "forbidden_event_ids": [
+        "gauge-original",
+        "gauge-correction-1",
+        "gauge-correction-2",
+        "gauge-forum-dispute",
+        "south-gauge-17",
+        "north-gauge-71",
+        "north-gauge-017",
+        "north-gauge-17-east",
+        "north-gauge-17-west",
+        "north-gauge-17-housing",
+        "north-canal-gauge-17-archive",
+        "north-canal-gauge-17-reference"
+      ]
+    }
+  ]
+}

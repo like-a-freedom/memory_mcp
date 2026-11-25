@@ -1,0 +1,434 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "product_binary_sha256": "71108d8f2eb3b9646f24bbde73d1020cce629ce81f4f927915e07041503c2812",
+    "corpus_sha256": "0b60fbc73d90fa5d515c0b9a1bc3a0718d6b984c193a857d21e51b015f65a73e",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752"
+  },
+  "cases": [
+    {
+      "case_id": "latest-correction-after-long-distractor-history",
+      "source_order": [
+        "crg-final",
+        "crg-correction-one",
+        "crg-initial"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-final",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.2\nunit: metres"
+          },
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-final",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.2\nunit: metres"
+          },
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition",
+          "incorrect_role",
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 3,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 3,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-final",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.2\nunit: metres"
+          },
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "forbidden_source",
+          "incorrect_disposition",
+          "incorrect_role",
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "reason_codes": [
+        "forbidden_source",
+        "incorrect_disposition",
+        "incorrect_role",
+        "missing_evidence",
+        "wrong_assertion"
+      ],
+      "receipt_path": "receipt-latest-correction-after-long-distractor-history.json",
+      "receipt_sha256": "c93d64d0167e78b88c132d2277e0144618c2c334404f99dbf9c0dbeb05dddb29"
+    },
+    {
+      "case_id": "prior-knowledge-before-final-correction",
+      "source_order": [
+        "crg-correction-one",
+        "crg-initial"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": false,
+      "decision_success": false,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "incorrect_disposition",
+          "incorrect_role",
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "crg-correction-one",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres"
+          },
+          {
+            "event_id": "crg-initial",
+            "role": "conflicting",
+            "text": "subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": false,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "incorrect_disposition",
+          "incorrect_role",
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "reason_codes": [
+        "incorrect_disposition",
+        "incorrect_role",
+        "missing_evidence",
+        "wrong_assertion"
+      ],
+      "receipt_path": "receipt-prior-knowledge-before-final-correction.json",
+      "receipt_sha256": "bea3d708d44104848f2e4c8d810ce262bf5400732b493a03bb49bab370bdd7d3"
+    },
+    {
+      "case_id": "numeric-neighbor-exact-identity-v2",
+      "source_order": [
+        "crg-gate-420"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": false,
+      "decision_success": true,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "crg-gate-420",
+            "role": "current",
+            "text": "subject: Copper Ridge Gate 420\nmeasure: clearance\nvalue: 47.0\nunit: metres"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "crg-gate-420",
+            "role": "current",
+            "text": "subject: Copper Ridge Gate 420\nmeasure: clearance\nvalue: 47.0\nunit: metres"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "crg-gate-420",
+            "role": "current",
+            "text": "subject: Copper Ridge Gate 420\nmeasure: clearance\nvalue: 47.0\nunit: metres"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "reason_codes": [
+        "missing_evidence",
+        "wrong_assertion"
+      ],
+      "receipt_path": "receipt-numeric-neighbor-exact-identity-v2.json",
+      "receipt_sha256": "4805ace8dfca69c3b210ad0c2782fac841a3097408eea622b9db63df663fd16b"
+    },
+    {
+      "case_id": "independent-source-open-conflict-v2",
+      "source_order": [
+        "svl-official-a",
+        "svl-official-b"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": false,
+      "decision_success": true,
+      "probe_success": false,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "svl-official-a",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          },
+          {
+            "event_id": "svl-official-b",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "svl-official-a",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          },
+          {
+            "event_id": "svl-official-b",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "evidence_enabled_temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "svl-official-a",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 18\nunit: tonnes"
+          },
+          {
+            "event_id": "svl-official-b",
+            "role": "conflicting",
+            "text": "subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 23\nunit: tonnes"
+          }
+        ]
+      },
+      "evidence_enabled_temporal_score": {
+        "decision_success": true,
+        "evidence_success": false,
+        "probe_success": false,
+        "reason_codes": [
+          "missing_evidence",
+          "wrong_assertion"
+        ]
+      },
+      "reason_codes": [
+        "missing_evidence",
+        "wrong_assertion"
+      ],
+      "receipt_path": "receipt-independent-source-open-conflict-v2.json",
+      "receipt_sha256": "d567b16ac32d911175f5cbdb0d66b73ed18d8c262a319a79ea0981811464a08f"
+    }
+  ]
+}

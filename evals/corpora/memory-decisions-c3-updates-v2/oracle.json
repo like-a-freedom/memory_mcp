@@ -1,0 +1,38 @@
+{
+  "schema_version":"memory-decisions-oracle/v2",
+  "oracles":[
+    {
+      "probe_id":"latest-correction-after-long-distractor-history",
+      "disposition":"answerable",
+      "evidence_alternatives":[[["crg-final"]]],
+      "expected_assertions":{"crg-final":"4.2 metres"},
+      "expected_roles":{"crg-final":"current"},
+      "forbidden_event_ids":["crg-initial","crg-correction-one","crg-gate-420","crg-gate-24","crg-gate-042","crg-east","crg-west","crg-south","crg-pump","crg-gatehouse","crg-archive","crg-reference"]
+    },
+    {
+      "probe_id":"prior-knowledge-before-final-correction",
+      "disposition":"answerable",
+      "evidence_alternatives":[[["crg-correction-one"]]],
+      "expected_assertions":{"crg-correction-one":"4.0 metres"},
+      "expected_roles":{"crg-correction-one":"current"},
+      "forbidden_event_ids":["crg-final"]
+    },
+    {
+      "probe_id":"numeric-neighbor-exact-identity-v2",
+      "disposition":"answerable",
+      "evidence_alternatives":[[["crg-gate-420"]]],
+      "expected_assertions":{"crg-gate-420":"47.0 metres"},
+      "expected_roles":{"crg-gate-420":"current"},
+      "forbidden_event_ids":["crg-initial","crg-correction-one","crg-final","crg-gate-24","crg-gate-042","crg-east","crg-west","crg-south","crg-gatehouse","crg-archive","crg-reference"]
+    },
+    {
+      "probe_id":"independent-source-open-conflict-v2",
+      "disposition":"conflict",
+      "evidence_alternatives":[[["svl-official-a"],["svl-official-b"]]],
+      "expected_assertions":{"svl-official-a":"18 tonnes","svl-official-b":"23 tonnes"},
+      "expected_roles":{"svl-official-a":"conflicting","svl-official-b":"conflicting"},
+      "forbidden_event_ids":[],
+      "relation_outcome":"contradiction"
+    }
+  ]
+}

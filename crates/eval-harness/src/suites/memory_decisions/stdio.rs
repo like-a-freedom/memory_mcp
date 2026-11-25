@@ -39,6 +39,13 @@ pub struct StdioSession {
     child_reaped: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeasuredToolResponse {
+    pub response: Value,
+    pub elapsed_us: u64,
+    pub compact_jsonrpc_bytes: usize,
+}
+
 impl StdioSession {
     pub fn spawn(binary: &Path, store: &Path) -> Result<Self, EvalError> {
         Self::spawn_with_timeouts(
@@ -232,6 +239,22 @@ impl StdioSession {
             )));
         }
         Ok(response)
+    }
+
+    pub fn call_tool_measured(
+        &mut self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<MeasuredToolResponse, EvalError> {
+        let started = Instant::now();
+        let response = self.call_tool(name, arguments)?;
+        let elapsed_us = u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX);
+        let compact_jsonrpc_bytes = serde_json::to_vec(&response)?.len();
+        Ok(MeasuredToolResponse {
+            compact_jsonrpc_bytes,
+            response,
+            elapsed_us,
+        })
     }
 
     pub fn shutdown(&mut self) -> Result<(), EvalError> {

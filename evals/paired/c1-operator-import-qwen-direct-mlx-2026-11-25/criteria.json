@@ -1,0 +1,9 @@
+{
+  "schema_version": "memory-mcp-agent-managed-screen-criteria/v1",
+  "expected_trials": 4,
+  "minimum_task_successes_per_arm": 3,
+  "minimum_independent_probe_successes_per_arm": 4,
+  "minimum_operator_import_successes_per_candidate": 4,
+  "maximum_unsupported_or_prohibited_sources_per_arm": 0,
+  "maximum_hard_violations_per_arm": 0
+}

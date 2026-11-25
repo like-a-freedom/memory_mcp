@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "95540-1795578344689873000-0",
+  "identity_sha256": "4e6c485ca32f37ce38c98fd7c8f6859f91b42652e0f300af564d547d73aac477",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "brackenridge-agro-controls-history",
+      "case_id": "brackenridge-agro-controls-current-greenhouse-irrigation-calendar",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "larkspur-glaze-collective-history",
+      "case_id": "larkspur-glaze-collective-current-glaze-batch-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "northcairn-rail-works-history",
+      "case_id": "northcairn-rail-works-current-switchyard-vibration-schedule",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "velvetpine-telescope-lab-history",
+      "case_id": "velvetpine-telescope-lab-current-spectrometer-alignment-book",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "brackenridge-agro-controls-history",
+        "case_id": "brackenridge-agro-controls-current-greenhouse-irrigation-calendar",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57330,
+        "output_tokens": 332,
+        "wall_time_ms": 28736
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "1c9c164b6fe8a087b81cdc42fcb970f6f90f5385ede4c17dab1aac3db2a4eb98",
+        "response_sha256": "07fe7018a9d0220563f537832054e4cb7618c99a1acbbb1d220c0bb3fa7395c0",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-brackenridge-agro-controls-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3121,
+          "maximum_wire_bytes": 3121
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "larkspur-glaze-collective-history",
+        "case_id": "larkspur-glaze-collective-current-glaze-batch-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57328,
+        "output_tokens": 349,
+        "wall_time_ms": 28065
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "c2f39cc1a026b7891260b57c06a58cd320cdb79d8f24c4d244f89f967f5d02d6",
+        "response_sha256": "2755bffb7622dec561e01fcac08c9ff01a499fabf289c52b7d4709443314465e",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-larkspur-glaze-collective-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3081,
+          "maximum_wire_bytes": 3081
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "northcairn-rail-works-history",
+        "case_id": "northcairn-rail-works-current-switchyard-vibration-schedule",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 58165,
+        "output_tokens": 341,
+        "wall_time_ms": 28328
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ee4816bc078885a2192e600702acdf0d77e93d01122e09e4ffca818a23d41054",
+        "response_sha256": "e66a9adcba1b4db6edba9a57c7fc046919a60456c24f0138dbd869ae742b2142",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-northcairn-rail-works-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3087,
+          "maximum_wire_bytes": 3087
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "velvetpine-telescope-lab-history",
+        "case_id": "velvetpine-telescope-lab-current-spectrometer-alignment-book",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57364,
+        "output_tokens": 332,
+        "wall_time_ms": 26778
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "101404e6f7b3a44c881945611d34586ee5af1ed465ffc74f2278ba8e0fc1b189",
+        "response_sha256": "833117037b8cb59e5332aabacdb909eadf7d2d9bd417daf1854d8b98bfd74881",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-velvetpine-telescope-lab-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3097,
+          "maximum_wire_bytes": 3097
+        }
+      }
+    }
+  ]
+}

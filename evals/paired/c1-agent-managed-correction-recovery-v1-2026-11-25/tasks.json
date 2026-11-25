@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "glassroot-herbarium-history",
+        "case_id": "glassroot-herbarium-current-seed-vault-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-20T10:00:00Z: Glassroot Botanical Archive uses Opal-73 as its seed vault index. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v1/glassroot-herbarium/update-01, and t_ref=2026-11-20T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-20T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-21T12:00:00Z, what is Glassroot Botanical Archive's current seed vault index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-21T12:00:00Z, what is Glassroot Botanical Archive's current seed vault index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-21T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v1-glassroot-herbarium-old-01",
+          "source_id": "conversation://c1-recovery-v1/glassroot-herbarium/original-01",
+          "source_type": "conversation",
+          "content": "Glassroot Botanical Archive uses Birch-28 as its seed vault index.",
+          "valid_at": "2026-11-10T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v1-glassroot-herbarium-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v1-glassroot-herbarium-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Opal-73"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v1-glassroot-herbarium-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "silverreach-sonar-history",
+        "case_id": "silverreach-sonar-current-calibration-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-20T10:00:00Z: Silverreach Marine Instruments uses Plover-82 as its deepwater calibration channel. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v1/silverreach-sonar/update-01, and t_ref=2026-11-20T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-20T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-21T12:00:00Z, what is Silverreach Marine Instruments's current deepwater calibration channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-21T12:00:00Z, what is Silverreach Marine Instruments's current deepwater calibration channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-21T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v1-silverreach-sonar-old-01",
+          "source_id": "conversation://c1-recovery-v1/silverreach-sonar/original-01",
+          "source_type": "conversation",
+          "content": "Silverreach Marine Instruments uses Nacre-45 as its deepwater calibration channel.",
+          "valid_at": "2026-11-11T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v1-silverreach-sonar-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v1-silverreach-sonar-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Plover-82"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v1-silverreach-sonar-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "farrowmere-observatory-history",
+        "case_id": "farrowmere-observatory-current-control-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-20T10:00:00Z: Farrowmere Observatory uses Saffron-94 as its telescope control bus. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v1/farrowmere-observatory/update-01, and t_ref=2026-11-20T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-20T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-21T12:00:00Z, what is Farrowmere Observatory's current telescope control bus? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-21T12:00:00Z, what is Farrowmere Observatory's current telescope control bus? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-21T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v1-farrowmere-observatory-old-01",
+          "source_id": "conversation://c1-recovery-v1/farrowmere-observatory/original-01",
+          "source_type": "conversation",
+          "content": "Farrowmere Observatory uses Cedar-61 as its telescope control bus.",
+          "valid_at": "2026-11-12T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v1-farrowmere-observatory-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v1-farrowmere-observatory-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Saffron-94"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v1-farrowmere-observatory-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "copperleaf-materials-history",
+        "case_id": "copperleaf-materials-current-receipt-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-20T10:00:00Z: Copperleaf Materials Laboratory uses Topaz-86 as its isotope receipt ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v1/copperleaf-materials/update-01, and t_ref=2026-11-20T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-20T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-21T12:00:00Z, what is Copperleaf Materials Laboratory's current isotope receipt ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-21T12:00:00Z, what is Copperleaf Materials Laboratory's current isotope receipt ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-21T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v1-copperleaf-materials-old-01",
+          "source_id": "conversation://c1-recovery-v1/copperleaf-materials/original-01",
+          "source_type": "conversation",
+          "content": "Copperleaf Materials Laboratory uses Juniper-37 as its isotope receipt ledger.",
+          "valid_at": "2026-11-13T13:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v1-copperleaf-materials-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v1-copperleaf-materials-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Topaz-86"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v1-copperleaf-materials-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

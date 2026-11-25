@@ -1,0 +1,17 @@
+{
+  "schema": "memory-mcp-decision-replay-comparison-evidence/v1",
+  "registration_id": "c3-historical-scale-2026-11-25",
+  "comparison_result": "match",
+  "comparator": "target/debug/memory-eval compare-decision-replays",
+  "left_index": {
+    "path": "first/receipts/index.json",
+    "sha256": "68e7aa29d24c5ac5cae4527cb5b5f93367bb7c42c41eeda9e166aa73ce9b816d"
+  },
+  "right_index": {
+    "path": "repeat/receipts/index.json",
+    "sha256": "09343c89b4314c906a398ba89757d674e85edad50cf9e5d101f90e5d63ad3347"
+  },
+  "product_binary_sha256": "23d49b598fb6b92585931dfeb5524b2ab3a53df9b754663d8094f2b9e23a448b",
+  "observed_output": "memory decision replays match",
+  "exit_code": 0
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": "memory-mcp-c3-scale-registration/v1",
+  "registration_id": "c3-historical-scale-2026-11-25",
+  "status": "frozen-before-capture",
+  "frozen_at_utc": "2026-11-25T06:37:49Z",
+  "host_requirement": "aarch64-apple-darwin",
+  "runner": "memory-eval run over public MCP stdio",
+  "provider_requirement": "none; local embedded database, no model, LM Studio, vendor login, API key, or network access",
+  "product": {
+    "revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "source_tree_clean": false,
+    "source_files_sha256": {
+      "crates/memory-mcp/src/memory/retrieval/admission.rs": "f3759e272f15b9fb58438777ba815e07df88fb0e6d8358977617bdcbbe9566b6",
+      "crates/memory-mcp/src/memory/retrieval/query_mode.rs": "1ac863f84dfd1b60a4052744f3bcafd0574307dc3a9c8d114cb40868bd1d7361",
+      "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "5661e1415e53e08d24b7a6132bad8d3c6f89774ec2914a70fddf294e78ab7675"
+    },
+    "tracked_diff_sha256": "517745aca4fee97d63002c21f73bbbfce702f18525e61e555e29a4b17d4b35cf",
+    "server_binary_sha256": "23d49b598fb6b92585931dfeb5524b2ab3a53df9b754663d8094f2b9e23a448b",
+    "evaluator_binary_sha256": "30ce10f73088113ba3d456b70ead7ef10bec4a8e6d4bf8193d4f8921585c5fb5",
+    "binary_format": "Mach-O arm64",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+  },
+  "profile": {
+    "path": "evals/profiles/memory_decisions_historical_boundaries.json",
+    "sha256": "9ef79b26fb44b438282af67f656f49fcf711ecf243aa630f03afcba94cb30d30",
+    "corpus_root": "evals/corpora/memory-decisions-historical-boundaries",
+    "corpus_file_sha256": {
+      "events.json": "f0efb213c6145cfbaf9a7de6d7762a666d8581ed6c08bc04fb74fb3f56c3dbcc",
+      "probes.json": "5a58a25f0a8c3483b756ed4700bedba0153c401a3f6d66489b510b956277d78f",
+      "oracle.json": "5ffa4d17ac0b8fce3fa910e69f247557e7c2502af44d6891e851688fcd74162b"
+    },
+    "event_count": 252,
+    "case_count": 3,
+    "scale_case": "old-subject reads one target fact among 250 lexical decoys",
+    "other_cases": ["ordinary-subject", "absent-subject"]
+  },
+  "capture_policy": {
+    "repetitions": 2,
+    "fresh_artifact_root_per_capture": true,
+    "same_product_binary_for_repeats": true,
+    "decision_replays_must_match": true,
+    "quality_failures_remain_in_denominator": true,
+    "timing": "Record each scored public assemble_context round trip in microseconds and case duration in milliseconds. This is a candidate repeatability/scale check; do not infer a treatment effect from the two repeated captures."
+  },
+  "expected_assertions": {
+    "old-subject": {"disposition": "supported", "required_source": "old-record", "forbidden_source_prefix": "depot-"},
+    "ordinary-subject": {"disposition": "supported", "required_source": "ordinary-record"},
+    "absent-subject": {"disposition": "unknown", "forbidden_source": "ordinary-record"},
+    "maximum_returned_items_per_case": 5,
+    "hard_violations": 0
+  },
+  "comparison_context": {
+    "prior_red_capture": "evals/paired/c3-history-characterization-2026-11-25/memory_decisions_c3_updates/first/run.json",
+    "purpose": "Run the historical 252-event control that was preregistered in the original C3 registration but not captured there. This registration binds the final C3 candidate and adds scale receipts; it is not a new independent treatment cohort."
+  },
+  "capture_commands": [
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=0f8ca42d194891ff5f431fb003f63fcdeb4db504 MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/evals/paired/c3-historical-scale-2026-11-25/first/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_historical_boundaries.json --artifact $PWD/evals/paired/c3-historical-scale-2026-11-25/first/run.json",
+    "MEMORY_DECISIONS_SERVER_BIN=$PWD/target/debug/memory_mcp MEMORY_DECISIONS_PRODUCT_REVISION=0f8ca42d194891ff5f431fb003f63fcdeb4db504 MEMORY_DECISIONS_ARTIFACT_ROOT=$PWD/evals/paired/c3-historical-scale-2026-11-25/repeat/receipts target/debug/memory-eval run --profile evals/profiles/memory_decisions_historical_boundaries.json --artifact $PWD/evals/paired/c3-historical-scale-2026-11-25/repeat/run.json",
+    "target/debug/memory-eval compare-decision-replays --left $PWD/evals/paired/c3-historical-scale-2026-11-25/first/receipts/index.json --right $PWD/evals/paired/c3-historical-scale-2026-11-25/repeat/receipts/index.json"
+  ]
+}

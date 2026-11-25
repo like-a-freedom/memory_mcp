@@ -1,0 +1,1924 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v7",
+  "arm": "incumbent",
+  "run_id": "85993-1795567493081704000-0",
+  "run_started_at": "2026-11-25T00:44:53.081723Z",
+  "run_completed_at": "2026-11-25T00:55:06.021009Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "openai-compatible-chat-completions",
+      "agent_version": "mlx-lm.server 0.32.2 direct; offline; server-config-sha256=6cbecbd2d6d67e9c5b72b51cc74a0c3219770ccf4d4a29fe3b9094a4e98aed99",
+      "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+      "task_prompt_sha256": "7535646d1502451a7f9ccb29b2f58e375040a929b8cf43ededd269a9393b280f",
+      "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+      "transport": "stdio",
+      "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+      "reader_config_sha256": "5b82299ee457c958c2714f2f792f6ee37b1e03c9916ff86fa09073404828f13a",
+      "judge_config_sha256": null,
+      "corpus_sha256": "c8ff7e18ccd4ec527129f9b6f73edaa9807f2ef413be4c87ab77380742ac7cd7",
+      "oracle_sha256": "d941fb0093e34e15beba0bfed82d53cff4967f85a88fe6929634c0d689df766b",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "acc747de6202c1f24e464034d12cb7aad3dbf93552b0357c397c388a66732d34",
+      "provider_fingerprints": {
+        "chat_completions_endpoint_config": "58f4031ad4cf2341a71b07ed539ac267799b7cf299bd2fcc09028a0a6e00c34b",
+        "chat_completions_sampling_config": "8b9927f12596f28eeea135bf513fa886c5f50a64b7de09ccc7cea67078f48df8",
+        "local_mlx_model_manifest": "0ef5c71da7ad323a940a8196632d6b083928e38f47590d5c61c79d2b81106451",
+        "local_mlx_server_config": "6cbecbd2d6d67e9c5b72b51cc74a0c3219770ccf4d4a29fe3b9094a4e98aed99",
+        "memory_eval_cli": "d72f34cfcb8bc0120220cc6921dfd768eac4bc429ea556f25725d2cb435e878c"
+      },
+      "context_budget_tokens": 15360,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+      "binary_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "evershade_observatory",
+      "case_id": "evershade_observatory-calibration-ledger-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "greydock_archive",
+      "case_id": "greydock_archive-incident-index-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "moonlit_reservoir",
+      "case_id": "moonlit_reservoir-pump-schedule-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "briarwave_station",
+      "case_id": "briarwave_station-equipment-register-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 7,
+          "response_sequence": 8,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 11,
+          "response_sequence": 12,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 15,
+          "response_sequence": 16,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 19,
+          "response_sequence": 20,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 23,
+          "response_sequence": 24,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 27,
+          "response_sequence": 28,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 31,
+          "response_sequence": 32,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        }
+      ],
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "briarwave_station",
+        "case_id": "briarwave_station-equipment-register-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "budget_exceeded",
+      "direct_memory_success": true,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 8,
+      "tool_calls": 8,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 24464,
+      "output_tokens": 412,
+      "wall_time_ms": 36602,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1071,
+          "output_tokens": 47
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "9697982885b3958b05e8e2a740e453c374987fa21348fc179cb3a48cca7cefba",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "75edaab85fe465c2bbb912ae912d6b880141c1fa068dfb1daaf5cbe90b3d9cee",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1615,
+          "output_tokens": 48
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "8100b87ab806b2cacca5635bb5b0b29c9af4fadcb04ad1df4f15ef211ddd21f0",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "bdef8874094f581725f432eea209975bebee2a69c1f3a8e7c86df1689c4ae378",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2160,
+          "output_tokens": 62
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "01f4ce470ee19019deb8e70bfe3d4b1050ef258bb4fb2e80d2cd0a6015d93886",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "474ffef5f699b17e287e67c8319340275dadf3d81e9313e0170255e3027ae9ef",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2719,
+          "output_tokens": 43
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "memory_read",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "f922ac0ddee1010cb23bdc9c58570bc4b3f7d8a6816e5e2636e68b1218af9347",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 16,
+          "turn": 4,
+          "kind": "tool_response",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "c8da1af39c08c1040a9713a040f803998e1f4a0ebac34d1d23c0aecc38c565e9",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 17,
+          "turn": 5,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 18,
+          "turn": 5,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3259,
+          "output_tokens": 63
+        },
+        {
+          "sequence": 19,
+          "turn": 5,
+          "kind": "memory_read",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "cba08933deb7f58e492cfce361b516e1f6f5b51b14b470650246c9e56230b95f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 20,
+          "turn": 5,
+          "kind": "tool_response",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "24e5963a0d1e86af93e739e697d3dd704772146fc4f4dcb5b2e22c26af571c78",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 21,
+          "turn": 6,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 22,
+          "turn": 6,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3996,
+          "output_tokens": 55
+        },
+        {
+          "sequence": 23,
+          "turn": 6,
+          "kind": "memory_read",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "44d4a15f2ab214c3a43b785bc3057e304930b181e8f8a1b7c97357287ca95792",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 24,
+          "turn": 6,
+          "kind": "tool_response",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "624b15dbcceebd73ff9bff365a6110df1b5d33ac4f049437a7f8b4568baf2e04",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 25,
+          "turn": 7,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 26,
+          "turn": 7,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 4548,
+          "output_tokens": 51
+        },
+        {
+          "sequence": 27,
+          "turn": 7,
+          "kind": "memory_read",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "8df90cb10b295b028776343b102831aae7703f8afd3ab8b814c4c92e267fec25",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 28,
+          "turn": 7,
+          "kind": "tool_response",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "cdec888601092e8164cff498eee0bcf88300141f0b143dbdae8a1dc6d8b119f1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 29,
+          "turn": 8,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 30,
+          "turn": 8,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 5096,
+          "output_tokens": 43
+        },
+        {
+          "sequence": 31,
+          "turn": 8,
+          "kind": "memory_read",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "18bd17bacffb66f850053fed8905c7076eceb1bf122802215b41c9633df45ba3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 32,
+          "turn": 8,
+          "kind": "tool_response",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "7efd26639cbdd6049424919a62f820d3546d26aba2d50497dcf078a358299702",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 33,
+          "turn": 8,
+          "kind": "budget_limit_reached",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 7,
+          "response_sequence": 8,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 11,
+          "response_sequence": 12,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 15,
+          "response_sequence": 16,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 19,
+          "response_sequence": 20,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 23,
+          "response_sequence": 24,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 27,
+          "response_sequence": 28,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 31,
+          "response_sequence": 32,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        }
+      ],
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "evershade_observatory",
+        "case_id": "evershade_observatory-calibration-ledger-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "budget_exceeded",
+      "direct_memory_success": true,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 8,
+      "tool_calls": 8,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 24456,
+      "output_tokens": 417,
+      "wall_time_ms": 35982,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1072,
+          "output_tokens": 55
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "3cf3fedc3c8e70db5a8ee49bb741953c7330f5c60fb0a185c774f40593119802",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "355ad0350eac348ca4481065af9610a4e66d211e6d2304ae62af6560475bb0b1",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1640,
+          "output_tokens": 52
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2683a8b25d8c560afd0b2751ce7bf24830d8195e58d325d3bf9e2f1b9eb102c7",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "e73a196d6f000576e847b7c32fb1cc9caacba02b8ab9f9eb5cdd67c57f081fed",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2205,
+          "output_tokens": 67
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "9e3acdb8ea0b1973087c52e97e73a4f7281f329002604610ac62df36306dfeb9",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "cd75061af36efffcc8640224446887b98fd7ae9d9004e7e7a08e44c0e3763002",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2785,
+          "output_tokens": 46
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "memory_read",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "93c980ea97291da53e69e744816f9c33af52958e3875347420c72b452afcbc9b",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 16,
+          "turn": 4,
+          "kind": "tool_response",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "16828a418e6d35fdcde571070fb616221020ef6952f6c36a5aaf4c46edcd7bfc",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 17,
+          "turn": 5,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 18,
+          "turn": 5,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3344,
+          "output_tokens": 43
+        },
+        {
+          "sequence": 19,
+          "turn": 5,
+          "kind": "memory_read",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "0965013355cb197b47c31ffc57991d9a9d8699e8662081f290efed7549d3cd7a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 20,
+          "turn": 5,
+          "kind": "tool_response",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "1e54c3a6dbfca8a68f81fe6214cd6e7481dfe5dfbd9bd8ef0b22f8b5cb4b9b5d",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 21,
+          "turn": 6,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 22,
+          "turn": 6,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3900,
+          "output_tokens": 60
+        },
+        {
+          "sequence": 23,
+          "turn": 6,
+          "kind": "memory_read",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "1af4de62f602d960a5e73b8c57d802f8d671c9c5b3a7d6a51364fe14eeea831e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 24,
+          "turn": 6,
+          "kind": "tool_response",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "4a1dccf7b62db865d9d7a3f915d9146a8deccbd33f1525cc6128b022c048bfc9",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 25,
+          "turn": 7,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 26,
+          "turn": 7,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 4473,
+          "output_tokens": 51
+        },
+        {
+          "sequence": 27,
+          "turn": 7,
+          "kind": "memory_read",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "5a4505637553d9058067ea7fb890dbb37e0e21ad2211be719e6f1c01b3c2a73b",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 28,
+          "turn": 7,
+          "kind": "tool_response",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "22372f27ff87e7acf3679ac54132e8302d810cb4f1a0153b765c1c9f585b2227",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 29,
+          "turn": 8,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 30,
+          "turn": 8,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 5037,
+          "output_tokens": 43
+        },
+        {
+          "sequence": 31,
+          "turn": 8,
+          "kind": "memory_read",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "fa6c40a08ebdfc27024d7b541e85cb96834af9e90d64595317646c0cb501720e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 32,
+          "turn": 8,
+          "kind": "tool_response",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "31ece9a52f679acb43ee0a60fa72a0a34ba3e21034fac255b7788528bc128028",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 33,
+          "turn": 8,
+          "kind": "budget_limit_reached",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 7,
+          "response_sequence": 8,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 11,
+          "response_sequence": 12,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 15,
+          "response_sequence": 16,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 19,
+          "response_sequence": 20,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 23,
+          "response_sequence": 24,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 27,
+          "response_sequence": 28,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 31,
+          "response_sequence": 32,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        }
+      ],
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "greydock_archive",
+        "case_id": "greydock_archive-incident-index-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "budget_exceeded",
+      "direct_memory_success": true,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 8,
+      "tool_calls": 8,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 24643,
+      "output_tokens": 522,
+      "wall_time_ms": 42643,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1070,
+          "output_tokens": 57
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "8400c9b20c16538b97673dd8bf11d8b4e9c7e9c0b1e837e88012370aaf0bec3a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "94ff34925ad091993c8adafce702989d87b6ae40b3a3591d59989aae78ecdb12",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1642,
+          "output_tokens": 50
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "ab3d4ffc8363715af0a7fdf867395c57b1fc804ac43a4979c5355b2535728d76",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "5540edcc8f4d8f0b63cda73d4631209092524f2555f304fbdfe9356b2696d2ec",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2211,
+          "output_tokens": 50
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "e45b3979b19de7bdc1bcde269de04ca2967fe99e39086ffb730ef8a1f13dae7c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "38e873597a536022b31ad969aeecdf7840f431a8269aef5f22da7cf5c3d05e21",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2776,
+          "output_tokens": 57
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "memory_read",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "a4b1e186e3d19d9487c4c29150f312ee84f8c7be73ee01ab06f5217f54c95154",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 16,
+          "turn": 4,
+          "kind": "tool_response",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "c705775af4528d1418c12ca50d15f7f2a372353e431102a098db720ac076dce6",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 17,
+          "turn": 5,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 18,
+          "turn": 5,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3348,
+          "output_tokens": 79
+        },
+        {
+          "sequence": 19,
+          "turn": 5,
+          "kind": "memory_read",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "e3688304b27f42d68eec58dc68a90412aae0b1e06c55ad4a98b88e228d2f393e",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 20,
+          "turn": 5,
+          "kind": "tool_response",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2ec90359a0178736c6036040a135b89fa378e2b2c57c643259940b09d08ad50c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 21,
+          "turn": 6,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 22,
+          "turn": 6,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3942,
+          "output_tokens": 56
+        },
+        {
+          "sequence": 23,
+          "turn": 6,
+          "kind": "memory_read",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "89c0a22d56594d629a6d37d3fd4548cfe38504e65d0c8360d743b134c03f4d91",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 24,
+          "turn": 6,
+          "kind": "tool_response",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "500479db1b1321829fe4a4e20405131ee8d71e07971ceb6f38661191845860a5",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 25,
+          "turn": 7,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 26,
+          "turn": 7,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 4513,
+          "output_tokens": 109
+        },
+        {
+          "sequence": 27,
+          "turn": 7,
+          "kind": "memory_read",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "c4b44a00ba3212f138cc10d9a21de30ccda324bd54a4655464972391baa889cb",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 28,
+          "turn": 7,
+          "kind": "tool_response",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "e773d770a20d4048fa1450f856495b5f83db5f8350a312c7262066c02104f522",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 29,
+          "turn": 8,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 30,
+          "turn": 8,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 5141,
+          "output_tokens": 64
+        },
+        {
+          "sequence": 31,
+          "turn": 8,
+          "kind": "memory_read",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "f2b2caf124daa9681361313e533cf7bcb66d93c8c09ab689bdcb993a22a924dc",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 32,
+          "turn": 8,
+          "kind": "tool_response",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "409bb7d854a2d5bf85208bb842d4437d02057fc377b40eebc9bada811a3874a3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 33,
+          "turn": 8,
+          "kind": "budget_limit_reached",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 7,
+          "response_sequence": 8,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 11,
+          "response_sequence": 12,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 15,
+          "response_sequence": 16,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 19,
+          "response_sequence": 20,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 23,
+          "response_sequence": 24,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 27,
+          "response_sequence": 28,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        },
+        {
+          "request_sequence": 31,
+          "response_sequence": 32,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "source_coverage": true,
+          "completeness": "unknown"
+        }
+      ],
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonlit_reservoir",
+        "case_id": "moonlit_reservoir-pump-schedule-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "budget_exceeded",
+      "direct_memory_success": true,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 8,
+      "tool_calls": 8,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 23786,
+      "output_tokens": 362,
+      "wall_time_ms": 31784,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1071,
+          "output_tokens": 32
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "7c97a20f0750a56c29ec222614f75b68b8a9362093921e33f573c6c718fbda89",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "708772b82b4bfb33ab25cb0f5758fd4f875e015f345a88a79ab6321de606cf12",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1602,
+          "output_tokens": 56
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "e599e3b4ff442efd0043da37e2033a2c47b719d21a1aad15f0b862cbddbe7906",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 8,
+          "turn": 2,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "b08727c4e65d892657e5e44ed1ebe40c1d5bb24430c4a7341fe66534510c0f51",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 9,
+          "turn": 3,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 10,
+          "turn": 3,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2157,
+          "output_tokens": 38
+        },
+        {
+          "sequence": 11,
+          "turn": 3,
+          "kind": "memory_read",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2df30e54401d8289ee9584c4a8d46fe7d89ad71906724d97cb0fcf521253e541",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 12,
+          "turn": 3,
+          "kind": "tool_response",
+          "call_id": "call-3",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "057c7e90e83359f19d5bd20a025ccdcb7395de508bbc36099c6764921320ec3b",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 13,
+          "turn": 4,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 14,
+          "turn": 4,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 2694,
+          "output_tokens": 49
+        },
+        {
+          "sequence": 15,
+          "turn": 4,
+          "kind": "memory_read",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "6fc72373a3283ae5a78d9ea3ed416613d2c7a42c1ebec73b868d81fb30a594ae",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 16,
+          "turn": 4,
+          "kind": "tool_response",
+          "call_id": "call-4",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "89295c7559580500b73afc264cb7aa8e05a0fc2dab2dcbcf3affcd3eae83992f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 17,
+          "turn": 5,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 18,
+          "turn": 5,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3242,
+          "output_tokens": 50
+        },
+        {
+          "sequence": 19,
+          "turn": 5,
+          "kind": "memory_read",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "725e20c5cee5064b64c884f0dc1542f774bcdc79efc6fa37d16c1da655dd8b31",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 20,
+          "turn": 5,
+          "kind": "tool_response",
+          "call_id": "call-5",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "13040ae0a087857039ec2080cbb7205bd53c221922c1ef007eee8c289ef13ccf",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 21,
+          "turn": 6,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 22,
+          "turn": 6,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 3791,
+          "output_tokens": 49
+        },
+        {
+          "sequence": 23,
+          "turn": 6,
+          "kind": "memory_read",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "684405e7d498c8268855b9b5a92999c91e800c4eaae78470bef153532e9abba3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 24,
+          "turn": 6,
+          "kind": "tool_response",
+          "call_id": "call-6",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "da2b2cc4f7cc43819e3e4d45a7677aa0c19f8176ccc300a55a9cb5427e2bdb28",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 25,
+          "turn": 7,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 26,
+          "turn": 7,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 4343,
+          "output_tokens": 44
+        },
+        {
+          "sequence": 27,
+          "turn": 7,
+          "kind": "memory_read",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2d1707be2e6a1365dfb8f91956cc3604bdc0944b860a6422162225af641f5d41",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 28,
+          "turn": 7,
+          "kind": "tool_response",
+          "call_id": "call-7",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "2006e2f5e0d00fabf0981dcd73c99206004b53a9f684c391d9efb4e5e0b98bc7",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 29,
+          "turn": 8,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 30,
+          "turn": 8,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 4886,
+          "output_tokens": 44
+        },
+        {
+          "sequence": 31,
+          "turn": 8,
+          "kind": "memory_read",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "fedb84270d279bddc11cde3d3eab91de999172948be0a07fd7fc7222c31bc252",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 32,
+          "turn": 8,
+          "kind": "tool_response",
+          "call_id": "call-8",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "937fecf7c4a7ec58ebf10dd708bae1b1171cc4d8324a7049212b11189ff672cc",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 33,
+          "turn": 8,
+          "kind": "budget_limit_reached",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    }
+  ]
+}

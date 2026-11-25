@@ -18,7 +18,7 @@ pub enum Command {
         #[arg(
             long,
             default_value = "agent_managed_memory",
-            value_parser = ["agent_managed_memory", "agent_source_authority", "agent_source_authority_literal_input", "agent_maintenance", "agent_maintenance_v2", "agent_maintenance_v3", "agent_maintenance_v4"]
+            value_parser = ["agent_managed_memory", "agent_source_authority", "agent_source_authority_literal_input", "agent_maintenance", "agent_maintenance_v2", "agent_maintenance_v3", "agent_maintenance_v4", "agent_maintenance_v5"]
         )]
         memory_tool_profile: String,
     },
@@ -289,7 +289,7 @@ pub enum Command {
         #[arg(long)]
         claim_rollout_stage: Option<String>,
         /// Fixed Codex tool surface; write access is opt-in and version-pinned.
-        #[arg(long, default_value = "recall_only", value_parser = ["recall_only", "agent_managed_memory", "agent_source_authority", "agent_source_authority_literal_input", "agent_maintenance", "agent_maintenance_v2", "agent_maintenance_v3", "agent_maintenance_v4"])]
+        #[arg(long, default_value = "recall_only", value_parser = ["recall_only", "agent_managed_memory", "agent_source_authority", "agent_source_authority_literal_input", "agent_maintenance", "agent_maintenance_v2", "agent_maintenance_v3", "agent_maintenance_v4", "agent_maintenance_v5"])]
         memory_tool_profile: String,
     },
     /// Execute source-authority trials through any loopback OpenAI-compatible API.
@@ -419,6 +419,23 @@ mod tests {
                 ..
             } if memory_tool_profile == "agent_maintenance_v4"
         ));
+
+        let maintenance_v5 = Cli::try_parse_from([
+            "memory-eval",
+            "hash-agent-managed-tasks",
+            "--tasks",
+            "tasks.json",
+            "--memory-tool-profile",
+            "agent_maintenance_v5",
+        ])
+        .expect("v5 maintenance fingerprints select a separately pinned profile");
+        assert!(matches!(
+            maintenance_v5.command,
+            Command::HashAgentManagedTasks {
+                memory_tool_profile,
+                ..
+            } if memory_tool_profile == "agent_maintenance_v5"
+        ));
     }
 
     #[test]
@@ -447,6 +464,37 @@ mod tests {
         ])
         .expect("complete paired comparison command parses");
         assert!(matches!(parsed.command, Command::ComparePaired { .. }));
+    }
+
+    #[test]
+    fn paired_codex_runner_accepts_the_new_maintenance_profile() {
+        let parsed = Cli::try_parse_from([
+            "memory-eval",
+            "run-paired-codex",
+            "--plan",
+            "plan.json",
+            "--tasks",
+            "tasks.json",
+            "--codex-binary",
+            "/usr/local/bin/codex",
+            "--incumbent-memory-server",
+            "/tmp/incumbent",
+            "--candidate-memory-server",
+            "/tmp/candidate",
+            "--output-directory",
+            "/tmp/paired",
+            "--memory-tool-profile",
+            "agent_maintenance_v5",
+        ])
+        .expect("v5 maintenance workflow is explicitly opt in");
+
+        assert!(matches!(
+            parsed.command,
+            Command::RunPairedCodex {
+                memory_tool_profile,
+                ..
+            } if memory_tool_profile == "agent_maintenance_v5"
+        ));
     }
 
     #[test]

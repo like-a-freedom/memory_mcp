@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "86657-1795569349970072000-0",
+  "identity_sha256": "60fe8a881711de025965006a23db2498abe35542c7528d128bf4ddec042c16b8",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "bluefen-cartography-lab-history",
+      "case_id": "bluefen-cartography-lab-current-lidar-tile-archive",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "giltarrow-orchard-systems-history",
+      "case_id": "giltarrow-orchard-systems-current-irrigation-audit-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "quillhaven-tugworks-history",
+      "case_id": "quillhaven-tugworks-current-engine-telemetry-partition",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction",
+      "family_id": "solstice-kiln-cooperative-history",
+      "case_id": "solstice-kiln-cooperative-current-vitrification-tray-registry",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "bluefen-cartography-lab-history",
+        "case_id": "bluefen-cartography-lab-current-lidar-tile-archive",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57868,
+        "output_tokens": 322,
+        "wall_time_ms": 30162
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ed1651371abd054f1dd9b44db6bdd4fa334a303502c65159443c88da9ed01523",
+        "response_sha256": "bea6e1a31edf9a4d949f433c8769240516026cfea0bd2d08c60de24061785041",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-correction-v2-bluefen-cartography-lab-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3061,
+          "maximum_wire_bytes": 3061
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "giltarrow-orchard-systems-history",
+        "case_id": "giltarrow-orchard-systems-current-irrigation-audit-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57318,
+        "output_tokens": 349,
+        "wall_time_ms": 29135
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "85f751a8f194bf53b3290ff9edc3c6ae91a9bb07b5e9197ad95932ddfc678de4",
+        "response_sha256": "6ad42cb219ebcfcaa3579dd5cd809511b329c6eeee0c7aa5c1133cd5ea634290",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-correction-v2-giltarrow-orchard-systems-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3107,
+          "maximum_wire_bytes": 3107
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "quillhaven-tugworks-history",
+        "case_id": "quillhaven-tugworks-current-engine-telemetry-partition",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57953,
+        "output_tokens": 327,
+        "wall_time_ms": 27355
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "476901d9eb00d7dcf12f030cab5decdbb31793eb382a8ca7f4e9a8344e72e602",
+        "response_sha256": "b8ecb041867d4fba8aee3183f7ae29cf6ede27d0ea2902bb7dafcb430d1ec338",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-correction-v2-quillhaven-tugworks-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3075,
+          "maximum_wire_bytes": 3075
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "solstice-kiln-cooperative-history",
+        "case_id": "solstice-kiln-cooperative-current-vitrification-tray-registry",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57310,
+        "output_tokens": 328,
+        "wall_time_ms": 25764
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "7d48e53cfccc030dbd5959d9553d78eacba242faf10d4518e2b7cecdff334e37",
+        "response_sha256": "65f63b65ce34f22a49ce8d7ef8f1e7b5e849a37e8272ebe788ad4262bf76dd76",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-correction-v2-solstice-kiln-cooperative-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3115,
+          "maximum_wire_bytes": 3115
+        }
+      }
+    }
+  ]
+}

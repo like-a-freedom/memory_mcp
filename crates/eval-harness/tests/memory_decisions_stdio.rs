@@ -38,7 +38,7 @@ while IFS= read -r line; do
   if [ "$mode" = "early" ]; then exit 0; fi
   if [ "$mode" = "init_hang" ] && [ "$method" = "initialize" ]; then continue; fi
   if [ "$method" = "initialize" ]; then
-    if [ "$mode" = "normal" ] || [ "$mode" = "stderr" ] || [ "$mode" = "call_hang" ] || [ "$mode" = "error" ]; then
+    if [ "$mode" = "normal" ] || [ "$mode" = "stderr" ] || [ "$mode" = "call_hang" ] || [ "$mode" = "call_delay" ] || [ "$mode" = "error" ]; then
       printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"ingest","inputSchema":{"properties":{}}},{"name":"extract","inputSchema":{"properties":{}}},{"name":"assemble_context","inputSchema":{"properties":{"as_of":{}}}}]}}'
     fi
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"serverInfo\":{\"name\":\"fake-memory\",\"version\":\"1\"}}}"
@@ -48,6 +48,7 @@ while IFS= read -r line; do
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"tools\":[{\"name\":\"ingest\",\"inputSchema\":{\"properties\":{}}},{\"name\":\"extract\",\"inputSchema\":{\"properties\":{}}},{\"name\":\"assemble_context\",\"inputSchema\":{\"properties\":{\"as_of\":{}}}}]}}"
   elif [ "$method" = "tools/call" ]; then
     if [ "$mode" = "call_hang" ]; then continue; fi
+    if [ "$mode" = "call_delay" ]; then sleep 0.15; fi
     if [ "$mode" = "error" ]; then
       printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"tool failed\"}]}}"
     else
@@ -94,6 +95,27 @@ fn stdio_initializes_without_waiting_for_a_notification_reply_and_buffers_out_of
     assert_eq!(
         response["result"]["structuredContent"]["result"],
         store_path.display().to_string()
+    );
+    session.shutdown().unwrap();
+}
+
+#[test]
+fn stdio_measured_tool_call_records_success_latency_and_compact_response_bytes() {
+    let temp = TempDir::new().unwrap();
+    let binary = fake_server(&temp, "call_delay");
+    let store_path = store(&temp, "store");
+    let (startup, call, shutdown) = short_timeouts();
+
+    let mut session =
+        StdioSession::spawn_with_timeouts(&binary, &store_path, startup, call, shutdown).unwrap();
+    let measured = session
+        .call_tool_measured("assemble_context", json!({"query":"fixed"}))
+        .unwrap();
+
+    assert!(measured.elapsed_us >= 100_000);
+    assert_eq!(
+        measured.compact_jsonrpc_bytes,
+        serde_json::to_vec(&measured.response).unwrap().len()
     );
     session.shutdown().unwrap();
 }

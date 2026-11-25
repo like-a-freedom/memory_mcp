@@ -364,6 +364,8 @@ impl AgentManagedTrialBackend for FormationFailureBackend {
                 memory_reads: None,
                 read_capture_status: None,
                 memory_write_episode_ids: vec![],
+                observed_fact_sources: Vec::new(),
+                invalidation_fact_ids: Vec::new(),
                 extract_fact_evidence: vec![],
                 extract_fact_evidence_telemetry_complete: false,
                 terminal_http_status_code: is_http_rejection.then_some(429),
@@ -427,6 +429,8 @@ fn observation(memory_source_episode_ids: Vec<String>) -> AgentObservation {
         memory_reads: None,
         read_capture_status: None,
         memory_write_episode_ids: vec![],
+        observed_fact_sources: Vec::new(),
+        invalidation_fact_ids: Vec::new(),
         extract_fact_evidence: vec![],
         extract_fact_evidence_telemetry_complete: false,
         terminal_http_status_code: None,
@@ -898,7 +902,7 @@ fn managed_phase_artifact_retains_only_content_free_terminal_failure_diagnostics
         let serialized = serde_json::to_value(supplement).expect("serialize stage sidecar");
         assert_eq!(
             serialized["schema_version"],
-            "memory-mcp-agent-managed-run/v5"
+            "memory-mcp-agent-managed-run/v6"
         );
         let failure_class = serialized
             .pointer("/stages/0/formation/terminal_error_class")
@@ -919,6 +923,19 @@ fn managed_phase_artifact_retains_only_content_free_terminal_failure_diagnostics
         );
     }
 
+    let mut missing_v6_audit = incumbent.clone();
+    missing_v6_audit.stages[0].exact_stale_fact_invalidation_verified = None;
+    assert!(
+        compare_agent_managed_runs(
+            &plan,
+            &incumbent_run,
+            &candidate_run,
+            &missing_v6_audit,
+            &candidate,
+        )
+        .is_err()
+    );
+
     let mut compatible_v4 = serde_json::to_value(&incumbent).expect("serialize v5 sidecar");
     compatible_v4["schema_version"] = serde_json::json!("memory-mcp-agent-managed-run/v4");
     for stage in compatible_v4["stages"].as_array_mut().expect("stage list") {
@@ -926,6 +943,10 @@ fn managed_phase_artifact_retains_only_content_free_terminal_failure_diagnostics
             .as_object_mut()
             .expect("phase summary")
             .remove("terminal_transport_stage");
+        stage
+            .as_object_mut()
+            .expect("stage receipt")
+            .remove("exact_stale_fact_invalidation_verified");
     }
     let compatible_v4: eval_harness::paired_agent::managed::AgentManagedRunSupplement =
         serde_json::from_value(compatible_v4).expect("v4 sidecar shape remains readable");
@@ -1112,11 +1133,11 @@ fn operator_file_import_uses_versioned_artifact_without_leaking_fixture_data() {
     );
     assert_eq!(
         incumbent_stages.schema_version,
-        "memory-mcp-agent-managed-run/v5"
+        "memory-mcp-agent-managed-run/v6"
     );
     assert_eq!(
         candidate_stages.schema_version,
-        "memory-mcp-agent-managed-run/v5"
+        "memory-mcp-agent-managed-run/v6"
     );
     assert_eq!(comparison.candidate.operator_import_fixtures_total, 1);
     assert_eq!(comparison.candidate.operator_setup_actions_total, 2);
@@ -1132,6 +1153,10 @@ fn operator_file_import_uses_versioned_artifact_without_leaking_fixture_data() {
     legacy_candidate["schema_version"] = serde_json::json!("memory-mcp-agent-managed-run/v2");
     for value in [&mut legacy_incumbent, &mut legacy_candidate] {
         for stage in value["stages"].as_array_mut().expect("stages array") {
+            stage
+                .as_object_mut()
+                .expect("stage object")
+                .remove("exact_stale_fact_invalidation_verified");
             stage["formation"]
                 .as_object_mut()
                 .expect("formation object")

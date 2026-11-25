@@ -188,6 +188,14 @@ sole trajectory in a fresh one-question build preflight with that method.
 See the [native baseline report](../../docs/evals/LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
 for both scored passes and their independent coverage receipts.
 
+The [B5 recheck](results/2026-11-25-b5-recheck/RECHECK.md) recorded 1/7
+official exact match and one complete reviewed source span. The subsequent
+[post-C3 recheck](results/2026-11-25-c3-final-query-fix/RECHECK.md) recorded
+3/7 exact matches and two complete reviewed spans on the same seven-case
+cohort. One exact-match answer was unsupported by context, and a second had
+sufficient adjacent controls without the full reviewed span. Treat these as
+small-sample outcomes, not proof of general quality or latency improvement.
+
 [The frozen manifest](small-web-text-cohort.json) registers seven questions
 backed by three complete accessibility-tree observations. Each entry gives
 the trajectory, state, line range and span hash. The staging command checks
@@ -221,6 +229,19 @@ the OpenAI Chat Completions protocol. A standalone MLX-LM server on Apple
 Silicon is one option. For the recorded Apple Silicon profile, run one
 instance per model with the same flags and distinct ports.
 
+The reviewed-span coverage check is a separate deterministic, provider-free
+step. It verifies each frozen source span's hash against the staged
+trajectories and checks for the complete span inside an individual saved text
+context item; it does not require the reader or judge to run.
+
+```bash
+python -m evals.longmemeval_v2.reviewed_span_coverage \
+  --cohort evals/longmemeval_v2/small-web-text-cohort.json \
+  --trajectories "$COHORT/trajectories.json" \
+  --per-question "$SCORES/per_question.jsonl" \
+  --output "$SCORES/reviewed-span-coverage.json"
+```
+
 ```bash
 HF_HUB_OFFLINE=1 mlx_lm.server --host 127.0.0.1 --port 18767 \
   --model "$READER_WEIGHTS" --temp 0 --chat-template-args '{"enable_thinking":false}'
@@ -237,10 +258,21 @@ stage the pinned upstream Qwen3.5‑9B processor assets in
 an isolated `HF_HOME` cache and set its offline `refs/main` to the recorded
 revision in the [native run profile](small-web-native-profile.json). The Qwen processor measures input context. Reader and judge
 inference use the separately configured models. With that environment,
-check processor availability before launching a full-store read.
+set `HF_HOME` explicitly and check processor availability before launching a
+full-store read. The `scored_coverage.py` runner now performs this check before
+calling the upstream harness; a missing processor is recorded as
+`preflight_error` for every selected case, before any memory query starts.
+This avoids spending the full-store read time on a run that cannot tokenize
+its prompts.
 
 ```bash
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python -c \
+MEMORY_LME_HF_HOME=/absolute/path/to/staged-hf-home
+LONGMEMEVAL_UPSTREAM=/absolute/path/to/pinned/LongMemEval-V2
+MEMORY_MCP_ROOT=/absolute/path/to/memory_mcp
+MEMORY_LME_PYTHON=/absolute/path/to/scorer-venv/bin/python
+HF_HOME="$MEMORY_LME_HF_HOME" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+  PYTHONPATH="$LONGMEMEVAL_UPSTREAM:$MEMORY_MCP_ROOT" \
+  "$MEMORY_LME_PYTHON" -c \
   'from evaluation.harness import get_memory_context_processor; get_memory_context_processor()'
 ```
 

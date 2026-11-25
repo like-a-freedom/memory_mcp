@@ -12,6 +12,33 @@ from evals.longmemeval_v2.scored_coverage import loopback_endpoint, run_observed
 
 
 class ScoredCoverageTests(unittest.TestCase):
+    def test_processor_preflight_failure_is_reported_before_prompt_building(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            calls = []
+
+            def preflight():
+                calls.append("preflight")
+                raise OSError("processor assets are unavailable")
+
+            def main():
+                calls.append("harness.main")
+
+            harness = SimpleNamespace(main=main, call_reader_model_async=None,
+                                      generate_all_reader_outputs=None, score_prediction=None,
+                                      LLM_EVAL_FUNCTIONS=set())
+            with self.assertRaisesRegex(RuntimeError, "preflight"):
+                run_observed(harness, [], ["a", "b"], output, preflight=preflight)
+
+            self.assertEqual(calls, ["preflight"])
+            report = json.loads((output / "score-coverage.json").read_text())
+            self.assertEqual(report["cases"], {"a": "preflight_error", "b": "preflight_error"})
+            self.assertEqual(report["failures"], {
+                "a": ["preflight_error"], "b": ["preflight_error"],
+            })
+            self.assertEqual(report["covered_case_count"], 0)
+            self.assertEqual(report["official_metrics_status"], "unavailable")
+
     def test_reader_fallback_is_excluded_from_coverage_but_native_score_is_preserved(self):
         with TemporaryDirectory() as directory:
             output = Path(directory)

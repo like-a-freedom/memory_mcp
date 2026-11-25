@@ -80,7 +80,8 @@ pub(super) async fn assemble_revision_bounded_context(
         .filter(|fact_type| !fact_type.is_empty())
         .map(str::to_owned)
         .collect::<Vec<_>>();
-    let cleaned_query = crate::shared::search::preprocess_search_query(&request.query);
+    let search_surface = super::query_mode::lexical_search_surface(&request.query);
+    let cleaned_query = crate::shared::search::preprocess_search_query(&search_surface);
     let query_opt = (!cleaned_query.is_empty()).then_some(cleaned_query.as_str());
     let query_terms = query_opt
         .map(crate::shared::search::search_query_terms)
@@ -435,7 +436,8 @@ pub(super) async fn prepare_context_params(
 
     let namespace = service.active_namespace.clone();
     let cutoff_iso = crate::shared::temporal::normalize_dt(cutoff);
-    let cleaned_query = crate::shared::search::preprocess_search_query(&request.query);
+    let search_surface = super::query_mode::lexical_search_surface(&request.query);
+    let cleaned_query = crate::shared::search::preprocess_search_query(&search_surface);
 
     let requested_view_mode = request
         .view_mode

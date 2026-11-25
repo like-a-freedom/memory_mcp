@@ -1,0 +1,113 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:201c39eb2168c189eee97991": "c1-sabletide-record-a",
+    "episode:79d55de04298b27891f1875d": "c1-sabletide-record-b"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "2dc1db05279ad89aa9b14c553714f1d87d0d92831aa974e0256ccb596c896092",
+    "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+    "source_event_ids": [
+      "c1-sabletide-record-b"
+    ],
+    "claim_annotations": [
+      {
+        "source_event_id": "c1-sabletide-record-b",
+        "evidence_status": "conflicting",
+        "relations": [
+          {
+            "outcome": "contradiction",
+            "role": "conflict"
+          }
+        ]
+      }
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 1,
+    "compact": true,
+    "known_revision": 15,
+    "query": "What retention period was recorded for Sabletide Archives on July 15, 2026?",
+    "valid_at": "2026-07-15T12:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-25T00:18:58.254066Z\",\"known_revision\":15,\"valid_at\":\"2026-07-15T12:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.7,\"content\":\"subject: Sabletide Archives\\ndimension: retention_period\\nvalue: 120 years effective July 15, 2026\",\"evidence_status\":\"conflicting\",\"fact_id\":\"fact:09da05c4c1d5b102d13e0077\",\"grounding\":0.88,\"provenance\":{\"extraction_strategy\":\"explicit_schema_record\",\"ingestion_method\":\"extraction\",\"known_revision\":15,\"source_episode_id\":\"episode:79d55de04298b27891f1875d\",\"source_id\":\"c1-sabletide-operations-log-b\",\"source_type\":\"owner-record\",\"valid_at\":\"2026-07-15T12:00:00+00:00\"},\"rationale\":\"historical\",\"reconciliation\":{\"relations\":[{\"outcome\":\"contradiction\",\"role\":\"conflict\"}]},\"relevance\":0.88,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:79d55de04298b27891f1875d\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-25T00:18:58.254066Z",
+            "known_revision": 15,
+            "valid_at": "2026-07-15T12:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.7,
+            "content": "subject: Sabletide Archives\ndimension: retention_period\nvalue: 120 years effective July 15, 2026",
+            "evidence_status": "conflicting",
+            "fact_id": "fact:09da05c4c1d5b102d13e0077",
+            "grounding": 0.88,
+            "provenance": {
+              "extraction_strategy": "explicit_schema_record",
+              "ingestion_method": "extraction",
+              "known_revision": 15,
+              "source_episode_id": "episode:79d55de04298b27891f1875d",
+              "source_id": "c1-sabletide-operations-log-b",
+              "source_type": "owner-record",
+              "valid_at": "2026-07-15T12:00:00+00:00"
+            },
+            "rationale": "historical",
+            "reconciliation": {
+              "relations": [
+                {
+                  "outcome": "contradiction",
+                  "role": "conflict"
+                }
+              ]
+            },
+            "relevance": 0.88,
+            "retrieval_tier": "historical_direct",
+            "semantic_available": false,
+            "source_episode": "episode:79d55de04298b27891f1875d"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+  "claim_rollout_stage": "evidence"
+}

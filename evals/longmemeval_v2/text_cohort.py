@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 def verified_span(trajectory, review):
+    """Return the reviewed source span after checking its bounds and digest."""
     states = [state for state in trajectory["states"] if state["state_index"] == review["state_index"]]
     if len(states) != 1:
         raise ValueError("evidence state is missing or ambiguous")
@@ -15,9 +16,11 @@ def verified_span(trajectory, review):
     first, last = review["start_line"], review["end_line"]
     if not 1 <= first <= last <= len(lines):
         raise ValueError("evidence span is out of bounds")
-    content = "\n".join(lines[first - 1:last]).encode("utf-8")
+    text = "\n".join(lines[first - 1:last])
+    content = text.encode("utf-8")
     if hashlib.sha256(content).hexdigest() != review["span_sha256"]:
         raise ValueError("evidence span digest does not match")
+    return text
 
 
 def stage(dataset, manifest, output):

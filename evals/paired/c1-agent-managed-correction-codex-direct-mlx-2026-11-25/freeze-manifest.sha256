@@ -1,0 +1,13 @@
+43d600e5dfc4a2d1e0e21411de3fe394589dfdfe7f3bcfb4a5966bca5a411961  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/plan.json
+0dc76a7869478a40e7c6c1b6347307a710a2b31c5f3919408620256d68c93df5  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/tasks.json
+ba062e2129da044fbc147a18a362a4e06b8c830a8258ac5bc4a413202a31b6b6  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/fingerprints.json
+bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/protocol-config.json
+ed8d7baa9795709c7737db43fba19b49959028484406d8f8501bc9c15156aeb7  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/host-policy.json
+d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/simulator.json
+1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/retry-policy.json
+abec05b82ddf82bc4df68d068002a31a3c811aa25f218ba96b9bd58501d1e509  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/criteria.json
+047d0649b3d701e6882fc03a24870d7b1f507959e0f13821e2bb3bfcae9d085a  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/preregistration.md
+522cf5356de737abf255fa54417129452d380e7a29a6c8f96c33f1c6477970cc  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/prompts/system.txt
+ccc62b898c6027d82cebecb0dfec152d51085f6a07b6306ffbfa602de7b2de9c  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/prompts/task-rules.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/prompts/recall-system.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/prompts/recall-task-rules.txt

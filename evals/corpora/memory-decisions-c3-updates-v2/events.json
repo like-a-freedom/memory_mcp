@@ -1,0 +1,20 @@
+{
+  "schema_version": "memory-decisions-events/v1",
+  "events": [
+    {"id":"crg-initial","source_id":"copper-ridge-owner-ledger","source_type":"owner-record","content":"subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 3.8\nunit: metres","t_ref":"2026-01-05T09:00:00Z"},
+    {"id":"crg-correction-one","source_id":"copper-ridge-owner-ledger","source_type":"owner-correction","content":"subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.0\nunit: metres","t_ref":"2026-02-05T09:00:00Z","correction_of":"crg-initial"},
+    {"id":"crg-final","source_id":"copper-ridge-owner-ledger","source_type":"owner-correction","content":"subject: Copper Ridge Gate 42\nmeasure: clearance\nvalue: 4.2\nunit: metres","t_ref":"2026-03-05T09:00:00Z","correction_of":"crg-correction-one"},
+    {"id":"crg-gate-420","source_id":"copper-ridge-gate-420-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 420\nmeasure: clearance\nvalue: 47.0\nunit: metres","t_ref":"2026-02-08T09:00:00Z"},
+    {"id":"crg-gate-24","source_id":"copper-ridge-gate-24-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 24\nmeasure: clearance\nvalue: 6.0\nunit: metres","t_ref":"2026-02-09T09:00:00Z"},
+    {"id":"crg-gate-042","source_id":"copper-ridge-gate-042-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 042\nmeasure: clearance\nvalue: 8.0\nunit: metres","t_ref":"2026-02-10T09:00:00Z"},
+    {"id":"crg-east","source_id":"copper-ridge-gate-42-east-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 42 East\nmeasure: clearance\nvalue: 9.0\nunit: metres","t_ref":"2026-02-11T09:00:00Z"},
+    {"id":"crg-west","source_id":"copper-ridge-gate-42-west-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 42 West\nmeasure: clearance\nvalue: 10.0\nunit: metres","t_ref":"2026-02-12T09:00:00Z"},
+    {"id":"crg-south","source_id":"south-ridge-gate-42-survey","source_type":"inspection-record","content":"subject: South Ridge Gate 42\nmeasure: clearance\nvalue: 7.1\nunit: metres","t_ref":"2026-02-13T09:00:00Z"},
+    {"id":"crg-pump","source_id":"copper-ridge-pump-42-survey","source_type":"inspection-record","content":"subject: Copper Ridge Pump 42\nmeasure: pressure\nvalue: 820\nunit: kPa","t_ref":"2026-02-14T09:00:00Z"},
+    {"id":"crg-gatehouse","source_id":"copper-ridge-gatehouse-42-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gatehouse 42\nmeasure: clearance\nvalue: 2.1\nunit: metres","t_ref":"2026-02-15T09:00:00Z"},
+    {"id":"crg-archive","source_id":"copper-ridge-gate-42-archive-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 42 Archive\nmeasure: clearance\nvalue: 1.9\nunit: metres","t_ref":"2026-02-16T09:00:00Z"},
+    {"id":"crg-reference","source_id":"copper-ridge-gate-42-reference-survey","source_type":"inspection-record","content":"subject: Copper Ridge Gate 42 Reference\nmeasure: clearance\nvalue: 5.7\nunit: metres","t_ref":"2026-02-17T09:00:00Z"},
+    {"id":"svl-official-a","source_id":"silver-valley-lock-6-audit-a","source_type":"inspection-record","content":"subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 18\nunit: tonnes","t_ref":"2026-02-20T12:00:00Z"},
+    {"id":"svl-official-b","source_id":"silver-valley-lock-6-audit-b","source_type":"inspection-record","content":"subject: Silver Valley Lock 6\nmeasure: capacity\nvalue: 23\nunit: tonnes","t_ref":"2026-02-20T12:00:00Z"}
+  ]
+}

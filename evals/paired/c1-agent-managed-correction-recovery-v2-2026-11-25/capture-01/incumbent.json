@@ -1,0 +1,485 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v8",
+  "arm": "incumbent",
+  "run_id": "75205-1795596836609275000-0",
+  "run_started_at": "2026-11-25T08:53:56.609307Z",
+  "run_completed_at": "2026-11-25T09:01:39.054923Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.171.0",
+      "model": "gpt-6.1-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "934c8d84001d917c5d272ca36042ec169ead3a280530dab21a7a4146479dfd1a",
+      "task_prompt_sha256": "97dc052cbd8a26cf90e49e2790af9a4505364dec86b05212f2ee83c32486ac15",
+      "host_policy_sha256": "ed8d7baa9795709c7737db43fba19b49959028484406d8f8501bc9c15156aeb7",
+      "transport": "stdio",
+      "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+      "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+      "judge_config_sha256": null,
+      "corpus_sha256": "2a7294b2d857e7f947ce092965bf19370ee01aad984b963e7844a54684c7d3d8",
+      "oracle_sha256": "12ee613fc3c165a27e7baddacc0ceac83ee7987f860efc43c2be5af21bd156fe",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+      "provider_fingerprints": {
+        "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+        "memory_eval_cli": "3db3c8c49151f99ce47977a42465ad51bc2d1b1b60c6324fefedfade0153728f"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504+dirty",
+      "binary_sha256": "946f5adc2dccb0aff15574f8034fcfe0f51e6190e9905abb9a204e9922b4ef87",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "mosslight-conservatory-history",
+      "case_id": "mosslight-conservatory-current-seed-vault-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "tideglass-acoustic-history",
+      "case_id": "tideglass-acoustic-current-calibration-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "northstar-ridge-history",
+      "case_id": "northstar-ridge-current-control-bus",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "ashenvale-isotope-history",
+      "case_id": "ashenvale-isotope-current-receipt-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "bfa110935ec3674e642f1bad6ddc1bd58cfede5a3d7c94dd5194888eb6875cee",
+          "non_query_arguments_sha256": "308eeea114ede01fd4183211c9e848e6db00bb7b9a3a43af4b3d3fdef30a6540",
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "ashenvale-isotope-history",
+        "case_id": "ashenvale-isotope-current-receipt-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 27945,
+      "output_tokens": 122,
+      "wall_time_ms": 16845,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "557e80ca1b412dd3b2942afc170fecce552faf563bdbb14b96696e6e26710671",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "2abaf40cb4eb931ca406c6190b3f096fbfb36847a6ad6279bbf1261c84a63cb3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 27945,
+          "output_tokens": 122
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "6a960281f214991fd71fcd72352969251254f64772378eea48125b7081643ba1",
+          "non_query_arguments_sha256": "6c8b2000d34373e63baa5167ca660a61e2c7977fb545684d212f534290c3fb07",
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "mosslight-conservatory-history",
+        "case_id": "mosslight-conservatory-current-seed-vault-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 27778,
+      "output_tokens": 137,
+      "wall_time_ms": 15284,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "d3fe0776c263e37231ace00c05edc63c56c1ea88e1806270fa815123c796117a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "2abaf40cb4eb931ca406c6190b3f096fbfb36847a6ad6279bbf1261c84a63cb3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 27778,
+          "output_tokens": 137
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "e5b2433fc86ebc5262e77008abe11e3fd1bf56660b84f313b9a28d52fb34c1a7",
+          "non_query_arguments_sha256": "6c8b2000d34373e63baa5167ca660a61e2c7977fb545684d212f534290c3fb07",
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "northstar-ridge-history",
+        "case_id": "northstar-ridge-current-control-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 27771,
+      "output_tokens": 134,
+      "wall_time_ms": 17389,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "3f3663861df864814743e1ff7b33d14077f274a9e265097b9a4bb5d0def1012f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "2abaf40cb4eb931ca406c6190b3f096fbfb36847a6ad6279bbf1261c84a63cb3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 27771,
+          "output_tokens": 134
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "5570c5b037d70dd9ed4f4352b53b4a78bcc144285bd0a3142e0ec110861e5b1e",
+          "non_query_arguments_sha256": "6c8b2000d34373e63baa5167ca660a61e2c7977fb545684d212f534290c3fb07",
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "tideglass-acoustic-history",
+        "case_id": "tideglass-acoustic-current-calibration-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 27783,
+      "output_tokens": 139,
+      "wall_time_ms": 19800,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "17c817908f396e0b9b9b39baa722d35c47b0c04b2f5864903cce36f67dd8487f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "2abaf40cb4eb931ca406c6190b3f096fbfb36847a6ad6279bbf1261c84a63cb3",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 27783,
+          "output_tokens": 139
+        }
+      ]
+    }
+  ]
+}

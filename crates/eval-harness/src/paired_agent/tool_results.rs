@@ -126,8 +126,8 @@ fn episode_id_from_ingest_payload(value: &Value) -> Option<String> {
 
 pub(crate) fn read_result(result: &Value) -> (super::MemoryReadOutcome, Option<u32>) {
     use super::MemoryReadOutcome;
-    let count = result
-        .pointer("/structuredContent/result")
+    let count = read_payload(result)
+        .and_then(|payload| payload.get("result"))
         .and_then(Value::as_array)
         .and_then(|items| u32::try_from(items.len()).ok());
     let outcome = match count {
@@ -157,11 +157,47 @@ pub(crate) fn requested_cutoff(arguments: &Value) -> Option<String> {
     .ok()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReadRequestFingerprints {
+    pub query_sha256: Option<String>,
+    pub non_query_arguments_sha256: String,
+}
+
+/// Retain only digests that let an offline evaluator prove a retry changed
+/// the query while preserving every selector and budget argument.
+pub(crate) fn read_request_fingerprints(
+    arguments: &Value,
+) -> Result<ReadRequestFingerprints, crate::EvalError> {
+    let mut non_query_arguments = arguments.clone();
+    let query = if let Value::Object(fields) = &mut non_query_arguments {
+        fields.remove("query")
+    } else {
+        None
+    };
+    let query_sha256 = query
+        .map(|query| serde_json::to_vec(&query).map(|bytes| super::sha256(&bytes)))
+        .transpose()?;
+    let non_query_arguments_sha256 = super::sha256(&serde_json::to_vec(&non_query_arguments)?);
+    Ok(ReadRequestFingerprints {
+        query_sha256,
+        non_query_arguments_sha256,
+    })
+}
+
+/// Fingerprint guidance when present without persisting its natural-language text.
+pub(crate) fn response_guidance_sha256(result: &Value) -> Option<String> {
+    let guidance = read_payload(result)
+        .and_then(|payload| payload.get("guidance"))
+        .or_else(|| result.get("guidance"))
+        .and_then(Value::as_str)?;
+    Some(super::sha256(guidance.as_bytes()))
+}
+
 pub(crate) fn read_evidence(
     result: &Value,
     requested_cutoff_sha256: Option<String>,
 ) -> Option<super::MemoryReadEvidence> {
-    let payload = result.get("structuredContent")?;
+    let payload = read_payload(result)?;
     let items = payload.get("result")?.as_array()?;
     let mut source_episode_ids = Vec::with_capacity(items.len());
     let mut claim_annotations = Vec::new();
@@ -194,4 +230,228 @@ pub(crate) fn read_evidence(
             })
             .and_then(requested_cutoff),
     })
+}
+
+fn read_payload(result: &Value) -> Option<&Value> {
+    let tool_result = result
+        .get("result")
+        .or_else(|| result.get("payload"))
+        .unwrap_or(result);
+    tool_result
+        .get("structuredContent")
+        .or_else(|| tool_result.get("structured_content"))
+}
+
+pub(crate) fn read_fact_source_pairs(result: &Value) -> Vec<(String, String)> {
+    let Some(items) = read_payload(result)
+        .and_then(|payload| payload.get("result"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .filter_map(|item| {
+            let fact_id = item.get("fact_id")?.as_str()?.trim();
+            let source_episode = item.get("source_episode")?.as_str()?.trim();
+            (!fact_id.is_empty() && !source_episode.is_empty())
+                .then(|| (fact_id.to_owned(), source_episode.to_owned()))
+        })
+        .collect()
+}
+
+pub(crate) fn successful_read_fact_source_pairs(result: &Value) -> Vec<(String, String)> {
+    let tool_result = result
+        .get("result")
+        .or_else(|| result.get("payload"))
+        .unwrap_or(result);
+    if result.get("isError").and_then(Value::as_bool) == Some(true)
+        || tool_result.get("isError").and_then(Value::as_bool) == Some(true)
+    {
+        return Vec::new();
+    }
+    let Some(payload) = read_payload(result) else {
+        return Vec::new();
+    };
+    if payload
+        .get("status")
+        .and_then(Value::as_str)
+        .is_some_and(|status| status != "success")
+        || read_result(result).0 != super::MemoryReadOutcome::Nonempty
+    {
+        return Vec::new();
+    }
+    read_fact_source_pairs(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{
+        read_evidence, read_request_fingerprints, read_result, response_guidance_sha256,
+        successful_read_fact_source_pairs,
+    };
+    use crate::paired_agent::{MemoryReadOutcome, ReadCompleteness};
+
+    #[test]
+    fn reads_structured_evidence_from_json_rpc_tool_result_envelope() {
+        let response = json!({
+            "jsonrpc":"2.0",
+            "id":7,
+            "result":{"structuredContent":{
+                "result":[{"source_episode":"episode:one","content":"Quartz-31"}],
+                "context":{"completeness":"partial"}
+            }}
+        });
+
+        let (outcome, count) = read_result(&response);
+        let evidence = read_evidence(&response, None).expect("structured evidence");
+
+        assert_eq!(outcome, MemoryReadOutcome::Nonempty);
+        assert_eq!(count, Some(1));
+        assert_eq!(evidence.source_episode_ids, ["episode:one"]);
+        assert_eq!(evidence.completeness, Some(ReadCompleteness::Partial));
+    }
+
+    #[test]
+    fn successful_fact_source_pairs_require_a_successful_nonempty_tool_result() {
+        let response = json!({
+            "result": {"structuredContent": {
+                "status":"success",
+                "result":[{"fact_id":"fact:one","source_episode":"episode:one"}]
+            }}
+        });
+
+        assert_eq!(
+            successful_read_fact_source_pairs(&response),
+            [("fact:one".into(), "episode:one".into())]
+        );
+    }
+
+    #[test]
+    fn failed_tool_result_cannot_supply_exact_invalidation_evidence() {
+        let response = json!({
+            "isError":true,
+            "result": {"structuredContent": {
+                "status":"success",
+                "result":[{"fact_id":"fact:one","source_episode":"episode:one"}]
+            }}
+        });
+
+        assert!(successful_read_fact_source_pairs(&response).is_empty());
+    }
+
+    #[test]
+    fn reads_structured_evidence_from_adapter_payload_envelope() {
+        let response = json!({
+            "payload":{"structured_content":{
+                "result":[{"source_episode":"episode:two","content":"Harbor-91"}],
+                "context":{"completeness":"complete"}
+            }}
+        });
+
+        let (outcome, count) = read_result(&response);
+        let evidence = read_evidence(&response, None).expect("structured evidence");
+
+        assert_eq!(outcome, MemoryReadOutcome::Nonempty);
+        assert_eq!(count, Some(1));
+        assert_eq!(evidence.source_episode_ids, ["episode:two"]);
+        assert_eq!(evidence.completeness, Some(ReadCompleteness::Complete));
+    }
+
+    #[test]
+    fn reads_empty_result_from_supported_response_envelope() {
+        let empty_response = json!({
+            "structuredContent":{"result":[],"context":{"completeness":"partial"}}
+        });
+
+        assert_eq!(
+            read_result(&empty_response),
+            (MemoryReadOutcome::Empty, Some(0))
+        );
+    }
+
+    #[test]
+    fn extracts_fact_to_source_pairs_from_structured_read() {
+        let response = json!({
+            "result": {"structuredContent": {"result": [
+                {"fact_id":"fact:old","source_episode":"episode:old"},
+                {"fact_id":"fact:new","source_episode":"episode:new"}
+            ]}}
+        });
+
+        assert_eq!(
+            super::read_fact_source_pairs(&response),
+            vec![
+                ("fact:old".to_owned(), "episode:old".to_owned()),
+                ("fact:new".to_owned(), "episode:new".to_owned())
+            ]
+        );
+    }
+
+    #[test]
+    fn reports_unknown_for_unrecognized_response_envelope() {
+        let unrecognized_response = json!({"content":[{"type":"text","text":"opaque"}]});
+
+        assert_eq!(
+            read_result(&unrecognized_response),
+            (MemoryReadOutcome::Unknown, None)
+        );
+    }
+
+    #[test]
+    fn read_request_fingerprints_change_only_when_query_changes() {
+        let first = json!({
+            "query":"where is the archive key?",
+            "valid_at":"2026-11-21T12:00:00Z",
+            "fact_types":["decision"],
+            "context_budget":2048,
+            "compact":true
+        });
+        let retry = json!({
+            "query":"which key is stored at the archive?",
+            "valid_at":"2026-11-21T12:00:00Z",
+            "fact_types":["decision"],
+            "context_budget":2048,
+            "compact":true
+        });
+        let broadened = json!({
+            "query":"which key is stored at the archive?",
+            "valid_at":"2026-11-22T12:00:00Z",
+            "fact_types":["decision"],
+            "context_budget":4096,
+            "compact":true
+        });
+
+        let first = read_request_fingerprints(&first).expect("fingerprint first request");
+        let retry = read_request_fingerprints(&retry).expect("fingerprint retry request");
+        let broadened =
+            read_request_fingerprints(&broadened).expect("fingerprint broadened request");
+
+        assert_ne!(first.query_sha256, retry.query_sha256);
+        assert_eq!(
+            first.non_query_arguments_sha256,
+            retry.non_query_arguments_sha256
+        );
+        assert_ne!(
+            retry.non_query_arguments_sha256,
+            broadened.non_query_arguments_sha256
+        );
+    }
+
+    #[test]
+    fn response_guidance_is_fingerprinted_without_retaining_its_text() {
+        let response = json!({
+            "result":{"structuredContent":{
+                "result":[],
+                "guidance":"No sufficient matching context was found. Refine the query or verify primary sources."
+            }}
+        });
+
+        let digest = response_guidance_sha256(&response).expect("guidance digest");
+
+        assert_eq!(digest.len(), 64);
+        assert!(!digest.contains("Refine"));
+    }
 }

@@ -1,0 +1,282 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "candidate",
+  "run_id": "75205-1795596836609275000-0",
+  "identity_sha256": "1a88302bf0abb1f159b5a1f3c22e6f3baa845efb673482a59dc03632a08ee98c",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "ashenvale-isotope-history",
+      "case_id": "ashenvale-isotope-current-receipt-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "mosslight-conservatory-history",
+      "case_id": "mosslight-conservatory-current-seed-vault-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "northstar-ridge-history",
+      "case_id": "northstar-ridge-current-control-bus",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "tideglass-acoustic-history",
+      "case_id": "tideglass-acoustic-current-calibration-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "ashenvale-isotope-history",
+        "case_id": "ashenvale-isotope-current-receipt-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57940,
+        "output_tokens": 336,
+        "wall_time_ms": 27874
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "6fa092b8defcbece28e8b932371fc53f810f149dd1263d3e030f0e2d208c3efc",
+        "response_sha256": "2ddd4247bad0834dec9e99e5038d9f6c52eb1f8a545fca05b58a859c9f746451",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v2-ashenvale-isotope-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3077,
+          "maximum_wire_bytes": 3077
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "mosslight-conservatory-history",
+        "case_id": "mosslight-conservatory-current-seed-vault-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57996,
+        "output_tokens": 341,
+        "wall_time_ms": 31573
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "f1640085891b7983b9c060f339560b7f17cc6efe185117c2aee071918806f957",
+        "response_sha256": "e83a8e5ea5c21a20c2d87d359e3014d618264c5a37ce22cfdac75deb746f63cf",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v2-mosslight-conservatory-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3101,
+          "maximum_wire_bytes": 3101
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "northstar-ridge-history",
+        "case_id": "northstar-ridge-current-control-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 57161,
+        "output_tokens": 319,
+        "wall_time_ms": 42581
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b2e59fcee800034974898ee416f44d9d37ff59d1ca71f234c5aad8a267680a03",
+        "response_sha256": "934d3796243de753ed2bbd282eacf6af803ec0362dbff1293e54b9f98bb3e194",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v2-northstar-ridge-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3097,
+          "maximum_wire_bytes": 3097
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "tideglass-acoustic-history",
+        "case_id": "tideglass-acoustic-current-calibration-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 58035,
+        "output_tokens": 325,
+        "wall_time_ms": 40377
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "537178b83ccd009b3e64f2d2ebba869b8021d62f48eb3260550eff5e420d3a32",
+        "response_sha256": "57ec88f84d984c4639d08ea3b3a5bf84fe53e7d428f11ce9d977d358c37b1248",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v2-tideglass-acoustic-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3179,
+          "maximum_wire_bytes": 3179
+        }
+      }
+    }
+  ]
+}

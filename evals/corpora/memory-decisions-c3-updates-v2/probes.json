@@ -1,0 +1,46 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id":"latest-correction-after-long-distractor-history",
+      "family_id":"copper-ridge-gate-correction-history-v2",
+      "event_ids":["crg-initial","crg-correction-one","crg-final","crg-gate-420","crg-gate-24","crg-gate-042","crg-east","crg-west","crg-south","crg-pump","crg-gatehouse","crg-archive","crg-reference"],
+      "query":"What clearance is currently supported for Copper Ridge Gate 42 after the final owner correction?",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"prior-knowledge-before-final-correction",
+      "family_id":"copper-ridge-gate-correction-history-v2",
+      "event_ids":["crg-initial","crg-correction-one","crg-final"],
+      "knowledge_before_event_id":"crg-final",
+      "query":"Before the final correction was known, what clearance had the owner recorded for Copper Ridge Gate 42?",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"numeric-neighbor-exact-identity-v2",
+      "family_id":"copper-ridge-gate-numeric-neighbors-v2",
+      "event_ids":["crg-initial","crg-correction-one","crg-final","crg-gate-420","crg-gate-24","crg-gate-042","crg-east","crg-west","crg-south","crg-gatehouse","crg-archive","crg-reference"],
+      "query":"What clearance was recorded for Copper Ridge Gate 420?",
+      "valid_at":"2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of":"2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    },
+    {
+      "id":"independent-source-open-conflict-v2",
+      "family_id":"silver-valley-lock-independent-source-conflict-v2",
+      "event_ids":["svl-official-a","svl-official-b"],
+      "query":"What capacity was recorded for Silver Valley Lock 6 on February 20?",
+      "valid_at":"2026-02-20T12:00:00Z",
+      "temporal_diagnostic_as_of":"2026-02-20T12:00:00Z",
+      "requires_separate_time_cutoffs":true,
+      "budget":5
+    }
+  ]
+}

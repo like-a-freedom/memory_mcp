@@ -1,0 +1,145 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "typed_conflict",
+        "family_id": "cinderbell_calibration_lab",
+        "case_id": "cinderbell_calibration_interval",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If any returned item has evidence_status \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What calibration interval should I report? Subject: Cinderbell Calibration Lab.",
+      "seed_episodes": [
+        {
+          "event_id": "c1-cinderbell-record-a",
+          "source_id": "c1-cinderbell-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Cinderbell Calibration Lab\ndimension: calibration_interval\nvalue: 21 days effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "c1-cinderbell-record-b",
+          "source_id": "c1-cinderbell-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Cinderbell Calibration Lab\ndimension: calibration_interval\nvalue: 28 days effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["c1-cinderbell-record-a"]],
+          [["c1-cinderbell-record-b"]]
+        ],
+        "accepted_answers": ["Conflicting records; ask the owner to confirm."],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "typed_conflict",
+        "family_id": "rillmark_orbital_yard",
+        "case_id": "rillmark_maintenance_window",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If any returned item has evidence_status \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What maintenance-window duration should I report? Subject: Rillmark Orbital Yard.",
+      "seed_episodes": [
+        {
+          "event_id": "c1-rillmark-record-a",
+          "source_id": "c1-rillmark-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Rillmark Orbital Yard\ndimension: maintenance_window\nvalue: 42 minutes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "c1-rillmark-record-b",
+          "source_id": "c1-rillmark-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Rillmark Orbital Yard\ndimension: maintenance_window\nvalue: 56 minutes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["c1-rillmark-record-a"]],
+          [["c1-rillmark-record-b"]]
+        ],
+        "accepted_answers": ["Conflicting records; ask the owner to confirm."],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "typed_conflict",
+        "family_id": "sabletide_archives",
+        "case_id": "sabletide_retention_period",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If any returned item has evidence_status \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What retention period should I report? Subject: Sabletide Archives.",
+      "seed_episodes": [
+        {
+          "event_id": "c1-sabletide-record-a",
+          "source_id": "c1-sabletide-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Sabletide Archives\ndimension: retention_period\nvalue: 90 years effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "c1-sabletide-record-b",
+          "source_id": "c1-sabletide-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Sabletide Archives\ndimension: retention_period\nvalue: 120 years effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["c1-sabletide-record-a"]],
+          [["c1-sabletide-record-b"]]
+        ],
+        "accepted_answers": ["Conflicting records; ask the owner to confirm."],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "typed_conflict",
+        "family_id": "wrenmere_survey_station",
+        "case_id": "wrenmere_payload_limit",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Call assemble_context exactly once with budget=1 for this question. Use only the returned memory item and follow the recall system rules. If any returned item has evidence_status \"conflicting\", set answer exactly to \"Conflicting records; ask the owner to confirm.\" and needs_clarification=true. Otherwise answer with the single recorded value and set needs_clarification=false. Cite only source_episode IDs returned by the tool. Question: What payload limit should I report? Subject: Wrenmere Survey Station.",
+      "seed_episodes": [
+        {
+          "event_id": "c1-wrenmere-record-a",
+          "source_id": "c1-wrenmere-operations-log-a",
+          "source_type": "owner-record",
+          "content": "subject: Wrenmere Survey Station\ndimension: payload_limit\nvalue: 7.2 tonnes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        },
+        {
+          "event_id": "c1-wrenmere-record-b",
+          "source_id": "c1-wrenmere-operations-log-b",
+          "source_type": "owner-record",
+          "content": "subject: Wrenmere Survey Station\ndimension: payload_limit\nvalue: 8.1 tonnes effective July 15, 2026",
+          "valid_at": "2026-07-15T12:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [["c1-wrenmere-record-a"]],
+          [["c1-wrenmere-record-b"]]
+        ],
+        "accepted_answers": ["Conflicting records; ask the owner to confirm."],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    }
+  ]
+}

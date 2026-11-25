@@ -1,0 +1,81 @@
+{
+  "schema_version": "memory-decisions-probes/v1",
+  "probes": [
+    {
+      "id": "latest-correction-conflict",
+      "family_id": "north-canal-gauge-correction-history",
+      "event_ids": [
+        "gauge-original",
+        "gauge-correction-1",
+        "north-gauge-170",
+        "south-gauge-17",
+        "north-pump-17",
+        "north-gauge-17-housing",
+        "north-gauge-71",
+        "north-gauge-017",
+        "north-gauge-17-east",
+        "north-gauge-17-west",
+        "north-canal-gauge-17-archive",
+        "north-canal-gauge-17-reference",
+        "gauge-correction-2",
+        "gauge-forum-dispute"
+      ],
+      "query": "What clearance is supported for NORTH CANAL GAUGE 17 after the latest inspection and forum report?",
+      "valid_at": "2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "before-final-correction",
+      "family_id": "north-canal-gauge-correction-history",
+      "event_ids": [
+        "gauge-original",
+        "gauge-correction-1",
+        "north-gauge-170",
+        "south-gauge-17",
+        "north-pump-17",
+        "north-gauge-17-housing",
+        "north-gauge-71",
+        "north-gauge-017",
+        "north-gauge-17-east",
+        "north-gauge-17-west",
+        "north-canal-gauge-17-archive",
+        "north-canal-gauge-17-reference",
+        "gauge-correction-2",
+        "gauge-forum-dispute"
+      ],
+      "knowledge_before_event_id": "gauge-correction-2",
+      "query": "What clearance did the inspection record for North Canal Gauge 17 by February 15?",
+      "valid_at": "2026-02-15T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-02-15T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    },
+    {
+      "id": "numeric-neighbor-identity",
+      "family_id": "numbered-gauge-identity-with-lexical-distractors",
+      "event_ids": [
+        "gauge-original",
+        "gauge-correction-1",
+        "north-gauge-170",
+        "south-gauge-17",
+        "north-pump-17",
+        "north-gauge-17-housing",
+        "north-gauge-71",
+        "north-gauge-017",
+        "north-gauge-17-east",
+        "north-gauge-17-west",
+        "north-canal-gauge-17-archive",
+        "north-canal-gauge-17-reference",
+        "gauge-correction-2",
+        "gauge-forum-dispute"
+      ],
+      "query": "What clearance was recorded for North Canal Gauge 170?",
+      "valid_at": "2026-03-10T09:00:00Z",
+      "temporal_diagnostic_as_of": "2026-03-10T09:00:00Z",
+      "requires_separate_time_cutoffs": true,
+      "budget": 5
+    }
+  ]
+}

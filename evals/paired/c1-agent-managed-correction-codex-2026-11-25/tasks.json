@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "valewick-signal-foundry-history",
+        "case_id": "valewick-signal-foundry-current-burn-in-archive-tag",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Valewick Signal Foundry uses Cinder-72 as its burn-in archive tag. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction/valewick-signal-foundry/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Valewick Signal Foundry's current burn-in archive tag? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Valewick Signal Foundry's current burn-in archive tag? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-valewick-signal-foundry-old-01",
+          "source_id": "conversation://c1-correction/valewick-signal-foundry/original-01",
+          "source_type": "conversation",
+          "content": "Valewick Signal Foundry uses Slate-14 as its burn-in archive tag.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-valewick-signal-foundry-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-valewick-signal-foundry-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cinder-72"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-valewick-signal-foundry-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "wrenfold-bathymetry-history",
+        "case_id": "wrenfold-bathymetry-current-survey-snapshot-shelf",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Wrenfold Bathymetry uses Palisade-64 as its survey snapshot shelf. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction/wrenfold-bathymetry/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Wrenfold Bathymetry's current survey snapshot shelf? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Wrenfold Bathymetry's current survey snapshot shelf? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-wrenfold-bathymetry-old-01",
+          "source_id": "conversation://c1-correction/wrenfold-bathymetry/original-01",
+          "source_type": "conversation",
+          "content": "Wrenfold Bathymetry uses Reed-36 as its survey snapshot shelf.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-wrenfold-bathymetry-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-wrenfold-bathymetry-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Palisade-64"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-wrenfold-bathymetry-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "morrowglass-ferry-history",
+        "case_id": "morrowglass-ferry-current-route-cache-namespace",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Morrowglass Ferry uses Slate-53 as its route cache namespace. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction/morrowglass-ferry/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Morrowglass Ferry's current route cache namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Morrowglass Ferry's current route cache namespace? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-morrowglass-ferry-old-01",
+          "source_id": "conversation://c1-correction/morrowglass-ferry/original-01",
+          "source_type": "conversation",
+          "content": "Morrowglass Ferry uses Harbor-08 as its route cache namespace.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-morrowglass-ferry-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-morrowglass-ferry-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Slate-53"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-morrowglass-ferry-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "oriel-threadworks-history",
+        "case_id": "oriel-threadworks-current-loom-calibration-vault",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Oriel Threadworks uses Basalt-91 as its loom calibration vault. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction/oriel-threadworks/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Oriel Threadworks's current loom calibration vault? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Oriel Threadworks's current loom calibration vault? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-oriel-threadworks-old-01",
+          "source_id": "conversation://c1-correction/oriel-threadworks/original-01",
+          "source_type": "conversation",
+          "content": "Oriel Threadworks uses Garnet-27 as its loom calibration vault.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-oriel-threadworks-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-oriel-threadworks-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Basalt-91"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-oriel-threadworks-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

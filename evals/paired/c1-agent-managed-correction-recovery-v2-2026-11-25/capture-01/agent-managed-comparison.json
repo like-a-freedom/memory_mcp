@@ -1,0 +1,563 @@
+{
+  "schema_version": "memory-mcp-agent-managed-comparison/v1",
+  "plan_id": "c1-agent-managed-correction-recovery-v2-2026-11-25",
+  "plan_sha256": "d1722dbd39cc7499f843f569b46d2c9c6e5b44ee5f9ee9b4e5a0b8fb5b5b687f",
+  "run_id": "75205-1795596836609275000-0",
+  "incumbent_artifact_sha256": "23704784e1db53558926925c63457457c06d0a896b32864549a6512bebb7d707",
+  "candidate_artifact_sha256": "865fbef208f5cbe8675f25e98f347d0fcf823765bb33d5b546cf2cd7950c9b94",
+  "incumbent_stage_sha256": "21e63d56cb269408848a000ceb10f75145fa390d408060ef0e32fdc5c19b1b42",
+  "candidate_stage_sha256": "a3eea8dc656256f8a6312a0033d56f2e0b53181ef544f90518602f5eddfc49c0",
+  "paired_agent_comparison": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "75205-1795596836609275000-0",
+    "run_started_at": "2026-11-25T08:53:56.609307Z",
+    "run_completed_at": "2026-11-25T09:01:39.054923Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "c1-agent-managed-correction-recovery-v2-2026-11-25",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "agent_managed_correction_recovery",
+          "family_id": "mosslight-conservatory-history",
+          "case_id": "mosslight-conservatory-current-seed-vault-index",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery",
+          "family_id": "tideglass-acoustic-history",
+          "case_id": "tideglass-acoustic-current-calibration-channel",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery",
+          "family_id": "northstar-ridge-history",
+          "case_id": "northstar-ridge-current-control-bus",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery",
+          "family_id": "ashenvale-isotope-history",
+          "case_id": "ashenvale-isotope-current-receipt-ledger",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 4,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.171.0",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "934c8d84001d917c5d272ca36042ec169ead3a280530dab21a7a4146479dfd1a",
+        "task_prompt_sha256": "97dc052cbd8a26cf90e49e2790af9a4505364dec86b05212f2ee83c32486ac15",
+        "host_policy_sha256": "ed8d7baa9795709c7737db43fba19b49959028484406d8f8501bc9c15156aeb7",
+        "transport": "stdio",
+        "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+        "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+        "judge_config_sha256": null,
+        "corpus_sha256": "2a7294b2d857e7f947ce092965bf19370ee01aad984b963e7844a54684c7d3d8",
+        "oracle_sha256": "12ee613fc3c165a27e7baddacc0ceac83ee7987f860efc43c2be5af21bd156fe",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+        "provider_fingerprints": {
+          "codex_cli": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+          "memory_eval_cli": "3db3c8c49151f99ce47977a42465ad51bc2d1b1b60c6324fefedfade0153728f"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 1024,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504+dirty",
+        "binary_sha256": "946f5adc2dccb0aff15574f8034fcfe0f51e6190e9905abb9a204e9922b4ef87",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "candidate_product": {
+        "revision": "0f8ca42d194891ff5f431fb003f63fcdeb4db504+dirty",
+        "binary_sha256": "946f5adc2dccb0aff15574f8034fcfe0f51e6190e9905abb9a204e9922b4ef87",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112527,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "d1722dbd39cc7499f843f569b46d2c9c6e5b44ee5f9ee9b4e5a0b8fb5b5b687f",
+    "manifest_sha256": "541aaea1075de5c55eacfef6d9c6e02195c77ab24923e2d6fbe34445e0ad47cd",
+    "incumbent_artifact_sha256": "23704784e1db53558926925c63457457c06d0a896b32864549a6512bebb7d707",
+    "candidate_artifact_sha256": "865fbef208f5cbe8675f25e98f347d0fcf823765bb33d5b546cf2cd7950c9b94",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 0.0,
+          "mosslight-conservatory-history": 0.0,
+          "northstar-ridge-history": 0.0,
+          "tideglass-acoustic-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": -133.5,
+        "interval": {
+          "estimate": -133.5,
+          "lower": -179.5,
+          "upper": -55.25,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": -14.0,
+          "mosslight-conservatory-history": -179.0,
+          "northstar-ridge-history": -161.0,
+          "tideglass-acoustic-history": -180.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 2.5,
+        "interval": {
+          "estimate": 2.5,
+          "lower": -5.5,
+          "upper": 14.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": -7.0,
+          "mosslight-conservatory-history": -1.0,
+          "northstar-ridge-history": 19.0,
+          "tideglass-acoustic-history": -1.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": 2514.25,
+        "interval": {
+          "estimate": 2514.25,
+          "lower": 1219.0,
+          "upper": 3809.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112527,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "ashenvale-isotope-history": 1043.0,
+          "mosslight-conservatory-history": 1395.0,
+          "northstar-ridge-history": 4195.0,
+          "tideglass-acoustic-history": 3424.0
+        }
+      }
+    },
+    "by_stratum": {
+      "agent_managed_correction_recovery": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 0.0,
+            "mosslight-conservatory-history": 0.0,
+            "northstar-ridge-history": 0.0,
+            "tideglass-acoustic-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": -133.5,
+          "interval": {
+            "estimate": -133.5,
+            "lower": -179.5,
+            "upper": -55.25,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": -14.0,
+            "mosslight-conservatory-history": -179.0,
+            "northstar-ridge-history": -161.0,
+            "tideglass-acoustic-history": -180.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 2.5,
+          "interval": {
+            "estimate": 2.5,
+            "lower": -5.5,
+            "upper": 14.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": -7.0,
+            "mosslight-conservatory-history": -1.0,
+            "northstar-ridge-history": 19.0,
+            "tideglass-acoustic-history": -1.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": 2514.25,
+          "interval": {
+            "estimate": 2514.25,
+            "lower": 1219.0,
+            "upper": 3809.5,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112527,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "ashenvale-isotope-history": 1043.0,
+            "mosslight-conservatory-history": 1395.0,
+            "northstar-ridge-history": 4195.0,
+            "tideglass-acoustic-history": 3424.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 4,
+    "independent_family_count": 4,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "agent_managed_correction_recovery": {
+        "incumbent_first": 2,
+        "candidate_first": 2
+      }
+    }
+  },
+  "incumbent": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 4
+    },
+    "formation_turns_total": 4,
+    "formation_tool_calls_total": 12,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 231045,
+    "formation_output_tokens_total": 1305,
+    "formation_wall_time_ms_total": 128633,
+    "retained_store_bytes_total": 137232692,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 4,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 4,
+      "extract_calls": 4,
+      "evidence_requests": 4,
+      "evidence_responses": 4,
+      "evidence_before_invalidation": 4,
+      "response_sizes": {
+        "measured_responses": 4,
+        "total_wire_bytes": 12454,
+        "maximum_wire_bytes": 3179
+      }
+    }
+  },
+  "candidate": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 4
+    },
+    "formation_turns_total": 4,
+    "formation_tool_calls_total": 12,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 231132,
+    "formation_output_tokens_total": 1321,
+    "formation_wall_time_ms_total": 142405,
+    "retained_store_bytes_total": 137232692,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 4,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 4,
+      "extract_calls": 4,
+      "evidence_requests": 4,
+      "evidence_responses": 4,
+      "evidence_before_invalidation": 4,
+      "response_sizes": {
+        "measured_responses": 4,
+        "total_wire_bytes": 12454,
+        "maximum_wire_bytes": 3179
+      }
+    }
+  },
+  "independent_probe_pairs": {
+    "paired_trials": 4,
+    "both_succeeded": 4,
+    "incumbent_only_succeeded": 0,
+    "candidate_only_succeeded": 0,
+    "neither_succeeded": 0
+  }
+}

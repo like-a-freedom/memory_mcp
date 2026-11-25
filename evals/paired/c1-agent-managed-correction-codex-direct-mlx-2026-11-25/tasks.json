@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "solstice-kiln-cooperative-history",
+        "case_id": "solstice-kiln-cooperative-current-vitrification-tray-registry",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Solstice Kiln Cooperative uses Brindle-84 as its vitrification tray registry. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction-v2/solstice-kiln-cooperative/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Solstice Kiln Cooperative's current vitrification tray registry? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Solstice Kiln Cooperative's current vitrification tray registry? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-v2-solstice-kiln-cooperative-old-01",
+          "source_id": "conversation://c1-correction-v2/solstice-kiln-cooperative/original-01",
+          "source_type": "conversation",
+          "content": "Solstice Kiln Cooperative uses Amber-19 as its vitrification tray registry.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-v2-solstice-kiln-cooperative-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-v2-solstice-kiln-cooperative-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Brindle-84"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-v2-solstice-kiln-cooperative-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "quillhaven-tugworks-history",
+        "case_id": "quillhaven-tugworks-current-engine-telemetry-partition",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Quillhaven Tugworks uses Ternary-67 as its engine telemetry partition. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction-v2/quillhaven-tugworks/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Quillhaven Tugworks's current engine telemetry partition? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Quillhaven Tugworks's current engine telemetry partition? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-v2-quillhaven-tugworks-old-01",
+          "source_id": "conversation://c1-correction-v2/quillhaven-tugworks/original-01",
+          "source_type": "conversation",
+          "content": "Quillhaven Tugworks uses Flint-03 as its engine telemetry partition.",
+          "valid_at": "2026-11-11T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-v2-quillhaven-tugworks-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-v2-quillhaven-tugworks-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Ternary-67"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-v2-quillhaven-tugworks-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "bluefen-cartography-lab-history",
+        "case_id": "bluefen-cartography-lab-current-lidar-tile-archive",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Bluefen Cartography Lab uses Cobalt-38 as its lidar tile archive. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction-v2/bluefen-cartography-lab/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Bluefen Cartography Lab's current lidar tile archive? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Bluefen Cartography Lab's current lidar tile archive? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-v2-bluefen-cartography-lab-old-01",
+          "source_id": "conversation://c1-correction-v2/bluefen-cartography-lab/original-01",
+          "source_type": "conversation",
+          "content": "Bluefen Cartography Lab uses Moss-52 as its lidar tile archive.",
+          "valid_at": "2026-11-12T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-v2-bluefen-cartography-lab-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-v2-bluefen-cartography-lab-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cobalt-38"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-v2-bluefen-cartography-lab-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "giltarrow-orchard-systems-history",
+        "case_id": "giltarrow-orchard-systems-current-irrigation-audit-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-24T14:00:00Z: Giltarrow Orchard Systems uses Meridian-75 as its irrigation audit ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-correction-v2/giltarrow-orchard-systems/update-01, and t_ref=2026-11-24T14:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-24T14:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T16:00:00Z, what is Giltarrow Orchard Systems's current irrigation audit ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T16:00:00Z, what is Giltarrow Orchard Systems's current irrigation audit ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-correction-v2-giltarrow-orchard-systems-old-01",
+          "source_id": "conversation://c1-correction-v2/giltarrow-orchard-systems/original-01",
+          "source_type": "conversation",
+          "content": "Giltarrow Orchard Systems uses Saffron-26 as its irrigation audit ledger.",
+          "valid_at": "2026-11-13T08:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-correction-v2-giltarrow-orchard-systems-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-correction-v2-giltarrow-orchard-systems-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Meridian-75"
+        ],
+        "forbidden_event_ids": [
+          "c1-correction-v2-giltarrow-orchard-systems-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

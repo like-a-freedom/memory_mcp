@@ -1,0 +1,8 @@
+{
+  "schema_version": "memory-mcp-agent-managed-maintenance-simulator/v4",
+  "history_model": "one existing durable fact plus one user-provided correction per isolated trial",
+  "agent_write_phase": "read exact active fact; inline extract one correction; use returned persisted statement and source quote for pre-invalidation verification when supported; otherwise reread the returned episode; invalidate only the exact stale fact",
+  "recall_phase": "fresh agent session reads only the corrected memory",
+  "independent_probe": "fixed query on the same trial store after both agent sessions",
+  "agent_managed_claim_scope": "bounded correction workflow feasibility and tool/token cost; not broad population benefit or long-term maintenance"
+}

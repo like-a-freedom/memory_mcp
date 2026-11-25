@@ -1,0 +1,37 @@
+{
+  "schema_version": "memory-mcp-literal-vs-operator-import-input-equivalence/v1",
+  "entries": [
+    {
+      "family_id": "evershade_observatory",
+      "literal_source_text": "At Evershade Observatory, the calibration ledger is Vesper-62.",
+      "literal_source_text_utf8_sha256": "e68389977e96000c02f3d3dde7a073c5a7edb62ffc63e59599a49adb5df8818e",
+      "operator_file_content_utf8_sha256": "e68389977e96000c02f3d3dde7a073c5a7edb62ffc63e59599a49adb5df8818e",
+      "same_utf8_bytes": true,
+      "literal_text_embedded_verbatim_in_formation_prompt": true
+    },
+    {
+      "family_id": "greydock_archive",
+      "literal_source_text": "At Greydock Archive, the incident index is Kestrel-43.",
+      "literal_source_text_utf8_sha256": "b9eaeaff5ef7ef641ea0ceb7a2b454dd7edf6920921d7d7f3436eda58dfe113d",
+      "operator_file_content_utf8_sha256": "b9eaeaff5ef7ef641ea0ceb7a2b454dd7edf6920921d7d7f3436eda58dfe113d",
+      "same_utf8_bytes": true,
+      "literal_text_embedded_verbatim_in_formation_prompt": true
+    },
+    {
+      "family_id": "moonlit_reservoir",
+      "literal_source_text": "At Moonlit Reservoir, the pump schedule is Harbor-26.",
+      "literal_source_text_utf8_sha256": "2ff204c7af81dee8c58974c3b3a30953ee6e1ecc647e44e92e0cb4cb62d7abe3",
+      "operator_file_content_utf8_sha256": "2ff204c7af81dee8c58974c3b3a30953ee6e1ecc647e44e92e0cb4cb62d7abe3",
+      "same_utf8_bytes": true,
+      "literal_text_embedded_verbatim_in_formation_prompt": true
+    },
+    {
+      "family_id": "briarwave_station",
+      "literal_source_text": "At Briarwave Station, the equipment register is Quill-91.",
+      "literal_source_text_utf8_sha256": "d20555d44e5b5a987e775cd843390428564d1824593ae7fe4886ba03307cf9ef",
+      "operator_file_content_utf8_sha256": "d20555d44e5b5a987e775cd843390428564d1824593ae7fe4886ba03307cf9ef",
+      "same_utf8_bytes": true,
+      "literal_text_embedded_verbatim_in_formation_prompt": true
+    }
+  ]
+}

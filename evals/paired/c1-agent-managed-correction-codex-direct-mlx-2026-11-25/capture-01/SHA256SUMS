@@ -1,0 +1,8 @@
+e8d0ecc202220c6a7e1fe6a3957a1b3f84fa16bdbe831ab177ec78b5dc6f988b  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/agent-managed-candidate.json
+f2734ca2af0efe0bdf6d1f6effd0d1087ca4b4fa25577297cb9eec4b42bc657a  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/agent-managed-comparison.json
+f2734ca2af0efe0bdf6d1f6effd0d1087ca4b4fa25577297cb9eec4b42bc657a  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/agent-managed-comparison-replay.json
+79d639f46d0b1209b5d03ec985f2e27449a1c29f0b189c011f0a0c1e37090f7a  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/agent-managed-incumbent.json
+f559f5a524e5c59df193461810d4f1531396b7ca37ea2f52a93311629496b9ba  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/candidate-receipts.jsonl
+b68dd23fae4b546f8aadb93da2cdadb19f514fe7cf4667ec07819cbb5c14ffeb  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/candidate.json
+1412d8bef076b3807b1821901d5cc91f816112103901009eca90705cb265dc7d  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/incumbent-receipts.jsonl
+a7447091232b2bba886503655ca4db3f46f5b14f351ecfbace394a3e83a5ff44  evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/capture-01/incumbent.json

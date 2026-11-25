@@ -1,0 +1,280 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v5",
+  "arm": "incumbent",
+  "run_id": "85993-1795567493081704000-0",
+  "identity_sha256": "d625e6bdc204acc21e4c85e9c5b95a9e6aeb3cb2521111e0bf99788a717c04ff",
+  "expected_trials": [
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "briarwave_station",
+      "case_id": "briarwave_station-equipment-register-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "evershade_observatory",
+      "case_id": "evershade_observatory-calibration-ledger-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "greydock_archive",
+      "case_id": "greydock_archive-incident-index-recall",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "source_file_import",
+      "family_id": "moonlit_reservoir",
+      "case_id": "moonlit_reservoir-pump-schedule-recall",
+      "repetition": 1,
+      "incumbent_first": true
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "briarwave_station",
+        "case_id": "briarwave_station-equipment-register-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5584,
+        "output_tokens": 219,
+        "wall_time_ms": 19912
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "484ce45e998678c6347f5265658af717aa3be12d6c06e0c56fcea376965bf7c4",
+        "response_sha256": "034d304f0144fe4ff5ab9290bf19b6ba484fa49d68bf76123be0072b6fa3f5fc",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-operator-import-briarwave_station-equipment-register"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2184,
+          "maximum_wire_bytes": 2184
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "evershade_observatory",
+        "case_id": "evershade_observatory-calibration-ledger-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5633,
+        "output_tokens": 197,
+        "wall_time_ms": 15671
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5b4a8d5b0c3e2740f8c69989b171903fb52c36cca70baeba5484ad32f871c58e",
+        "response_sha256": "95c9f28ba8d8de76ae9dfb357583395cb18398c54a1556f361c89b623b6397c9",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-operator-import-evershade_observatory-calibration-ledger"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2194,
+          "maximum_wire_bytes": 2194
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "greydock_archive",
+        "case_id": "greydock_archive-incident-index-recall",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "invalid_tool_call",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5630,
+        "output_tokens": 320,
+        "wall_time_ms": 23321
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "048acc44ee8b2c270c2214ddb5c5fff70dbc4bc454d1ce806d7b2b0edf83bba9",
+        "response_sha256": "f2fdff18fffe3677d717077b9542a7e0ce7ecfba05cb205c3e586a83025a5a5c",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-operator-import-greydock_archive-incident-index"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2186,
+          "maximum_wire_bytes": 2186
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "source_file_import",
+        "family_id": "moonlit_reservoir",
+        "case_id": "moonlit_reservoir-pump-schedule-recall",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "terminal_error_class": "invalid_tool_call",
+        "turns_used": 3,
+        "tool_calls": 2,
+        "user_clarifications": 0,
+        "input_tokens": 5612,
+        "output_tokens": 332,
+        "wall_time_ms": 24074
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/ingest",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "57f70b6fc3e64af5c9964016427f94dec293d6626794b9487c12583348a13f81",
+        "response_sha256": "444f03656db32ddd0e29c423edaf6653c2ad6e73e4bf3968cde5e8d29c3d38f5",
+        "known_revision": 3,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-operator-import-moonlit_reservoir-pump-schedule"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 2186,
+          "maximum_wire_bytes": 2186
+        }
+      }
+    }
+  ]
+}

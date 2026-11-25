@@ -56,6 +56,8 @@ impl PairedTrialBackend for NoReadAgent {
             final_answer: Some(answer),
             memory_source_episode_ids: Vec::new(),
             memory_write_episode_ids: Vec::new(),
+            observed_fact_sources: Vec::new(),
+            invalidation_fact_ids: Vec::new(),
             extract_fact_evidence: Vec::new(),
             extract_fact_evidence_telemetry_complete: false,
             terminal_http_status_code: None,

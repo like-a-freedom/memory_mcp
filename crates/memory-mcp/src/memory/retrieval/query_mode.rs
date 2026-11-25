@@ -97,6 +97,118 @@ pub(super) fn query_phrase_candidates(query: &str) -> Vec<String> {
     phrases
 }
 
+fn split_query_clauses(query: &str) -> Vec<(&str, Option<char>)> {
+    let mut clauses = Vec::new();
+    let mut start = 0;
+    let characters = query.char_indices().collect::<Vec<_>>();
+
+    for (index, (offset, character)) in characters.iter().enumerate() {
+        let next_is_boundary = characters
+            .get(index + 1)
+            .is_none_or(|(_, next)| next.is_whitespace());
+        let boundary = matches!(character, '?' | '!' | ';' | '\n' | '\r')
+            || (*character == '.' && next_is_boundary && !is_abbreviation_period(query, *offset));
+        if boundary {
+            let clause = query[start..*offset].trim();
+            if !clause.is_empty() {
+                clauses.push((clause, Some(*character)));
+            }
+            start = offset + character.len_utf8();
+        }
+    }
+
+    let clause = query[start..].trim();
+    if !clause.is_empty() {
+        clauses.push((clause, None));
+    }
+    clauses
+}
+
+fn is_abbreviation_period(query: &str, period_offset: usize) -> bool {
+    let token_start = query[..period_offset]
+        .rfind(char::is_whitespace)
+        .map_or(0, |index| index + 1);
+    let token = &query[token_start..period_offset];
+    let segments = token.split('.').filter(|segment| !segment.is_empty());
+    let segments = segments.collect::<Vec<_>>();
+    if segments.len() > 1
+        && segments.iter().all(|segment| {
+            segment
+                .chars()
+                .filter(|character| character.is_alphabetic())
+                .count()
+                == 1
+        })
+    {
+        return true;
+    }
+
+    matches!(
+        token.to_ascii_lowercase().as_str(),
+        "dr" | "mr" | "mrs" | "ms" | "prof" | "sr" | "jr" | "st" | "vs" | "etc" | "e.g" | "i.e"
+    )
+}
+
+pub(super) fn query_clauses(query: &str) -> Vec<&str> {
+    split_query_clauses(query)
+        .into_iter()
+        .map(|(clause, _)| clause)
+        .collect()
+}
+
+/// Keeps interrogative/request clauses for lexical candidate search while the
+/// original full query remains available for admission and temporal rules.
+pub(super) fn lexical_search_surface(query: &str) -> String {
+    const QUERY_FRAME_STARTERS: &[&str] = &[
+        "what",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "where",
+        "when",
+        "why",
+        "how",
+        "tell",
+        "show",
+        "find",
+        "list",
+        "describe",
+        "explain",
+        "summarize",
+        "recall",
+        "remember",
+    ];
+    const AUXILIARY_QUESTION_STARTERS: &[&str] = &[
+        "did", "does", "do", "is", "are", "was", "were", "has", "have", "had", "can", "could",
+        "will", "would", "should",
+    ];
+    let question_clauses = split_query_clauses(query)
+        .into_iter()
+        .filter(|(clause, terminator)| {
+            let first = clause
+                .split(|character: char| !character.is_alphabetic())
+                .find(|token| !token.is_empty());
+            first.is_some_and(|first| {
+                QUERY_FRAME_STARTERS
+                    .iter()
+                    .any(|starter| first.eq_ignore_ascii_case(starter))
+                    || (*terminator == Some('?')
+                        && AUXILIARY_QUESTION_STARTERS
+                            .iter()
+                            .any(|starter| first.eq_ignore_ascii_case(starter)))
+            })
+        })
+        .map(|(clause, _)| clause)
+        .collect::<Vec<_>>();
+
+    if question_clauses.is_empty() {
+        query.trim().to_owned()
+    } else {
+        question_clauses.join(" ")
+    }
+}
+
 pub(super) fn detect_query_flags(
     raw_query_opt: Option<&str>,
     query_terms: &[String],
@@ -150,6 +262,48 @@ pub(super) fn resolve_view_mode(
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn lexical_search_surface_excludes_non_question_followup_sentence() {
+        assert_eq!(
+            lexical_search_surface(
+                "Which clearance measurements are recorded for Slate Basin Spillway 58? No source identifies an explicit correction."
+            ),
+            "Which clearance measurements are recorded for Slate Basin Spillway 58"
+        );
+    }
+
+    #[test]
+    fn lexical_search_surface_preserves_multiple_question_clauses() {
+        assert_eq!(
+            lexical_search_surface("What did Redwood Lock record? Which source reported it?"),
+            "What did Redwood Lock record Which source reported it"
+        );
+    }
+
+    #[test]
+    fn lexical_search_surface_keeps_unframed_search_phrases_intact() {
+        assert_eq!(
+            lexical_search_surface("Slate Basin Spillway 58"),
+            "Slate Basin Spillway 58"
+        );
+    }
+
+    #[test]
+    fn lexical_search_surface_keeps_auxiliary_questions_and_drops_negative_directives() {
+        assert_eq!(
+            lexical_search_surface("Can you find Redwood Lock? Do not use archived records."),
+            "Can you find Redwood Lock"
+        );
+    }
+
+    #[test]
+    fn lexical_search_surface_keeps_initialisms_inside_question_clauses() {
+        assert_eq!(
+            lexical_search_surface("What did J.R.R. Tolkien write? No citation was supplied."),
+            "What did J.R.R. Tolkien write"
+        );
+    }
 
     #[test]
     fn detect_query_flags_marks_timeline_and_path_queries() {

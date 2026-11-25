@@ -1,0 +1,72 @@
+{
+  "schema_version": "memory-mcp-c1-probe-preflight/v1",
+  "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+  "expected": 4,
+  "passed": 4,
+  "results": [
+    {
+      "family_id": "cinderbell_calibration_lab",
+      "source_event_ids": [
+        "c1-cinderbell-record-a"
+      ],
+      "budget_used": 1,
+      "completed": true,
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "91b7311d32c5818d8262bbfaa65b1823a2563b54c337b1a28da80332dd3b3b3d",
+        "oracle_sha256": "9026bb2918b99426a93eda6f0bd8df6013ca773ea3d4d1881a4ba658d56d6d17",
+        "observation_sha256": "258c4451d09ca7f6ed15a6f1064d85bd78d9ea3658bb1b2f7546fc486918d2db",
+        "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+        "evidence_success": true
+      }
+    },
+    {
+      "family_id": "rillmark_orbital_yard",
+      "source_event_ids": [
+        "c1-rillmark-record-a"
+      ],
+      "budget_used": 1,
+      "completed": true,
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "676e1e99d8d3ba4aad48ace5c8c6d1917b812afb4ea9e2607726e2ffcfe90002",
+        "oracle_sha256": "47ca85de0f854ee2747861345fdd718d9e6530a8b22400c515c0cb611f39e492",
+        "observation_sha256": "f87285a98f49ea4b57aa80e387b41457bd3f62022442da0d07a1f288597b396b",
+        "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+        "evidence_success": true
+      }
+    },
+    {
+      "family_id": "sabletide_archives",
+      "source_event_ids": [
+        "c1-sabletide-record-b"
+      ],
+      "budget_used": 1,
+      "completed": true,
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "2dc1db05279ad89aa9b14c553714f1d87d0d92831aa974e0256ccb596c896092",
+        "oracle_sha256": "3dbf82772fa8735aba0a2b6a3496291c676a5353b898a5e2dd126f2669aafaf9",
+        "observation_sha256": "5e7f63d975830ac5ac83e0dec10a698b10cdf683b03033c23545bc278f7476c6",
+        "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+        "evidence_success": true
+      }
+    },
+    {
+      "family_id": "wrenmere_survey_station",
+      "source_event_ids": [
+        "c1-wrenmere-record-b"
+      ],
+      "budget_used": 1,
+      "completed": true,
+      "score": {
+        "schema_version": "memory-mcp-independent-probe-score/v1",
+        "input_sha256": "c9575b1e53873cd7890981c418fc97ca0a88f687d09e2620ff59a45c4cbcfaa0",
+        "oracle_sha256": "7b7f1d556be18646e492ed81e5a1c1eed982f30ccf059ea0e3080f8de217a1a2",
+        "observation_sha256": "142c39bca8ae99dd7d81c5636b56d4abb2bf5a63533830b632c714cc4a994e97",
+        "product_sha256": "e91265cff95d995fd8b4cffcdeff2c0a06d0dadeb5c85fd40d2d9724cbf46cca",
+        "evidence_success": true
+      }
+    }
+  ]
+}

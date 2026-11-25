@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "larkspur-glaze-collective-history",
+        "case_id": "larkspur-glaze-collective-current-glaze-batch-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Larkspur Glaze Collective uses Meridian-61 as its glaze batch index. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-v3-2026-11-25/larkspur-glaze-collective/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Larkspur Glaze Collective's current glaze batch index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Larkspur Glaze Collective's current glaze batch index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-v3-2026-11-25-larkspur-glaze-collective-old-01",
+          "source_id": "conversation://c1-read-normalization-v3-2026-11-25/larkspur-glaze-collective/original-01",
+          "source_type": "conversation",
+          "content": "Larkspur Glaze Collective uses Slate-12 as its glaze batch index.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-v3-2026-11-25-larkspur-glaze-collective-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-v3-2026-11-25-larkspur-glaze-collective-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Meridian-61"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-larkspur-glaze-collective-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "northcairn-rail-works-history",
+        "case_id": "northcairn-rail-works-current-switchyard-vibration-schedule",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Northcairn Rail Works uses Oxbow-84 as its switchyard vibration schedule. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-v3-2026-11-25/northcairn-rail-works/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Northcairn Rail Works's current switchyard vibration schedule? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Northcairn Rail Works's current switchyard vibration schedule? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-v3-2026-11-25-northcairn-rail-works-old-01",
+          "source_id": "conversation://c1-read-normalization-v3-2026-11-25/northcairn-rail-works/original-01",
+          "source_type": "conversation",
+          "content": "Northcairn Rail Works uses Quartz-39 as its switchyard vibration schedule.",
+          "valid_at": "2026-11-11T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-v3-2026-11-25-northcairn-rail-works-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-v3-2026-11-25-northcairn-rail-works-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Oxbow-84"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-northcairn-rail-works-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "velvetpine-telescope-lab-history",
+        "case_id": "velvetpine-telescope-lab-current-spectrometer-alignment-book",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Velvetpine Telescope Lab uses Lyric-26 as its spectrometer alignment book. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-v3-2026-11-25/velvetpine-telescope-lab/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Velvetpine Telescope Lab's current spectrometer alignment book? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Velvetpine Telescope Lab's current spectrometer alignment book? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-v3-2026-11-25-velvetpine-telescope-lab-old-01",
+          "source_id": "conversation://c1-read-normalization-v3-2026-11-25/velvetpine-telescope-lab/original-01",
+          "source_type": "conversation",
+          "content": "Velvetpine Telescope Lab uses Fern-47 as its spectrometer alignment book.",
+          "valid_at": "2026-11-12T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-v3-2026-11-25-velvetpine-telescope-lab-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-v3-2026-11-25-velvetpine-telescope-lab-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lyric-26"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-velvetpine-telescope-lab-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "brackenridge-agro-controls-history",
+        "case_id": "brackenridge-agro-controls-current-greenhouse-irrigation-calendar",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Brackenridge Agro Controls uses Alder-72 as its greenhouse irrigation calendar. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-v3-2026-11-25/brackenridge-agro-controls/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Brackenridge Agro Controls's current greenhouse irrigation calendar? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Brackenridge Agro Controls's current greenhouse irrigation calendar? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-v3-2026-11-25-brackenridge-agro-controls-old-01",
+          "source_id": "conversation://c1-read-normalization-v3-2026-11-25/brackenridge-agro-controls/original-01",
+          "source_type": "conversation",
+          "content": "Brackenridge Agro Controls uses Topaz-55 as its greenhouse irrigation calendar.",
+          "valid_at": "2026-11-13T08:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-v3-2026-11-25-brackenridge-agro-controls-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-v3-2026-11-25-brackenridge-agro-controls-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Alder-72"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-v3-2026-11-25-brackenridge-agro-controls-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

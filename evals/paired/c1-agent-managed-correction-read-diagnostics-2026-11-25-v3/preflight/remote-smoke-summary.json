@@ -1,0 +1,17 @@
+{
+  "schema": "memory-mcp-codex-synthetic-connectivity-preflight/v1",
+  "completed_at_utc": "2026-11-25T03:42:33Z",
+  "host": "aarch64-apple-darwin",
+  "codex_cli_version": "0.171.0",
+  "codex_cli_sha256": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42",
+  "model_alias": "gpt-6.1-sol",
+  "input": "one-line synthetic connectivity check; no project or personal data",
+  "process_exit_code": 0,
+  "events": [
+    "thread.started",
+    "turn.started",
+    "item.completed:agent_message",
+    "turn.completed"
+  ],
+  "included_in_task_denominator": false
+}

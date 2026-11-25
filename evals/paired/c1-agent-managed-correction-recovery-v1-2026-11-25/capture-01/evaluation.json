@@ -1,0 +1,78 @@
+{
+  "candidate": {
+    "evidence_verified_before_invalidation": 0,
+    "exact_cited_answers": 0,
+    "exact_stale_fact_invalidation_verified": 0,
+    "gates": {
+      "evidence_before_invalidation_floor": false,
+      "exact_extract_floor": false,
+      "exact_stale_fact_invalidation_floor": false,
+      "independent_probe_floor": false,
+      "retry_exposure_floor": false,
+      "successful_invalidation_floor": false,
+      "task_success_floor": false,
+      "zero_hard_violations": true,
+      "zero_resource_exits": true,
+      "zero_untrusted_probe_sources": false
+    },
+    "guidance_authorized_retry_trials": 0,
+    "hard_violations": 0,
+    "independent_probe_successes": 0,
+    "nonempty_reads_with_source_coverage": 0,
+    "passed": false,
+    "read_count": 0,
+    "read_outcomes": {},
+    "recall_wall_time_ms": {
+      "max": 383,
+      "mean": 302.25,
+      "median": 279.0
+    },
+    "resource_or_timeout_exits": 0,
+    "successful_exact_once_extracts": 0,
+    "successful_exact_once_invalidations": 0,
+    "task_successes": 0,
+    "trials": 4,
+    "unsupported_or_prohibited_probe_sources": 4
+  },
+  "eligible_for_capture_02": false,
+  "exact_invalidation_evidence": "private fact_id-to-source match; raw IDs are not persisted",
+  "incumbent": {
+    "evidence_verified_before_invalidation": 0,
+    "exact_cited_answers": 0,
+    "exact_stale_fact_invalidation_verified": 0,
+    "gates": {
+      "evidence_before_invalidation_floor": false,
+      "exact_extract_floor": false,
+      "exact_stale_fact_invalidation_floor": false,
+      "independent_probe_floor": false,
+      "retry_exposure_floor": false,
+      "successful_invalidation_floor": false,
+      "task_success_floor": false,
+      "zero_hard_violations": true,
+      "zero_resource_exits": true,
+      "zero_untrusted_probe_sources": false
+    },
+    "guidance_authorized_retry_trials": 0,
+    "hard_violations": 0,
+    "independent_probe_successes": 0,
+    "nonempty_reads_with_source_coverage": 0,
+    "passed": false,
+    "read_count": 0,
+    "read_outcomes": {},
+    "recall_wall_time_ms": {
+      "max": 332,
+      "mean": 289,
+      "median": 278.0
+    },
+    "resource_or_timeout_exits": 0,
+    "successful_exact_once_extracts": 0,
+    "successful_exact_once_invalidations": 0,
+    "task_successes": 0,
+    "trials": 4,
+    "unsupported_or_prohibited_probe_sources": 4
+  },
+  "interpretation": "same-product workflow qualification; not a treatment-effect estimate",
+  "plan_id": "c1-agent-managed-correction-recovery-v1-2026-11-25",
+  "schema_version": "c1-agent-managed-correction-recovery-evaluation/v1",
+  "status": "no_go_or_inconclusive"
+}

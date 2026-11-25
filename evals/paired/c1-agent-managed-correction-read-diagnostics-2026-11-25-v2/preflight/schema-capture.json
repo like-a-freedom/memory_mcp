@@ -1,0 +1,99 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {
+    "episode:92442a6be927f7e33c931a8e": "record-saffron"
+  },
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "cdb9de7bd13a604ebfb7798b9af5a204776e5a25ef0b2b7d7361c84adf896543",
+    "product_sha256": "9c9b24b757a948eae3299313dd1a0a14c6cd4ddd62f033580bc27a7edf06213d",
+    "source_event_ids": [
+      "record-saffron"
+    ],
+    "claim_annotations": [
+      {
+        "source_event_id": "record-saffron",
+        "evidence_status": "unknown"
+      }
+    ],
+    "budget_used": 1,
+    "completed": true
+  },
+  "request": {
+    "budget": 8,
+    "compact": true,
+    "known_revision": 3,
+    "query": "Which cabinet contains the Saffron geodesic tile?",
+    "valid_at": "2026-05-01T10:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\",\"claim relations cannot be attached to episode-only evidence\"],\"snapshot\":{\"known_at\":\"2026-11-25T03:38:32.394721Z\",\"known_revision\":3,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.85,\"content\":\"The Saffron geodesic tile is kept in Cabinet-842.\",\"evidence_status\":\"unknown\",\"fact_id\":\"episode_fallback:episode:92442a6be927f7e33c931a8e\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"known_revision\":3,\"reference_time\":\"2026-05-01T10:00:00Z\",\"source_episode\":\"episode:92442a6be927f7e33c931a8e\",\"source_id\":\"saffron-operations-log\",\"source_type\":\"document\",\"valid_at\":\"2026-05-01T10:00:00+00:00\"},\"rationale\":\"tier=fallback\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:92442a6be927f7e33c931a8e\"}],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance",
+            "claim relations cannot be attached to episode-only evidence"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-25T03:38:32.394721Z",
+            "known_revision": 3,
+            "valid_at": "2026-05-01T10:00:00Z"
+          }
+        },
+        "guidance": "Historical context is partial; use the returned snapshot and verify omitted selector channels before relying on an empty or reduced result.",
+        "result": [
+          {
+            "confidence": 0.85,
+            "content": "The Saffron geodesic tile is kept in Cabinet-842.",
+            "evidence_status": "unknown",
+            "fact_id": "episode_fallback:episode:92442a6be927f7e33c931a8e",
+            "grounding": 1.0,
+            "provenance": {
+              "episode_fallback": true,
+              "known_revision": 3,
+              "reference_time": "2026-05-01T10:00:00Z",
+              "source_episode": "episode:92442a6be927f7e33c931a8e",
+              "source_id": "saffron-operations-log",
+              "source_type": "document",
+              "valid_at": "2026-05-01T10:00:00+00:00"
+            },
+            "rationale": "tier=fallback",
+            "relevance": 1.0,
+            "retrieval_tier": "fallback",
+            "semantic_available": false,
+            "source_episode": "episode:92442a6be927f7e33c931a8e"
+          }
+        ],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "cc5339eb0b61c4a1ab93caf7f48b6e9d9c0b1c33a8fe5deb72658fe1abfdb752",
+  "claim_rollout_stage": "evidence"
+}

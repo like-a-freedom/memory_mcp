@@ -1,0 +1,13 @@
+1bc1e7f145830465a6b3e9f1cdce72f4546b60cfd10d1bfd28d5c899351d3720  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/plan.json
+75a441e7eda87b021cc5f805e055996cec893b6b9f703d8a030a3efc26e785b2  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/tasks.json
+2be2d4dfb74120bd68cff5512d847514fd6e341aead8eab8a48901c465184e01  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/fingerprints.json
+bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/protocol-config.json
+ed8d7baa9795709c7737db43fba19b49959028484406d8f8501bc9c15156aeb7  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/host-policy.json
+d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/simulator.json
+1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/retry-policy.json
+abec05b82ddf82bc4df68d068002a31a3c811aa25f218ba96b9bd58501d1e509  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/criteria.json
+7867735b75115633d005b7c09a885186f07a79b8d083139901691114db08397e  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/preregistration.md
+522cf5356de737abf255fa54417129452d380e7a29a6c8f96c33f1c6477970cc  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/prompts/system.txt
+ccc62b898c6027d82cebecb0dfec152d51085f6a07b6306ffbfa602de7b2de9c  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/prompts/task-rules.txt
+a0d62bcaa98dda043ad5e46996a6a848c993cd375bae404f93fb9f3bd9dfbc52  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/prompts/recall-system.txt
+f50faed23ccb5d4958ebe5dacba65a32dd87f18a3c683a02a9cb72fd15a0e095  evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/prompts/recall-task-rules.txt

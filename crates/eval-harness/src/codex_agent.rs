@@ -39,6 +39,8 @@ pub enum CodexMemoryToolProfile {
     AgentMaintenanceV2,
     AgentMaintenanceV3,
     AgentMaintenanceV4,
+    AgentMaintenanceV5,
+    RecallOnlyV2,
 }
 
 impl CodexMemoryToolProfile {
@@ -53,6 +55,7 @@ impl CodexMemoryToolProfile {
             "agent_maintenance_v2" => Ok(Self::AgentMaintenanceV2),
             "agent_maintenance_v3" => Ok(Self::AgentMaintenanceV3),
             "agent_maintenance_v4" => Ok(Self::AgentMaintenanceV4),
+            "agent_maintenance_v5" => Ok(Self::AgentMaintenanceV5),
             _ => Err(EvalError::InvalidConfig(
                 "unsupported Codex memory tool profile".into(),
             )),
@@ -61,7 +64,7 @@ impl CodexMemoryToolProfile {
 
     pub const fn enabled_tools(self) -> &'static [&'static str] {
         match self {
-            Self::RecallOnly => &["assemble_context"],
+            Self::RecallOnly | Self::RecallOnlyV2 => &["assemble_context"],
             Self::AgentManagedMemory => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentFormation => &["ingest", "extract"],
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -71,13 +74,15 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentMaintenanceV2 => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentMaintenanceV3 => &["assemble_context", "extract", "invalidate"],
-            Self::AgentMaintenanceV4 => &["assemble_context", "extract", "invalidate"],
+            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
+                &["assemble_context", "extract", "invalidate"]
+            }
         }
     }
 
     const fn enabled_tools_config(self) -> &'static str {
         match self {
-            Self::RecallOnly => "[\"assemble_context\"]",
+            Self::RecallOnly | Self::RecallOnlyV2 => "[\"assemble_context\"]",
             Self::AgentManagedMemory => {
                 "[\"assemble_context\",\"ingest\",\"extract\",\"invalidate\"]"
             }
@@ -93,13 +98,16 @@ impl CodexMemoryToolProfile {
                 "[\"assemble_context\",\"ingest\",\"extract\",\"invalidate\"]"
             }
             Self::AgentMaintenanceV3 => "[\"assemble_context\",\"extract\",\"invalidate\"]",
-            Self::AgentMaintenanceV4 => "[\"assemble_context\",\"extract\",\"invalidate\"]",
+            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
+                "[\"assemble_context\",\"extract\",\"invalidate\"]"
+            }
         }
     }
 
     const fn system_instructions(self) -> &'static str {
         match self {
             Self::RecallOnly => SYSTEM_INSTRUCTIONS,
+            Self::RecallOnlyV2 => RECALL_SYSTEM_INSTRUCTIONS_V2,
             Self::AgentManagedMemory => AGENT_MEMORY_SYSTEM_INSTRUCTIONS,
             Self::AgentFormation => AGENT_FORMATION_SYSTEM_INSTRUCTIONS,
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -109,13 +117,16 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
             Self::AgentMaintenanceV2 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
             Self::AgentMaintenanceV3 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
-            Self::AgentMaintenanceV4 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
+            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
+                AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS
+            }
         }
     }
 
     const fn task_rules(self) -> &'static str {
         match self {
             Self::RecallOnly => TASK_RULES,
+            Self::RecallOnlyV2 => RECALL_TASK_RULES_V3,
             Self::AgentManagedMemory => AGENT_MEMORY_TASK_RULES,
             Self::AgentFormation => AGENT_FORMATION_TASK_RULES,
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -125,7 +136,7 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => AGENT_MAINTENANCE_TASK_RULES,
             Self::AgentMaintenanceV2 => AGENT_MAINTENANCE_TASK_RULES,
             Self::AgentMaintenanceV3 => AGENT_MAINTENANCE_V3_TASK_RULES,
-            Self::AgentMaintenanceV4 => AGENT_MAINTENANCE_V4_TASK_RULES,
+            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => AGENT_MAINTENANCE_V4_TASK_RULES,
         }
     }
 
@@ -140,6 +151,8 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenanceV2 => Some(AGENT_MAINTENANCE_V2_OUTPUT_TOKEN_LIMIT),
             Self::AgentMaintenanceV3 => Some(AGENT_MAINTENANCE_V2_OUTPUT_TOKEN_LIMIT),
             Self::AgentMaintenanceV4 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
+            Self::AgentMaintenanceV5 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
+            Self::RecallOnlyV2 => Some(MEMORY_READER_OUTPUT_TOKEN_LIMIT),
             Self::AgentFormation => None,
         }
     }
@@ -175,11 +188,19 @@ impl CodexMemoryToolProfile {
                 Self::AgentMaintenance
                 | Self::AgentMaintenanceV2
                 | Self::AgentMaintenanceV3
-                | Self::AgentMaintenanceV4,
+                | Self::AgentMaintenanceV4
+                | Self::AgentMaintenanceV5,
                 _,
                 false,
             ) => Some(self),
             _ => None,
+        }
+    }
+
+    pub(crate) const fn recall_profile(self) -> Self {
+        match self {
+            Self::AgentMaintenanceV5 => Self::RecallOnlyV2,
+            _ => Self::RecallOnly,
         }
     }
 }
@@ -227,6 +248,10 @@ const MEMORY_READER_OUTPUT_TOKEN_LIMIT: u64 = 8192;
 const AGENT_MAINTENANCE_V2_OUTPUT_TOKEN_LIMIT: u64 = 2048;
 const SYSTEM_INSTRUCTIONS: &str = crate::paired_agent::prompts::RECALL_SYSTEM_INSTRUCTIONS;
 const TASK_RULES: &str = crate::paired_agent::prompts::RECALL_TASK_RULES;
+const RECALL_SYSTEM_INSTRUCTIONS_V2: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-system-v2.txt");
+const RECALL_TASK_RULES_V3: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-task-rules-v3.txt");
 const AGENT_MEMORY_SYSTEM_INSTRUCTIONS: &str =
     include_str!("../../../evals/paired/prompts/agent-managed-memory-system-v1.txt");
 const AGENT_MEMORY_TASK_RULES: &str =
@@ -890,7 +915,7 @@ pub fn task_rules_for_profile(profile: CodexMemoryToolProfile) -> &'static str {
 
 pub fn reader_config_sha256_for_profile(profile: CodexMemoryToolProfile) -> Option<String> {
     match profile {
-        CodexMemoryToolProfile::RecallOnly => None,
+        CodexMemoryToolProfile::RecallOnly | CodexMemoryToolProfile::RecallOnlyV2 => None,
         CodexMemoryToolProfile::AgentOperatorPrepared => None,
         CodexMemoryToolProfile::AgentSourceAuthority => {
             Some(crate::paired_agent::prompts::source_authority_protocol_config_sha256())
@@ -909,6 +934,9 @@ pub fn reader_config_sha256_for_profile(profile: CodexMemoryToolProfile) -> Opti
             Some(sha256(AGENT_MAINTENANCE_V3_PROTOCOL_CONFIG))
         }
         CodexMemoryToolProfile::AgentMaintenanceV4 => {
+            Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
+        }
+        CodexMemoryToolProfile::AgentMaintenanceV5 => {
             Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
         }
     }
@@ -1009,6 +1037,20 @@ pub fn agent_maintenance_v4_task_prompt_sha256() -> String {
     hash_phase_prompts(
         task_rules_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV4),
         task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnly),
+    )
+}
+
+pub fn agent_maintenance_v5_system_prompt_sha256() -> String {
+    hash_phase_prompts(
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV5),
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV2),
+    )
+}
+
+pub fn agent_maintenance_v5_task_prompt_sha256() -> String {
+    hash_phase_prompts(
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV5),
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV2),
     )
 }
 
@@ -1198,6 +1240,8 @@ fn parse_codex_jsonl_with_terminal_status(
     let mut read_capture_status = ReadCaptureStatus::Observed;
     let mut memory_source_episode_ids = BTreeSet::new();
     let mut memory_write_episode_ids = BTreeSet::new();
+    let mut observed_fact_sources = Vec::new();
+    let mut invalidation_fact_ids = Vec::new();
     let mut turns_used = 0_u32;
     let mut tool_calls = 0_u32;
     let mut input_tokens = 0_u64;
@@ -1287,6 +1331,15 @@ fn parse_codex_jsonl_with_terminal_status(
                                     "Codex MCP tool event omitted its arguments".into(),
                                 )
                             })?;
+                            let invalidation_fact_id = (tool == "invalidate")
+                                .then(|| {
+                                    arguments
+                                        .get("fact_id")
+                                        .and_then(Value::as_str)
+                                        .filter(|value| !value.trim().is_empty())
+                                        .map(str::to_owned)
+                                })
+                                .flatten();
                             tool_calls = tool_calls.checked_add(1).ok_or_else(|| {
                                 EvalError::InvalidInput("Codex tool-call count overflowed".into())
                             })?;
@@ -1301,6 +1354,15 @@ fn parse_codex_jsonl_with_terminal_status(
                                 None,
                                 None,
                             )?;
+                            if let Some(fact_id) = invalidation_fact_id {
+                                let sequence =
+                                    trace.last().map(|event| event.sequence).ok_or_else(|| {
+                                        EvalError::InvalidInput(
+                                            "Codex invalidation request was not recorded".into(),
+                                        )
+                                    })?;
+                                invalidation_fact_ids.push((fact_id, sequence));
+                            }
                             if tool == "extract" {
                                 let request_sequence =
                                     trace.last().map(|event| event.sequence).ok_or_else(|| {
@@ -1332,6 +1394,10 @@ fn parse_codex_jsonl_with_terminal_status(
                                             )
                                         })?
                                         .sequence;
+                                    let request_fingerprints =
+                                        crate::paired_agent::tool_results::read_request_fingerprints(
+                                            arguments,
+                                        )?;
                                     pending_reads.insert(
                                         call_id.clone(),
                                         (
@@ -1339,6 +1405,7 @@ fn parse_codex_jsonl_with_terminal_status(
                                             crate::paired_agent::tool_results::requested_cutoff(
                                                 arguments,
                                             ),
+                                            request_fingerprints.clone(),
                                         ),
                                     );
                                     memory_reads.push(MemoryReadObservation {
@@ -1346,6 +1413,11 @@ fn parse_codex_jsonl_with_terminal_status(
                                         response_sequence: None,
                                         outcome: MemoryReadOutcome::Unknown,
                                         item_count: None,
+                                        request_query_sha256: request_fingerprints.query_sha256,
+                                        non_query_arguments_sha256: Some(
+                                            request_fingerprints.non_query_arguments_sha256,
+                                        ),
+                                        response_guidance_sha256: None,
                                         evidence: None,
                                     });
                                 } else {
@@ -1400,7 +1472,7 @@ fn parse_codex_jsonl_with_terminal_status(
                                         None,
                                         None,
                                     )?;
-                                    if let Some((index, _)) = pending_reads.remove(&call_id) {
+                                    if let Some((index, _, _)) = pending_reads.remove(&call_id) {
                                         let read = &mut memory_reads[index];
                                         read.response_sequence =
                                             trace.last().map(|event| event.sequence);
@@ -1440,12 +1512,26 @@ fn parse_codex_jsonl_with_terminal_status(
                                         Some(serialized_response_bytes(result)?),
                                     );
                                     if tool == "assemble_context" {
-                                        if let Some((index, requested_cutoff)) =
+                                        let response_sequence = trace
+                                            .last()
+                                            .map(|event| event.sequence)
+                                            .ok_or_else(|| {
+                                                EvalError::InvalidInput(
+                                                    "Codex read response was not recorded".into(),
+                                                )
+                                            })?;
+                                        observed_fact_sources.extend(
+                                            crate::paired_agent::tool_results::successful_read_fact_source_pairs(result)
+                                                .into_iter()
+                                                .map(|(fact_id, episode_id)| {
+                                                    (fact_id, episode_id, response_sequence)
+                                                }),
+                                        );
+                                        if let Some((index, requested_cutoff, _)) =
                                             pending_reads.remove(&call_id)
                                         {
                                             let read = &mut memory_reads[index];
-                                            read.response_sequence =
-                                                trace.last().map(|event| event.sequence);
+                                            read.response_sequence = Some(response_sequence);
                                             (read.outcome, read.item_count) =
                                                 crate::paired_agent::tool_results::read_result(
                                                     result,
@@ -1455,6 +1541,7 @@ fn parse_codex_jsonl_with_terminal_status(
                                                     result,
                                                     requested_cutoff,
                                                 );
+                                            read.response_guidance_sha256 = crate::paired_agent::tool_results::response_guidance_sha256(result);
                                         }
                                         collect_source_episode_ids(
                                             result,
@@ -1713,6 +1800,8 @@ fn parse_codex_jsonl_with_terminal_status(
         memory_reads: Some(memory_reads),
         read_capture_status: Some(read_capture_status),
         memory_write_episode_ids: memory_write_episode_ids.into_iter().collect(),
+        observed_fact_sources: observed_fact_sources.into_iter().collect(),
+        invalidation_fact_ids,
         extract_fact_evidence,
         extract_fact_evidence_telemetry_complete: true,
         terminal_http_status_code: None,
@@ -1863,6 +1952,7 @@ fn collect_error_text(value: &Value, text: &mut Vec<String>) {
 mod tests {
     use super::*;
     use crate::paired::{NormalizedErrorClass, TraceEventKind};
+    use crate::paired_agent::{MemoryReadOutcome, ReadCaptureStatus};
 
     #[test]
     fn parses_tool_trace_usage_and_final_answer_without_persisting_payloads() {
@@ -1904,6 +1994,48 @@ mod tests {
                 .all(|event| { event.payload_sha256.as_deref() != Some("SECRET MEMORY PAYLOAD") })
         );
         assert!(actual.trace.iter().all(|event| event.error_class.is_none()));
+    }
+
+    #[test]
+    fn fingerprints_read_arguments_and_guidance_without_persisting_text() {
+        let jsonl = concat!(
+            r#"{"type":"turn.started"}"#,
+            "\n",
+            r#"{"type":"item.started","item":{"id":"read-1","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE QUERY: which archive key?","valid_at":"2026-11-21T12:00:00Z","context_budget":2048}}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"read-1","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"PRIVATE QUERY: which archive key?","valid_at":"2026-11-21T12:00:00Z","context_budget":2048},"result":{"structuredContent":{"result":[],"guidance":"PRIVATE GUIDANCE: refine the query"}},"error":null,"status":"completed"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":"{\"answer\":\"unknown\",\"citations\":[],\"needs_clarification\":true}"}}"#,
+            "\n",
+            r#"{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":5}}"#
+        );
+
+        let actual = parse_codex_jsonl(jsonl).expect("well-formed Codex event stream");
+        let read = &actual.memory_reads.as_ref().expect("read capture")[0];
+        let serialized = serde_json::to_string(&actual).expect("serialize safe observation");
+
+        assert_eq!(
+            actual.read_capture_status,
+            Some(ReadCaptureStatus::Observed)
+        );
+        assert_eq!(read.outcome, MemoryReadOutcome::Empty);
+        assert!(
+            read.request_query_sha256
+                .as_ref()
+                .is_some_and(|hash| hash.len() == 64)
+        );
+        assert!(
+            read.non_query_arguments_sha256
+                .as_ref()
+                .is_some_and(|hash| hash.len() == 64)
+        );
+        assert!(
+            read.response_guidance_sha256
+                .as_ref()
+                .is_some_and(|hash| hash.len() == 64)
+        );
+        assert!(!serialized.contains("PRIVATE QUERY"));
+        assert!(!serialized.contains("PRIVATE GUIDANCE"));
     }
 
     #[test]
@@ -2248,6 +2380,31 @@ mod tests {
     }
 
     #[test]
+    fn maintenance_v5_uses_a_separate_read_only_recovery_profile() {
+        let profile = CodexMemoryToolProfile::from_name("agent_maintenance_v5")
+            .expect("registered v5 maintenance profile");
+
+        assert_eq!(profile, CodexMemoryToolProfile::AgentMaintenanceV5);
+        assert_eq!(
+            profile.recall_profile(),
+            CodexMemoryToolProfile::RecallOnlyV2
+        );
+        assert_eq!(
+            profile.recall_profile().enabled_tools(),
+            &["assemble_context"]
+        );
+        assert_ne!(
+            system_instructions_sha256_for_profile(profile.recall_profile()),
+            system_instructions_sha256_for_profile(CodexMemoryToolProfile::RecallOnly)
+        );
+        assert_ne!(
+            task_rules_sha256_for_profile(profile.recall_profile()),
+            task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnly)
+        );
+        assert!(CodexMemoryToolProfile::from_name("recall_only_v2").is_err());
+    }
+
+    #[test]
     fn source_authority_workflow_uses_read_only_candidate_formation_after_import() {
         let profile = CodexMemoryToolProfile::from_name("agent_source_authority")
             .expect("source-authority paired workflow is registered");
@@ -2409,6 +2566,33 @@ mod tests {
             parse_codex_jsonl(jsonl).expect_err("missing provider usage is not a valid receipt");
 
         assert!(error.to_string().contains("omitted provider usage"));
+    }
+
+    #[test]
+    fn transient_exact_invalidation_inputs_are_scored_in_memory_and_not_serialized() {
+        let jsonl = concat!(
+            r#"{"type":"turn.started"}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"read-1","type":"mcp_tool_call","server":"memory_decisions","tool":"assemble_context","arguments":{"query":"old fact"},"result":{"structuredContent":{"result":[{"fact_id":"fact:old","source_episode":"episode:old"}]}}}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"id":"invalidate-1","type":"mcp_tool_call","server":"memory_decisions","tool":"invalidate","arguments":{"fact_id":"fact:old","t_invalid":"2026-11-20T10:00:00Z","reason":"superseded"},"result":{"structuredContent":{"result":"invalidated"}}}}"#,
+            "\n",
+            r#"{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}"#
+        );
+
+        let observation = parse_codex_jsonl_with_enabled_memory_tools(
+            jsonl,
+            &["assemble_context", "extract", "invalidate"],
+        )
+        .expect("parse private scoring inputs");
+
+        assert_eq!(
+            observation.observed_fact_sources,
+            [("fact:old".into(), "episode:old".into(), 3)]
+        );
+        assert_eq!(observation.invalidation_fact_ids, [("fact:old".into(), 4)]);
+        let serialized = serde_json::to_string(&observation).expect("serialize public receipt");
+        assert!(!serialized.contains("fact:old"));
     }
 
     #[test]

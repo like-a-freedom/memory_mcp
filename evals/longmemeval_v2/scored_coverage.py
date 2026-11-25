@@ -16,7 +16,7 @@ def failure_status(role, error):
     return f"{role}_{'timeout' if timeout else 'error'}"
 
 
-def run_observed(harness, argv, case_ids, output):
+def run_observed(harness, argv, case_ids, output, preflight=None):
     failures = defaultdict(list)
     reader_cases = {}
     duration = {"reader": 0.0, "judge_scoring": 0.0}
@@ -57,6 +57,13 @@ def run_observed(harness, argv, case_ids, output):
         for name in ("LME_LOCAL_READER_TOKEN", "LME_LOCAL_JUDGE_TOKEN")
     }
     try:
+        if preflight is not None:
+            try:
+                preflight()
+            except Exception as error:
+                for case_id in case_ids:
+                    failures[case_id].append("preflight_error")
+                raise RuntimeError("LongMemEval scoring preflight failed") from error
         with (
             patch("sys.argv", argv),
             patch.dict(os.environ, {"NO_PROXY": "*", "no_proxy": "*", **local_env}),
@@ -162,7 +169,7 @@ def main():
         "--prompt-build-max-workers", str(args.prompt_workers),
         "--temperature", "0", "--max-completion-tokens", "256", "--timeout-seconds", "30",
         "--evaluator-max-completion-tokens", "256", "--evaluator-timeout-seconds", "30",
-    ], case_ids, args.output)
+    ], case_ids, args.output, preflight=harness.get_memory_context_processor)
 
 
 if __name__ == "__main__":

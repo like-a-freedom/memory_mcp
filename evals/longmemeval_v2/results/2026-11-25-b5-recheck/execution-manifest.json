@@ -1,0 +1,85 @@
+{
+  "schema": "memory-mcp-longmemeval-b5-recheck/v1",
+  "run_id": "2026-11-25-b5-recheck-run-02",
+  "started_at_utc": "2026-11-25T02:48:45.007149+00:00",
+  "completed_at_utc": "2026-11-25T03:19:22.153732+00:00",
+  "host": {
+    "platform": "aarch64-apple-darwin",
+    "execution": "local Apple Silicon"
+  },
+  "repository": {
+    "head": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "product_binary": "target/release/memory_mcp",
+    "product_binary_sha256": "9c9b24b757a948eae3299313dd1a0a14c6cd4ddd62f033580bc27a7edf06213d",
+    "memory_source_changes_after_b5_replay": false
+  },
+  "cohort": {
+    "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+    "dataset_manifest_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+    "frozen_case_ids": [
+      "0c6b0c60",
+      "6d975a08",
+      "89a20f48",
+      "922a0c56",
+      "d6da3938",
+      "f43926d9",
+      "f61a096f"
+    ],
+    "ordered_haystack_count": 100,
+    "staged_input_sha256": {
+      "questions.json": "7f5beb79700ad9670b81b423777f60c643bbdcba4eeb65fb6fbb0586a938afec",
+      "haystack.json": "9b751199062ea7db2edc472a4f362aca7af5eb113f7ddf2f39c0b6d3d5eba1ac",
+      "trajectories.json": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+      "selection.json": "3749af6c58ec5886a71ba5eaf72ea2d86dca344675bbc4ab09d21fc1e7d0aca8"
+    },
+    "staged_inputs_match_prior_b5_cohort": true,
+    "shared_memory_snapshot": "target/c4-native/build/memory_state",
+    "snapshot_build_coverage_sha256": "33d3712e0abad5b5624bf4ece1e1b897fe018e37b1e669dfee6630fe15009a27"
+  },
+  "models": {
+    "runtime": "standalone mlx-lm server; no LM Studio application, server, or CLI",
+    "mlx_lm": "0.32.2",
+    "mlx": "0.32.4",
+    "reader": {
+      "profile_id": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "endpoint": "http://127.0.0.1:18767/v1",
+      "profile_file_hashes_verified": true,
+      "temperature": 0,
+      "max_completion_tokens": 256
+    },
+    "judge": {
+      "profile_id": "ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+      "endpoint": "http://127.0.0.1:18766/v1",
+      "profile_file_hashes_verified": true,
+      "temperature": 0,
+      "max_completion_tokens": 256
+    },
+    "context_processor": {
+      "checkpoint": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "offline_cache": true,
+      "processor_preflight_passed": true
+    }
+  },
+  "execution": {
+    "network": "model endpoints and API-compatible requests limited to loopback; Hugging Face offline mode enabled",
+    "prompt_workers": 3,
+    "reader_requests_concurrency": 1,
+    "selected_cases": 7,
+    "native_scored_cases": 7,
+    "covered_cases": 7,
+    "reader_failures": 0,
+    "judge_failures": 0,
+    "scorer_failures": 0,
+    "official_score": "1/7",
+    "run_arguments": "run-02/run_args.json",
+    "coverage_receipt": "run-02/score-coverage.json",
+    "aggregate_metrics": "run-02/aggregated_metrics.json"
+  },
+  "invalid_attempt": {
+    "path": "run-01/",
+    "reason": "The default Hugging Face cache lacked the pinned processor; prompt construction stopped before reader or judge inference.",
+    "included_in_scored_results": false,
+    "resolution": "Added processor preflight and used the explicit pinned offline HF_HOME for run-02."
+  }
+}

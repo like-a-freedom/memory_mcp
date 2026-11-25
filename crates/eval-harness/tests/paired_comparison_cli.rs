@@ -982,6 +982,45 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         std::fs::read(replay.join("incumbent.json")).unwrap()
     );
 
+    let mut v8_observations = v4.clone();
+    for arm in ["incumbent", "candidate"] {
+        for trial in v8_observations[arm]["trials"].as_array_mut().unwrap() {
+            let read = &mut trial["observation"]["memory_reads"][0];
+            read["request_query_sha256"] = json!("a".repeat(64));
+            read["non_query_arguments_sha256"] = json!("b".repeat(64));
+            read["response_guidance_sha256"] = json!("c".repeat(64));
+        }
+    }
+    write_json(&observations_path, &v8_observations);
+    let v8_run = directory.path().join("v8-linked");
+    let output = score(&v8_run);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let v8_bytes = std::fs::read(v8_run.join("incumbent.json")).unwrap();
+    let v8_artifact: serde_json::Value = serde_json::from_slice(&v8_bytes).unwrap();
+    assert_eq!(v8_artifact["schema_version"], "memory-mcp-agent-paired/v8");
+    assert_eq!(
+        v8_artifact["receipts"][0]["read_diagnostics"][0]["request_query_sha256"],
+        "a".repeat(64)
+    );
+    let mut missing_v8_fingerprint = v8_artifact.clone();
+    missing_v8_fingerprint["receipts"][0]["read_diagnostics"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("request_query_sha256");
+    let missing_v8_fingerprint: PairedRunArtifact =
+        serde_json::from_value(missing_v8_fingerprint).unwrap();
+    assert!(missing_v8_fingerprint.validate().is_err());
+    let v8_replay = directory.path().join("v8-replay");
+    assert!(score(&v8_replay).status.success());
+    assert_eq!(
+        v8_bytes,
+        std::fs::read(v8_replay.join("incumbent.json")).unwrap()
+    );
+
     assert_eq!(artifact["receipts"][0]["read_capture_status"], "observed");
     assert_eq!(
         artifact["receipts"][0]["read_diagnostics"][0]["item_count"],

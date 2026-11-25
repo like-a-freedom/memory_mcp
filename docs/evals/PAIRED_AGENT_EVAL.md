@@ -466,7 +466,24 @@ answer classification for every schema-valid final answer. V5 artifacts remain
 readable without migration. No response text is persisted in these diagnostics.
 Observation v4 adds `read_capture_status` and `memory_reads`. Each observed read references its request and terminal trace sequence. The offline scorer rejects mismatched call IDs, tools, terminal kinds and observed captures that omit a read. Capture status distinguishes observed, partial and unavailable capture. A text-only reply has an unknown result count.
 
-The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. Native captures with read observations use journal v5. Observation v1–v3 still replay to paired v6, and paired v2–v6 remain readable. Read diagnostics leave existing decision and independent-probe scores intact.
+As of 2026-11-25, read normalization accepts structured results both as a bare
+MCP `CallToolResult` and inside a JSON-RPC `result` or adapter `payload`
+envelope. A content-only or otherwise unrecognized response remains unknown;
+the evaluator does not infer an empty read from missing structured data. The
+fresh [C1 read-diagnostics screen](../../evals/paired/c1-agent-managed-correction-read-diagnostics-2026-11-25-v3/README.md)
+observed 13 structured reads: the adapter recorded an empty/nonempty outcome
+and count for all, with source coverage on every returned item. It recorded
+partial completeness for four and unknown for nine. The receipt does not keep
+raw episode IDs or tool responses, so `unknown` cannot distinguish absent
+metadata from an unrecognized value after capture. The frozen C1 registration
+also required completeness for every read and asked for raw IDs in a
+content-free receipt; future registrations must require temporal completeness
+only for a registered revision-bounded request and report source coverage or
+counts without retaining IDs. The candidate task floor failed (2/4 versus
+3/4); no repeat was allowed. See the report before interpreting these
+diagnostics as an adapter or memory defect.
+
+The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. When a runner supplies query, non-query argument, and response-guidance fingerprints for every captured read, the scorer writes paired v8; v8 validates those digests and preserves them for deterministic retry analysis. Native journals use v5 without the new fingerprints and v6 with them. Observation v1–v3 still replay to v6/v7/v8 as appropriate, and paired v2–v7 artifacts remain readable. Read diagnostics leave existing decision and independent-probe scores intact.
 
 The scorer writes
 `incumbent.json` and `candidate.json` into a new directory. The same frozen plan, task manifest
@@ -756,6 +773,20 @@ preregistration before another agent run. The valid runs, invalid host/setup
 preflights, frozen inputs, checksums and byte-identical deterministic replay
 commands are documented in the [v2 archive](../../evals/paired/agent-managed-maintenance-v2/README.md).
 
+### Bounded read recovery — maintenance v5
+
+The opt-in `agent_maintenance_v5` profile keeps the v4 correction-phase tools,
+host policy, response limits and protocol. It changes only the fresh recall
+phase: after a successful empty or unsupported read, the agent may follow the
+tool's refinement guidance and retry once, changing only the query wording
+while retaining every other request argument. Failed calls are not retried
+unless their guidance explicitly permits it. The retry stays within the
+original time and query constraints, and final answers still require exact
+returned source citations. This profile is an agent-workflow hypothesis; its
+presence does not show that retries improve answer quality, memory quality or
+latency. See the [frozen recovery screen](../../evals/paired/c1-agent-managed-correction-recovery-v1-2026-11-25/README.md)
+for its preregistered outcomes and stop rule.
+
 The `run-paired-codex` adapter accepts the explicit profile
 `--memory-tool-profile agent_maintenance_v2`; the default remains
 `recall_only`. This live adapter is optional. The runner-neutral task and
@@ -803,7 +834,7 @@ case HTTP agent cohort or the paired product comparison.
 ### Agent-managed phase sidecars
 
 New agent-managed stage supplements use
-`memory-mcp-agent-managed-run/v5`. A failed formation phase may include an
+`memory-mcp-agent-managed-run/v6`. A failed formation phase may include an
 optional `terminal_error_class` with a normalized enum value from the final
 failure trace event, an optional `terminal_http_status_code` when the provider
 returned a non-success HTTP response, and an optional closed
@@ -821,6 +852,16 @@ a transport stage must accompany `transport`/`ModelFailure` or
 `timeout`/`TimedOut`, and cannot coexist with an HTTP status. These diagnostics
 localize provider and transport failures without retaining their content; they
 do not change quality scoring or establish memory or agent benefit.
+
+Schema v6 adds an optional content-free
+`exact_stale_fact_invalidation_verified` result. The Codex parser keeps
+`fact_id`/source pairs from successful `assemble_context` responses and
+invalidation arguments only in process memory. Agent-managed scoring sets the
+result only when the single successful invalidation targeted a fact read from
+a seeded source marked forbidden by the hidden oracle. The raw fact ID and
+source pair are never serialized; older v1-v5 sidecars remain readable without
+this evidence. This check complements task and independent-probe outcomes; it
+does not by itself prove the whole memory workflow correct.
 
 ## Development incumbent pilot
 
@@ -1441,10 +1482,20 @@ cutoff produces `false` even when source coverage passes.
 The v7 receipt contains the read outcome, item count and available diagnostics:
 source coverage, annotation match, cutoff matches, completeness and count of
 distinct cited sources from that reply. A partial empty read describes the
-reply at that snapshot. Legacy observations replay without the new fields.
-Keep observations and task manifests private. Published artifacts contain the
-scoring outcomes and trace hashes. Task acceptance and independent probe
-results retain their existing scoring rules.
+reply at that snapshot. V8 adds SHA-256 fingerprints of the exact query,
+arguments with `query` removed, and response guidance; it stores none of those
+texts. This lets a frozen evaluator prove a bounded retry changed only the
+query and followed registered guidance. Legacy observations replay without
+these fields. Keep observations and task manifests private. Published
+artifacts contain scoring outcomes and trace hashes. Task acceptance and
+independent probe results retain their existing scoring rules.
+
+The [C1 recovery screen](../../evals/paired/c1-agent-managed-correction-recovery-v1-2026-11-25/README.md)
+uses the provider-neutral v8 receipt with a standard-library validator. That
+validator requires complete read capture, permits one retry only after the
+exact empty-result refinement guidance, checks the query-only change, and
+requires at least one retry exposure per arm. Its status is a workflow screen;
+it does not estimate the causal effect of retries.
 
 
 ### Registered recall controls

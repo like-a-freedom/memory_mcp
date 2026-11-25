@@ -18,6 +18,7 @@ pub const AGENT_MANAGED_ARTIFACT_SCHEMA_V2: &str = "memory-mcp-agent-managed-run
 pub const AGENT_MANAGED_ARTIFACT_SCHEMA_V3: &str = "memory-mcp-agent-managed-run/v3";
 pub const AGENT_MANAGED_ARTIFACT_SCHEMA_V4: &str = "memory-mcp-agent-managed-run/v4";
 pub const AGENT_MANAGED_ARTIFACT_SCHEMA_V5: &str = "memory-mcp-agent-managed-run/v5";
+pub const AGENT_MANAGED_ARTIFACT_SCHEMA_V6: &str = "memory-mcp-agent-managed-run/v6";
 pub const AGENT_MANAGED_COMPARISON_SCHEMA_V1: &str = "memory-mcp-agent-managed-comparison/v1";
 pub const AGENT_MANAGED_COMPARISON_SCHEMA_V2: &str = "memory-mcp-agent-managed-comparison/v2";
 
@@ -189,7 +190,8 @@ impl AgentManagedTaskManifest {
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenance
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV2
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV3
-                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4,
+                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4
+                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5,
                 false,
             ) => Ok(()),
             (
@@ -267,6 +269,12 @@ impl AgentManagedTaskManifest {
                 crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4 => (
                     crate::codex_agent::agent_maintenance_v4_system_prompt_sha256(),
                     crate::codex_agent::agent_maintenance_v4_task_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v4_host_policy_sha256(),
+                    crate::codex_agent::agent_maintenance_v4_simulator_sha256(),
+                ),
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5 => (
+                    crate::codex_agent::agent_maintenance_v5_system_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v5_task_prompt_sha256(),
                     crate::codex_agent::agent_maintenance_v4_host_policy_sha256(),
                     crate::codex_agent::agent_maintenance_v4_simulator_sha256(),
                 ),
@@ -576,6 +584,10 @@ pub struct AgentManagedStageReceipt {
     pub successful_ingest_count: usize,
     pub identified_ingest_episode_count: usize,
     pub independent_probe: AgentManagedProbeReceipt,
+    /// Private scoring result for whether the one invalidation call targeted
+    /// a fact previously read from a forbidden (superseded) source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exact_stale_fact_invalidation_verified: Option<bool>,
     /// Candidate-side setup actions, kept separate from agent tool calls.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub operator_imports: Vec<AgentManagedOperatorImportReceipt>,
@@ -1197,6 +1209,12 @@ impl<B: AgentManagedTrialBackend> super::PairedTrialBackend for ManagedPairedBac
         let generated_episode_id = (successful_ingest_count == 1
             && result.formation.memory_write_episode_ids.len() == 1)
             .then(|| result.formation.memory_write_episode_ids[0].clone());
+        let exact_stale_fact_invalidation_verified = Some(score_exact_stale_fact_invalidation(
+            &result.formation,
+            &result.initial_episode_id_to_event_id,
+            &definition.oracle,
+            &write_operations,
+        ));
         let mut bindings = result.initial_episode_id_to_event_id;
         if let Some(episode_id) = generated_episode_id.as_ref() {
             if bindings.contains_key(episode_id) {
@@ -1228,6 +1246,7 @@ impl<B: AgentManagedTrialBackend> super::PairedTrialBackend for ManagedPairedBac
             successful_ingest_count,
             identified_ingest_episode_count: result.formation.memory_write_episode_ids.len(),
             independent_probe: probe_receipt,
+            exact_stale_fact_invalidation_verified,
             operator_imports: result.operator_imports,
             fact_evidence_audit: summarize_fact_evidence(&result.formation)?,
         };
@@ -1474,6 +1493,41 @@ fn score_independent_probe(
     }
 }
 
+fn score_exact_stale_fact_invalidation(
+    formation: &AgentObservation,
+    episode_id_to_event_id: &BTreeMap<String, String>,
+    oracle: &HiddenTaskOracle,
+    operations: &[AgentManagedWriteOperation],
+) -> bool {
+    let invalidation = operations
+        .iter()
+        .find(|operation| operation.tool_name == "memory_decisions/invalidate");
+    if !matches!(
+        invalidation,
+        Some(operation)
+            if operation.attempts == 1
+                && operation.succeeded == 1
+                && operation.failed == 0
+                && operation.unresolved == 0
+    ) || formation.invalidation_fact_ids.len() != 1
+    {
+        return false;
+    }
+    let (invalidated_fact_id, invalidation_sequence) = &formation.invalidation_fact_ids[0];
+    let observed_sources = formation
+        .observed_fact_sources
+        .iter()
+        .filter(|(fact_id, _, response_sequence)| {
+            fact_id == invalidated_fact_id && response_sequence < invalidation_sequence
+        })
+        .filter_map(|(_, episode_id, _)| episode_id_to_event_id.get(episode_id))
+        .collect::<BTreeSet<_>>();
+    observed_sources.len() == 1
+        && observed_sources
+            .iter()
+            .any(|event_id| oracle.forbidden_event_ids.contains(*event_id))
+}
+
 fn create_supplement(
     run: &crate::paired::PairedRunArtifact,
     mut stages: Vec<AgentManagedStageReceipt>,
@@ -1482,7 +1536,7 @@ fn create_supplement(
     expected_trials.sort();
     stages.sort_by(|left, right| left.key.cmp(&right.key));
     Ok(AgentManagedRunSupplement {
-        schema_version: AGENT_MANAGED_ARTIFACT_SCHEMA_V5.into(),
+        schema_version: AGENT_MANAGED_ARTIFACT_SCHEMA_V6.into(),
         arm: run.arm,
         run_id: run
             .run_id
@@ -1522,24 +1576,39 @@ fn validate_supplement(
         .stages
         .iter()
         .any(|stage| stage.formation.terminal_transport_stage.is_some());
+    let has_exact_stale_fact_audits = supplement
+        .stages
+        .iter()
+        .all(|stage| stage.exact_stale_fact_invalidation_verified.is_some());
+    let has_any_exact_stale_fact_audits = supplement
+        .stages
+        .iter()
+        .any(|stage| stage.exact_stale_fact_invalidation_verified.is_some());
     let schema_matches = match supplement.schema_version.as_str() {
         AGENT_MANAGED_ARTIFACT_SCHEMA_V1 => {
             !has_operator_imports
                 && !has_terminal_error_classes
                 && !has_terminal_http_status_codes
                 && !has_terminal_transport_stages
+                && !has_any_exact_stale_fact_audits
         }
         AGENT_MANAGED_ARTIFACT_SCHEMA_V2 => {
             has_operator_imports
                 && !has_terminal_error_classes
                 && !has_terminal_http_status_codes
                 && !has_terminal_transport_stages
+                && !has_any_exact_stale_fact_audits
         }
         AGENT_MANAGED_ARTIFACT_SCHEMA_V3 => {
-            !has_terminal_http_status_codes && !has_terminal_transport_stages
+            !has_terminal_http_status_codes
+                && !has_terminal_transport_stages
+                && !has_any_exact_stale_fact_audits
         }
-        AGENT_MANAGED_ARTIFACT_SCHEMA_V4 => !has_terminal_transport_stages,
-        AGENT_MANAGED_ARTIFACT_SCHEMA_V5 => true,
+        AGENT_MANAGED_ARTIFACT_SCHEMA_V4 => {
+            !has_terminal_transport_stages && !has_any_exact_stale_fact_audits
+        }
+        AGENT_MANAGED_ARTIFACT_SCHEMA_V5 => !has_any_exact_stale_fact_audits,
+        AGENT_MANAGED_ARTIFACT_SCHEMA_V6 => has_exact_stale_fact_audits,
         _ => false,
     };
     if !schema_matches
@@ -1893,6 +1962,97 @@ mod tests {
     use super::*;
     use crate::paired::TrialStatus;
 
+    #[test]
+    fn maintenance_v5_fingerprints_only_the_changed_recall_behavior() {
+        let manifest: AgentManagedTaskManifest = serde_json::from_str(include_str!(
+            "../../../../evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/tasks.json"
+        ))
+        .expect("frozen synthetic correction manifest");
+        let v4 = manifest
+            .fingerprints_for_profile(
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4,
+            )
+            .expect("v4 fingerprints");
+        let v5 = manifest
+            .fingerprints_for_profile(
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5,
+            )
+            .expect("v5 fingerprints");
+
+        assert_ne!(v4.system_prompt_sha256, v5.system_prompt_sha256);
+        assert_ne!(v4.task_prompt_sha256, v5.task_prompt_sha256);
+        assert_eq!(v4.host_policy_sha256, v5.host_policy_sha256);
+        assert_eq!(v4.retry_policy_sha256, v5.retry_policy_sha256);
+        assert_eq!(v4.simulator_sha256, v5.simulator_sha256);
+        assert_eq!(v4.protocol_config_sha256, v5.protocol_config_sha256);
+    }
+
+    #[test]
+    fn exact_stale_invalidation_requires_the_previously_read_forbidden_fact_id() {
+        let mut formation = observation(Vec::new());
+        formation.observed_fact_sources = vec![("fact:old".into(), "episode:old".into(), 1)];
+        formation.invalidation_fact_ids = vec![("fact:old".into(), 2)];
+        let bindings = BTreeMap::from([("episode:old".into(), "event:old".into())]);
+        let oracle = HiddenTaskOracle {
+            sufficient_evidence_alternatives: vec![],
+            accepted_answers: vec![],
+            forbidden_event_ids: vec!["event:old".into()],
+            needs_clarification: false,
+            read_expectation: None,
+        };
+        let operation = AgentManagedWriteOperation {
+            tool_name: "memory_decisions/invalidate".into(),
+            attempts: 1,
+            succeeded: 1,
+            failed: 0,
+            unresolved: 0,
+        };
+
+        assert!(score_exact_stale_fact_invalidation(
+            &formation,
+            &bindings,
+            &oracle,
+            std::slice::from_ref(&operation)
+        ));
+
+        formation.invalidation_fact_ids = vec![("fact:other".into(), 2)];
+        assert!(!score_exact_stale_fact_invalidation(
+            &formation,
+            &bindings,
+            &oracle,
+            &[operation]
+        ));
+    }
+
+    #[test]
+    fn exact_stale_invalidation_requires_read_response_before_write_request() {
+        let mut formation = observation(Vec::new());
+        formation.observed_fact_sources = vec![("fact:old".into(), "episode:old".into(), 3)];
+        formation.invalidation_fact_ids = vec![("fact:old".into(), 2)];
+        let bindings = BTreeMap::from([("episode:old".into(), "event:old".into())]);
+        let oracle = HiddenTaskOracle {
+            sufficient_evidence_alternatives: vec![],
+            accepted_answers: vec![],
+            forbidden_event_ids: vec!["event:old".into()],
+            needs_clarification: false,
+            read_expectation: None,
+        };
+        let operation = AgentManagedWriteOperation {
+            tool_name: "memory_decisions/invalidate".into(),
+            attempts: 1,
+            succeeded: 1,
+            failed: 0,
+            unresolved: 0,
+        };
+
+        assert!(!score_exact_stale_fact_invalidation(
+            &formation,
+            &bindings,
+            &oracle,
+            &[operation]
+        ));
+    }
+
     struct State {
         formed_episode_id: String,
     }
@@ -1960,6 +2120,8 @@ mod tests {
             memory_reads: None,
             read_capture_status: None,
             memory_write_episode_ids: vec!["episode:formed".into()],
+            observed_fact_sources: Vec::new(),
+            invalidation_fact_ids: Vec::new(),
             extract_fact_evidence: vec![],
             extract_fact_evidence_telemetry_complete: false,
             terminal_http_status_code: None,

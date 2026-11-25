@@ -1,0 +1,278 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1795581421",
+  "profile": "nightly",
+  "started_at": "2026-11-25T04:37:01.012567Z",
+  "duration_ms": 21,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "independent-source-open-conflict-v2"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "latest-correction-after-long-distractor-history"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "numeric-neighbor-exact-identity-v2"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "prior-knowledge-before-final-correction"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "independent-source-open-conflict-v2"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "latest-correction-after-long-distractor-history"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 5,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "numeric-neighbor-exact-identity-v2"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "prior-knowledge-before-final-correction"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {
+        "evidence_stage_temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "evidence_stage_temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_decision_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_evidence_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "temporal_probe_success": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 3,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "memory-decisions",
+      "mode": "end_to_end",
+      "total": 4,
+      "passed": 0,
+      "quality_failed": 0,
+      "invalid": 4,
+      "metrics": {
+        "decision_success_rate": 0.0,
+        "evidence_stage_temporal_decision_success_rate": 0.0,
+        "evidence_stage_temporal_evidence_success_rate": 0.0,
+        "evidence_stage_temporal_probe_success_rate": 0.0,
+        "evidence_success_rate": 0.0,
+        "probe_success_rate": 0.0,
+        "temporal_decision_success_rate": 0.0,
+        "temporal_evidence_success_rate": 0.0,
+        "temporal_probe_success_rate": 0.0
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "a91dc5afd29495a3b59be7333872cba32df37c3b23e1f569b42e84113722d3df",
+    "git_commit": "0f8ca42d194891ff5f431fb003f63fcdeb4db504",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "memory-decisions": {
+        "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+        "corpus_sha256": "0b60fbc73d90fa5d515c0b9a1bc3a0718d6b984c193a857d21e51b015f65a73e",
+        "product_binary": "/Users/solovey/Documents/dev/memory_mcp/target/debug/memory_mcp",
+        "product_binary_sha256": "71108d8f2eb3b9646f24bbde73d1020cce629ce81f4f927915e07041503c2812",
+        "provider_profile": "storage=embedded-surreal-local;namespace=main;embeddings=disabled;retrieval=lexical-fallback;ner=regex-builtin;primary_claim_rollout=product_default;evidence_diagnostic_claim_rollout=evidence;transaction_time=server-assigned;scoring_protocol=temporal-cutoff-v2",
+        "receipt_index": "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-decisions-invalid-31607-1795581420923003000/index.json",
+        "receipt_index_sha256": "5035cb86454e00997352654d5ca8c3bb1ac490939aa55621e65aef780f796391",
+        "replay_cases": "4",
+        "replay_elapsed_ms": "20"
+      }
+    },
+    "profile_digest": "1897284cb1459332db93749c30b84f7e15a489c836b54d7c34a933d780c0e92d"
+  },
+  "budget_status": "passed",
+  "verdict": "invalid",
+  "issues": []
+}

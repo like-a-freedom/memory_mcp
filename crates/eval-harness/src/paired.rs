@@ -377,6 +377,7 @@ pub const PAIRED_ARTIFACT_SCHEMA_V4: &str = "memory-mcp-agent-paired/v4";
 pub const PAIRED_ARTIFACT_SCHEMA_V5: &str = "memory-mcp-agent-paired/v5";
 pub const PAIRED_ARTIFACT_SCHEMA_V7: &str = "memory-mcp-agent-paired/v7";
 pub const PAIRED_ARTIFACT_SCHEMA_V6: &str = "memory-mcp-agent-paired/v6";
+pub const PAIRED_ARTIFACT_SCHEMA_V8: &str = "memory-mcp-agent-paired/v8";
 pub const PAIRED_COMPARISON_SCHEMA_V2: &str = "memory-mcp-agent-comparison/v2";
 pub const PAIRED_PLAN_SCHEMA_V2: &str = "memory-mcp-agent-plan/v2";
 pub const PAIRED_PILOT_REPORT_SCHEMA_V3: &str = "memory-mcp-agent-pilot-report/v3";
@@ -610,6 +611,7 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V5
                 | PAIRED_ARTIFACT_SCHEMA_V6
                 | PAIRED_ARTIFACT_SCHEMA_V7
+                | PAIRED_ARTIFACT_SCHEMA_V8
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired artifact schema {:?}",
@@ -648,7 +650,10 @@ impl PairedRunArtifact {
         }
         if !matches!(
             self.schema_version.as_str(),
-            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
+            PAIRED_ARTIFACT_SCHEMA_V5
+                | PAIRED_ARTIFACT_SCHEMA_V6
+                | PAIRED_ARTIFACT_SCHEMA_V7
+                | PAIRED_ARTIFACT_SCHEMA_V8
         ) && self
             .receipts
             .iter()
@@ -660,7 +665,10 @@ impl PairedRunArtifact {
         }
         if matches!(
             self.schema_version.as_str(),
-            PAIRED_ARTIFACT_SCHEMA_V5 | PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
+            PAIRED_ARTIFACT_SCHEMA_V5
+                | PAIRED_ARTIFACT_SCHEMA_V6
+                | PAIRED_ARTIFACT_SCHEMA_V7
+                | PAIRED_ARTIFACT_SCHEMA_V8
         ) && self.receipts.iter().any(|receipt| {
             receipt.status != TrialStatus::Skipped && receipt.task_oracle_diagnostics.is_none()
         }) {
@@ -674,7 +682,23 @@ impl PairedRunArtifact {
                 receipt.read_capture_status,
                 &receipt.read_diagnostics,
             ) {
-                (PAIRED_ARTIFACT_SCHEMA_V7, Some(status), Some(reads)) => {
+                (PAIRED_ARTIFACT_SCHEMA_V8, Some(status), Some(reads)) => {
+                    for read in reads {
+                        for digest in [
+                            read.request_query_sha256.as_deref(),
+                            read.non_query_arguments_sha256.as_deref(),
+                        ] {
+                            let Some(digest) = digest else {
+                                return Err(EvalError::InvalidInput(
+                                    "paired artifact v8 read diagnostics require request fingerprints".into(),
+                                ));
+                            };
+                            validate_sha256("read request", digest)?;
+                        }
+                        if let Some(digest) = read.response_guidance_sha256.as_deref() {
+                            validate_sha256("read guidance", digest)?;
+                        }
+                    }
                     let associations = reads
                         .iter()
                         .map(|read| crate::paired_agent::MemoryReadObservation {
@@ -682,6 +706,9 @@ impl PairedRunArtifact {
                             response_sequence: read.response_sequence,
                             outcome: read.outcome,
                             item_count: read.item_count,
+                            request_query_sha256: read.request_query_sha256.clone(),
+                            non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
+                            response_guidance_sha256: read.response_guidance_sha256.clone(),
                             evidence: None,
                         })
                         .collect::<Vec<_>>();
@@ -691,9 +718,40 @@ impl PairedRunArtifact {
                         &receipt.trace,
                     )?;
                 }
-                (PAIRED_ARTIFACT_SCHEMA_V7, None, None)
+                (PAIRED_ARTIFACT_SCHEMA_V7, Some(status), Some(reads)) => {
+                    if reads.iter().any(|read| {
+                        read.request_query_sha256.is_some()
+                            || read.non_query_arguments_sha256.is_some()
+                            || read.response_guidance_sha256.is_some()
+                    }) {
+                        return Err(EvalError::InvalidInput(
+                            "paired artifact v7 cannot contain v8 request fingerprints".into(),
+                        ));
+                    }
+                    let associations = reads
+                        .iter()
+                        .map(|read| crate::paired_agent::MemoryReadObservation {
+                            request_sequence: read.request_sequence,
+                            response_sequence: read.response_sequence,
+                            outcome: read.outcome,
+                            item_count: read.item_count,
+                            request_query_sha256: None,
+                            non_query_arguments_sha256: None,
+                            response_guidance_sha256: None,
+                            evidence: None,
+                        })
+                        .collect::<Vec<_>>();
+                    crate::paired_agent::validate_read_associations(
+                        status,
+                        &associations,
+                        &receipt.trace,
+                    )?;
+                }
+                (PAIRED_ARTIFACT_SCHEMA_V7 | PAIRED_ARTIFACT_SCHEMA_V8, None, None)
                     if receipt.status == TrialStatus::Skipped => {}
-                (version, None, None) if version != PAIRED_ARTIFACT_SCHEMA_V7 => {}
+                (version, None, None)
+                    if version != PAIRED_ARTIFACT_SCHEMA_V7
+                        && version != PAIRED_ARTIFACT_SCHEMA_V8 => {}
                 _ => {
                     return Err(EvalError::InvalidInput(
                         "read diagnostics do not match paired artifact version".into(),
@@ -712,7 +770,7 @@ impl PairedRunArtifact {
             }
             if matches!(
                 self.schema_version.as_str(),
-                PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7
+                PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7 | PAIRED_ARTIFACT_SCHEMA_V8
             ) && diagnostics.accepted_answer_match.is_some()
                 != diagnostics.final_answer_schema_valid
             {

@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "ironvale-ceramic-works-history",
+        "case_id": "ironvale-ceramic-works-current-annealing-kiln-docket",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Ironvale Ceramic Works uses Tundra-28 as its annealing kiln docket. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-2026-11-25/ironvale-ceramic-works/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Ironvale Ceramic Works's current annealing kiln docket? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Ironvale Ceramic Works's current annealing kiln docket? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-2026-11-25-ironvale-ceramic-works-old-01",
+          "source_id": "conversation://c1-read-normalization-2026-11-25/ironvale-ceramic-works/original-01",
+          "source_type": "conversation",
+          "content": "Ironvale Ceramic Works uses Granite-74 as its annealing kiln docket.",
+          "valid_at": "2026-11-10T10:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-2026-11-25-ironvale-ceramic-works-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-2026-11-25-ironvale-ceramic-works-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Tundra-28"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-2026-11-25-ironvale-ceramic-works-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "meadowline-harbor-services-history",
+        "case_id": "meadowline-harbor-services-current-ferry-engine-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Meadowline Harbor Services uses Current-92 as its ferry engine ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-2026-11-25/meadowline-harbor-services/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Meadowline Harbor Services's current ferry engine ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Meadowline Harbor Services's current ferry engine ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-2026-11-25-meadowline-harbor-services-old-01",
+          "source_id": "conversation://c1-read-normalization-2026-11-25/meadowline-harbor-services/original-01",
+          "source_type": "conversation",
+          "content": "Meadowline Harbor Services uses Pumice-61 as its ferry engine ledger.",
+          "valid_at": "2026-11-11T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-2026-11-25-meadowline-harbor-services-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-2026-11-25-meadowline-harbor-services-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Current-92"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-2026-11-25-meadowline-harbor-services-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "morrowglass-observatory-history",
+        "case_id": "morrowglass-observatory-current-dome-seal-register",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Morrowglass Observatory uses Aperture-37 as its dome seal register. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-2026-11-25/morrowglass-observatory/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Morrowglass Observatory's current dome seal register? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Morrowglass Observatory's current dome seal register? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-2026-11-25-morrowglass-observatory-old-01",
+          "source_id": "conversation://c1-read-normalization-2026-11-25/morrowglass-observatory/original-01",
+          "source_type": "conversation",
+          "content": "Morrowglass Observatory uses Linen-53 as its dome seal register.",
+          "valid_at": "2026-11-12T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-2026-11-25-morrowglass-observatory-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-2026-11-25-morrowglass-observatory-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Aperture-37"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-2026-11-25-morrowglass-observatory-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction",
+        "family_id": "tidepeak-seed-laboratory-history",
+        "case_id": "tidepeak-seed-laboratory-current-cold-room-stock-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T01:00:00Z: Tidepeak Seed Laboratory uses Harvest-15 as its cold-room stock ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-read-normalization-2026-11-25/tidepeak-seed-laboratory/update-01, and t_ref=2026-11-25T01:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T01:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T03:00:00Z, what is Tidepeak Seed Laboratory's current cold-room stock ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T03:00:00Z, what is Tidepeak Seed Laboratory's current cold-room stock ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T03:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-read-normalization-2026-11-25-tidepeak-seed-laboratory-old-01",
+          "source_id": "conversation://c1-read-normalization-2026-11-25/tidepeak-seed-laboratory/original-01",
+          "source_type": "conversation",
+          "content": "Tidepeak Seed Laboratory uses Willow-68 as its cold-room stock ledger.",
+          "valid_at": "2026-11-13T08:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-read-normalization-2026-11-25-tidepeak-seed-laboratory-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-read-normalization-2026-11-25-tidepeak-seed-laboratory-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Harvest-15"
+        ],
+        "forbidden_event_ids": [
+          "c1-read-normalization-2026-11-25-tidepeak-seed-laboratory-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

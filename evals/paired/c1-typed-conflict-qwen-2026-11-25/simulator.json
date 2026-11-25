@@ -1,0 +1,9 @@
+{
+  "schema_version": "memory-mcp-c1-seeded-recall-simulator/v1",
+  "transport": "stdio",
+  "store": "fresh embedded store per arm and task",
+  "history": "the two registered owner records are seeded through the public fixture path",
+  "claim_rollout_stage": "evidence",
+  "read_budget": 1,
+  "external_network": "disabled for model and benchmark inputs"
+}

@@ -31,6 +31,8 @@ pub const PAIRED_TASK_MANIFEST_SCHEMA_V1: &str = "memory-mcp-agent-tasks/v1";
 pub const PAIRED_TASK_MANIFEST_SCHEMA_V2: &str = "memory-mcp-agent-tasks/v2";
 pub const PAIRED_KNOWN_REVISION_PLACEHOLDER: &str = "{{KNOWN_REVISION}}";
 const RECEIPT_JOURNAL_SCHEMA_V4: &str = "memory-mcp-agent-trial-receipt/v4";
+const RECEIPT_JOURNAL_SCHEMA_V5: &str = "memory-mcp-agent-trial-receipt/v5";
+const RECEIPT_JOURNAL_SCHEMA_V6: &str = "memory-mcp-agent-trial-receipt/v6";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -139,6 +141,12 @@ pub struct AgentObservation {
     /// support independent post-write probes without retaining memory content.
     #[serde(default)]
     pub memory_write_episode_ids: Vec<String>,
+    /// Transient fact/source pairs and invalidation targets used only for
+    /// private agent-managed scoring; raw identifiers are never serialized.
+    #[serde(skip)]
+    pub observed_fact_sources: Vec<(String, String, u32)>,
+    #[serde(skip)]
+    pub invalidation_fact_ids: Vec<(String, u32)>,
     /// Content-free request/response observations for inline fact evidence.
     /// External runners may provide the same normalized telemetry; raw
     /// statements and source quotes must never be stored here.
@@ -175,6 +183,15 @@ pub struct MemoryReadObservation {
     pub response_sequence: Option<u32>,
     pub outcome: MemoryReadOutcome,
     pub item_count: Option<u32>,
+    /// SHA-256 of the exact JSON query argument; query text is not retained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_query_sha256: Option<String>,
+    /// SHA-256 of all request arguments except `query`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub non_query_arguments_sha256: Option<String>,
+    /// SHA-256 of returned guidance text; guidance itself is not retained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_guidance_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<MemoryReadEvidence>,
 }
@@ -204,6 +221,12 @@ pub struct MemoryReadDiagnostic {
     pub response_sequence: Option<u32>,
     pub outcome: MemoryReadOutcome,
     pub item_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_query_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub non_query_arguments_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_guidance_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_cutoff_match: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -656,6 +679,32 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
         }
     }
 
+    for artifact in [&mut incumbent, &mut candidate] {
+        let has_read_capture = artifact
+            .receipts
+            .iter()
+            .any(|receipt| receipt.read_capture_status.is_some());
+        let has_complete_request_fingerprints = artifact
+            .receipts
+            .iter()
+            .filter(|receipt| receipt.read_capture_status.is_some())
+            .all(|receipt| {
+                receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+                    reads.iter().all(|read| {
+                        read.request_query_sha256.is_some()
+                            && read.non_query_arguments_sha256.is_some()
+                    })
+                })
+            });
+        if has_read_capture {
+            artifact.schema_version = if has_complete_request_fingerprints {
+                crate::paired::PAIRED_ARTIFACT_SCHEMA_V8.into()
+            } else {
+                crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
+            };
+        }
+    }
+
     let run_completed_at = Utc::now();
     incumbent.run_completed_at = run_completed_at;
     candidate.run_completed_at = run_completed_at;
@@ -713,6 +762,9 @@ fn score_read(
         response_sequence: read.response_sequence,
         outcome: read.outcome,
         item_count: read.item_count,
+        request_query_sha256: read.request_query_sha256.clone(),
+        non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
+        response_guidance_sha256: read.response_guidance_sha256.clone(),
         requested_cutoff_match: None,
         returned_cutoff_match: None,
         source_coverage: None,
@@ -1130,8 +1182,15 @@ fn append_receipt_journal(
     }
     let receipt_bytes = serde_json::to_vec(&(arm, receipt))?;
     let record = JournalRecord {
-        schema_version: if receipt.read_capture_status.is_some() {
-            "memory-mcp-agent-trial-receipt/v5"
+        schema_version: if receipt.read_capture_status.is_some()
+            && receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+                reads.iter().all(|read| {
+                    read.request_query_sha256.is_some() && read.non_query_arguments_sha256.is_some()
+                })
+            }) {
+            RECEIPT_JOURNAL_SCHEMA_V6
+        } else if receipt.read_capture_status.is_some() {
+            RECEIPT_JOURNAL_SCHEMA_V5
         } else {
             RECEIPT_JOURNAL_SCHEMA_V4
         },
@@ -1284,6 +1343,8 @@ mod tests {
                     memory_reads: None,
                     read_capture_status: None,
                     memory_write_episode_ids: vec![],
+                    observed_fact_sources: Vec::new(),
+                    invalidation_fact_ids: Vec::new(),
                     extract_fact_evidence: vec![],
                     extract_fact_evidence_telemetry_complete: false,
                     terminal_http_status_code: None,
@@ -1520,6 +1581,96 @@ mod tests {
         assert!(journal.lines().all(|line| {
             line.contains("\"schema_version\":\"memory-mcp-agent-trial-receipt/v4\"")
         }));
+    }
+
+    #[test]
+    fn read_receipt_journal_stays_v5_without_request_fingerprints() {
+        let directory = tempfile::tempdir().expect("journal directory");
+        let path = directory.path().join("receipts.jsonl");
+        std::fs::write(&path, "").expect("create journal");
+
+        append_receipt_journal(
+            &path,
+            &"a".repeat(64),
+            RunArm::Candidate,
+            &journal_read_receipt(false),
+        )
+        .expect("write legacy read receipt");
+
+        let line = std::fs::read_to_string(path).expect("read journal");
+        assert!(line.contains("\"schema_version\":\"memory-mcp-agent-trial-receipt/v5\""));
+        assert!(!line.contains("request_query_sha256"));
+    }
+
+    #[test]
+    fn read_receipt_journal_uses_v6_for_request_fingerprints_without_raw_text() {
+        let directory = tempfile::tempdir().expect("journal directory");
+        let path = directory.path().join("receipts.jsonl");
+        std::fs::write(&path, "").expect("create journal");
+
+        append_receipt_journal(
+            &path,
+            &"a".repeat(64),
+            RunArm::Candidate,
+            &journal_read_receipt(true),
+        )
+        .expect("write v6 read receipt");
+
+        let line = std::fs::read_to_string(path).expect("read journal");
+        let record: serde_json::Value = serde_json::from_str(&line).expect("journal JSON");
+        assert_eq!(
+            record["schema_version"],
+            "memory-mcp-agent-trial-receipt/v6"
+        );
+        assert_eq!(
+            record["receipt"]["read_diagnostics"][0]["request_query_sha256"],
+            "b".repeat(64)
+        );
+        assert!(!line.contains("PRIVATE QUERY"));
+        assert!(!line.contains("PRIVATE GUIDANCE"));
+    }
+
+    fn journal_read_receipt(with_fingerprints: bool) -> TrialReceipt {
+        TrialReceipt {
+            read_capture_status: Some(ReadCaptureStatus::Observed),
+            read_diagnostics: Some(vec![MemoryReadDiagnostic {
+                request_sequence: 1,
+                response_sequence: Some(2),
+                outcome: MemoryReadOutcome::Empty,
+                item_count: Some(0),
+                request_query_sha256: with_fingerprints.then(|| "b".repeat(64)),
+                non_query_arguments_sha256: with_fingerprints.then(|| "c".repeat(64)),
+                response_guidance_sha256: with_fingerprints.then(|| "d".repeat(64)),
+                requested_cutoff_match: None,
+                returned_cutoff_match: None,
+                source_coverage: None,
+                annotation_match: None,
+                completeness: None,
+                cited_returned_source_count: None,
+            }]),
+            key: CaseTrialKey {
+                stratum_id: "test".into(),
+                family_id: "family".into(),
+                case_id: "case".into(),
+                repetition: 1,
+                incumbent_first: true,
+            },
+            arm_order: 1,
+            known_revision_checkpoint: None,
+            status: TrialStatus::Completed,
+            direct_memory_success: false,
+            task_oracle_passed: false,
+            task_oracle_diagnostics: None,
+            turns_used: 1,
+            tool_calls: 1,
+            repair_turns: 0,
+            user_clarifications: 0,
+            input_tokens: 1,
+            output_tokens: 1,
+            wall_time_ms: 1,
+            hard_violations: Vec::new(),
+            trace: Vec::new(),
+        }
     }
 
     #[test]
@@ -1966,6 +2117,8 @@ mod tests {
             memory_reads: None,
             read_capture_status: None,
             memory_write_episode_ids: vec![],
+            observed_fact_sources: Vec::new(),
+            invalidation_fact_ids: Vec::new(),
             extract_fact_evidence: vec![],
             extract_fact_evidence_telemetry_complete: false,
             terminal_http_status_code: None,

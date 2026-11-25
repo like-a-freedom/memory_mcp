@@ -1,0 +1,20 @@
+{
+  "schema_version":"memory-decisions-events/v1",
+  "events":[
+    {"id":"sb-initial","source_id":"slate-basin-survey-ledger","source_type":"survey-record","content":"subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.6\nunit: metres","t_ref":"2026-01-05T09:00:00Z"},
+    {"id":"sb-update-one","source_id":"slate-basin-survey-ledger","source_type":"survey-record","content":"subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 3.9\nunit: metres","t_ref":"2026-02-05T09:00:00Z"},
+    {"id":"sb-update-two","source_id":"slate-basin-survey-ledger","source_type":"survey-record","content":"subject: Slate Basin Spillway 58\nmeasure: clearance\nvalue: 4.1\nunit: metres","t_ref":"2026-03-05T09:00:00Z"},
+    {"id":"sb-spillway-580","source_id":"slate-basin-spillway-580-survey","source_type":"survey-record","content":"subject: Slate Basin Spillway 580\nmeasure: clearance\nvalue: 41.0\nunit: metres","t_ref":"2026-02-08T09:00:00Z"},
+    {"id":"sb-spillway-85","source_id":"slate-basin-spillway-85-survey","source_type":"survey-record","content":"subject: Slate Basin Spillway 85\nmeasure: clearance\nvalue: 6.0\nunit: metres","t_ref":"2026-02-09T09:00:00Z"},
+    {"id":"sb-spillway-058","source_id":"slate-basin-spillway-058-survey","source_type":"survey-record","content":"subject: Slate Basin Spillway 058\nmeasure: clearance\nvalue: 8.0\nunit: metres","t_ref":"2026-02-10T09:00:00Z"},
+    {"id":"sb-east","source_id":"slate-basin-spillway-58-east-survey","source_type":"survey-record","content":"subject: Slate Basin Spillway 58 East\nmeasure: clearance\nvalue: 9.0\nunit: metres","t_ref":"2026-02-11T09:00:00Z"},
+    {"id":"sb-west","source_id":"slate-basin-spillway-58-west-survey","source_type":"survey-record","content":"subject: Slate Basin Spillway 58 West\nmeasure: clearance\nvalue: 10.0\nunit: metres","t_ref":"2026-02-12T09:00:00Z"},
+    {"id":"sb-south","source_id":"south-basin-spillway-58-survey","source_type":"survey-record","content":"subject: South Basin Spillway 58\nmeasure: clearance\nvalue: 7.1\nunit: metres","t_ref":"2026-02-13T09:00:00Z"},
+    {"id":"sb-pump","source_id":"slate-basin-pump-58-survey","source_type":"survey-record","content":"subject: Slate Basin Pump 58\nmeasure: pressure\nvalue: 820\nunit: kPa","t_ref":"2026-02-14T09:00:00Z"},
+    {"id":"sb-gatehouse","source_id":"slate-basin-gatehouse-58-survey","source_type":"survey-record","content":"subject: Slate Basin Gatehouse 58\nmeasure: clearance\nvalue: 2.1\nunit: metres","t_ref":"2026-02-15T09:00:00Z"},
+    {"id":"sb-archive","source_id":"slate-basin-spillway-58-archive","source_type":"survey-record","content":"subject: Slate Basin Spillway 58 Archive\nmeasure: clearance\nvalue: 1.9\nunit: metres","t_ref":"2026-02-16T09:00:00Z"},
+    {"id":"sb-reference","source_id":"slate-basin-spillway-58-reference","source_type":"survey-record","content":"subject: Slate Basin Spillway 58 Reference\nmeasure: clearance\nvalue: 5.7\nunit: metres","t_ref":"2026-02-17T09:00:00Z"},
+    {"id":"rl-official-a","source_id":"redwood-lock-8-audit-a","source_type":"inspection-record","content":"subject: Redwood Lock 8\nmeasure: capacity\nvalue: 18\nunit: tonnes","t_ref":"2026-02-20T12:00:00Z"},
+    {"id":"rl-official-b","source_id":"redwood-lock-8-audit-b","source_type":"inspection-record","content":"subject: Redwood Lock 8\nmeasure: capacity\nvalue: 23\nunit: tonnes","t_ref":"2026-02-20T12:00:00Z"}
+  ]
+}
