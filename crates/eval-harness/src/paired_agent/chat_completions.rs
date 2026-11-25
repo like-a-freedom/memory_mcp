@@ -69,6 +69,15 @@ pub trait MemoryToolSession {
 pub enum RecallReadMode {
     Live,
     FixedReply(Value),
+    FixedReplyWithEvidenceActionHint(Value),
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecallPresentation {
+    #[default]
+    Current,
+    EvidenceActionHint,
 }
 
 /// Executes at most one public read in the trial's own memory session.
@@ -82,7 +91,8 @@ pub struct RecallMemorySession<'a, M> {
 
 impl<'a, M: MemoryToolSession> RecallMemorySession<'a, M> {
     pub fn new(memory: &'a mut M, mode: RecallReadMode) -> Result<Self, EvalError> {
-        if let RecallReadMode::FixedReply(arguments) = &mode
+        if let RecallReadMode::FixedReply(arguments)
+        | RecallReadMode::FixedReplyWithEvidenceActionHint(arguments) = &mode
             && !arguments
                 .get("query")
                 .and_then(Value::as_str)
@@ -119,21 +129,125 @@ impl<M: MemoryToolSession> MemoryToolSession for RecallMemorySession<'_, M> {
                 "recall diagnostic only permits assemble_context".into(),
             ));
         }
-        let arguments = match self.mode.take() {
-            Some(RecallReadMode::Live) => arguments,
-            Some(RecallReadMode::FixedReply(registered)) => registered,
+        let (arguments, presentation) = match self.mode.take() {
+            Some(RecallReadMode::Live) => (arguments, RecallPresentation::Current),
+            Some(RecallReadMode::FixedReply(registered)) => {
+                (registered, RecallPresentation::Current)
+            }
+            Some(RecallReadMode::FixedReplyWithEvidenceActionHint(registered)) => {
+                (registered, RecallPresentation::EvidenceActionHint)
+            }
             None => {
                 return Err(EvalError::InvalidInput(
                     "recall diagnostic permits only one read".into(),
                 ));
             }
         };
-        let reply = self.memory.call_tool(name, arguments)?;
+        let mut reply = self.memory.call_tool(name, arguments)?;
         if let Some(validate) = self.validate_reply {
             validate(&reply)?;
         }
+        if presentation == RecallPresentation::EvidenceActionHint {
+            add_evidence_action_hint(&mut reply);
+        }
         Ok(reply)
     }
+}
+
+fn add_evidence_action_hint(reply: &mut Value) {
+    let Some(structured) = structured_content_mut(reply) else {
+        return;
+    };
+    if structured.contains_key("agent_action_hint") {
+        return;
+    }
+    let Some(items) = structured.get("result").and_then(Value::as_array) else {
+        return;
+    };
+    let source_episode_ids = items
+        .iter()
+        .filter_map(|item| item.get("source_episode").and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|source| !source.is_empty())
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    let has_conflict = items.iter().any(|item| {
+        item.get("evidence_status").and_then(Value::as_str) == Some("conflicting")
+            || item
+                .pointer("/reconciliation/relations")
+                .and_then(Value::as_array)
+                .is_some_and(|relations| {
+                    relations.iter().any(|relation| {
+                        matches!(
+                            relation.get("outcome").and_then(Value::as_str),
+                            Some("contradiction" | "temporal_ambiguity")
+                        )
+                    })
+                })
+    });
+    let all_items_have_citable_evidence = !items.is_empty()
+        && items.iter().all(|item| {
+            matches!(
+                item.get("evidence_status").and_then(Value::as_str),
+                Some("current" | "historical")
+            ) && item
+                .get("source_episode")
+                .and_then(Value::as_str)
+                .is_some_and(|source| !source.trim().is_empty())
+        });
+    let (action, instruction) = if has_conflict {
+        (
+            "clarify_conflict",
+            "State the returned contradiction or temporal ambiguity, cite the listed source IDs, and do not choose a side.",
+        )
+    } else if items.is_empty() {
+        (
+            "verify_or_ask",
+            "No usable evidence was returned. An empty or partial result does not prove absence; verify the source or ask the user.",
+        )
+    } else if !all_items_have_citable_evidence {
+        (
+            "verify_or_ask",
+            "At least one returned item has unknown or untraceable evidence status. Do not treat it as sufficient support; verify the source or ask the user. Partial or empty results do not prove absence.",
+        )
+    } else {
+        (
+            "answer_with_sources",
+            "Answer only when the returned evidence directly supports the question and cite its listed source IDs. If it does not, state what is missing; partial or empty results do not prove global absence.",
+        )
+    };
+    structured.insert(
+        "agent_action_hint".into(),
+        json!({
+            "action": action,
+            "source_episode_ids": source_episode_ids,
+            "instruction": instruction
+        }),
+    );
+    let action_guidance = format!("Evaluation-only action hint (not evidence): {instruction}");
+    let guidance = structured
+        .get("guidance")
+        .and_then(Value::as_str)
+        .filter(|guidance| !guidance.trim().is_empty())
+        .map(|guidance| format!("{guidance}\n{action_guidance}"))
+        .unwrap_or(action_guidance);
+    structured.insert("guidance".into(), Value::String(guidance));
+}
+
+fn structured_content_mut(reply: &mut Value) -> Option<&mut serde_json::Map<String, Value>> {
+    for path in [
+        "/result/structuredContent",
+        "/result/structured_content",
+        "/payload/structuredContent",
+        "/payload/structured_content",
+        "/structuredContent",
+        "/structured_content",
+    ] {
+        if reply.pointer_mut(path).is_some() {
+            return reply.pointer_mut(path).and_then(Value::as_object_mut);
+        }
+    }
+    None
 }
 
 impl MemoryToolSession for crate::suites::memory_decisions::stdio::StdioSession {
@@ -751,6 +865,11 @@ impl ChatCompletionsAgent {
                             non_query_arguments_sha256: read_request_fingerprints.as_ref().map(
                                 |fingerprints| fingerprints.non_query_arguments_sha256.clone(),
                             ),
+                            selector_arguments_sha256: read_request_fingerprints
+                                .as_ref()
+                                .map(|fingerprints| fingerprints.selector_arguments_sha256.clone()),
+                            requested_valid_at_sha256:
+                                super::tool_results::requested_valid_at_sha256(&arguments),
                             response_guidance_sha256: None,
                             evidence: None,
                         });
@@ -796,6 +915,11 @@ impl ChatCompletionsAgent {
                             non_query_arguments_sha256: read_request_fingerprints.as_ref().map(
                                 |fingerprints| fingerprints.non_query_arguments_sha256.clone(),
                             ),
+                            selector_arguments_sha256: read_request_fingerprints
+                                .as_ref()
+                                .map(|fingerprints| fingerprints.selector_arguments_sha256.clone()),
+                            requested_valid_at_sha256:
+                                super::tool_results::requested_valid_at_sha256(&arguments),
                             response_guidance_sha256: super::tool_results::response_guidance_sha256(
                                 &tool_result,
                             ),

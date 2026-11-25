@@ -15,12 +15,17 @@ stopped at its registered ordinary-task gate. The
 [source-authority workflow screen](../../evals/paired/source-authority-codex-gpt62-sol-qualification-2026-11-24/runs/run-02/report.md)
 qualified one exact configuration on four synthetic families. The
 [LongMemEval-V2 Small web text baseline](LONGMEMEVAL_V2_SMALL_WEB_BASELINE.md)
-has complete scoring coverage on seven verified questions and upstream
-accuracy of 0/7 before B5. The repeated seven-case [post-B5 comparison](../../evals/longmemeval_v2/results/2026-11-24-b5-post-fix/REPEATED_COMPARISON.md)
-retained context in 7/7 and scored 1/7 in each run, but only 1/7 cases
-contained the complete reviewed evidence span and measured latency was
-inconclusive. This supports the context-retention fix, not a claim of improved
-grounded answering. See the
+has a seven-question audited slice, not a full benchmark score. The repeated
+[post-B5 comparison](../../evals/longmemeval_v2/results/2026-11-24-b5-post-fix/REPEATED_COMPARISON.md)
+measured context retention, while the November 25 paired B5/C3 recheck used an
+identical concise-answer prompt and local standalone MLX-LM for both arms. Its
+pinned scorer was 1/7 for B5 and 3/7 for C3; a supplemental strict list metric
+was 0/4 and 2/4, respectively. This prompt-adapted diagnostic is not an
+official LongMemEval score or a population-level quality claim. The full
+[paired recheck report](../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/RECHECK.md)
+records per-case evidence, scoring limits and latency. It supports a narrow
+improvement on two list questions, while false-premise answers remain wrong
+and the seven one-shot latency observations do not establish a speedup. See the
 [follow-up design and tasks](../superpowers/specs/2026-11-24-agent-memory-follow-up-design.md).
 
 The initial ordinary local [agent-workflow screen](../../evals/paired/agent-workflow-qualification-2026-11-25/README.md)
@@ -31,8 +36,34 @@ control, the fresh [v3 ordinary workflow screen](../../evals/paired/agent-workfl
 passed both captures: task, actual-read and independent-probe scores were each
 4/4 per arm and capture, with zero violations or budget exits. This qualifies
 only that runner/model configuration for a separately frozen study. It is not
-a memory benefit estimate; typed-conflict, agent-managed correction and
-operator-import C1 populations remain unrun.
+a memory benefit estimate. The latest [C1 cross-capture review](../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
+is NO-GO for workflow qualification: capture 01 passed 4/4 exact cited tasks
+in each same-product arm, but the single preregistered repeat fell to 0/4 in
+both arms. Independent probes, exact-once corrections and invalidations, and
+pre-invalidation evidence checks stayed 4/4. Capture 02 had six empty reads
+per arm over three tasks; valid-time requests and returned snapshots matched
+on every read. The per-field selector report identifies frequent `known_at`
+and `compact` mismatches, but these also appeared in successful capture 01 and
+the receipts intentionally do not retain raw selector values. One incumbent
+read returned sufficient evidence but was not used in the final answer; the
+candidate's only nonempty read lacked sufficient evidence and recorded one
+prohibited-evidence violation. The failed repeat shows run-to-run
+agent-workflow instability on these four synthetic families. It does not
+identify a causal memory defect or estimate a memory treatment effect. The
+earlier [C1 v6 report](../../evals/paired/c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25/capture-01/REPORT.md)
+remains the historical valid-time screen. Separate typed-conflict and
+operator-import screens were also completed and failed their 3/4 task gates:
+typed conflict scored 0/4 in both arms, while operator import scored 0/4 in
+both arms and required 31 candidate formation calls versus 8 for incumbent.
+These are workflow NO-GO results, not evidence of a memory treatment effect.
+See the [qualification plan](../superpowers/plans/2026-11-24-memory-evaluation-qualification-implementation-plan.md#task-c1-qualify-workflows-under-independent-gates)
+for per-screen reports and denominators.
+
+The [A8 evidence-action hint screen](../../evals/paired/a8-evidence-action-hint-2026-11-25/README.md)
+also found no task-success gain (2/3 per arm) on three synthetic families.
+The evaluator-only hint improved clarification matching for an empty read, but
+the candidate still missed the exact answer. This result does not justify a
+product response change.
 
 ### Keeping evaluation evidence
 

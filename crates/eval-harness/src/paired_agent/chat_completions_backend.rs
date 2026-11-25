@@ -388,6 +388,14 @@ pub struct FixedReadInput {
     pub arguments: serde_json::Value,
     pub expected_source_events: Vec<String>,
     pub expected_completeness: Option<super::ReadCompleteness>,
+    #[serde(default, skip_serializing_if = "is_current_recall_presentation")]
+    pub presentation: super::chat_completions::RecallPresentation,
+}
+
+fn is_current_recall_presentation(
+    presentation: &super::chat_completions::RecallPresentation,
+) -> bool {
+    *presentation == super::chat_completions::RecallPresentation::Current
 }
 
 impl FixedReadInput {
@@ -637,9 +645,16 @@ impl super::PairedTrialBackend for ChatCompletionsRecallBackend {
             .find(|entry| entry.key == task.input.key && entry.arm == arm);
         let mode = match (self.registration.mode, registered) {
             (RecallCaptureMode::Live, None) => super::chat_completions::RecallReadMode::Live,
-            (RecallCaptureMode::FixedReply, Some(entry)) => {
-                super::chat_completions::RecallReadMode::FixedReply(entry.arguments.clone())
-            }
+            (RecallCaptureMode::FixedReply, Some(entry)) => match entry.presentation {
+                super::chat_completions::RecallPresentation::Current => {
+                    super::chat_completions::RecallReadMode::FixedReply(entry.arguments.clone())
+                }
+                super::chat_completions::RecallPresentation::EvidenceActionHint => {
+                    super::chat_completions::RecallReadMode::FixedReplyWithEvidenceActionHint(
+                        entry.arguments.clone(),
+                    )
+                }
+            },
             _ => {
                 return Err(EvalError::InvalidConfig(
                     "no registered fixed read for this trial".into(),
@@ -828,6 +843,7 @@ mod tests {
 
     use super::*;
     use crate::paired::PairedEvaluationPlan;
+    use crate::paired_agent::chat_completions::RecallPresentation;
 
     fn preregistered_inputs() -> (PairedEvaluationPlan, AgentManagedTaskManifest, PathBuf) {
         let mut plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
@@ -886,6 +902,105 @@ mod tests {
         let registration = RecallRegistration::new(RecallCaptureMode::Live, None, &plan);
 
         assert!(registration.is_ok());
+    }
+
+    fn fixed_read_inputs(
+        plan: &PairedEvaluationPlan,
+        candidate_presentation: RecallPresentation,
+    ) -> Vec<FixedReadInput> {
+        plan.expected_trials
+            .iter()
+            .flat_map(|key| {
+                [RunArm::Incumbent, RunArm::Candidate]
+                    .into_iter()
+                    .map(move |arm| FixedReadInput {
+                        key: key.clone(),
+                        arm,
+                        arguments: serde_json::json!({
+                            "query": format!("{} registered read", key.case_id),
+                            "budget": 1
+                        }),
+                        expected_source_events: Vec::new(),
+                        expected_completeness: None,
+                        presentation: if arm == RunArm::Candidate {
+                            candidate_presentation
+                        } else {
+                            RecallPresentation::Current
+                        },
+                    })
+            })
+            .collect()
+    }
+
+    fn fixed_read_plan() -> PairedEvaluationPlan {
+        let mut plan: PairedEvaluationPlan = serde_json::from_str(include_str!(
+            "../../../../evals/paired/recall-read-local-screen-2026-11-24/live-plan.json"
+        ))
+        .expect("local recall plan parses");
+        plan.stage = crate::paired::PairedEvaluationStage::ExploratoryComparison;
+        plan.shared_identity.tool_call_budget = 1;
+        plan
+    }
+
+    #[test]
+    fn current_fixed_read_presentation_is_omitted_from_legacy_registration_bytes() {
+        let plan = fixed_read_plan();
+        let inputs = fixed_read_inputs(&plan, RecallPresentation::Current);
+        let serialized = serde_json::to_value(inputs).expect("serialize current inputs");
+
+        assert!(
+            serialized
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|input| input.get("presentation").is_none())
+        );
+    }
+
+    #[test]
+    fn evidence_action_hint_requires_a_matching_fixed_read_fingerprint() {
+        let mut plan = fixed_read_plan();
+        let current_inputs = fixed_read_inputs(&plan, RecallPresentation::Current);
+        plan.shared_identity.reader_config_sha256 = sha256(
+            &serde_json::to_vec(&(
+                "recall-read/v1",
+                RecallCaptureMode::FixedReply,
+                &current_inputs,
+            ))
+            .expect("serialize current registration"),
+        );
+        assert!(
+            RecallRegistration::new(RecallCaptureMode::FixedReply, Some(current_inputs), &plan,)
+                .is_ok()
+        );
+
+        let candidate_inputs = fixed_read_inputs(&plan, RecallPresentation::EvidenceActionHint);
+        let current_fingerprint = plan.shared_identity.reader_config_sha256.clone();
+        plan.shared_identity.reader_config_sha256 = sha256(
+            &serde_json::to_vec(&(
+                "recall-read/v1",
+                RecallCaptureMode::FixedReply,
+                &candidate_inputs,
+            ))
+            .expect("serialize candidate registration"),
+        );
+        assert!(
+            RecallRegistration::new(RecallCaptureMode::FixedReply, Some(candidate_inputs), &plan,)
+                .is_ok()
+        );
+
+        plan.shared_identity.reader_config_sha256 = current_fingerprint;
+        assert!(
+            RecallRegistration::new(
+                RecallCaptureMode::FixedReply,
+                Some(fixed_read_inputs(
+                    &plan,
+                    RecallPresentation::EvidenceActionHint,
+                )),
+                &plan,
+            )
+            .is_err()
+        );
     }
 
     fn runtime(

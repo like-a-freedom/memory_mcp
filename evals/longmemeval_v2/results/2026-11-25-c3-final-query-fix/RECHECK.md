@@ -1,98 +1,102 @@
-# LongMemEval-V2 post-C3 query-fix recheck
+# LongMemEval-V2 post-C3 recheck
 
-**Completed:** 2026-11-25 06:14 UTC  
-**Host:** native Apple Silicon (`aarch64-apple-darwin`)  
-**Reader and judge:** standalone local MLX-LM 0.32.2 / MLX 0.32.4 over loopback; no LM Studio runtime, remote inference, or API credential.
+**Date:** 2026-11-25
+**Host:** Apple Silicon (`aarch64-apple-darwin`)
+**Reader/judge runtime:** standalone MLX-LM 0.32.2 / MLX 0.32.4, loopback only. The LM Studio application, server and CLI were not used.
 
-## Result
+## Paired seven-case result
 
-The run scored all 7/7 frozen text cases. Reader, judge and scorer failures were
-zero, aggregate metrics recomputed from per-question scores, and none of the
-seven memory contexts was truncated. Official exact match was 3/7 (42.9%),
-versus 1/7 in the immediately preceding B5 run on the same cohort and saved
-snapshot. Non-abstention accuracy was 3/4; abstention accuracy was 0/3 because
-the reader answered rather than returning unknown on the three closed-list
-false-premise questions.
+The same seven frozen questions, saved memory snapshot, reader/judge model
+files, decoding settings and concise output instruction were applied to B5 and
+post-C3 contexts. Reader and judge outputs completed for 7/7 cases in both
+arms. Exact scoring used the pinned LongMemEval-V2 scoring predicates and
+abstention judge prompt; the HTTP adapter sent requests only to local MLX-LM.
+Because this paired diagnostic adds a concise-answer instruction to the system
+prompt, its scores are **not an official full LongMemEval-V2 result** and must
+not be compared directly with leaderboard scores.
 
-This is one post-C3 model capture on seven cases. It is a positive result for
-this sample, not a confirmed population-level or repeatable quality gain. The
-per-case context and score are model-run outcomes; only the reviewed-source
-span check is deterministic. The full selected-cohort denominator and failure
-coverage are retained in [`score-coverage.json`](run-01/score-coverage.json).
-
-## Evidence, answers and cost
-
-The exact reviewed spans were regenerated from the frozen line ranges and
-verified against their SHA-256 values. The provider-free
-[`reviewed-span-coverage.json`](run-01/reviewed-span-coverage.json) scorer
-found 2/7 complete spans in the reader contexts. This is a strict whole-span
-check, not a complete measure of semantic sufficiency.
-
-| Case | Exact match | Full reviewed span | Context tokens | Query time |
-|---|---:|---:|---:|---:|
-| `0c6b0c60` | Pass, unsupported | No | 3,463 | 292.3 s |
-| `6d975a08` | Pass | Yes | 3,564 | 434.0 s |
-| `89a20f48` | Fail | No | 3,543 | 300.8 s |
-| `922a0c56` | Fail | No | 3,532 | 950.0 s |
-| `d6da3938` | Pass | No | 1,473 | 1,008.2 s |
-| `f43926d9` | Fail | Yes | 3,598 | 408.9 s |
-| `f61a096f` | Fail | No | 2,939 | 797.8 s |
-
-The `0c6b0c60` answer lists options inferred from typical Postmill behavior;
-the options are absent from the returned context, so this is an official
-scorer pass but not a grounded memory success. In `d6da3938`, the context
-contains consecutive toolbar buttons `Create Order` and `Reset Password`,
-which support the exact answer, but the complete 20-line reviewed span is not
-present. That case exposes a limitation of the full-span metric: whole-span
-absence does not necessarily mean the answer-bearing evidence is absent.
-Conversely, `f43926d9` contains the full reviewed span but the reader still
-answers incorrectly, so retrieval alone does not guarantee correct use.
-
-| Metric | B5 run 02 | Post-C3 run 01 |
+| Measure | B5 | Post-C3 repeat |
 |---|---:|---:|
-| Official exact match | 1/7 | 3/7 |
-| Complete reviewed span | 1/7 | 2/7 |
-| Mean query latency | 630.4 s | 598.8 s |
-| Median query latency | 437.7 s | 434.0 s |
-| p95 / max query latency | 1,011.5 s | 1,008.2 s |
-| Wall time | 1,838.3 s | 1,854.0 s |
+| Pinned scorer, 7 frozen cases | 1/7 | 3/7 |
+| Strict phrase-set accuracy, list-valued cases only | 0/4 | 2/4 |
+| Complete reviewed source span in context | 1/7 | 2/7 |
+| Mean memory-query latency | 630.4 s | 590.5 s |
+| Median memory-query latency | 437.7 s | 429.7 s |
+| Maximum memory-query latency | 1,011.5 s | 989.6 s |
+| Mean reader generation time in concise protocol | 13.2 s | 9.8 s |
 
-The two new exact-match cases are `6d975a08` and `d6da3938`; the pre-existing
-`0c6b0c60` scorer pass remains unsupported. Four contexts changed and three
-were byte-identical to B5 run 02. The mean and median query times moved down
-slightly, while wall time moved up. With seven observations and one post-C3
-capture, do not claim a meaningful or stable latency improvement.
+The query means are 6.3% lower for post-C3, while the median is 1.8% lower.
+These are descriptive differences from seven questions and one memory read
+per arm; they do not establish a stable speedup. The post-C3 repeated context
+payloads match the first C3 run for all 7/7 questions. B5 and post-C3 context
+payloads match for 3/7 and differ for 4/7.
 
-## Reproduction and provenance
+The exact-match gains are `6d975a08` and `d6da3938`. The deterministic strict
+list metric confirms those two answers. The upstream phrase-subset scorer also
+counts `0c6b0c60` as correct, but its response adds the unsupported option
+“Past hour”; the strict metric rejects it. This is why the report preserves
+both scores instead of treating subset inclusion as exact list accuracy.
 
-The [execution manifest](execution-manifest.json) records the exact seven
-question IDs, ordered 100-trajectory cohort, hashes, saved memory snapshot,
-binary and local model profile. The same B5 snapshot and input hashes were
-reused. C3 changed query construction only; it did not re-ingest the dataset.
-The C3 release product binary is native arm64. The reader and judge used their
-previously hash-verified pinned model files and the same profile/settings as
-B5; the model files were reused at the same paths and were not re-hashed during
-this run. Processor, reader and judge versions and model-file pins are listed
-in [`small-web-native-profile.json`](../../small-web-native-profile.json).
+None of the three false-premise cases passed the abstention judge in either
+arm. The reader gave concrete answers for `89a20f48` (“Past year”),
+`922a0c56` (“Send Email”), and `f43926d9` (“Forums”). This is a persistent
+memory-to-answer failure slice; retrieval changes alone did not resolve it.
+For `d6da3938`, C3 returned “Reset Password” and passed exact phrase scoring;
+its context contains the adjacent toolbar controls but not the complete
+reviewed span. For `6d975a08`, the complete span and exact list are both
+present. The `f43926d9` context also contains its complete reviewed span, but
+the reader still gave a wrong answer. Retrieval evidence is therefore
+necessary for these cases but does not guarantee correct use.
 
-`run-01/run_args.json` records the invocation arguments and local loopback
-endpoints. `run-01/prompt_rows.jsonl`, `per_question.jsonl`,
-`aggregated_metrics.json`, `score-coverage.json` and
-`reviewed-span-coverage.json` retain the run evidence. The temporary cohort
-inputs are not copied into the repository; their hashes and staging path are
-in the execution manifest. This is the reviewed seven-case subset, not a full
-LongMemEval-V2 benchmark run.
+## Deterministic list metric
 
-The model-free source-span scorer can be replayed with the command documented
-in [`evals/longmemeval_v2/README.md`](../../README.md). The complete adapter
-unit suite passed 32 tests with five opt-in skips:
-`python3 -m unittest discover -s evals/longmemeval_v2`.
+The pinned `norm_phrase_set_match` predicate verifies that every gold phrase
+appears in the prediction; it permits additional phrases. The local
+`exact_answer_quality` metric supplements it by requiring equality of the
+normalized phrase sets and counting incomplete selected rows as failures.
+Five unit tests cover order/punctuation normalization, extra and missing
+phrases, empty values, inapplicable judge rows, and incomplete responses.
 
-## Follow-up
+```sh
+python3 -m unittest evals.longmemeval_v2.test_exact_answer_quality
+python3 -m evals.longmemeval_v2.exact_answer_quality \
+  --per-question evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-02/scoring-replay-concise-v1/per_question.jsonl \
+  --output evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-02/scoring-replay-concise-v1/strict-phrase-set-accuracy.json
+```
 
-Keep the C3 retrieval fix for the cases it repairs, while treating this run as
-confirmatory evidence still pending a repeat. The next evaluation improvement
-is a source-sufficiency oracle that measures whether answer-bearing controls
-and values are present without requiring every unrelated line in a reviewed
-span. Preserve abstention questions as a separate failure slice. No speedup,
-full-benchmark result, or general agent-utility claim is established here.
+## Provenance and run validity
+
+The seven IDs, ordered 100-trajectory haystack, input hashes and persisted C4
+snapshot are unchanged. C3 changed retrieval/query construction only; the
+snapshot was not rebuilt. The current C3 memory-query run produced all seven
+contexts and reader outputs, but its original scoring attempt had two empty
+judge responses. That attempt remains in `run-02/scoring-replay/` as a failed
+diagnostic and is not used for the paired result above.
+
+The repeat imported `evaluation.harness` from
+`target/c4-native/upstream`, a staged source copy without its own `.git`
+directory. A `git rev-parse` in that directory misleadingly resolved to the
+memory-mcp checkout. Provenance was therefore rechecked by comparing all 53
+staged source files against the clean checkout at pinned commit
+`ef67f10aacd9080c75aeb2dd527a0af25dc26f1b`; every compared file matched.
+The extra 29 files in the pinned checkout are generated `build/lib` and
+packaging metadata and were not imported by this runner.
+
+Reader and judge traffic used only `127.0.0.1:18767` and `127.0.0.1:18766`.
+Hugging Face was offline. Model files were locally cached and hash-checked
+against the pinned profile before the memory-query run. No Codex or remote
+inference service was involved.
+
+Artifacts:
+
+- [Paired comparison JSON](concise-b5-vs-c3-comparison.json)
+- [C3 repeated execution manifest](execution-manifest.json)
+- [B5 concise replay](../2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1/replay.json)
+- [C3 concise replay](run-02/scoring-replay-concise-v1/replay.json)
+- [C3 strict list score](run-02/scoring-replay-concise-v1/strict-phrase-set-accuracy.json)
+- [C3 reviewed-span coverage](run-02/reviewed-span-coverage.json)
+
+The cohort remains a seven-case audited slice, not the full LongMemEval-V2
+benchmark. The source-span metric requires a complete reviewed span and can
+miss smaller sufficient evidence; a deterministic answer-bearing control
+oracle remains future evaluation work.

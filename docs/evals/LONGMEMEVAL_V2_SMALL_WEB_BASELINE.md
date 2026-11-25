@@ -114,3 +114,34 @@ binary. Query the frozen text of `f43926d9` twice. Each
 `MemoryMcpBackend.query` call opens a private clone of the store. Apply
 the pinned upstream `evaluation.harness.truncate_memory_context` with
 `max_tokens=4096` and the cached processor from the frozen profile.
+
+## Post-B5 paired C3 recheck
+
+The November 25 C3 recheck repeated the seven frozen cases on the same saved
+snapshot. Its first scoring pass was incomplete because two judge responses
+were empty. A later paired reader/judge replay used the saved B5 and C3
+contexts with the same concise-answer instruction, local standalone MLX-LM
+runtime, and pinned upstream scoring predicates. The prompt adaptation means
+these are paired diagnostic scores, not an official full LongMemEval result.
+
+| Measure | B5 context | Post-C3 context |
+| --- | ---: | ---: |
+| Pinned scoring predicate | 1/7 | 3/7 |
+| Strict phrase-set exactness on list answers | 0/4 | 2/4 |
+| Complete reviewed evidence span | 1/7 | 2/7 |
+| Mean memory-query time | 630.4 s | 590.5 s |
+| Median memory-query time | 437.7 s | 429.7 s |
+
+The two strict list improvements are the forum browse tabs and the customer
+password action. Three false-premise questions remain wrong in both arms: the
+reader supplies “Past year,” “Send Email,” and “Forums” instead of rejecting
+the premise. The official phrase-subset predicate also accepts an unsupported
+extra “Past hour” in the answer to `0c6b0c60`; the supplemental exact-set
+metric rejects it. The full seven-case results, per-case evidence and
+limitations are in the [C3 recheck report](../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/RECHECK.md).
+
+Query latency is slightly lower for C3 in this seven-case pair, but one
+measurement per case does not establish a stable speedup. The C3 context
+contains the complete reviewed span in 2/7 cases, versus 1/7 for B5. The
+`f43926d9` case demonstrates that retrieving a complete reviewed span still
+does not guarantee the reader will answer correctly.

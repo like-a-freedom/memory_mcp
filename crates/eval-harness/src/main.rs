@@ -1069,7 +1069,9 @@ async fn cmd_run_paired_codex(
         | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV2
         | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV3
         | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4
-        | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5 => {
+        | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5
+        | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV6
+        | eval_harness::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV7 => {
             if independent_probes_path.is_some() {
                 eprintln!(
                     "error: --independent-probes is incompatible with agent-managed tasks; use the frozen post-write probe in the task manifest"
@@ -1098,7 +1100,9 @@ async fn cmd_run_paired_codex(
         }
         eval_harness::codex_agent::CodexMemoryToolProfile::AgentFormation
         | eval_harness::codex_agent::CodexMemoryToolProfile::AgentOperatorPrepared
-        | eval_harness::codex_agent::CodexMemoryToolProfile::RecallOnlyV2 => {
+        | eval_harness::codex_agent::CodexMemoryToolProfile::RecallOnlyV2
+        | eval_harness::codex_agent::CodexMemoryToolProfile::RecallOnlyV3
+        | eval_harness::codex_agent::CodexMemoryToolProfile::RecallOnlyV4 => {
             eprintln!("error: internal phase profile cannot be used as a paired-run mode");
             return std::process::ExitCode::from(2);
         }

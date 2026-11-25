@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "moonfern-alpine-seed-history",
+        "case_id": "moonfern-current-highland-parcel-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Moonfern Alpine Seed Archive uses Lattice-82 as its high-altitude seed parcel index. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v5/moonfern-alpine-seed-archive/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Moonfern Alpine Seed Archive's current high-altitude seed parcel index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Moonfern Alpine Seed Archive's current high-altitude seed parcel index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v5-moonfern-alpine-seed-archive-old-01",
+          "source_id": "conversation://c1-recovery-v5/moonfern-alpine-seed-archive/original-01",
+          "source_type": "conversation",
+          "content": "Moonfern Alpine Seed Archive uses Mallow-17 as its high-altitude seed parcel index.",
+          "valid_at": "2026-11-04T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v5-moonfern-alpine-seed-archive-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v5-moonfern-alpine-seed-archive-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lattice-82"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v5-moonfern-alpine-seed-archive-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "tidelamp-deep-ocean-history",
+        "case_id": "tidelamp-current-abyssal-calibration-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Tidelamp Deep Ocean Archive uses Vesper-56 as its abyssal sensor calibration code. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v5/tidelamp-deep-ocean-archive/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Tidelamp Deep Ocean Archive's current abyssal sensor calibration code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Tidelamp Deep Ocean Archive's current abyssal sensor calibration code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v5-tidelamp-deep-ocean-archive-old-01",
+          "source_id": "conversation://c1-recovery-v5/tidelamp-deep-ocean-archive/original-01",
+          "source_type": "conversation",
+          "content": "Tidelamp Deep Ocean Archive uses Brine-29 as its abyssal sensor calibration code.",
+          "valid_at": "2026-11-05T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v5-tidelamp-deep-ocean-archive-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v5-tidelamp-deep-ocean-archive-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Vesper-56"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v5-tidelamp-deep-ocean-archive-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "flintglass-sky-array-history",
+        "case_id": "flintglass-current-telescope-timing-link",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Flintglass Sky Array uses Cedar-93 as its telescope timing link. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v5/flintglass-sky-array/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Flintglass Sky Array's current telescope timing link? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Flintglass Sky Array's current telescope timing link? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v5-flintglass-sky-array-old-01",
+          "source_id": "conversation://c1-recovery-v5/flintglass-sky-array/original-01",
+          "source_type": "conversation",
+          "content": "Flintglass Sky Array uses Alloy-14 as its telescope timing link.",
+          "valid_at": "2026-11-06T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v5-flintglass-sky-array-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v5-flintglass-sky-array-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cedar-93"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v5-flintglass-sky-array-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "cloudharbor-orchid-records-history",
+        "case_id": "cloudharbor-current-orchid-accession-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Cloudharbor Orchid Repository uses Mica-67 as its orchid accession ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v5/cloudharbor-orchid-repository/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Cloudharbor Orchid Repository's current orchid accession ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Cloudharbor Orchid Repository's current orchid accession ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v5-cloudharbor-orchid-repository-old-01",
+          "source_id": "conversation://c1-recovery-v5/cloudharbor-orchid-repository/original-01",
+          "source_type": "conversation",
+          "content": "Cloudharbor Orchid Repository uses Fern-38 as its orchid accession ledger.",
+          "valid_at": "2026-11-07T13:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v5-cloudharbor-orchid-repository-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v5-cloudharbor-orchid-repository-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Mica-67"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v5-cloudharbor-orchid-repository-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

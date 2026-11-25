@@ -40,10 +40,50 @@ pub enum CodexMemoryToolProfile {
     AgentMaintenanceV3,
     AgentMaintenanceV4,
     AgentMaintenanceV5,
+    AgentMaintenanceV6,
+    AgentMaintenanceV7,
     RecallOnlyV2,
+    RecallOnlyV3,
+    RecallOnlyV4,
 }
 
 impl CodexMemoryToolProfile {
+    /// Whether this profile may start an agent-managed trial that can write
+    /// to memory. Centralize this admission contract so prompt registration
+    /// and runtime admission cannot drift apart.
+    pub const fn supports_agent_managed_trial(self) -> bool {
+        matches!(
+            self,
+            Self::AgentManagedMemory
+                | Self::AgentSourceAuthority
+                | Self::AgentSourceAuthorityLiteralInput
+                | Self::AgentMaintenance
+                | Self::AgentMaintenanceV2
+                | Self::AgentMaintenanceV3
+                | Self::AgentMaintenanceV4
+                | Self::AgentMaintenanceV5
+                | Self::AgentMaintenanceV6
+                | Self::AgentMaintenanceV7
+        )
+    }
+
+    /// Whether this profile may run the memory-forming phase of a
+    /// multi-phase agent-managed trial.
+    pub const fn supports_agent_memory_formation(self) -> bool {
+        matches!(
+            self,
+            Self::AgentFormation
+                | Self::AgentOperatorPrepared
+                | Self::AgentMaintenance
+                | Self::AgentMaintenanceV2
+                | Self::AgentMaintenanceV3
+                | Self::AgentMaintenanceV4
+                | Self::AgentMaintenanceV5
+                | Self::AgentMaintenanceV6
+                | Self::AgentMaintenanceV7
+        )
+    }
+
     pub fn from_name(value: &str) -> Result<Self, EvalError> {
         match value {
             "recall_only" => Ok(Self::RecallOnly),
@@ -56,6 +96,8 @@ impl CodexMemoryToolProfile {
             "agent_maintenance_v3" => Ok(Self::AgentMaintenanceV3),
             "agent_maintenance_v4" => Ok(Self::AgentMaintenanceV4),
             "agent_maintenance_v5" => Ok(Self::AgentMaintenanceV5),
+            "agent_maintenance_v6" => Ok(Self::AgentMaintenanceV6),
+            "agent_maintenance_v7" => Ok(Self::AgentMaintenanceV7),
             _ => Err(EvalError::InvalidConfig(
                 "unsupported Codex memory tool profile".into(),
             )),
@@ -64,7 +106,9 @@ impl CodexMemoryToolProfile {
 
     pub const fn enabled_tools(self) -> &'static [&'static str] {
         match self {
-            Self::RecallOnly | Self::RecallOnlyV2 => &["assemble_context"],
+            Self::RecallOnly | Self::RecallOnlyV2 | Self::RecallOnlyV3 | Self::RecallOnlyV4 => {
+                &["assemble_context"]
+            }
             Self::AgentManagedMemory => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentFormation => &["ingest", "extract"],
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -74,15 +118,18 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentMaintenanceV2 => &["assemble_context", "ingest", "extract", "invalidate"],
             Self::AgentMaintenanceV3 => &["assemble_context", "extract", "invalidate"],
-            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
-                &["assemble_context", "extract", "invalidate"]
-            }
+            Self::AgentMaintenanceV4
+            | Self::AgentMaintenanceV5
+            | Self::AgentMaintenanceV6
+            | Self::AgentMaintenanceV7 => &["assemble_context", "extract", "invalidate"],
         }
     }
 
     const fn enabled_tools_config(self) -> &'static str {
         match self {
-            Self::RecallOnly | Self::RecallOnlyV2 => "[\"assemble_context\"]",
+            Self::RecallOnly | Self::RecallOnlyV2 | Self::RecallOnlyV3 | Self::RecallOnlyV4 => {
+                "[\"assemble_context\"]"
+            }
             Self::AgentManagedMemory => {
                 "[\"assemble_context\",\"ingest\",\"extract\",\"invalidate\"]"
             }
@@ -98,9 +145,10 @@ impl CodexMemoryToolProfile {
                 "[\"assemble_context\",\"ingest\",\"extract\",\"invalidate\"]"
             }
             Self::AgentMaintenanceV3 => "[\"assemble_context\",\"extract\",\"invalidate\"]",
-            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
-                "[\"assemble_context\",\"extract\",\"invalidate\"]"
-            }
+            Self::AgentMaintenanceV4
+            | Self::AgentMaintenanceV5
+            | Self::AgentMaintenanceV6
+            | Self::AgentMaintenanceV7 => "[\"assemble_context\",\"extract\",\"invalidate\"]",
         }
     }
 
@@ -108,6 +156,8 @@ impl CodexMemoryToolProfile {
         match self {
             Self::RecallOnly => SYSTEM_INSTRUCTIONS,
             Self::RecallOnlyV2 => RECALL_SYSTEM_INSTRUCTIONS_V2,
+            Self::RecallOnlyV3 => RECALL_SYSTEM_INSTRUCTIONS_V3,
+            Self::RecallOnlyV4 => RECALL_SYSTEM_INSTRUCTIONS_V4,
             Self::AgentManagedMemory => AGENT_MEMORY_SYSTEM_INSTRUCTIONS,
             Self::AgentFormation => AGENT_FORMATION_SYSTEM_INSTRUCTIONS,
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -117,9 +167,10 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
             Self::AgentMaintenanceV2 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
             Self::AgentMaintenanceV3 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
-            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => {
-                AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS
-            }
+            Self::AgentMaintenanceV4
+            | Self::AgentMaintenanceV5
+            | Self::AgentMaintenanceV6
+            | Self::AgentMaintenanceV7 => AGENT_MAINTENANCE_SYSTEM_INSTRUCTIONS,
         }
     }
 
@@ -127,6 +178,8 @@ impl CodexMemoryToolProfile {
         match self {
             Self::RecallOnly => TASK_RULES,
             Self::RecallOnlyV2 => RECALL_TASK_RULES_V3,
+            Self::RecallOnlyV3 => RECALL_TASK_RULES_V4,
+            Self::RecallOnlyV4 => RECALL_TASK_RULES_V5,
             Self::AgentManagedMemory => AGENT_MEMORY_TASK_RULES,
             Self::AgentFormation => AGENT_FORMATION_TASK_RULES,
             Self::AgentSourceAuthority | Self::AgentSourceAuthorityLiteralInput => {
@@ -136,7 +189,10 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenance => AGENT_MAINTENANCE_TASK_RULES,
             Self::AgentMaintenanceV2 => AGENT_MAINTENANCE_TASK_RULES,
             Self::AgentMaintenanceV3 => AGENT_MAINTENANCE_V3_TASK_RULES,
-            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 => AGENT_MAINTENANCE_V4_TASK_RULES,
+            Self::AgentMaintenanceV4 | Self::AgentMaintenanceV5 | Self::AgentMaintenanceV6 => {
+                AGENT_MAINTENANCE_V4_TASK_RULES
+            }
+            Self::AgentMaintenanceV7 => AGENT_MAINTENANCE_V4_TASK_RULES,
         }
     }
 
@@ -152,7 +208,11 @@ impl CodexMemoryToolProfile {
             Self::AgentMaintenanceV3 => Some(AGENT_MAINTENANCE_V2_OUTPUT_TOKEN_LIMIT),
             Self::AgentMaintenanceV4 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
             Self::AgentMaintenanceV5 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
-            Self::RecallOnlyV2 => Some(MEMORY_READER_OUTPUT_TOKEN_LIMIT),
+            Self::AgentMaintenanceV6 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
+            Self::AgentMaintenanceV7 => Some(AGENT_MAINTENANCE_V4_OUTPUT_TOKEN_LIMIT),
+            Self::RecallOnlyV2 | Self::RecallOnlyV3 | Self::RecallOnlyV4 => {
+                Some(MEMORY_READER_OUTPUT_TOKEN_LIMIT)
+            }
             Self::AgentFormation => None,
         }
     }
@@ -189,7 +249,9 @@ impl CodexMemoryToolProfile {
                 | Self::AgentMaintenanceV2
                 | Self::AgentMaintenanceV3
                 | Self::AgentMaintenanceV4
-                | Self::AgentMaintenanceV5,
+                | Self::AgentMaintenanceV5
+                | Self::AgentMaintenanceV6
+                | Self::AgentMaintenanceV7,
                 _,
                 false,
             ) => Some(self),
@@ -200,6 +262,8 @@ impl CodexMemoryToolProfile {
     pub(crate) const fn recall_profile(self) -> Self {
         match self {
             Self::AgentMaintenanceV5 => Self::RecallOnlyV2,
+            Self::AgentMaintenanceV6 => Self::RecallOnlyV3,
+            Self::AgentMaintenanceV7 => Self::RecallOnlyV4,
             _ => Self::RecallOnly,
         }
     }
@@ -252,6 +316,14 @@ const RECALL_SYSTEM_INSTRUCTIONS_V2: &str =
     include_str!("../../../evals/paired/prompts/memory-recall-system-v2.txt");
 const RECALL_TASK_RULES_V3: &str =
     include_str!("../../../evals/paired/prompts/memory-recall-task-rules-v3.txt");
+const RECALL_SYSTEM_INSTRUCTIONS_V3: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-system-v3.txt");
+const RECALL_TASK_RULES_V4: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-task-rules-v4.txt");
+const RECALL_SYSTEM_INSTRUCTIONS_V4: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-system-v4.txt");
+const RECALL_TASK_RULES_V5: &str =
+    include_str!("../../../evals/paired/prompts/memory-recall-task-rules-v5.txt");
 const AGENT_MEMORY_SYSTEM_INSTRUCTIONS: &str =
     include_str!("../../../evals/paired/prompts/agent-managed-memory-system-v1.txt");
 const AGENT_MEMORY_TASK_RULES: &str =
@@ -300,6 +372,8 @@ const AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG: &[u8] =
     include_bytes!("../../../evals/paired/agent-managed-maintenance-v4/protocol-config.json");
 const AGENT_MAINTENANCE_V4_HOST_POLICY: &[u8] =
     include_bytes!("../../../evals/paired/agent-managed-maintenance-v4/host-policy.json");
+const AGENT_MAINTENANCE_V6_HOST_POLICY: &[u8] =
+    include_bytes!("../../../evals/paired/agent-managed-maintenance-v6-portable/host-policy.json");
 const AGENT_MAINTENANCE_V4_SIMULATOR: &[u8] =
     include_bytes!("../../../evals/paired/agent-managed-maintenance-v4/simulator.json");
 
@@ -327,6 +401,14 @@ pub fn agent_maintenance_v3_simulator_sha256() -> String {
 
 pub fn agent_maintenance_v4_host_policy_sha256() -> String {
     sha256(AGENT_MAINTENANCE_V4_HOST_POLICY)
+}
+
+pub fn agent_maintenance_v6_host_policy_sha256() -> String {
+    sha256(AGENT_MAINTENANCE_V6_HOST_POLICY)
+}
+
+pub fn agent_maintenance_v7_host_policy_sha256() -> String {
+    agent_maintenance_v6_host_policy_sha256()
 }
 
 pub fn agent_maintenance_v4_simulator_sha256() -> String {
@@ -569,9 +651,11 @@ fn build_codex_command(
         "plugins",
         "memories",
         "request_permissions_tool",
+        "skill_search",
     ] {
         command.arg("--disable").arg(feature);
     }
+    command.arg("--enable").arg("skip_host_skill_discovery");
     let mut mcp_config = match &config.memory_transport {
         CodexMemoryTransport::Stdio => vec![
             (
@@ -915,7 +999,10 @@ pub fn task_rules_for_profile(profile: CodexMemoryToolProfile) -> &'static str {
 
 pub fn reader_config_sha256_for_profile(profile: CodexMemoryToolProfile) -> Option<String> {
     match profile {
-        CodexMemoryToolProfile::RecallOnly | CodexMemoryToolProfile::RecallOnlyV2 => None,
+        CodexMemoryToolProfile::RecallOnly
+        | CodexMemoryToolProfile::RecallOnlyV2
+        | CodexMemoryToolProfile::RecallOnlyV3
+        | CodexMemoryToolProfile::RecallOnlyV4 => None,
         CodexMemoryToolProfile::AgentOperatorPrepared => None,
         CodexMemoryToolProfile::AgentSourceAuthority => {
             Some(crate::paired_agent::prompts::source_authority_protocol_config_sha256())
@@ -937,6 +1024,12 @@ pub fn reader_config_sha256_for_profile(profile: CodexMemoryToolProfile) -> Opti
             Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
         }
         CodexMemoryToolProfile::AgentMaintenanceV5 => {
+            Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
+        }
+        CodexMemoryToolProfile::AgentMaintenanceV6 => {
+            Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
+        }
+        CodexMemoryToolProfile::AgentMaintenanceV7 => {
             Some(sha256(AGENT_MAINTENANCE_V4_PROTOCOL_CONFIG))
         }
     }
@@ -1051,6 +1144,34 @@ pub fn agent_maintenance_v5_task_prompt_sha256() -> String {
     hash_phase_prompts(
         task_rules_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV5),
         task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV2),
+    )
+}
+
+pub fn agent_maintenance_v6_system_prompt_sha256() -> String {
+    hash_phase_prompts(
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV6),
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV3),
+    )
+}
+
+pub fn agent_maintenance_v6_task_prompt_sha256() -> String {
+    hash_phase_prompts(
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV6),
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV3),
+    )
+}
+
+pub fn agent_maintenance_v7_system_prompt_sha256() -> String {
+    hash_phase_prompts(
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV7),
+        system_instructions_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV4),
+    )
+}
+
+pub fn agent_maintenance_v7_task_prompt_sha256() -> String {
+    hash_phase_prompts(
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::AgentMaintenanceV7),
+        task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV4),
     )
 }
 
@@ -1417,6 +1538,10 @@ fn parse_codex_jsonl_with_terminal_status(
                                         non_query_arguments_sha256: Some(
                                             request_fingerprints.non_query_arguments_sha256,
                                         ),
+                                        selector_arguments_sha256: Some(
+                                            request_fingerprints.selector_arguments_sha256,
+                                        ),
+                                        requested_valid_at_sha256: crate::paired_agent::tool_results::requested_valid_at_sha256(arguments),
                                         response_guidance_sha256: None,
                                         evidence: None,
                                     });
@@ -2405,6 +2530,77 @@ mod tests {
     }
 
     #[test]
+    fn maintenance_v6_uses_the_partial_history_retry_contract() {
+        let profile = CodexMemoryToolProfile::from_name("agent_maintenance_v6")
+            .expect("registered v6 maintenance profile");
+
+        assert_eq!(profile, CodexMemoryToolProfile::AgentMaintenanceV6);
+        assert_eq!(
+            profile.recall_profile(),
+            CodexMemoryToolProfile::RecallOnlyV3
+        );
+        assert_eq!(
+            profile.recall_profile().enabled_tools(),
+            &["assemble_context"]
+        );
+        assert_ne!(
+            system_instructions_sha256_for_profile(profile.recall_profile()),
+            system_instructions_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV2)
+        );
+        assert_ne!(
+            task_rules_sha256_for_profile(profile.recall_profile()),
+            task_rules_sha256_for_profile(CodexMemoryToolProfile::RecallOnlyV2)
+        );
+        assert!(
+            profile
+                .recall_profile()
+                .system_instructions()
+                .contains("partial historical reads")
+        );
+        assert!(
+            profile
+                .recall_profile()
+                .task_rules()
+                .contains("partial historical result")
+        );
+        assert!(
+            profile
+                .recall_profile()
+                .system_instructions()
+                .contains("Preserve the snapshot and every other request argument exactly")
+        );
+        assert!(profile.recall_profile().task_rules().contains(
+            "Copy every other argument from the first request exactly, including fact_types, temporal fields"
+        ));
+        assert!(CodexMemoryToolProfile::from_name("recall_only_v3").is_err());
+    }
+
+    #[test]
+    fn maintenance_v7_preserves_both_snapshot_axes_on_an_authorized_retry() {
+        let profile = CodexMemoryToolProfile::from_name("agent_maintenance_v7")
+            .expect("registered v7 maintenance profile");
+        let recall = profile.recall_profile();
+        let rules = recall.task_rules();
+        let system = recall.system_instructions();
+
+        assert_ne!(profile, CodexMemoryToolProfile::AgentMaintenanceV6);
+        assert_ne!(recall, CodexMemoryToolProfile::RecallOnlyV3);
+        assert!(system.contains(
+            "set retry `valid_at` and `known_revision` to the values in `context.snapshot`"
+        ));
+        assert!(
+            rules
+                .contains("Copy the exact `valid_at` and `known_revision` from `context.snapshot`")
+        );
+        assert!(rules.contains("omit `as_of` and `known_at`"));
+        assert!(
+            rules.contains("Change only query wording for the same subject and requested fact")
+        );
+        assert!(!rules.contains("copy every other argument from the first request exactly"));
+        assert!(!system.contains("Preserve the snapshot and every other request argument exactly"));
+    }
+
+    #[test]
     fn source_authority_workflow_uses_read_only_candidate_formation_after_import() {
         let profile = CodexMemoryToolProfile::from_name("agent_source_authority")
             .expect("source-authority paired workflow is registered");
@@ -2430,6 +2626,18 @@ mod tests {
                 .formation_profile_for_arm(crate::paired::RunArm::Candidate, true),
             None
         );
+    }
+
+    #[test]
+    fn maintenance_v6_is_admitted_to_trial_and_memory_formation_phases() {
+        let profile = CodexMemoryToolProfile::AgentMaintenanceV6;
+
+        assert!(profile.supports_agent_managed_trial());
+        assert!(profile.supports_agent_memory_formation());
+        assert!(!CodexMemoryToolProfile::RecallOnly.supports_agent_managed_trial());
+        assert!(!CodexMemoryToolProfile::RecallOnly.supports_agent_memory_formation());
+        assert!(!CodexMemoryToolProfile::AgentFormation.supports_agent_managed_trial());
+        assert!(CodexMemoryToolProfile::AgentFormation.supports_agent_memory_formation());
     }
 
     #[test]
@@ -2738,6 +2946,8 @@ mod tests {
         assert!(joined.contains("--disable plugins"));
         assert!(joined.contains("--disable memories"));
         assert!(joined.contains("--disable request_permissions_tool"));
+        assert!(joined.contains("--disable skill_search"));
+        assert!(joined.contains("--enable skip_host_skill_discovery"));
         assert!(joined.contains("web_search=\"disabled\""));
         assert!(joined.contains("enabled_tools=[\"assemble_context\"]"));
         assert!(joined.contains("env_vars=[]"));

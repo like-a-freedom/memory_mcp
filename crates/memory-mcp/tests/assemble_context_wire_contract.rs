@@ -471,6 +471,123 @@ async fn historical_response_names_each_unversioned_selector_it_omits() {
     );
 }
 
+#[tokio::test]
+async fn empty_partial_historical_read_gives_bounded_safe_refinement_guidance() {
+    let memory = common::TestMemory::new(false).await;
+    let mut request = params("unmatched historical selector query", true);
+    request.valid_at = Some("2026-11-21T00:00:00Z".into());
+    request.known_revision = Some(0);
+
+    let response = assemble_context(&memory.service, request)
+        .await
+        .expect("produce an empty historical response");
+
+    assert!(response.result.as_array().is_some_and(Vec::is_empty));
+    assert_eq!(
+        response
+            .context
+            .as_ref()
+            .expect("historical completeness metadata")
+            .completeness,
+        memory_mcp::models::ContextCompleteness::Partial
+    );
+    assert_eq!(
+        response.guidance.as_deref(),
+        Some(
+            "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source."
+        )
+    );
+}
+
+#[tokio::test]
+async fn query_refinement_reuses_returned_snapshot_after_a_new_write() {
+    let memory = common::TestMemory::new(false).await;
+    let mut first_request = params("no matching marker before the write", true);
+    first_request.valid_at = Some("2026-11-21T00:00:00Z".into());
+    let first = assemble_context(&memory.service, first_request)
+        .await
+        .expect("read the initial partial snapshot");
+    let snapshot = first
+        .context
+        .as_ref()
+        .expect("initial snapshot metadata")
+        .snapshot
+        .clone();
+    assert!(first.result.as_array().is_some_and(Vec::is_empty));
+
+    let new_episode = common::ingest_episode(
+        &memory.service,
+        "silver-depot-after-snapshot",
+        "subject: Silver Depot; dimension: location; value: Quartz Point",
+    )
+    .await;
+
+    let mut unpinned_retry = params("Silver Depot location Quartz Point", true);
+    unpinned_retry.valid_at = Some(snapshot.valid_at.to_rfc3339());
+    let unpinned = assemble_context(&memory.service, unpinned_retry)
+        .await
+        .expect("read a new knowledge snapshot when revision is omitted");
+    assert!(
+        unpinned.result.as_array().is_some_and(|items| items
+            .iter()
+            .any(|item| item["source_episode"] == new_episode)),
+        "the omitted revision should resolve to the post-write knowledge state"
+    );
+
+    let mut pinned_retry = params("Silver Depot location Quartz Point", true);
+    pinned_retry.valid_at = Some(snapshot.valid_at.to_rfc3339());
+    pinned_retry.known_revision = Some(snapshot.known_revision);
+    let pinned = assemble_context(&memory.service, pinned_retry)
+        .await
+        .expect("reuse the exact knowledge snapshot from the first reply");
+    assert_eq!(
+        pinned
+            .context
+            .as_ref()
+            .expect("pinned snapshot metadata")
+            .snapshot
+            .known_revision,
+        snapshot.known_revision
+    );
+    assert!(pinned.result.as_array().is_some_and(|items| {
+        items
+            .iter()
+            .all(|item| item["source_episode"] != new_episode)
+    }));
+}
+
+#[tokio::test]
+async fn nonempty_partial_historical_read_does_not_suggest_a_retry() {
+    let memory = common::TestMemory::new(false).await;
+    let fact_id = common::seed_fact_at(
+        &memory.service,
+        "partial-guidance",
+        "Northstar Ridge Observatory uses Cinder-92 as its telescope control bus.",
+        chrono::DateTime::parse_from_rfc3339("2026-11-01T00:00:00Z")
+            .expect("valid fixture time")
+            .with_timezone(&Utc),
+    )
+    .await;
+    let revision = latest_revision(memory.db_client.as_ref()).await;
+    let mut request = params("Northstar Ridge Observatory Cinder-92 control bus", true);
+    request.valid_at = Some("2026-11-10T00:00:00Z".into());
+    request.known_revision = Some(revision);
+
+    let response = assemble_context(&memory.service, request)
+        .await
+        .expect("produce a nonempty historical response");
+
+    let items = response.result.as_array().expect("context item array");
+    assert!(items.iter().any(|item| item["fact_id"] == fact_id));
+    assert_eq!(
+        response.context.as_ref().unwrap().completeness,
+        memory_mcp::models::ContextCompleteness::Partial
+    );
+    let guidance = response.guidance.expect("partial-read guidance");
+    assert!(!guidance.contains("retry once"));
+    assert!(guidance.contains("verify omitted selector channels"));
+}
+
 async fn latest_revision(database: &impl memory_mcp::storage::DbClient) -> i64 {
     let rows = database
         .query(

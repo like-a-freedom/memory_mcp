@@ -1,0 +1,253 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v8",
+  "arm": "candidate",
+  "run_id": "13774-1795610189212672000-0",
+  "run_started_at": "2026-11-25T12:36:29.212676Z",
+  "run_completed_at": "2026-11-25T12:37:40.232619Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.171.0-alpha.13",
+      "model": "gpt-6.1-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "abd2a2e1fc473ed6a37419bb00f4fa101f7711670a78ef20f569ab15b85583ee",
+      "task_prompt_sha256": "1b9dc6977e1cad79e0195400b5bb60d24f0f97d9a9884ae3a0292565978324a8",
+      "host_policy_sha256": "2df1be214f58e0edbb8514121f93d427cc8a8d3709d0dff16b26d5a61088e239",
+      "transport": "stdio",
+      "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+      "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+      "judge_config_sha256": null,
+      "corpus_sha256": "882e2987d1f2146a35876b61d6b04b640c48324912bdbb7a9fe6148782d7a69e",
+      "oracle_sha256": "bede62287901b9e0e5f0e02fd2049dceb28fc858edc455f53fda9826602fa3df",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+      "provider_fingerprints": {
+        "codex_cli": "3b6d00deea5fabc50ad34be1872b8e4ead1638d23c68fabb7837edc07f0cf1e0",
+        "memory_eval_cli": "ccd86548b734dc515efad4a74a528a941bd2334d4c70d45e152a2c08cf748f51"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+      "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "emberglass-arctic-seed-history",
+      "case_id": "emberglass-current-polar-catalog-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "bluewake-oceanographic-archive-history",
+      "case_id": "bluewake-current-subglacial-calibration-code",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "cinderpeak-sky-survey-history",
+      "case_id": "cinderpeak-current-array-timing-bus",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "lanternwild-orchid-reserve-history",
+      "case_id": "lanternwild-current-orchid-accession-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "bluewake-oceanographic-archive-history",
+        "case_id": "bluewake-current-subglacial-calibration-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 0,
+      "tool_calls": 0,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "wall_time_ms": 381,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 0,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "cinderpeak-sky-survey-history",
+        "case_id": "cinderpeak-current-array-timing-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 0,
+      "tool_calls": 0,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "wall_time_ms": 326,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 0,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "emberglass-arctic-seed-history",
+        "case_id": "emberglass-current-polar-catalog-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 0,
+      "tool_calls": 0,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "wall_time_ms": 295,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 0,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "lanternwild-orchid-reserve-history",
+        "case_id": "lanternwild-current-orchid-accession-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "model_failure",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": false,
+        "final_answer_schema_valid": false,
+        "accepted_answer": null,
+        "required_evidence_cited": null,
+        "clarification_matches": true
+      },
+      "turns_used": 0,
+      "tool_calls": 0,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "wall_time_ms": 351,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 0,
+          "kind": "model_failure",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    }
+  ]
+}

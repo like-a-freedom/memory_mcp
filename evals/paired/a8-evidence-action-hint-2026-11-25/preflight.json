@@ -1,0 +1,44 @@
+{
+  "schema_version": "memory-mcp-a8-static-preflight/v1",
+  "local_only": true,
+  "model_requests": 0,
+  "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+  "cases": [
+    {
+      "family_id": "opal-support",
+      "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+      "returned_event_ids": [
+        "ledger"
+      ],
+      "item_count": 1,
+      "completeness": null,
+      "statuses": [
+        "<missing>"
+      ],
+      "relations": []
+    },
+    {
+      "family_id": "quartz-conflict",
+      "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+      "returned_event_ids": [
+        "ledger",
+        "note"
+      ],
+      "item_count": 2,
+      "completeness": null,
+      "statuses": [
+        "<missing>"
+      ],
+      "relations": []
+    },
+    {
+      "family_id": "helios-absent",
+      "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+      "returned_event_ids": [],
+      "item_count": 0,
+      "completeness": null,
+      "statuses": [],
+      "relations": []
+    }
+  ]
+}

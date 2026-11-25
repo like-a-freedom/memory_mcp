@@ -1,0 +1,202 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "incumbent",
+  "run_id": "13774-1795610189212672000-0",
+  "identity_sha256": "b6d36a1ccf78995024725612ab04e8327bed8d65102709e0e0403732152f5cef",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "bluewake-oceanographic-archive-history",
+      "case_id": "bluewake-current-subglacial-calibration-code",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "cinderpeak-sky-survey-history",
+      "case_id": "cinderpeak-current-array-timing-bus",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "emberglass-arctic-seed-history",
+      "case_id": "emberglass-current-polar-catalog-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "lanternwild-orchid-reserve-history",
+      "case_id": "lanternwild-current-orchid-accession-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "bluewake-oceanographic-archive-history",
+        "case_id": "bluewake-current-subglacial-calibration-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 376
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "ea0650cd596c0fc9094d833cf1f715e2a7714e670f586b5c87842045442a1ca8",
+        "response_sha256": "a3c26111ec2091770b551978290c660cc01528f657c813b9b823ef1c1023d1b8",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-recovery-v3-bluewake-oceanographic-archive-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "exact_stale_fact_invalidation_verified": false,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "cinderpeak-sky-survey-history",
+        "case_id": "cinderpeak-current-array-timing-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 298
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "b86fbff26f533e2cd7d0b24a3d4941b7d51b182ebbc7faee04d5014ccdd26e24",
+        "response_sha256": "fdc2b105bd4cbdbe702fa331e40e6add9399ac83347860a0773c14b143fbb813",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-recovery-v3-cinderpeak-sky-survey-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "exact_stale_fact_invalidation_verified": false,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "emberglass-arctic-seed-history",
+        "case_id": "emberglass-current-polar-catalog-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 280
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "77bbc40e2e39858ba1bb07d3f29b240686f11d624a815dbc60ecb0c2a9571860",
+        "response_sha256": "54f0f4b8c2d954c7bd8cd406f99fcd33e224879a9c04b2f06f2b861da6998806",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-recovery-v3-emberglass-arctic-seed-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "exact_stale_fact_invalidation_verified": false,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "lanternwild-orchid-reserve-history",
+        "case_id": "lanternwild-current-orchid-accession-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "model_failure",
+        "turns_used": 0,
+        "tool_calls": 0,
+        "user_clarifications": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 368
+      },
+      "write_operations": [],
+      "successful_ingest_count": 0,
+      "identified_ingest_episode_count": 0,
+      "independent_probe": {
+        "request_sha256": "ca09de8b51e91c795ff5b6ade647d01a0e52b9388c5338ac2fd6a48dd84ccb11",
+        "response_sha256": "9262def14a3216840eff983870ffee3abebc9aa41f82db9052225a53d46649cc",
+        "known_revision": 6,
+        "retained_store_bytes": 34209869,
+        "source_event_ids": [
+          "c1-recovery-v3-lanternwild-orchid-reserve-old-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 1,
+        "evidence_success": false
+      },
+      "exact_stale_fact_invalidation_verified": false,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 0,
+        "evidence_requests": 0,
+        "evidence_responses": 0,
+        "evidence_before_invalidation": 0
+      }
+    }
+  ]
+}

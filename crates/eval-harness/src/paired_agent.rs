@@ -33,6 +33,8 @@ pub const PAIRED_KNOWN_REVISION_PLACEHOLDER: &str = "{{KNOWN_REVISION}}";
 const RECEIPT_JOURNAL_SCHEMA_V4: &str = "memory-mcp-agent-trial-receipt/v4";
 const RECEIPT_JOURNAL_SCHEMA_V5: &str = "memory-mcp-agent-trial-receipt/v5";
 const RECEIPT_JOURNAL_SCHEMA_V6: &str = "memory-mcp-agent-trial-receipt/v6";
+const RECEIPT_JOURNAL_SCHEMA_V7: &str = "memory-mcp-agent-trial-receipt/v7";
+const RECEIPT_JOURNAL_SCHEMA_V8: &str = "memory-mcp-agent-trial-receipt/v8";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -116,6 +118,8 @@ pub struct ReadExpectation {
     pub valid_at: Option<DateTime<Utc>>,
     pub required_claim_annotation_alternatives:
         Vec<Vec<crate::independent_probe::ProbeClaimAnnotation>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_arguments: Option<BTreeMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,6 +193,12 @@ pub struct MemoryReadObservation {
     /// SHA-256 of all request arguments except `query`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub non_query_arguments_sha256: Option<String>,
+    /// Per-field hashes of the effective `assemble_context` selector values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_arguments_sha256: Option<BTreeMap<String, String>>,
+    /// SHA-256 of normalized requested valid time; the timestamp is not retained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_valid_at_sha256: Option<String>,
     /// SHA-256 of returned guidance text; guidance itself is not retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_guidance_sha256: Option<String>,
@@ -204,6 +214,9 @@ pub struct MemoryReadEvidence {
     pub completeness: Option<ReadCompleteness>,
     pub requested_cutoff_sha256: Option<String>,
     pub returned_cutoff_sha256: Option<String>,
+    /// SHA-256 of normalized snapshot valid time; the timestamp is not retained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub returned_valid_at_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,7 +239,15 @@ pub struct MemoryReadDiagnostic {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub non_query_arguments_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_expectation_registered: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_argument_matches: Option<BTreeMap<String, bool>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_guidance_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_valid_at_match: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub returned_valid_at_match: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_cutoff_match: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -520,6 +541,21 @@ fn validate_task(task: &PairedTaskDefinition) -> Result<(), EvalError> {
         }
     }
     if let Some(expectation) = &task.oracle.read_expectation {
+        if let Some(selector_arguments) = &expectation.selector_arguments {
+            tool_results::validate_expected_selector_arguments(selector_arguments)?;
+            if let Some(expected_valid_at) = expectation.valid_at {
+                let selector_valid_at = selector_arguments
+                    .get("valid_at")
+                    .and_then(Value::as_str)
+                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                    .map(|value| value.with_timezone(&Utc));
+                if selector_valid_at != Some(expected_valid_at) {
+                    return Err(EvalError::InvalidInput(
+                        "registered read selector valid_at contradicts its read expectation".into(),
+                    ));
+                }
+            }
+        }
         for alternative in &expectation.required_claim_annotation_alternatives {
             if alternative.is_empty() {
                 return Err(EvalError::InvalidInput(
@@ -667,7 +703,24 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                 RunArm::Incumbent => &incumbent_journal,
                 RunArm::Candidate => &candidate_journal,
             };
-            append_receipt_journal(journal_path, &plan_sha256, arm, &receipt)?;
+            let valid_time_registered = task
+                .oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.valid_at.is_some());
+            let selector_expectation_registered = task
+                .oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.selector_arguments.is_some());
+            append_receipt_journal(
+                journal_path,
+                &plan_sha256,
+                arm,
+                &receipt,
+                valid_time_registered,
+                selector_expectation_registered,
+            )?;
             let artifact = match arm {
                 RunArm::Incumbent => &mut incumbent,
                 RunArm::Candidate => &mut candidate,
@@ -696,13 +749,28 @@ pub(crate) fn run_paired_agent_evaluation_validated<B: PairedTrialBackend>(
                     })
                 })
             });
+        let valid_time_registered = manifest.tasks.iter().any(|task| {
+            task.oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.valid_at.is_some())
+        });
+        let selector_expectation_registered = manifest.tasks.iter().any(|task| {
+            task.oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.selector_arguments.is_some())
+        });
         if has_read_capture {
-            artifact.schema_version = if has_complete_request_fingerprints {
-                crate::paired::PAIRED_ARTIFACT_SCHEMA_V8.into()
-            } else {
-                crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
-            };
+            artifact.schema_version = crate::paired::paired_artifact_schema_for_reads(
+                has_read_capture,
+                has_complete_request_fingerprints,
+                valid_time_registered,
+                selector_expectation_registered,
+            )?
+            .into();
         }
+        complete_selector_registration_diagnostics(artifact);
     }
 
     let run_completed_at = Utc::now();
@@ -723,6 +791,22 @@ fn new_run_id() -> Result<String, EvalError> {
         .as_nanos();
     let sequence = NEXT_RUN.fetch_add(1, Ordering::Relaxed);
     Ok(format!("{}-{timestamp}-{sequence}", std::process::id()))
+}
+
+pub(crate) fn complete_selector_registration_diagnostics(
+    artifact: &mut crate::paired::PairedRunArtifact,
+) {
+    if artifact.schema_version != crate::paired::PAIRED_ARTIFACT_SCHEMA_V10 {
+        return;
+    }
+    for read in artifact
+        .receipts
+        .iter_mut()
+        .filter_map(|receipt| receipt.read_diagnostics.as_mut())
+        .flatten()
+    {
+        read.selector_expectation_registered.get_or_insert(false);
+    }
 }
 
 fn arm_order_for(arm: RunArm, incumbent_first: bool) -> u8 {
@@ -757,6 +841,20 @@ fn score_read(
     execution: &PairedTrialExecution,
     citations: Option<&[String]>,
 ) -> Result<MemoryReadDiagnostic, EvalError> {
+    let selector_expectation = oracle
+        .read_expectation
+        .as_ref()
+        .and_then(|expectation| expectation.selector_arguments.as_ref());
+    let actual_selector_fingerprints = if selector_expectation.is_some() {
+        Some(read.selector_arguments_sha256.as_ref().ok_or_else(|| {
+            EvalError::InvalidInput(
+                "registered selector expectations require fingerprints for every captured read"
+                    .into(),
+            )
+        })?)
+    } else {
+        None
+    };
     let mut diagnostic = MemoryReadDiagnostic {
         request_sequence: read.request_sequence,
         response_sequence: read.response_sequence,
@@ -764,7 +862,11 @@ fn score_read(
         item_count: read.item_count,
         request_query_sha256: read.request_query_sha256.clone(),
         non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
+        selector_expectation_registered: selector_expectation.map(|_| true),
+        selector_argument_matches: None,
         response_guidance_sha256: read.response_guidance_sha256.clone(),
+        requested_valid_at_match: None,
+        returned_valid_at_match: None,
         requested_cutoff_match: None,
         returned_cutoff_match: None,
         source_coverage: None,
@@ -772,6 +874,47 @@ fn score_read(
         completeness: None,
         cited_returned_source_count: None,
     };
+    if let Some(digest) = read.requested_valid_at_sha256.as_deref() {
+        crate::paired::validate_sha256("requested valid_at", digest)?;
+    }
+    if let Some(fingerprints) = &read.selector_arguments_sha256 {
+        if fingerprints.len() != tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
+            || tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+                .iter()
+                .any(|field| !fingerprints.contains_key(*field))
+        {
+            return Err(EvalError::InvalidInput(
+                "read selector fingerprints do not match the fixed field set".into(),
+            ));
+        }
+        for digest in fingerprints.values() {
+            crate::paired::validate_sha256("read selector", digest)?;
+        }
+    }
+    if let Some(valid_at) = oracle
+        .read_expectation
+        .as_ref()
+        .and_then(|expectation| expectation.valid_at)
+    {
+        let expected = tool_results::valid_at_sha256(valid_at);
+        diagnostic.requested_valid_at_match = read
+            .requested_valid_at_sha256
+            .as_ref()
+            .map(|digest| digest == &expected);
+    }
+    if let (Some(expectation), Some(actual)) = (selector_expectation, actual_selector_fingerprints)
+    {
+        let expected = tool_results::expected_selector_argument_fingerprints(expectation)?;
+        diagnostic.selector_argument_matches = Some(
+            tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+                .iter()
+                .map(|field| {
+                    let matches = actual.get(*field) == expected.get(*field);
+                    ((*field).to_owned(), matches)
+                })
+                .collect(),
+        );
+    }
     let Some(evidence) = &read.evidence else {
         return Ok(diagnostic);
     };
@@ -789,6 +932,7 @@ fn score_read(
     for digest in [
         &evidence.requested_cutoff_sha256,
         &evidence.returned_cutoff_sha256,
+        &evidence.returned_valid_at_sha256,
     ]
     .into_iter()
     .flatten()
@@ -833,6 +977,13 @@ fn score_read(
             .len()
     });
     if let Some(expectation) = &oracle.read_expectation {
+        if let Some(valid_at) = expectation.valid_at {
+            let expected = tool_results::valid_at_sha256(valid_at);
+            diagnostic.returned_valid_at_match = evidence
+                .returned_valid_at_sha256
+                .as_ref()
+                .map(|digest| digest == &expected);
+        }
         if !expectation
             .required_claim_annotation_alternatives
             .is_empty()
@@ -850,8 +1001,11 @@ fn score_read(
                     }),
             );
         }
-        if let Some(valid_at) = expectation.valid_at {
-            let expected = tool_results::cutoff_digest(valid_at, checkpoint)?;
+        if let (Some(valid_at), Some(revision)) = (expectation.valid_at, checkpoint) {
+            // A full cutoff is only an oracle when both axes were registered.
+            // Comparing against a synthetic `None` revision turns an
+            // unregistered transaction boundary into a false mismatch.
+            let expected = tool_results::cutoff_digest(valid_at, Some(revision))?;
             diagnostic.requested_cutoff_match = evidence
                 .requested_cutoff_sha256
                 .as_ref()
@@ -1171,6 +1325,8 @@ fn append_receipt_journal(
     plan_sha256: &str,
     arm: RunArm,
     receipt: &TrialReceipt,
+    valid_time_registered: bool,
+    selector_expectation_registered: bool,
 ) -> Result<(), EvalError> {
     #[derive(Serialize)]
     struct JournalRecord<'a> {
@@ -1182,18 +1338,11 @@ fn append_receipt_journal(
     }
     let receipt_bytes = serde_json::to_vec(&(arm, receipt))?;
     let record = JournalRecord {
-        schema_version: if receipt.read_capture_status.is_some()
-            && receipt.read_diagnostics.as_ref().is_some_and(|reads| {
-                reads.iter().all(|read| {
-                    read.request_query_sha256.is_some() && read.non_query_arguments_sha256.is_some()
-                })
-            }) {
-            RECEIPT_JOURNAL_SCHEMA_V6
-        } else if receipt.read_capture_status.is_some() {
-            RECEIPT_JOURNAL_SCHEMA_V5
-        } else {
-            RECEIPT_JOURNAL_SCHEMA_V4
-        },
+        schema_version: receipt_journal_schema(
+            receipt,
+            valid_time_registered,
+            selector_expectation_registered,
+        ),
         plan_sha256,
         arm,
         receipt,
@@ -1215,6 +1364,32 @@ fn append_receipt_journal(
         path: path.to_path_buf(),
         source,
     })
+}
+
+fn receipt_journal_schema(
+    receipt: &TrialReceipt,
+    valid_time_registered: bool,
+    selector_expectation_registered: bool,
+) -> &'static str {
+    let has_complete_request_fingerprints =
+        receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+            reads.iter().all(|read| {
+                read.request_query_sha256.is_some() && read.non_query_arguments_sha256.is_some()
+            })
+        });
+    if selector_expectation_registered {
+        return RECEIPT_JOURNAL_SCHEMA_V8;
+    }
+    match (
+        receipt.read_capture_status.is_some(),
+        has_complete_request_fingerprints,
+        valid_time_registered,
+    ) {
+        (true, true, true) => RECEIPT_JOURNAL_SCHEMA_V7,
+        (true, true, false) => RECEIPT_JOURNAL_SCHEMA_V6,
+        (true, false, _) => RECEIPT_JOURNAL_SCHEMA_V5,
+        (false, _, _) => RECEIPT_JOURNAL_SCHEMA_V4,
+    }
 }
 
 fn write_json_new<T: Serialize>(path: &Path, value: &T) -> Result<(), EvalError> {
@@ -1359,6 +1534,34 @@ mod tests {
                 },
                 episode_id_to_event_id: BTreeMap::from([(episode_id, episode.event_id.clone())]),
             })
+        }
+    }
+
+    struct ReadCaptureBackend {
+        fixed: FixedBackend,
+    }
+
+    impl PairedTrialBackend for ReadCaptureBackend {
+        fn execute(
+            &mut self,
+            arm: RunArm,
+            task: &PreparedPairedTask,
+        ) -> Result<PairedTrialExecution, EvalError> {
+            let mut execution = self.fixed.execute(arm, task)?;
+            execution.observation.memory_reads = Some(vec![MemoryReadObservation {
+                request_sequence: 2,
+                response_sequence: Some(3),
+                outcome: MemoryReadOutcome::Nonempty,
+                item_count: Some(1),
+                request_query_sha256: Some("b".repeat(64)),
+                non_query_arguments_sha256: Some("c".repeat(64)),
+                selector_arguments_sha256: None,
+                requested_valid_at_sha256: None,
+                response_guidance_sha256: None,
+                evidence: None,
+            }]);
+            execution.observation.read_capture_status = Some(ReadCaptureStatus::Observed);
+            Ok(execution)
         }
     }
 
@@ -1594,6 +1797,8 @@ mod tests {
             &"a".repeat(64),
             RunArm::Candidate,
             &journal_read_receipt(false),
+            false,
+            false,
         )
         .expect("write legacy read receipt");
 
@@ -1613,6 +1818,8 @@ mod tests {
             &"a".repeat(64),
             RunArm::Candidate,
             &journal_read_receipt(true),
+            false,
+            false,
         )
         .expect("write v6 read receipt");
 
@@ -1630,6 +1837,45 @@ mod tests {
         assert!(!line.contains("PRIVATE GUIDANCE"));
     }
 
+    #[test]
+    fn registered_valid_time_publishes_v7_journal_with_unknown_match() {
+        let directory = tempfile::tempdir().expect("paired output directory");
+        let mut manifest = manifest();
+        manifest.schema_version = PAIRED_TASK_MANIFEST_SCHEMA_V2.into();
+        for task in &mut manifest.tasks {
+            task.oracle.read_expectation = Some(ReadExpectation {
+                valid_at: Some(
+                    DateTime::parse_from_rfc3339("2026-05-01T10:00:00Z")
+                        .expect("valid fixture date")
+                        .with_timezone(&Utc),
+                ),
+                required_claim_annotation_alternatives: Vec::new(),
+                selector_arguments: None,
+            });
+        }
+        let plan = plan(&manifest);
+        let mut backend = ReadCaptureBackend {
+            fixed: FixedBackend {
+                calls: Vec::new(),
+                answer: "North City".into(),
+            },
+        };
+
+        run_paired_agent_evaluation(&plan, &manifest, &mut backend, directory.path())
+            .expect("registered read publishes paired run artifacts");
+
+        let journal = std::fs::read_to_string(directory.path().join("candidate-receipts.jsonl"))
+            .expect("candidate receipt journal");
+        assert_eq!(journal.lines().count(), 2);
+        for line in journal.lines() {
+            let record: serde_json::Value = serde_json::from_str(line).expect("journal JSON");
+            assert_eq!(record["schema_version"], RECEIPT_JOURNAL_SCHEMA_V7);
+            let read = &record["receipt"]["read_diagnostics"][0];
+            assert!(read.get("requested_valid_at_match").is_none());
+            assert!(read.get("returned_valid_at_match").is_none());
+        }
+    }
+
     fn journal_read_receipt(with_fingerprints: bool) -> TrialReceipt {
         TrialReceipt {
             read_capture_status: Some(ReadCaptureStatus::Observed),
@@ -1640,7 +1886,11 @@ mod tests {
                 item_count: Some(0),
                 request_query_sha256: with_fingerprints.then(|| "b".repeat(64)),
                 non_query_arguments_sha256: with_fingerprints.then(|| "c".repeat(64)),
+                selector_expectation_registered: None,
+                selector_argument_matches: None,
                 response_guidance_sha256: with_fingerprints.then(|| "d".repeat(64)),
+                requested_valid_at_match: None,
+                returned_valid_at_match: None,
                 requested_cutoff_match: None,
                 returned_cutoff_match: None,
                 source_coverage: None,

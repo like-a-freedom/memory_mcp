@@ -134,6 +134,60 @@ diagnostics before choosing a retrieval change. C2 remains ineligible. See the
 [v1 setup record](../../../evals/paired/c1-agent-managed-correction-recovery-v1-2026-11-25/README.md)
 and [v2 result](../../../evals/paired/c1-agent-managed-correction-recovery-v2-2026-11-25/README.md).
 
+**Latest C1 result — recovery v5 (2026-11-25):** The corrected retry rule
+completed a fresh native Apple Silicon capture. Both arms passed correction
+extraction, exact stale-fact invalidation, evidence-before-invalidation, and
+independent probes 4/4, with zero hard violations, timeouts, or prohibited
+sources. However, all 16 agent-facing reads were empty and partial; exact cited
+task success was 0/4 per arm, so the frozen 3/4 floor failed and capture 02 was
+not run. First-query hashes matched between arms within each family but did not
+match the registered question. Non-query argument hashes differed across arms
+in three of four families. Since raw query and selector arguments are not
+retained, the run cannot separate a query-formulation miss from a temporal or
+other selector mismatch. Do not change retrieval or response presentation on
+this evidence alone. The next diagnostic needs private-oracle comparisons of
+the registered and observed read selectors, while persisting only normalized
+match outcomes. See the [v5 report](../../../evals/paired/c1-agent-managed-correction-recovery-v5-2026-11-25/capture-01/REPORT.md)
+and [audit-ready index](../../../evals/paired/c1-agent-managed-correction-recovery-v5-2026-11-25/README.md).
+
+**Latest C1 result — valid-time diagnostic v6 (2026-11-25):** A fresh
+four-family cohort again passed correction extraction, exact invalidation,
+pre-invalidation evidence, and independent probes 4/4 in both arms, but agent
+task success remained 0/4 and all 16 reads were empty/partial. The registered
+stop rule prohibited capture 02. Requested and returned `valid_at` matched on
+all reads, so valid-time selection does not explain this cohort. First query
+hashes matched across arms but did not equal the registered question; aggregate
+non-query hashes matched across arms in only 2/4 families, so selector details
+remain unresolved. Critical review found the scorer had reported a full-cutoff
+mismatch despite no registered transaction revision. The scorer now leaves
+that result unknown without both registered axes; frozen v6 output is preserved
+and the invalid booleans are not evidence. No memory behavior change is
+authorized by this ambiguous screen. See the
+[v6 report](../../../evals/paired/c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25/capture-01/REPORT.md).
+
+**Latest C1 result — selector diagnostics v7 (2026-11-25):** Four disjoint
+synthetic histories registered the full ten-field selector allowlist. Capture
+01 passed every gate, with 4/4 exact cited tasks in both same-product arms, so
+the preregistered capture 02 was run. Capture 02 then failed the task-success
+floor at 0/4 in both arms; it also recorded one candidate
+`prohibited_evidence` violation. The repeat had six empty reads per arm across
+three tasks; one incumbent read carried sufficient evidence but was not used
+in the answer, while the candidate's single nonempty read lacked sufficient
+evidence. Probes, correction/invalidation checks, and valid-time checks passed.
+`known_at` and `compact` mismatches appeared in both the passing and failing
+capture, so the boolean field diagnostics do not identify a cause. The
+registered repeat was exhausted; this C1 workflow remains NO-GO, and C2 stays
+ineligible. See the [cross-capture review](../../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
+and the [A10 implementation record](2026-11-24-agent-read-diagnostics-implementation-plan.md).
+
+- [x] Run the disjoint C1 v6 valid-time diagnostic on native Apple Silicon;
+  preserve the original artifacts and stop after capture 01 on the frozen
+  task gate. Record valid-time matches, exact-question hashes, cross-arm
+  selector fingerprint consistency, and latency. The first run exposed a
+  scorer defect for unregistered transaction revisions; RED → GREEN CLI
+  regression and the 14-test paired CLI target passed. See the v6 report and
+  [A9 scorer contract](2026-11-24-agent-read-diagnostics-implementation-plan.md).
+
 - [x] Freeze the corrected C1 registration and fresh disjoint families before
   capture. Keep exact fact IDs transient, persist only the evaluator's boolean
   stale-target check, and treat missing read capture as an explicit failure.
@@ -143,6 +197,11 @@ and [v2 result](../../../evals/paired/c1-agent-managed-correction-recovery-v2-20
   correction writes and probes but empty agent reads; see the v2 report. A new
   registration must first fix the unreachable retry gate and add safe query
   diagnostics before any retrieval change is selected.
+- [x] Add complete, privacy-preserving per-field selector diagnostics and
+  replay archived artifacts unchanged; validate them at the public paired
+  scorer seam. Run the fresh C1 v7 capture 01 and the one permitted repeat on
+  Apple Silicon; stop after capture 02 failed its frozen task gate. The
+  implementation, focused tests and review are in the [A10 plan](2026-11-24-agent-read-diagnostics-implementation-plan.md).
 
 ## Task C2. Design confirmation only for an eligible workflow
 
@@ -274,30 +333,35 @@ preflight and explicit offline cache fixed that harness failure before the
 valid retry. See the [recheck report](../../../evals/longmemeval_v2/results/2026-11-25-b5-recheck/RECHECK.md)
 and [execution manifest](../../../evals/longmemeval_v2/results/2026-11-25-b5-recheck/execution-manifest.json).
 
-The post-C3 recheck then repeated the same seven frozen cases, 100 ordered
-trajectories, saved snapshot, reader/judge profiles and local MLX-LM runtime
-with the C3 release binary. It scored 7/7 cases without reader, judge or
-scorer failures and without context truncation. Exact match was 3/7, compared
-with 1/7 in the immediately preceding B5 run; the strict full reviewed-span
-check rose from 1/7 to 2/7. One exact match (`0c6b0c60`) is explicitly
-unsupported by its context; another (`d6da3938`) has the exact adjacent
-`Create Order` / `Reset Password` evidence although the strict whole-span
-check does not count it. Thus the single post-C3 capture is a promising result
-on this seven-case sample, not a confirmed general memory-quality gain. Mean
-query time was 598.8 s vs 630.4 s in the prior run, while wall time moved from
-1,838.3 s to 1,854.0 s; do not claim a stable speedup. The exact source-span
-scorer is now reproducible without a model/provider. See the [post-C3 report](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/RECHECK.md),
+The post-C3 report now records a matched concise-prompt replay of the same
+seven frozen cases, 100 ordered trajectories, saved snapshot, reader/judge
+profiles and local MLX-LM runtime with the C3 release binary. This is a paired
+diagnostic, **not an official full LongMemEval-V2 result**. The repeated
+post-C3 arm scored 3/7 under the pinned scorer versus 1/7 for its concise B5
+replay; strict phrase-set accuracy on list-valued cases was 2/4 versus 0/4,
+and the full reviewed-span check was 2/7 versus 1/7. The `0c6b0c60` scorer pass
+is unsupported (`Past hour` was absent from context); `d6da3938` passed exact
+phrase scoring with adjacent evidence that the strict whole-span check does
+not count. The repeated context payloads match the first C3 run for 7/7 cases.
+The earlier C3 scoring attempt with two empty judge responses remains recorded
+as a failed diagnostic and is excluded from the paired result. Mean query time
+was 590.5 s versus 630.4 s in the concise B5 replay, with median 429.7 s versus
+437.7 s; these seven-case descriptive differences do not establish a stable
+speedup. Do not claim a general memory-quality gain from this sample. The exact
+source-span scorer is reproducible without a model/provider. See the
+[post-C3 report](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/RECHECK.md),
 [execution manifest](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/execution-manifest.json),
-and [reviewed-span coverage receipt](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-01/reviewed-span-coverage.json).
+and [repeated reviewed-span coverage receipt](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-02/reviewed-span-coverage.json).
 
 The ordinary agent-control gate was replayed offline and remained eligible for
 its exact configuration: two captures each passed task, direct-read, and
 independent-probe criteria 4/4 with no violations or resource exits. The
-offline qualification report replayed byte-identically. The subsequent fresh
-Codex C1 correction/read-diagnostics cohort is a separate synthetic workflow
-screen and failed its candidate task floor; its report records the exact
-diagnostics and limits. Neither screen qualifies C2 or demonstrates a memory
-treatment effect.
+offline qualification report replayed byte-identically. The fresh C1 v7
+selector-diagnostic workflow passed capture 01 but failed its one allowed
+repeat at 0/4 exact cited tasks in both arms. Its cross-capture report records
+the per-field selectors, valid-time results, evidence coverage, failures and
+latency. Neither screen qualifies C2 or demonstrates a memory treatment
+effect.
 
 ## Task D1. Bound and reconstruct public explain citations
 

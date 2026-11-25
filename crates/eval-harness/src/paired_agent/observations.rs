@@ -20,6 +20,8 @@ pub const OBSERVATIONS_SCHEMA_V1: &str = "memory-mcp-agent-observations/v1";
 pub const OBSERVATIONS_SCHEMA_V2: &str = "memory-mcp-agent-observations/v2";
 pub const OBSERVATIONS_SCHEMA_V4: &str = "memory-mcp-agent-observations/v4";
 pub const OBSERVATIONS_SCHEMA_V3: &str = "memory-mcp-agent-observations/v3";
+pub const OBSERVATIONS_SCHEMA_V5: &str = "memory-mcp-agent-observations/v5";
+pub const OBSERVATIONS_SCHEMA_V6: &str = "memory-mcp-agent-observations/v6";
 
 /// Export the plan-bound inputs a runner needs without exposing expected outcomes.
 pub fn export_paired_inputs(
@@ -95,6 +97,8 @@ impl RecordedPair {
                 | OBSERVATIONS_SCHEMA_V2
                 | OBSERVATIONS_SCHEMA_V3
                 | OBSERVATIONS_SCHEMA_V4
+                | OBSERVATIONS_SCHEMA_V5
+                | OBSERVATIONS_SCHEMA_V6
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired observations schema {:?}",
@@ -190,13 +194,81 @@ impl RecordedPair {
                 trial.observation.read_capture_status,
                 &trial.observation.memory_reads,
             ) {
-                (OBSERVATIONS_SCHEMA_V4, Some(_), Some(_)) => {}
-                (version, None, None) if version != OBSERVATIONS_SCHEMA_V4 => {}
+                (
+                    OBSERVATIONS_SCHEMA_V4 | OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6,
+                    Some(_),
+                    Some(_),
+                ) => {}
+                (version, None, None)
+                    if version != OBSERVATIONS_SCHEMA_V4
+                        && version != OBSERVATIONS_SCHEMA_V5
+                        && version != OBSERVATIONS_SCHEMA_V6 => {}
                 _ => {
                     return Err(EvalError::InvalidInput(
                         "read capture fields do not match observation version".into(),
                     ));
                 }
+            }
+            if self.schema_version == OBSERVATIONS_SCHEMA_V4
+                && trial
+                    .observation
+                    .memory_reads
+                    .as_ref()
+                    .is_some_and(|reads| {
+                        reads.iter().any(|read| {
+                            read.requested_valid_at_sha256.is_some()
+                                || read.selector_arguments_sha256.is_some()
+                                || read.evidence.as_ref().is_some_and(|evidence| {
+                                    evidence.returned_valid_at_sha256.is_some()
+                                })
+                        })
+                    })
+            {
+                return Err(EvalError::InvalidInput(
+                    "observations v4 cannot contain valid-time read fingerprints or selector fingerprints"
+                        .into(),
+                ));
+            }
+            if self.schema_version == OBSERVATIONS_SCHEMA_V5
+                && trial
+                    .observation
+                    .memory_reads
+                    .as_ref()
+                    .is_some_and(|reads| {
+                        reads
+                            .iter()
+                            .any(|read| read.selector_arguments_sha256.is_some())
+                    })
+            {
+                return Err(EvalError::InvalidInput(
+                    "paired observations v5 cannot contain selector fingerprints".into(),
+                ));
+            }
+            if self.schema_version == OBSERVATIONS_SCHEMA_V6
+                && trial
+                    .observation
+                    .memory_reads
+                    .as_ref()
+                    .is_some_and(|reads| {
+                        reads
+                            .iter()
+                            .any(|read| read.selector_arguments_sha256.is_none())
+                    })
+            {
+                return Err(EvalError::InvalidInput(
+                    "paired observations v6 require selector fingerprints for every read".into(),
+                ));
+            }
+            if task
+                .oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.selector_arguments.is_some())
+                && self.schema_version != OBSERVATIONS_SCHEMA_V6
+            {
+                return Err(EvalError::InvalidInput(
+                    "registered selector expectations require paired observations v6".into(),
+                ));
             }
             receipts.push(score_trial(
                 task,
@@ -222,16 +294,39 @@ impl RecordedPair {
                     })
                 })
             });
-        let artifact = PairedRunArtifact {
-            schema_version: if self.schema_version == OBSERVATIONS_SCHEMA_V4 {
-                if request_fingerprints_complete {
-                    crate::paired::PAIRED_ARTIFACT_SCHEMA_V8.into()
-                } else {
-                    crate::paired::PAIRED_ARTIFACT_SCHEMA_V7.into()
-                }
-            } else {
-                PAIRED_ARTIFACT_SCHEMA_V6.into()
-            },
+        let valid_time_registered = matches!(
+            self.schema_version.as_str(),
+            OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6
+        ) && tasks.values().any(|task| {
+            task.oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.valid_at.is_some())
+        });
+        let selector_expectation_registered = tasks.values().any(|task| {
+            task.oracle
+                .read_expectation
+                .as_ref()
+                .is_some_and(|expectation| expectation.selector_arguments.is_some())
+        });
+        let artifact_schema = if matches!(
+            self.schema_version.as_str(),
+            OBSERVATIONS_SCHEMA_V4 | OBSERVATIONS_SCHEMA_V5 | OBSERVATIONS_SCHEMA_V6
+        ) {
+            crate::paired::paired_artifact_schema_for_reads(
+                receipts
+                    .iter()
+                    .any(|receipt| receipt.read_capture_status.is_some()),
+                request_fingerprints_complete,
+                valid_time_registered,
+                selector_expectation_registered,
+            )?
+            .into()
+        } else {
+            PAIRED_ARTIFACT_SCHEMA_V6.into()
+        };
+        let mut artifact = PairedRunArtifact {
+            schema_version: artifact_schema,
             arm,
             run_id: Some(self.run_id.clone()),
             run_started_at: self.run_started_at,
@@ -240,6 +335,7 @@ impl RecordedPair {
             expected_trials,
             receipts,
         };
+        super::complete_selector_registration_diagnostics(&mut artifact);
         artifact.validate()?;
         Ok(artifact)
     }

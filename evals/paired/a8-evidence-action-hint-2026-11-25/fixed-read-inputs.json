@@ -1,0 +1,117 @@
+[
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "helios-absent",
+      "case_id": "helios-absent",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "incumbent",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Helios override code"
+    },
+    "expected_source_events": [],
+    "expected_completeness": null
+  },
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "helios-absent",
+      "case_id": "helios-absent",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "candidate",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Helios override code"
+    },
+    "expected_source_events": [],
+    "expected_completeness": null,
+    "presentation": "evidence_action_hint"
+  },
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "opal-support",
+      "case_id": "opal-support",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "incumbent",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Opal calibration key"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": null
+  },
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "opal-support",
+      "case_id": "opal-support",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "candidate",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Opal calibration key"
+    },
+    "expected_source_events": [
+      "ledger"
+    ],
+    "expected_completeness": null,
+    "presentation": "evidence_action_hint"
+  },
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "quartz-conflict",
+      "case_id": "quartz-conflict",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "incumbent",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Quartz calibration key"
+    },
+    "expected_source_events": [
+      "ledger",
+      "note"
+    ],
+    "expected_completeness": null
+  },
+  {
+    "key": {
+      "stratum_id": "a8-presentation",
+      "family_id": "quartz-conflict",
+      "case_id": "quartz-conflict",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "candidate",
+    "arguments": {
+      "budget": 8,
+      "compact": true,
+      "query": "Quartz calibration key"
+    },
+    "expected_source_events": [
+      "ledger",
+      "note"
+    ],
+    "expected_completeness": null,
+    "presentation": "evidence_action_hint"
+  }
+]

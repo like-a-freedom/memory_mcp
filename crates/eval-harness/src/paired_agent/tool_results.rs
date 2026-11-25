@@ -3,6 +3,7 @@
 use std::collections::BTreeSet;
 
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub(crate) fn collect_source_episode_ids(value: &Value, found: &mut BTreeSet<String>) {
     match value {
@@ -157,11 +158,54 @@ pub(crate) fn requested_cutoff(arguments: &Value) -> Option<String> {
     .ok()
 }
 
+/// Fingerprint only the normalized valid-time axis, independently of a
+/// knowledge-revision selector. RFC3339 offsets normalize to the same UTC hash.
+pub(crate) fn valid_at_sha256(valid_at: chrono::DateTime<chrono::Utc>) -> String {
+    super::sha256(
+        valid_at
+            .to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+            .as_bytes(),
+    )
+}
+
+pub(crate) fn requested_valid_at_sha256(arguments: &Value) -> Option<String> {
+    let timestamp = arguments
+        .get("valid_at")
+        .and_then(Value::as_str)
+        .or_else(|| arguments.get("as_of").and_then(Value::as_str))?;
+    chrono::DateTime::parse_from_rfc3339(timestamp)
+        .ok()
+        .map(|timestamp| valid_at_sha256(timestamp.with_timezone(&chrono::Utc)))
+}
+
+fn returned_valid_at_sha256(payload: &Value) -> Option<String> {
+    let timestamp = payload
+        .pointer("/context/snapshot/valid_at")
+        .and_then(Value::as_str)?;
+    chrono::DateTime::parse_from_rfc3339(timestamp)
+        .ok()
+        .map(|timestamp| valid_at_sha256(timestamp.with_timezone(&chrono::Utc)))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReadRequestFingerprints {
     pub query_sha256: Option<String>,
     pub non_query_arguments_sha256: String,
+    pub selector_arguments_sha256: BTreeMap<String, String>,
 }
+
+pub(crate) const ASSEMBLE_CONTEXT_SELECTOR_FIELDS: [&str; 10] = [
+    "fact_types",
+    "as_of",
+    "valid_at",
+    "known_at",
+    "known_revision",
+    "budget",
+    "view_mode",
+    "window_start",
+    "window_end",
+    "compact",
+];
 
 /// Retain only digests that let an offline evaluator prove a retry changed
 /// the query while preserving every selector and budget argument.
@@ -181,7 +225,185 @@ pub(crate) fn read_request_fingerprints(
     Ok(ReadRequestFingerprints {
         query_sha256,
         non_query_arguments_sha256,
+        selector_arguments_sha256: selector_argument_fingerprints(arguments)?,
     })
+}
+
+pub(crate) fn expected_selector_argument_fingerprints(
+    arguments: &BTreeMap<String, Value>,
+) -> Result<BTreeMap<String, String>, crate::EvalError> {
+    let value = Value::Object(
+        arguments
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
+    );
+    selector_argument_fingerprints(&value)
+}
+
+pub(crate) fn validate_expected_selector_arguments(
+    arguments: &BTreeMap<String, Value>,
+) -> Result<(), crate::EvalError> {
+    use crate::EvalError;
+
+    for (field, value) in arguments {
+        if !ASSEMBLE_CONTEXT_SELECTOR_FIELDS.contains(&field.as_str()) {
+            return Err(EvalError::InvalidInput(
+                "registered read selector contains an unsupported field".into(),
+            ));
+        }
+        let valid = match field.as_str() {
+            "fact_types" => value
+                .as_array()
+                .is_some_and(|values| values.iter().all(Value::is_string)),
+            "as_of" => value.as_str().is_some_and(|timestamp| {
+                timestamp.trim().is_empty()
+                    || chrono::DateTime::parse_from_rfc3339(timestamp).is_ok()
+            }),
+            "valid_at" | "known_at" => {
+                value.is_null()
+                    || value.as_str().is_some_and(|timestamp| {
+                        chrono::DateTime::parse_from_rfc3339(timestamp).is_ok()
+                    })
+            }
+            "window_start" | "window_end" => {
+                value.is_null()
+                    || value.as_str().is_some_and(|timestamp| {
+                        memory_mcp::tools::parsers::parse_datetime(timestamp).is_some()
+                    })
+            }
+            "known_revision" => {
+                value.is_null() || value.as_i64().is_some_and(|revision| revision >= 0)
+            }
+            "budget" => value
+                .as_i64()
+                .is_some_and(|budget| i32::try_from(budget).is_ok()),
+            "view_mode" => value.is_null() || value.is_string(),
+            "compact" => value.is_boolean(),
+            _ => false,
+        };
+        if !valid {
+            return Err(EvalError::InvalidInput(
+                "registered read selector has an invalid value".into(),
+            ));
+        }
+    }
+
+    let as_of = arguments
+        .get("as_of")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty());
+    if as_of
+        && ["valid_at", "known_at", "known_revision"]
+            .iter()
+            .any(|field| arguments.get(*field).is_some_and(|value| !value.is_null()))
+        || arguments
+            .get("known_at")
+            .is_some_and(|value| !value.is_null())
+            && arguments
+                .get("known_revision")
+                .is_some_and(|value| !value.is_null())
+    {
+        return Err(EvalError::InvalidInput(
+            "registered read selector combines incompatible temporal axes".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn selector_argument_fingerprints(
+    arguments: &Value,
+) -> Result<BTreeMap<String, String>, crate::EvalError> {
+    let mut fingerprints = BTreeMap::new();
+    for field in ASSEMBLE_CONTEXT_SELECTOR_FIELDS {
+        let normalized = effective_selector_value(field, arguments.get(field));
+        fingerprints.insert(
+            field.to_owned(),
+            super::sha256(&serde_json::to_vec(&normalized)?),
+        );
+    }
+    Ok(fingerprints)
+}
+
+fn effective_selector_value(field: &str, value: Option<&Value>) -> Value {
+    use serde_json::json;
+
+    match field {
+        "fact_types" => match value {
+            None => json!([]),
+            Some(Value::Array(values)) => {
+                let mut normalized = values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                normalized.sort();
+                normalized.dedup();
+                json!(normalized)
+            }
+            Some(value) => value.clone(),
+        },
+        "as_of" => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+            if value.as_str().is_some_and(|value| value.trim().is_empty()) {
+                return Value::Null;
+            }
+            normalized_timestamp_value(value)
+        }
+        "valid_at" | "known_at" => value.map(normalized_timestamp_value).unwrap_or(Value::Null),
+        "window_start" | "window_end" => value
+            .and_then(Value::as_str)
+            .and_then(memory_mcp::tools::parsers::parse_datetime)
+            .map(|timestamp| {
+                Value::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
+            })
+            .unwrap_or(Value::Null),
+        "known_revision" => value
+            .filter(|value| !value.is_null())
+            .cloned()
+            .unwrap_or(Value::Null),
+        "view_mode" => match value {
+            None | Some(Value::Null) => Value::Null,
+            Some(Value::String(value)) => {
+                let trimmed = value.trim();
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("current") {
+                    Value::Null
+                } else {
+                    Value::String(trimmed.to_owned())
+                }
+            }
+            Some(value) => value.clone(),
+        },
+        "budget" => match value {
+            None => json!(5),
+            Some(value) => value
+                .as_i64()
+                .map(|budget| json!(budget.clamp(1, 250)))
+                .unwrap_or_else(|| value.clone()),
+        },
+        "compact" => value.cloned().unwrap_or(Value::Bool(true)),
+        _ => Value::Null,
+    }
+}
+
+fn normalized_timestamp_value(value: &Value) -> Value {
+    let Some(timestamp) = value.as_str() else {
+        return value.clone();
+    };
+    chrono::DateTime::parse_from_rfc3339(timestamp)
+        .ok()
+        .map(|timestamp| {
+            Value::String(
+                timestamp
+                    .with_timezone(&chrono::Utc)
+                    .to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
+            )
+        })
+        .unwrap_or_else(|| value.clone())
 }
 
 /// Fingerprint guidance when present without persisting its natural-language text.
@@ -229,6 +451,7 @@ pub(crate) fn read_evidence(
                     .is_some()
             })
             .and_then(requested_cutoff),
+        returned_valid_at_sha256: returned_valid_at_sha256(payload),
     })
 }
 
@@ -286,11 +509,18 @@ pub(crate) fn successful_read_fact_source_pairs(result: &Value) -> Vec<(String, 
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use serde_json::json;
 
+    fn selector_fingerprints(arguments: &Value) -> BTreeMap<String, String> {
+        read_request_fingerprints(arguments)
+            .expect("request fingerprints")
+            .selector_arguments_sha256
+    }
+
     use super::{
-        read_evidence, read_request_fingerprints, read_result, response_guidance_sha256,
-        successful_read_fact_source_pairs,
+        read_evidence, read_request_fingerprints, read_result, requested_valid_at_sha256,
+        response_guidance_sha256, successful_read_fact_source_pairs,
     };
     use crate::paired_agent::{MemoryReadOutcome, ReadCompleteness};
 
@@ -406,21 +636,21 @@ mod tests {
             "query":"where is the archive key?",
             "valid_at":"2026-11-21T12:00:00Z",
             "fact_types":["decision"],
-            "context_budget":2048,
+            "budget":2,
             "compact":true
         });
         let retry = json!({
             "query":"which key is stored at the archive?",
             "valid_at":"2026-11-21T12:00:00Z",
             "fact_types":["decision"],
-            "context_budget":2048,
+            "budget":2,
             "compact":true
         });
         let broadened = json!({
             "query":"which key is stored at the archive?",
             "valid_at":"2026-11-22T12:00:00Z",
             "fact_types":["decision"],
-            "context_budget":4096,
+            "budget":4,
             "compact":true
         });
 
@@ -438,6 +668,88 @@ mod tests {
             retry.non_query_arguments_sha256,
             broadened.non_query_arguments_sha256
         );
+        assert_eq!(
+            first.selector_arguments_sha256["budget"],
+            retry.selector_arguments_sha256["budget"]
+        );
+        assert_ne!(
+            retry.selector_arguments_sha256["budget"],
+            broadened.selector_arguments_sha256["budget"]
+        );
+    }
+
+    #[test]
+    fn selector_fingerprints_normalize_default_values() {
+        let defaults = selector_fingerprints(&json!({}));
+        let explicit_defaults = selector_fingerprints(&json!({
+            "fact_types": [],
+            "budget": 5,
+            "compact": true
+        }));
+        assert_eq!(defaults, explicit_defaults);
+    }
+
+    #[test]
+    fn selector_fingerprints_clamp_budget_to_server_minimum() {
+        let minimum_budget = selector_fingerprints(&json!({"budget": 0}));
+        let explicit_minimum = selector_fingerprints(&json!({"budget": 1}));
+        assert_eq!(minimum_budget["budget"], explicit_minimum["budget"]);
+    }
+
+    #[test]
+    fn selector_fingerprints_clamp_budget_to_server_maximum() {
+        let maximum_budget = selector_fingerprints(&json!({"budget": 251}));
+        let explicit_maximum = selector_fingerprints(&json!({"budget": 250}));
+        assert_eq!(maximum_budget["budget"], explicit_maximum["budget"]);
+    }
+
+    #[test]
+    fn selector_fingerprints_treat_blank_legacy_time_as_unset() {
+        let defaults = selector_fingerprints(&json!({}));
+        let blank_legacy_time = selector_fingerprints(&json!({"as_of": "  "}));
+
+        assert_eq!(defaults["as_of"], blank_legacy_time["as_of"]);
+    }
+
+    #[test]
+    fn blank_legacy_time_does_not_conflict_with_valid_time_registration() {
+        let blank_legacy_axis = std::collections::BTreeMap::from([
+            ("as_of".to_owned(), json!("  ")),
+            ("valid_at".to_owned(), json!("2026-05-01T10:00:00Z")),
+        ]);
+        validate_expected_selector_arguments(&blank_legacy_axis)
+            .expect("whitespace-only legacy selector is unset");
+    }
+
+    #[test]
+    fn selector_fingerprints_treat_current_view_as_default() {
+        let defaults = selector_fingerprints(&json!({}));
+        let current_view = selector_fingerprints(&json!({"view_mode": " CURRENT "}));
+
+        assert_eq!(defaults["view_mode"], current_view["view_mode"]);
+    }
+
+    #[test]
+    fn selector_window_timestamps_accept_the_server_minute_precision() {
+        let minute_precision = selector_fingerprints(&json!({
+            "window_start":"2026-05-01T11:00Z"
+        }));
+        let second_precision = selector_fingerprints(&json!({
+            "window_start":"2026-05-01T11:00:00Z"
+        }));
+
+        assert_eq!(
+            minute_precision["window_start"],
+            second_precision["window_start"]
+        );
+    }
+
+    #[test]
+    fn registered_selector_rejects_negative_knowledge_revision() {
+        let selectors =
+            std::collections::BTreeMap::from([("known_revision".to_owned(), json!(-1))]);
+
+        assert!(validate_expected_selector_arguments(&selectors).is_err());
     }
 
     #[test]
@@ -453,5 +765,47 @@ mod tests {
 
         assert_eq!(digest.len(), 64);
         assert!(!digest.contains("Refine"));
+    }
+
+    #[test]
+    fn valid_at_fingerprints_normalize_offsets_and_accept_legacy_as_of() {
+        let valid_at = json!({"valid_at":"2026-05-01T11:00:00+01:00"});
+        let legacy_as_of = json!({"as_of":"2026-05-01T10:00:00Z"});
+
+        assert_eq!(
+            requested_valid_at_sha256(&valid_at),
+            requested_valid_at_sha256(&legacy_as_of)
+        );
+        assert_eq!(
+            requested_valid_at_sha256(&valid_at).as_deref(),
+            Some("092c00268b464dfd95c1624f4019859171028b88271f5c69b9bb29536ec8b33f")
+        );
+    }
+
+    #[test]
+    fn invalid_or_absent_requested_valid_at_has_no_fingerprint() {
+        assert_eq!(
+            requested_valid_at_sha256(&json!({"valid_at":"not a timestamp"})),
+            None
+        );
+        assert_eq!(requested_valid_at_sha256(&json!({"query":"no time"})), None);
+    }
+
+    #[test]
+    fn read_evidence_fingerprints_snapshot_valid_at_without_retaining_timestamp() {
+        let response = json!({
+            "structuredContent": {
+                "result": [{"source_episode":"episode:one"}],
+                "context": {"snapshot": {"valid_at":"2026-05-01T10:00:00Z"}}
+            }
+        });
+        let evidence = read_evidence(&response, None).expect("structured evidence");
+        let serialized = serde_json::to_string(&evidence).expect("serialized evidence");
+
+        assert_eq!(
+            evidence.returned_valid_at_sha256.as_deref(),
+            Some("092c00268b464dfd95c1624f4019859171028b88271f5c69b9bb29536ec8b33f")
+        );
+        assert!(!serialized.contains("2026-05-01"));
     }
 }

@@ -189,12 +189,16 @@ See the [native baseline report](../../docs/evals/LONGMEMEVAL_V2_SMALL_WEB_BASEL
 for both scored passes and their independent coverage receipts.
 
 The [B5 recheck](results/2026-11-25-b5-recheck/RECHECK.md) recorded 1/7
-official exact match and one complete reviewed source span. The subsequent
-[post-C3 recheck](results/2026-11-25-c3-final-query-fix/RECHECK.md) recorded
-3/7 exact matches and two complete reviewed spans on the same seven-case
-cohort. One exact-match answer was unsupported by context, and a second had
-sufficient adjacent controls without the full reviewed span. Treat these as
-small-sample outcomes, not proof of general quality or latency improvement.
+exact matches and one complete reviewed source span under its original reader
+protocol. The subsequent paired [post-C3 recheck](results/2026-11-25-c3-final-query-fix/RECHECK.md)
+replayed the same seven B5 and C3 contexts with identical concise-answer
+instructions and local standalone MLX-LM; its pinned scorer recorded 1/7 for
+B5 and 3/7 for C3, while the supplemental strict list metric was 0/4 and 2/4.
+Because the paired reader prompt was adapted, this is a diagnostic comparison,
+not an official full LongMemEval result. One accepted answer includes an
+unsupported extra option, and the false-premise cases remain wrong. Treat the
+outcomes as small-sample evidence, not proof of general quality or latency
+improvement.
 
 [The frozen manifest](small-web-text-cohort.json) registers seven questions
 backed by three complete accessibility-tree observations. Each entry gives

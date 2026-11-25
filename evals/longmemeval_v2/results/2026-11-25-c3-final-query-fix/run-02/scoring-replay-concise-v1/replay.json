@@ -1,0 +1,91 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-concise-paired-reader/v1",
+  "version": "c3",
+  "protocol": "paired local diagnostic; appends the exact output constraint recorded below to both arms",
+  "prompt_suffix": "\n\nOutput constraint: Do not include analysis. Return only a concise final answer in the exact format requested. If the premise is wrong, state the flaw briefly inside the requested boxed format.",
+  "prompt_suffix_sha256": "d945ee385942c96ed9532c4981f005825361e591c8d12aac64b00ec70ef6399c",
+  "reader_model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "judge_model": "/Users/solovey/.cache/lm-studio/models/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+  "reader_endpoint": "http://127.0.0.1:18767/v1/chat/completions",
+  "judge_endpoint": "http://127.0.0.1:18766/v1/chat/completions",
+  "runtime": "standalone MLX-LM loopback; LM Studio application/server/CLI not used",
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "reader_initial_max_tokens": 512,
+  "judge_initial_max_tokens": 512,
+  "retry_caps": [
+    512,
+    1024
+  ],
+  "pinned_upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "official_scoring": "pinned upstream qa_eval_metrics predicates and judge prompt; stdlib loopback adapter",
+  "cases": {
+    "selected_case_count": 7,
+    "scored_case_count": 7,
+    "official_exact_match": "3/7",
+    "official_failure_inclusive_successes_over_selected": 3,
+    "official_metrics_status": "complete",
+    "strict_phrase_set": {
+      "selected": 4,
+      "correct": 2,
+      "failure_inclusive_accuracy": 0.5
+    },
+    "memory_query_latency_seconds": {
+      "mean": 590.5487533511415,
+      "median": 429.7414541670005,
+      "max": 989.6444373749982
+    },
+    "reader_generation_seconds": {
+      "mean": 9.833428571428572,
+      "median": 10.007,
+      "sum": 68.834
+    },
+    "contexts": {
+      "0c6b0c60": "9579cd1bf5a592b1fc9c683a7f32957b6ada642d492edf84fee147759d71e60c",
+      "6d975a08": "3b739781a4bf51b790d820b7fac89455b102e35a9fd4a0f46ee56d1ab72f97a9",
+      "89a20f48": "6dd0330ed123b490403da7c14aff67df9f87307a9104486c87213c7b313499de",
+      "922a0c56": "240408ef58f2961eabe304e92870179275e6963489aa6874789027e7ef902ccd",
+      "d6da3938": "c122f96369d0ddc837e1286c37b52be159273e6d92585d31eb3df30b75b58e6d",
+      "f43926d9": "8abd977bc05625ee3faf79d7c3275c4c1ffa87a748ea4707ac7faeac47b16ffc",
+      "f61a096f": "576f130d3eb924251ad4c67d6cc369199704f710e3d553114cb610ae9190aad0"
+    },
+    "case_official_scores": {
+      "0c6b0c60": true,
+      "6d975a08": true,
+      "89a20f48": false,
+      "922a0c56": false,
+      "d6da3938": true,
+      "f43926d9": false,
+      "f61a096f": false
+    },
+    "case_strict_scores": {
+      "0c6b0c60": false,
+      "6d975a08": true,
+      "89a20f48": null,
+      "922a0c56": null,
+      "d6da3938": true,
+      "f43926d9": null,
+      "f61a096f": false
+    },
+    "case_status": {
+      "0c6b0c60": "scored",
+      "6d975a08": "scored",
+      "89a20f48": "scored",
+      "922a0c56": "scored",
+      "d6da3938": "scored",
+      "f43926d9": "scored",
+      "f61a096f": "scored"
+    },
+    "completion_tokens": {
+      "0c6b0c60": 25,
+      "6d975a08": 12,
+      "89a20f48": 7,
+      "922a0c56": 37,
+      "d6da3938": 135,
+      "f43926d9": 7,
+      "f61a096f": 257
+    }
+  }
+}

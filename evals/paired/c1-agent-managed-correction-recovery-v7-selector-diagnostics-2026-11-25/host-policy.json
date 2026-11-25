@@ -1,0 +1,30 @@
+{
+  "schema_version": "memory-mcp-agent-managed-maintenance-host-policy/v6",
+  "codex_binary": "resolved from the run command; exact SHA-256 is pinned in plan.json",
+  "codex_version": "pinned per registered run in plan.json",
+  "authentication": "existing local Codex home; no API key copied to runner artifacts",
+  "ephemeral_session": true,
+  "ignore_user_config": true,
+  "ignore_exec_rules": true,
+  "sandbox": "read-only",
+  "disabled_codex_features": [
+    "apps",
+    "memories",
+    "plugins",
+    "request_permissions_tool",
+    "shell_tool",
+    "skill_search"
+  ],
+  "enabled_codex_features": ["skip_host_skill_discovery"],
+  "host_context_isolation": {
+    "home": "fresh temporary directory per trial",
+    "working_directory": "fresh isolated workspace per trial",
+    "codex_home": "existing local authenticated Codex home used only for authentication; config ignored"
+  },
+  "web_search": "disabled",
+  "mcp_server": "required local memory_decisions stdio server",
+  "maintenance_tool_allowlist": ["assemble_context", "extract", "invalidate"],
+  "recall_tool_allowlist": ["assemble_context"],
+  "independent_probe": "direct MCP call by evaluator; no agent session",
+  "outer_host_execution": "direct host launch; transmit only synthetic task data unless user explicitly approves a different scope"
+}

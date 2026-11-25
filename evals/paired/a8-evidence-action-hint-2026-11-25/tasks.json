@@ -1,0 +1,87 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "a8-presentation",
+        "family_id": "opal-support",
+        "case_id": "opal-support",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use the memory tool once. Where is the Opal calibration key stored? Return the required JSON answer.",
+      "seed_episodes": [
+        {
+          "event_id": "ledger",
+          "source_id": "a8-opal-ledger",
+          "source_type": "document",
+          "content": "The Opal calibration key is stored in Cabinet-28.",
+          "valid_at": "2026-11-24T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["ledger"]]],
+        "accepted_answers": ["Cabinet-28"],
+        "forbidden_event_ids": [],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "a8-presentation",
+        "family_id": "quartz-conflict",
+        "case_id": "quartz-conflict",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Use the memory tool once. Which cabinet stores the Quartz calibration key? If the records conflict, answer exactly `The records conflict.` and ask for clarification.",
+      "seed_episodes": [
+        {
+          "event_id": "ledger",
+          "source_id": "a8-quartz-signed-ledger",
+          "source_type": "document",
+          "content": "The Quartz calibration key is stored in Cabinet-43.",
+          "valid_at": "2026-11-24T10:00:00Z"
+        },
+        {
+          "event_id": "note",
+          "source_id": "a8-quartz-maintenance-note",
+          "source_type": "document",
+          "content": "The Quartz calibration key is stored in Cabinet-72.",
+          "valid_at": "2026-11-24T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [[["ledger"], ["note"]]],
+        "accepted_answers": ["The records conflict."],
+        "forbidden_event_ids": [],
+        "needs_clarification": true
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "a8-presentation",
+        "family_id": "helios-absent",
+        "case_id": "helios-absent",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Use the memory tool once. What is the Helios override code? If memory has no supporting evidence, answer exactly `I do not know.` and ask for the source.",
+      "seed_episodes": [
+        {
+          "event_id": "unrelated",
+          "source_id": "a8-helios-unrelated-record",
+          "source_type": "document",
+          "content": "The Helios storage room has blue shelves.",
+          "valid_at": "2026-11-24T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [],
+        "accepted_answers": ["I do not know."],
+        "forbidden_event_ids": ["unrelated"],
+        "needs_clarification": true
+      }
+    }
+  ]
+}

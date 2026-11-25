@@ -121,7 +121,19 @@
     "run-01/reviewed-span-coverage.json": "6e0e343816ff891f6a7ec365272f07f4bdb6338ed0dd3f0ecc0c77f2c7536be3",
     "reviewed_span_coverage.py": "07ac4af003ccd0de6469f4686aaa4a564a5b840c0b1cbfd285426db5b64639ca",
     "test_reviewed_span_coverage.py": "288868ac0b131bb925f94dac29adc53a6cc0539fed66846b2a7bf3106fb65234",
-    "text_cohort.py": "cc750e4361266bd98dd8acfb365a7d0b286a56ac8e0ad005e9044345ec20c391"
+    "text_cohort.py": "cc750e4361266bd98dd8acfb365a7d0b286a56ac8e0ad005e9044345ec20c391",
+    "run-02/scoring-replay-concise-v1/reader_outputs.jsonl": "468b889f791666637bbd6e627c9b3c64952ba43ecbd73ba8f92da940698c3f2c",
+    "run-02/scoring-replay-concise-v1/per_question.jsonl": "b38e5ac1fae0e8ee253edf5c806a73a8f541b4a3fed9da04dcc8307398768e6f",
+    "run-02/scoring-replay-concise-v1/replay.json": "2606ccc73aea7aadb05a0fb30d2d909979b38c184bee2374342954b7bc09f80c",
+    "run-02/scoring-replay-concise-v1/strict-phrase-set-accuracy.json": "778f7c8a79ccd6a47b8f0508784688e1e165e9a0afae7f1c6a8f8182e524352b",
+    "run-02/reviewed-span-coverage.json": "6e0e343816ff891f6a7ec365272f07f4bdb6338ed0dd3f0ecc0c77f2c7536be3",
+    "concise-b5-vs-c3-comparison.json": "24cde9b2dfd259a34fcbbda99d35f84edf9b81ca2b0af61ef585c2d1ea915782",
+    "../2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1/reader_outputs.jsonl": "fd1ccd3ede3e2678f50eac2787038dfc50f52e197b53aac7e759de7031f97d88",
+    "../2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1/per_question.jsonl": "726753fd1a8c008949fcaba34d83fc76ae6e739ad4a67644d294085dcf748536",
+    "../2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1/replay.json": "dffd3c406741b9ada91051e5a60ebbb11a33d0d28a58e36deb9820bf5d0033d2",
+    "../2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1/strict-phrase-set-accuracy.json": "b0bf5e1ca6c0b8d83a5e03abde44e1c958028ffa48a51fbd64e55e6e8ba7cac8",
+    "evals/longmemeval_v2/exact_answer_quality.py": "12b65ee62dd77b74bf3db83caa10d7f8d5289c1b90aae68d2de49630fe48dd60",
+    "evals/longmemeval_v2/test_exact_answer_quality.py": "bd1114746a305a09724770bf375a0b466d144ff2d31dfe2aa7f38c526983c663"
   },
   "baseline_comparison": {
     "run": "evals/longmemeval_v2/results/2026-11-25-b5-recheck/run-02",
@@ -137,9 +149,157 @@
   },
   "interpretation_limits": [
     "This is the reviewed seven-case subset, not the full LongMemEval-V2 benchmark.",
-    "Only one post-C3 model capture was run; exact-match changes are not yet repeat-confirmed.",
+    "The repeated original-protocol scoring attempt had two judge failures, so its official 7-case score is unavailable; the separate matched concise-prompt replay scored 7/7 but is not an official full LongMemEval result.",
     "One exact-match pass is unsupported by its retrieved context.",
     "The reviewed-span metric requires a complete frozen span and can miss narrower sufficient evidence.",
     "The sample does not establish a stable latency improvement or general agent utility."
-  ]
+  ],
+  "repeat_run": {
+    "schema": "memory-mcp-longmemeval-v2-c3-repeat/v1",
+    "status": "memory query and reader outputs completed; original scoring attempt incomplete; paired concise-protocol scoring completed separately",
+    "host": {
+      "platform": "aarch64-apple-darwin",
+      "execution": "local Apple Silicon"
+    },
+    "repository": {
+      "head": "457044031d612cf6c8ecb1477802c6ddaa5f6346",
+      "working_tree_dirty": true,
+      "product_binary": "target/release/memory_mcp",
+      "product_binary_sha256": "44296692d85f4f9e1074ffa9b6d1198f8a3972f51c23a3d712cea4e2221a33ac",
+      "product_binary_format": "Mach-O arm64"
+    },
+    "upstream": {
+      "pinned_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+      "resolved_import_path": "target/c4-native/upstream",
+      "resolved_path_has_git_metadata": false,
+      "git_rev_parse_was_not_valid_provenance": true,
+      "verification": "SHA-256 content comparison against a clean checkout of the pinned commit",
+      "staged_source_files_compared": 53,
+      "content_mismatches": 0,
+      "pinned_checkout_extra_files": 29,
+      "extra_files_scope": "generated build/lib copies and packaging metadata; not imported"
+    },
+    "cohort": {
+      "frozen_case_ids": [
+        "0c6b0c60",
+        "6d975a08",
+        "89a20f48",
+        "922a0c56",
+        "d6da3938",
+        "f43926d9",
+        "f61a096f"
+      ],
+      "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+      "staged_input_sha256": {
+        "questions.json": "7f5beb79700ad9670b81b423777f60c643bbdcba4eeb65fb6fbb0586a938afec",
+        "haystack.json": "9b751199062ea7db2edc472a4f362aca7af5eb113f7ddf2f39c0b6d3d5eba1ac",
+        "trajectories.json": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+        "selection.json": "3749af6c58ec5886a71ba5eaf72ea2d86dca344675bbc4ab09d21fc1e7d0aca8"
+      },
+      "staged_inputs_match_first_c3": true,
+      "snapshot_digest": "97740bee54fbff313865ced6aab3bac17666d1cca8e4c6efc29502376c7e105e",
+      "same_snapshot_as_first_c3": true
+    },
+    "models": {
+      "runtime": "standalone local MLX-LM 0.32.2 / MLX 0.32.4, loopback only; no LM Studio endpoint or external inference",
+      "model_profile_sha256": "495cec02ff18302331ae6ca5d123a0ed494814a548a1f7b7cce1b68ba2e18582",
+      "reader_and_judge_profile_file_count_rehashed": 23,
+      "all_reader_and_judge_files_match_profile": true,
+      "processor_profile_file_count_rehashed": 8,
+      "all_processor_files_match_profile": true,
+      "network": "HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1; model traffic only to 127.0.0.1"
+    },
+    "execution": {
+      "prompt_contexts_built": 7,
+      "reader_responses_generated": 7,
+      "judge_scored_cases": 5,
+      "judge_failures": {
+        "89a20f48": {
+          "stage": "judge",
+          "error_type": "ValueError"
+        },
+        "f43926d9": {
+          "stage": "judge",
+          "error_type": "ValueError"
+        }
+      },
+      "initial_attempt_elapsed_seconds": 1850.926,
+      "reader_replay_seconds": 169.486,
+      "official_exact_match": null,
+      "scored_case_exact_match": "2/5",
+      "failure_inclusive_successes_over_7": "2/7",
+      "official_metrics_status": "unavailable_due_to_scoring_failure",
+      "reviewed_full_span": {
+        "present": 2,
+        "selected": 7
+      },
+      "context_payloads_identical_to_first_c3": 7,
+      "memory_query_seconds": {
+        "mean": 590.5487533511415,
+        "median": 429.7414541670005,
+        "p95": 989.6444373749982,
+        "max": 989.6444373749982
+      }
+    },
+    "artifact_sha256": {
+      "run-02/run_args.json": "0ad26e9efe44a86a1ea024457c7cc4507f43a31268a0b8d79c1831fe57d2f28e",
+      "run-02/prompt_build_summary.json": "560663f94df15b3f64e8e2dff77f933b866719e49f64bc05b7205940626c871f",
+      "run-02/prompt_rows.jsonl": "545a780721d74b86866f6edbc50c818119c0ab229afd8c6aa88431cae09ef632",
+      "run-02/score-coverage.json": "87c3ca2adbb4c7c528151abf500162d2209d0cd4c7725942501d46c01877f853",
+      "run-02/reviewed-span-coverage.json": "6e0e343816ff891f6a7ec365272f07f4bdb6338ed0dd3f0ecc0c77f2c7536be3",
+      "run-02/case-comparison.json": "9e488c5effa12fd41f4e081e75a11684af04329c0ad83a3321d37d4af622f509",
+      "run-02/scoring-replay/reader_outputs.jsonl": "2b26949aabc81918d6059000f224ec7c0b1ab1d26c664740e86d149e5671e5d5",
+      "run-02/scoring-replay/per_question.jsonl": "f95c63e69123da5044776593a80f49a4eaced3b9277230f5386991430dbdf48c",
+      "run-02/scoring-replay/scoring-replay.json": "c3751b480413ae52298fc5c7f308f7833087ff6e4abcf9fc7a39d163cc1d70fe"
+    },
+    "interpretation_limits": [
+      "In the repeated original-protocol scoring attempt, judge errors for 89a20f48 and f43926d9 mean official 7-case accuracy is unavailable; a separate matched concise-prompt replay completed but is not an official full benchmark result.",
+      "2/5 is accuracy among cases with successful judge responses; 2/7 is a failure-inclusive lower-bound count, not an official aggregate.",
+      "All seven memory context payloads match the first post-C3 run, so retrieval output was stable on this frozen snapshot.",
+      "Only the complete frozen source-span check is deterministic; it is present for 2/7 and can miss narrower sufficient evidence.",
+      "Observed latency shifts are small, from one seven-case sample; no material speedup is established."
+    ],
+    "paired_concise_replay": {
+      "schema": "memory-mcp-longmemeval-v2-b5-c3-concise-paired-comparison/v1",
+      "artifact": "concise-b5-vs-c3-comparison.json",
+      "same_frozen_case_count": 7,
+      "reader_and_judge_coverage": {
+        "b5": "7/7",
+        "post_c3": "7/7"
+      },
+      "memory_contexts_match_first_c3": "7/7",
+      "b5_vs_c3_contexts_match": "3/7",
+      "pinned_scoring_accuracy": {
+        "b5": "1/7",
+        "post_c3": "3/7"
+      },
+      "strict_phrase_set_accuracy": {
+        "b5": "0/4",
+        "post_c3": "2/4"
+      },
+      "complete_reviewed_span": {
+        "b5": "1/7",
+        "post_c3": "2/7"
+      },
+      "memory_query_seconds": {
+        "b5": {
+          "mean": 630.4063079402861,
+          "median": 437.6712041669962,
+          "max": 1011.490362291006
+        },
+        "post_c3": {
+          "mean": 590.5487533511415,
+          "median": 429.7414541670005,
+          "max": 989.6444373749982
+        }
+      },
+      "reader_generation_seconds": {
+        "b5_sum": 92.173,
+        "post_c3_sum": 68.834
+      },
+      "protocol": "paired diagnostic with the same concise output instruction appended to both arms; not an official full LongMemEval run",
+      "prompt_suffix_sha256": "d945ee385942c96ed9532c4981f005825361e591c8d12aac64b00ec70ef6399c",
+      "runtime": "standalone local MLX-LM loopback; no LM Studio or remote inference"
+    }
+  }
 }

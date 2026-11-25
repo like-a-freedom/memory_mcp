@@ -1,0 +1,95 @@
+{
+  "schema_version": "memory-mcp-agent-plan/v2",
+  "plan_id": "c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25",
+  "stage": "development_pilot",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "mossvale-cryo-vial-ledger-key-history",
+      "case_id": "mossvale-current-cryo-vial-ledger-key",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "amberwick-tide-gauge-calibration-station-history",
+      "case_id": "amberwick-current-tide-gauge-calibration-station",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "bellpine-radar-synchronization-channel-history",
+      "case_id": "bellpine-current-radar-synchronization-channel",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "wrenfield-saltwater-germination-tray-history",
+      "case_id": "wrenfield-current-saltwater-germination-tray",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "planned_independent_families": 4,
+  "shared_identity": {
+    "agent_runner": "codex-cli",
+    "agent_version": "0.171.0-alpha.13",
+    "model": "gpt-6.1-sol",
+    "model_identity_protocol": {
+      "method": "same_alias_within_invocation",
+      "max_duration_seconds": 7200
+    },
+    "system_prompt_sha256": "abd2a2e1fc473ed6a37419bb00f4fa101f7711670a78ef20f569ab15b85583ee",
+    "task_prompt_sha256": "1b9dc6977e1cad79e0195400b5bb60d24f0f97d9a9884ae3a0292565978324a8",
+    "host_policy_sha256": "2df1be214f58e0edbb8514121f93d427cc8a8d3709d0dff16b26d5a61088e239",
+    "transport": "stdio",
+    "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+    "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+    "judge_config_sha256": null,
+    "corpus_sha256": "09b103f16c02e87bfd419627e51c2e84c2a841f20c805e8ff74a901bb9429ee2",
+    "oracle_sha256": "32d0e7bf243807186c6a28541a074390c882593bdcc59784858a81c4d7bdfddb",
+    "clock_id": "macos-utc-wall-clock-v1",
+    "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+    "provider_fingerprints": {
+      "codex_cli": "3b6d00deea5fabc50ad34be1872b8e4ead1638d23c68fabb7837edc07f0cf1e0",
+      "memory_eval_cli": "bb0d5845da7ecf61c74113edba1803a978f0ec2963930d837943f3eda128e10e"
+    },
+    "context_budget_tokens": 65536,
+    "tool_call_budget": 8,
+    "turn_budget": 8,
+    "output_token_budget": 1024,
+    "wall_time_budget_ms": 120000,
+    "hardware_class": "macos-arm64"
+  },
+  "incumbent_product": {
+    "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+    "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "candidate_product": {
+    "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+    "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+    "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+    "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "declared_tool_schema_change": null,
+  "bootstrap": {
+    "seed": 2026112528,
+    "draws": 10000,
+    "confidence_level_basis_points": 9500
+  },
+  "pilot_report_sha256": null,
+  "power_analysis_sha256": null,
+  "promotion_criteria": null
+}

@@ -1,0 +1,173 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "emberglass-arctic-seed-history",
+        "case_id": "emberglass-current-polar-catalog-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Emberglass Arctic Seed Repository uses Opal-31 as its polar seed catalog index. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v3/emberglass-arctic-seed/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Emberglass Arctic Seed Repository's current polar seed catalog index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Emberglass Arctic Seed Repository's current polar seed catalog index? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v3-emberglass-arctic-seed-old-01",
+          "source_id": "conversation://c1-recovery-v3/emberglass-arctic-seed/original-01",
+          "source_type": "conversation",
+          "content": "Emberglass Arctic Seed Repository uses Sable-43 as its polar seed catalog index.",
+          "valid_at": "2026-11-04T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v3-emberglass-arctic-seed-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v3-emberglass-arctic-seed-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Opal-31"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v3-emberglass-arctic-seed-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "bluewake-oceanographic-archive-history",
+        "case_id": "bluewake-current-subglacial-calibration-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Bluewake Oceanographic Archive uses Current-58 as its subglacial array calibration code. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v3/bluewake-oceanographic-archive/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Bluewake Oceanographic Archive's current subglacial array calibration code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Bluewake Oceanographic Archive's current subglacial array calibration code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v3-bluewake-oceanographic-archive-old-01",
+          "source_id": "conversation://c1-recovery-v3/bluewake-oceanographic-archive/original-01",
+          "source_type": "conversation",
+          "content": "Bluewake Oceanographic Archive uses Morrow-22 as its subglacial array calibration code.",
+          "valid_at": "2026-11-05T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v3-bluewake-oceanographic-archive-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v3-bluewake-oceanographic-archive-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Current-58"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v3-bluewake-oceanographic-archive-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "cinderpeak-sky-survey-history",
+        "case_id": "cinderpeak-current-array-timing-bus",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Cinderpeak Sky Survey uses Quartz-74 as its primary array timing bus. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v3/cinderpeak-sky-survey/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Cinderpeak Sky Survey's current primary array timing bus? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Cinderpeak Sky Survey's current primary array timing bus? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v3-cinderpeak-sky-survey-old-01",
+          "source_id": "conversation://c1-recovery-v3/cinderpeak-sky-survey/original-01",
+          "source_type": "conversation",
+          "content": "Cinderpeak Sky Survey uses Ember-13 as its primary array timing bus.",
+          "valid_at": "2026-11-06T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v3-cinderpeak-sky-survey-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v3-cinderpeak-sky-survey-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-74"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v3-cinderpeak-sky-survey-old-01"
+        ],
+        "needs_clarification": false
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "lanternwild-orchid-reserve-history",
+        "case_id": "lanternwild-current-orchid-accession-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Lanternwild Orchid Reserve uses Nimbus-26 as its orchid accession ledger. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v3/lanternwild-orchid-reserve/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Lanternwild Orchid Reserve's current orchid accession ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Lanternwild Orchid Reserve's current orchid accession ledger? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v3-lanternwild-orchid-reserve-old-01",
+          "source_id": "conversation://c1-recovery-v3/lanternwild-orchid-reserve/original-01",
+          "source_type": "conversation",
+          "content": "Lanternwild Orchid Reserve uses Iodine-44 as its orchid accession ledger.",
+          "valid_at": "2026-11-07T13:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v3-lanternwild-orchid-reserve-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v3-lanternwild-orchid-reserve-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Nimbus-26"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v3-lanternwild-orchid-reserve-old-01"
+        ],
+        "needs_clarification": false
+      }
+    }
+  ]
+}

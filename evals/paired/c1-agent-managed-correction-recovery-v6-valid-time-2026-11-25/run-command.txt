@@ -1,0 +1,44 @@
+# Run from the repository root. This script executes capture 01 only.
+set -euo pipefail
+plan_root="$PWD/evals/paired/c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25"
+shasum -a 256 -c "$plan_root/freeze-manifest.sha256" >/dev/null
+capture_dir="$plan_root/capture-01"
+if test -e "$capture_dir"; then
+  printf 'Refusing to overwrite existing capture directory: %s\n' "$capture_dir" >&2
+  exit 1
+fi
+
+private_root=$(mktemp -d /tmp/c1-v6-codex-home.XXXXXX)
+trap 'rm -rf "$private_root"' EXIT
+mkdir -m 700 -p "$private_root/home" "$private_root/codex-home"
+cp "$HOME/.codex/auth.json" "$private_root/codex-home/auth.json"
+chmod 600 "$private_root/codex-home/auth.json"
+
+target/debug/memory-eval run-paired-codex \
+  --plan "$plan_root/plan.json" \
+  --tasks "$plan_root/tasks.json" \
+  --codex-binary "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex" \
+  --codex-home "$private_root/codex-home" \
+  --memory-tool-profile agent_maintenance_v6 \
+  --incumbent-memory-server "$PWD/target/debug/memory_mcp" \
+  --candidate-memory-server "$PWD/target/debug/memory_mcp" \
+  --output-directory "$capture_dir"
+
+target/debug/memory-eval compare-agent-managed \
+  --plan "$plan_root/plan.json" \
+  --incumbent "$capture_dir/incumbent.json" \
+  --candidate "$capture_dir/candidate.json" \
+  --incumbent-stages "$capture_dir/agent-managed-incumbent.json" \
+  --candidate-stages "$capture_dir/agent-managed-candidate.json" \
+  --output "$capture_dir/agent-managed-comparison.json"
+
+python3 "$plan_root/evaluate_c1.py" \
+  --tasks "$plan_root/tasks.json" --criteria "$plan_root/criteria.json" \
+  --plan "$plan_root/plan.json" --fingerprints "$plan_root/fingerprints.json" \
+  --incumbent "$capture_dir/incumbent.json" --candidate "$capture_dir/candidate.json" \
+  --incumbent-stages "$capture_dir/agent-managed-incumbent.json" \
+  --candidate-stages "$capture_dir/agent-managed-candidate.json" \
+  --output "$capture_dir/evaluation.json"
+
+# Capture 02 is a separate invocation allowed only if evaluation.json has
+# eligible_for_capture_02=true. It must use fresh temporary HOME/CODEX_HOME.

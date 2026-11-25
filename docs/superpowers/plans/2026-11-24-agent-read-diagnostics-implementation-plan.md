@@ -101,10 +101,10 @@ Add an optional private `MemoryReadEvidence` to each `MemoryReadObservation`, wi
 
 Produced per-read diagnostics include `outcome`, `requested_cutoff_match`, `returned_cutoff_match`, `source_coverage`, `annotation_match`, `completeness`, and `cited_returned_source_count`. Use `Option<bool>` for checks that may be unobservable or unregistered, and the product's `complete`/`partial`/`unknown` vocabulary for completeness. Source IDs and annotation tuples in private scorer input are bound to the matched reply. Reuse the existing status/outcome/role vocabulary. For cutoff matching use the normalized UTC instant and revision from the request and returned snapshot. In normalized external input carry canonical pair digests for the request and response rather than raw query or snapshot text. Compare each against the checkpoint and valid time from private registration. Missing echo is unknown. A positively different echo is mismatch.
 
-- [ ] Write `actual_read_scores_source_coverage_and_missing_claim_status_independently`. Bind `episode:cedar` to the required event `cedar-ledger`. Return it in the read, but omit required `evidence_status: "conflicting"`. Read the CLI receipt and assert `source_coverage == Some(true)` and `annotation_match == Some(false)`. Preserve the legacy task score. Through `run_with_independent_probes`, independently exercise the same agent-trial observation with a successful `FixedTrialProbe` and assert that the independent score still passes.
-- [ ] Run `cargo test -p eval-harness --locked --test paired_comparison_cli actual_read_scores_source_coverage_and_missing_claim_status_independently`. RED is absent per-read scoring.
-- [ ] Extend `score_trial` to evaluate the captured fields. Reuse existing source-group and annotation matching semantics, leaving independent scoring and existing task acceptance intact. Persist only normalized outcomes. A source in the second reply cannot repair the *first* reply's diagnostics; task-level scoring can still use several successful reads by its existing rules.
-- [ ] Run the same filter. Then run one Red → Green slice per case below. Use the case name as the test filter.
+- [x] Verify source coverage, missing claim status, and task acceptance independently through the public CLI regression `scores_external_observations_offline_using_the_private_oracle`. It asserts `source_coverage == true`, `annotation_match == false`, and preserves task success; the separate `cli_blocks_confirmation_when_ordinary_workflow_fails_despite_passing_probes` regression proves that 4/4 independent probes cannot compensate for failed ordinary tasks. Reuse these assertions instead of adding duplicate large fixtures.
+- [x] Run `cargo test -p eval-harness --locked --test paired_comparison_cli scores_external_observations_offline_using_the_private_oracle`; it passed on native Apple Silicon on 2026-11-25.
+- [x] Implement and verify `score_trial` with the private source-group and annotation oracle. Persist only normalized outcomes; read diagnostics remain separate from task and independent-probe scores.
+- [x] Cover the table cases in the existing public CLI scorer regression: wrong returned revision with the correct source, UTC-equivalent registered time, wrong final answer, missing citation, and empty partial read. The output is replayed byte-identically; private IDs, answers, annotations, and cutoff digests are absent from published receipts.
 
 | Case | Fixture and assertion |
 | --- | --- |
@@ -113,7 +113,7 @@ Produced per-read diagnostics include `outcome`, `requested_cutoff_match`, `retu
 | `adequate_read_preserves_missing_citation_diagnostic` | Same adequate read and correct answer with empty citation list. Assert `required_evidence_cited == Some(false)` with zero cited returned sources, task fails. |
 | `partial_empty_read_does_not_indicate_global_absence` | Return an empty array with `partial` historical context. Assert `Empty` plus `Partial`; absent completeness metadata yields unknown. |
 
-- [ ] Run the focused CLI and adapter targets. Check native and offline scoring produce the same normalized diagnostics for the same projection. Commit `feat(eval): score actual read evidence independently`.
+- [x] Run the focused public CLI and adapter regressions. The native CLI replay produces byte-identical receipts for equivalent observations; `scores_external_observations_offline_using_the_private_oracle` passed on 2026-11-25. Implementation is present in the current workspace; no commit is claimed here.
 
 ## Task A5. Prove diagnostic redaction and oracle isolation
 
@@ -121,10 +121,9 @@ Produced per-read diagnostics include `outcome`, `requested_cutoff_match`, `retu
 
 **Interfaces.** Consume A4. Test `export-paired-inputs` and `score-paired-observations`. Legacy `final_answer` remains private scoring input under the existing contract; it never appears in published receipts. New diagnostics never copy raw final text, request parameters, MCP replies or oracle values.
 
-- [ ] Write `read_expectations_stay_out_of_exported_runner_inputs`, with a distinct marker in the private oracle. Assert unchanged public projection and marker absence.
-- [ ] Run `cargo test -p eval-harness --locked --test paired_comparison_cli read_expectations_stay_out_of_exported_runner_inputs`. Treat an already GREEN fixture as a guard. Implement only a demonstrated leak fix.
-- [ ] Write and run `receipts_exclude_read_and_final_answer_sentinels`. Use distinct request, tool result, provider call ID and final-output markers. Assert that artifacts and journal contain none while task scoring still uses the private final text. Run `cargo test -p eval-harness --locked --test paired_comparison_cli --test paired_prompt_contract`.
-- [ ] Update the public schema/replay guide and commit `docs(eval): specify read telemetry and archive compatibility` with any redaction fix.
+- [x] Verify the public runner projection excludes the private oracle and its read expectation in `scores_external_observations_offline_using_the_private_oracle`; the fixture asserts the annotation sentinel and `read_expectation` are absent.
+- [x] Verify published receipts omit private source IDs, answer text, annotations, and cutoff digests while scoring still uses the private answer. Native journal tests also assert query and guidance text are not serialized. No raw argument or reply fields were added.
+- [x] Update the public contract in [PAIRED_AGENT_EVAL.md](../../evals/PAIRED_AGENT_EVAL.md). The existing regression and journal tests cover the current redaction contract; no duplicate test-only fixture was added.
 
 ## Task A6. Replay one registered public reply in a diagnostic capture
 
@@ -132,11 +131,10 @@ Produced per-read diagnostics include `outcome`, `requested_cutoff_match`, `retu
 
 **Interfaces.** Introduce `RecallReadMode::{Live, FixedReply}` with a diagnostic-only `RecallMemorySession<M: MemoryToolSession>` implementing the existing trait. First add the adapter through `run_phase`, then expose explicit `run-paired-chat-completions --recall-read-mode live|fixed-reply` for a recall task manifest. The existing CLI without this flag still consumes its managed-task manifest. Use `--fixed-read-inputs <path>` only with `fixed-reply`. Registration keys are `CaseTrialKey` plus arm; each value pins canonical public `assemble_context` arguments and its expected normalized response shape. The payload delivered to the agent is the exact response to that fixed call in the trial's seeded session. Bind mode and registration hash to `SharedRunIdentity.reader_config_sha256`; compare runs of different modes as diagnostic controls, outside the promotion comparator.
 
-- [ ] Write `fixed_reply_is_delivered_to_the_original_tool_call`. Script `read-1`. Have the public tool fixture return empty for the model-selected query and its one registered response containing `episode:cedar` and `Cabinet-28` for the fixed query. Assert the next model request has the same `tool_call_id`, a tool message whose content deserializes to the exact fixed response JSON, and the same advertised schema as the live path.
-- [ ] Run `cargo test -p eval-harness --locked --test chat_completions_runner fixed_reply_is_delivered_to_the_original_tool_call`. The incumbent forwards the empty live result.
-- [ ] Validate a unique, bounded registration before capture. For the first allowed `assemble_context` call, substitute the registered public request and deliver its exact reply. Execute one public read in either mode. Use a separate diagnostic registration with `tool_call_budget = 1` and track the model's attempted arguments distinctly from the fixed executed request. Never supply a reply for a forbidden tool or without a read. Validate that the response sources and snapshot bind to this seeded trial. This reuse avoids cross-run episode IDs and extra retrieval side effects.
-- [ ] Run the same filter. Red → Green for `recall_capture_rejects_unregistered_read_mode` at the CLI. Assert exit 2 before opening a session when CLI mode or registry hash disagrees with the exploratory plan. Reuse existing public seed logic, fingerprints, loopback checks and budgets. Do not accept confirmation plans in this diagnostic mode.
-- [ ] Run both target suites. Assert unchanged history inputs, budgets and oracle projection and report successful reads, clarification turns, input/output tokens and budget exits separately. Commit `feat(eval): add fixed-reply recall diagnostics`.
+- [x] Verify `fixed_reply_is_delivered_to_the_original_tool_call`: the scripted model call ID is preserved, the registered public reply reaches the model, and the live tool schema remains unchanged.
+- [x] Verify registration and mode enforcement with `recall_capture_rejects_unregistered_read_mode`; unregistered modes fail before opening the session.
+- [x] Keep fixed-reply mode bound to the registered trial/arm and response shape, with one public read and unchanged prompts, history, budgets, and oracle projection. The mode and registration hash are included in run identity.
+- [x] Run `cargo test -p eval-harness --locked --test chat_completions_runner fixed_reply_is_delivered_to_the_original_tool_call` and `cargo test -p eval-harness --locked --test paired_comparison_cli recall_capture_rejects_unregistered_read_mode`; both passed on native Apple Silicon on 2026-11-25.
 
 ## Task A7. Run the bounded diagnostic screen
 
@@ -152,13 +150,199 @@ recovered the historical source and cutoff on LFM; neither local model
 produced a usable answer under the registered historical controls.
 [Receipts and qualified interpretation](../../../evals/paired/recall-read-local-screen-2026-11-24/report.md)
 
-## Task A8. Change response presentation only after A7 reproduces the failure
+## Task A8. Test an evaluator-only evidence-action hint
 
-**Files.** `crates/memory-mcp/src/tools/assemble_context.rs`, owning `src/memory/api.rs` or retrieval module if domain logic is needed, `tests/assemble_context_wire_contract.rs`. Any wire addition requires an approved compatibility contract first.
+**Current disposition (2026-11-25): no public product change is supported.** A7 recovered the registered source/snapshot with fixed reply in the LFM screen, but neither local model produced a passing final answer; Qwen did not provide a valid paired comparison. A response hint cannot know semantic answerability from retrieval alone, so the experiment must not expose `answer`, `clarify`, or `insufficient` as if they were answer-quality judgments.
 
-- [ ] Freeze a public candidate response fixture that gives a typed disposition (`answer`, `clarify`, `insufficient`) and existing source IDs. Compare the same sources and budgets with the current projection in the controlled runner. Proceed only with an observed presentation-specific gain under A7 and the unchanged safety oracle.
-- [ ] Write one wire-contract test per disposition. Assert the exact serialized disposition, existing source ID and no new claims. For partial input assert `insufficient` or `clarify` as specified by the accepted fixture, never a global absence conclusion. Pin the old consumer projection and existing payload limit in separate cases.
-- [ ] Run each new test through `cargo test -p memory_mcp --locked --test assemble_context_wire_contract <test-name>` before and after its minimal implementation. Replay ordinary and contradiction controls through the native deterministic plan. Require no new ordinary miss, zero prohibited/unsupported evidence, unchanged compatibility and compliance with the frozen item/byte budgets.
-- [ ] Commit a product change only with reproducible GREEN receipts. Document the screen and its scope even if the candidate is declined.
+The controlled candidate is an evaluator-only projection added after the public MCP reply is validated. It is derived solely from returned public fields and carries one of three bounded actions: `answer_with_sources` when non-conflicting items were returned, `clarify_conflict` when a returned item exposes contradiction or temporal ambiguity, and `verify_or_ask` when no usable items were returned. The hint must preserve source IDs, instruct the agent to answer only when the returned facts support the task, and never equate an empty or partial result with global absence. The raw public result, prompts, read arguments, model, budgets and safety oracle remain matched. The hint is not added to the product response unless a separate, successful promotion study supports it.
+
+**Files.** `crates/eval-harness/src/paired_agent/{chat_completions,chat_completions_backend}.rs`, `tests/chat_completions_runner.rs`, `tests/paired_comparison_cli.rs`, `evals/paired/`, and the evaluation guide. No product wire change is part of this task.
+
+- [x] Add a registered `current` versus `evidence_action_hint` projection to fixed-read diagnostics. Bind it to the reader fingerprint; default `current` preserves historical registration bytes. Public runner tests cover supported evidence, typed conflict, unknown/missing status, empty partial evidence, opaque replies, and unchanged source/call association.
+- [x] Freeze a fresh all-synthetic cohort, identical agent prompts/model/budgets and registered read arguments, outcome/resource gates, stopping rule, static public-MCP preflight, and local native Apple Silicon command before any model request. The run used the direct local MLX endpoint and no remote data.
+- [x] Run matched current/hint captures. Compare exact task answer, source citation, clarification, prohibited evidence and resource use. Keep task families as the sampling unit and preserve every failed run. The screen returned 2/3 exact tasks per arm, with zero hard violations; no candidate-only task success occurred. The absent-evidence clarification matched only in the hint arm, but its answer still failed acceptance. Median latency was 15.490s current versus 15.941s candidate; one incumbent invalid response accounts for the apparent mean difference. No disjoint repeat or product promotion was authorized by the stop rule.
+- [x] Record the result and decision in the [paired evaluation guide](../../evals/PAIRED_AGENT_EVAL.md#registered-recall-controls) and [A8 report](../../../evals/paired/a8-evidence-action-hint-2026-11-25/README.md). The candidate was declined for promotion; product wire-contract tests and compatibility review were therefore not entered.
+
+**A8 result (2026-11-25).** One native Apple Silicon matched capture on three
+synthetic families produced 2/3 exact task successes in both arms. Expected
+source coverage was 3/3 in each arm. The candidate improved clarification
+matching on the empty case, but its final answer still contained unacceptable
+extra text. The incumbent's corresponding run ended with `invalid_response`.
+No hard violations occurred. Candidate median trial latency was 451ms slower;
+the lower mean is driven by the mismatched failure outcomes and is not a
+latency improvement. The typed status needed to label the conflict was absent
+from the public replies, so the candidate safely used `verify_or_ask`. This
+screen supports neither a product change nor an end-to-end benefit claim.
+
+## Task A9. Separate valid-time selection from transaction-revision matching
+
+**Purpose.** C1 recovery v5 showed empty partial reads, but its query and
+non-query hashes could not distinguish a missed `valid_at` from a missed
+query. The next diagnostic must attribute the valid-time axis before changing
+retrieval or response behavior.
+
+**Files.** `crates/eval-harness/src/paired_agent/{tool_results,observations}.rs`,
+`src/{paired_agent,codex_agent}.rs`, `src/paired.rs`, and
+`tests/paired_comparison_cli.rs`.
+
+- [x] Capture only SHA-256 of normalized requested `valid_at` (or legacy
+  `as_of`) and returned `context.snapshot.valid_at`. Normalize RFC3339 offsets
+  to UTC. Never serialize raw timestamps.
+- [x] Compare each fingerprint independently with the private registered
+  `read_expectation.valid_at`. Preserve the existing full cutoff comparison
+  for tasks that pin both valid time and `known_revision`; unknown echoes stay
+  unknown.
+- [x] Add observation v5, paired receipt v9 and native journal v7 with strict
+  compatibility checks. Preserve v4 observations and v7/v8 paired artifact
+  replay without mutation.
+- [x] RED → GREEN through the public `score-paired-observations` CLI: UTC
+  offset equivalence, matching and mismatching request/returned times,
+  timestamp redaction, and byte-identical replay. Run the paired comparison
+  CLI test target and helper unit tests on native Apple Silicon.
+- [x] Register a fresh, disjoint synthetic C1 cohort with private expected
+  `valid_at`; run locally on native Apple Silicon and report whether empty
+  reads are explained by request-time mismatch, returned snapshot mismatch,
+  or an unresolved query/selector issue. Do not change retrieval on an
+  ambiguous result. V6 completed on 2026-11-25: both requested and returned
+  times matched 8/8 per arm, but reads stayed empty/partial 8/8 and task
+  success was 0/4. Query fingerprints exactly matched neither registered
+  question; first-read non-query fingerprints matched across arms in 2/4
+  families. This does not isolate semantic query quality or the differing
+  selector. Review also exposed a scorer bug that compared a full cutoff when
+  no transaction revision was registered; the false results are marked
+  unusable in the [capture report](../../../evals/paired/c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25/capture-01/REPORT.md).
+  A public CLI regression failed before and passed after the scorer was changed
+  to compare the full cutoff only when both axes are registered. The focused
+  test and full `paired_comparison_cli` target passed (14 tests); the frozen
+  offline capture evaluation completed with its expected NO-GO decision. No
+  retrieval change was justified by this ambiguous result.
+
+## Task A10. Attribute the remaining selector mismatch
+
+**Purpose.** A9 proved that requested and returned `valid_at` were correct in
+C1 v6, but its aggregate non-query digest cannot identify whether `fact_types`,
+the knowledge boundary, budget, view, window, or compact selector differs.
+Before changing memory retrieval, record a field-level comparison against a
+private, task-registered selector oracle.
+
+**Public seam.** `score-paired-observations` takes an observation bundle and
+the private paired task manifest, then emits only per-field match booleans.
+The agent adapter and persisted observation contain hashes only; query text,
+argument values, returned memory, and private oracle values remain out of the
+scored artifact. Exact query equality remains diagnostic and is never a
+task-success gate.
+
+**Compatibility.** Add observations v6, paired artifact v10, and native receipt
+journal v8. Keep v1–v5 observations and paired artifact v2–v9 replay unchanged.
+Fingerprint only the fixed `assemble_context` selector allowlist. Normalize
+timestamps to UTC and resolve product defaults before hashing so omitted
+`budget`, `compact`, and empty/default selectors are not reported as false
+mismatches. A present selector oracle is complete: unspecified allowlisted
+fields mean their effective product default.
+
+**Files.** `crates/eval-harness/src/paired_agent/{tool_results,observations}.rs`,
+`src/{paired_agent,codex_agent}.rs`, `src/paired.rs`,
+`tests/paired_comparison_cli.rs`, and a fresh disjoint C1 registration and
+report. Do not change product retrieval or presentation in this task.
+
+- [x] First add a public CLI regression with different faults in two allowed
+  selectors. Confirm RED before implementation. Assert that the evaluator
+  names only those fields with false matches, reports true matches for the
+  independent controls, emits no raw value/query sentinels, and replays old
+  artifacts byte-identically.
+- [x] Add request-side allowlisted selector fingerprints to both Codex and
+  Chat Completions capture paths. Reject malformed/unknown selector-oracle
+  fields at registration. Compare each normalized field to the private oracle
+  in the scorer; never add the values or expected hashes to public output.
+- [x] Bump and validate the three artifact schemas above. Require complete
+  selector fingerprints for the new observation version and selector-match
+  diagnostics for its paired artifact; preserve historical version-specific
+  validation.
+- [x] Run focused tests for timestamp normalization and defaults, then the
+  whole `paired_comparison_cli` target and relevant adapter targets on native
+  Apple Silicon. Replay at least one archived v6 report through the old schema
+  path and compare output bytes.
+- [x] Register and freeze a disjoint synthetic C1 selector-diagnostic cohort
+  before any model call. Run capture 01 on local Apple Silicon without LM Studio;
+  keep Codex input synthetic-only. Run capture 02 only after the registered
+  capture-01 gates pass, then stop under the preregistered task gate. Report
+  per-field selector matches, valid-time results, read/source coverage, task
+  success, failures, and latency. A failed gate remains NO-GO; no memory code
+  change follows unless a specific selector defect is reproduced and a
+  deterministic product-level guard demonstrates it.
+
+**A10 implementation and verification — 2026-11-25.** Selector fingerprints
+and paired v10 validation are implemented for Codex and Chat Completions. The
+public CLI regression verifies per-field booleans, redaction, mixed registered
+and unregistered reads, and byte-identical replay. An archived C1 v6 artifact
+replayed byte-identically. Selector normalization tests passed (10); the full
+`paired_comparison_cli` target passed (15), the v7 standalone evaluator tests
+passed (29), formatting passed, and workspace Clippy passed without warnings.
+
+The fresh [C1 v7 cross-capture review](../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
+has a NO-GO workflow result: capture 01 passed 4/4 exact cited tasks in both
+arms, while the single allowed repeat fell to 0/4 in both. Independent probes,
+correction and invalidation checks stayed 4/4. Capture 02 had six empty reads
+per arm and one sufficient-evidence incumbent read whose final answer failed;
+the candidate's sole nonempty read was insufficient and triggered one
+`prohibited_evidence` hard violation. All valid-time checks matched. Selector
+mismatches do not explain this result because similar `known_at` and `compact`
+mismatches also occurred in successful capture 01. No product memory change is
+supported. The cohort stop rule prohibits any further capture on these four
+families.
+
+The `v7` in this cohort name refers to the selector-diagnostics artifact
+version, not maintenance prompt v7. Its frozen registration and run command pin
+`agent_maintenance_v6`, with recall system v3 and recall task rules v4. Do not
+cite this C1 result as a model-backed evaluation of `agent_maintenance_v7`.
+
+Critical review of selector normalization found no current mismatch with the
+server path: the server clamps retrieval budget to 1–250; trims and drops empty
+fact types before membership filtering; uses RFC 3339 parsing for temporal
+selectors and the shared `parse_datetime` for windows; and defaults `compact`
+to true. The evaluator applies the same effective defaults. Its sort/dedup of
+fact types is equivalent because filtering is set membership. This is a source
+parity audit, not a cross-crate contract test; duplicated normalization remains
+a drift risk, but no code defect was demonstrated.
+
+## Task A11. Resolve the registered prompt conflict with B5
+
+**Finding.** Critical review after A10 found that the maintenance-v6 answer
+prompt said to preserve every read argument, including `as_of` and `known_at`,
+while B5 requires an authorized retry to bind `valid_at` and `known_revision`
+to the returned snapshot. Keep v6 immutable for artifact replay; make the
+corrected prompt opt in under a new profile.
+
+- [x] Add `agent_maintenance_v7` and its separate `recall_only_v4` phase. The
+  new system/rule pair copies both snapshot axes, omits legacy temporal fields,
+  keeps all other selectors fixed, permits at most one explicitly authorized
+  query-only retry, and preserves partial/unknown semantics.
+- [x] Pin v7 through CLI parsing, managed-manifest fingerprints, Codex identity
+  validation and internal read-phase dispatch. Add regressions for prompt
+  separation and retain the v6 conflicting prompt/fingerprint path for replay.
+- [x] Document the profile and qualification limit in the
+  [paired evaluation guide](../../evals/PAIRED_AGENT_EVAL.md#snapshot-consistent-retry--maintenance-v7).
+- [ ] Run a preregistered model-backed v7 screen on disjoint synthetic
+  families before claiming an improvement in agent behavior or task metrics.
+  The C1 v7 selector-diagnostics cohort does not satisfy this task: it ran
+  `agent_maintenance_v6`, as recorded in its frozen `run-command.txt` and
+  `fingerprints.json`.
+  No memory product change is justified by this prompt defect alone.
+
+**Disposition.** The instruction mismatch is fixed and deterministically
+checked. No model-backed v7 result is claimed; its effect on agent behavior
+and task metrics remains unmeasured. Before that screen can make a retry-compliance
+claim, extend the registered evaluator to represent the initial read and its
+possible retry as a state transition: a retry after an empty partial response
+must change only the query, set `valid_at` and `known_revision` from the
+preceding response snapshot, omit `as_of` and `known_at`, and preserve the
+remaining selectors. The current `ReadExpectation` applies one static selector
+oracle to every read and cannot prove that relationship. A standalone v7
+feasibility result may report task success and observed selector hashes, but it
+must not claim v6-to-v7 improvement or verified snapshot-bound retry behavior.
+A future comparative prompt experiment also needs arm-specific prompt/profile
+identity; paired Codex runs currently require both arms to share one memory-tool
+profile and one shared prompt identity. Any follow-up must use fresh families
+and obey the existing workflow gates.
 
 Next independent plans: [Historical retrieval and identity](2026-11-24-historical-memory-implementation-plan.md) · [Qualification and remaining evaluations](2026-11-24-memory-evaluation-qualification-implementation-plan.md).

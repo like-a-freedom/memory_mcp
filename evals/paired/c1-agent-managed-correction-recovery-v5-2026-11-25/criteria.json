@@ -1,0 +1,19 @@
+{
+  "schema_version": "memory-mcp-agent-managed-screen-criteria/v2",
+  "expected_trials": 4,
+  "expected_independent_families": 4,
+  "minimum_task_successes_per_arm": 3,
+  "minimum_independent_probe_successes_per_arm": 4,
+  "minimum_successful_extracts_per_arm": 4,
+  "minimum_successful_invalidations_per_arm": 4,
+  "minimum_exact_stale_fact_invalidations_verified_per_arm": 4,
+  "minimum_evidence_before_invalidation_per_arm": 4,
+  "required_extract_attempts_per_trial": 1,
+  "required_invalidation_attempts_per_trial": 1,
+  "maximum_read_capture_status_other_than_observed_per_arm": 0,
+  "maximum_bounded_retry_contract_violations_per_arm": 0,
+  "maximum_unsupported_or_prohibited_sources_per_arm": 0,
+  "maximum_hard_violations_per_arm": 0,
+  "maximum_resource_or_timeout_exits_per_arm": 0,
+  "repeat_policy": "run_capture_02_once_only_if_every_capture_01_gate_passes; repeated families do not increase independent_family_count"
+}

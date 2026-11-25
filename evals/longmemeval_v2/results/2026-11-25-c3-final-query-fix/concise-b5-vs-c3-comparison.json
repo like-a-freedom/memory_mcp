@@ -1,0 +1,210 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-b5-c3-concise-paired-comparison/v1",
+  "cohort_case_ids": [
+    "0c6b0c60",
+    "6d975a08",
+    "89a20f48",
+    "922a0c56",
+    "d6da3938",
+    "f43926d9",
+    "f61a096f"
+  ],
+  "pinned_upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "paired_prompt_suffix_sha256": "d945ee385942c96ed9532c4981f005825361e591c8d12aac64b00ec70ef6399c",
+  "same_query_prompts_applied_to_both_arms": true,
+  "context_sha256_matches": 3,
+  "results": {
+    "b5": {
+      "selected_case_count": 7,
+      "scored_case_count": 7,
+      "official_exact_match": "1/7",
+      "official_failure_inclusive_successes_over_selected": 1,
+      "official_metrics_status": "complete",
+      "strict_phrase_set": {
+        "selected": 4,
+        "correct": 0,
+        "failure_inclusive_accuracy": 0.0
+      },
+      "memory_query_latency_seconds": {
+        "mean": 630.4063079402861,
+        "median": 437.6712041669962,
+        "max": 1011.490362291006
+      },
+      "reader_generation_seconds": {
+        "mean": 13.16757142857143,
+        "median": 10.765,
+        "sum": 92.173
+      },
+      "contexts": {
+        "0c6b0c60": "05bf434cd61a1dfcdeca3b38b3c292cfd35ceb824b54bd85aa62aee369941e47",
+        "6d975a08": "925ce9396bd7f3a36ca155d3d5b83d9198ec767c5c4269114f06eef35c713be7",
+        "89a20f48": "ee1c6c3cf4d0d8e3ab52d1b42fb075ce062c61464d04fe9f5658a27b33ecf062",
+        "922a0c56": "240408ef58f2961eabe304e92870179275e6963489aa6874789027e7ef902ccd",
+        "d6da3938": "51ba48bb6e2c460a55d27cb79a929c2decba15be4a5aba531363387a513ce4cb",
+        "f43926d9": "8abd977bc05625ee3faf79d7c3275c4c1ffa87a748ea4707ac7faeac47b16ffc",
+        "f61a096f": "576f130d3eb924251ad4c67d6cc369199704f710e3d553114cb610ae9190aad0"
+      },
+      "case_official_scores": {
+        "0c6b0c60": true,
+        "6d975a08": false,
+        "89a20f48": false,
+        "922a0c56": false,
+        "d6da3938": false,
+        "f43926d9": false,
+        "f61a096f": false
+      },
+      "case_strict_scores": {
+        "0c6b0c60": false,
+        "6d975a08": false,
+        "89a20f48": null,
+        "922a0c56": null,
+        "d6da3938": false,
+        "f43926d9": null,
+        "f61a096f": false
+      },
+      "case_status": {
+        "0c6b0c60": "scored",
+        "6d975a08": "scored",
+        "89a20f48": "scored",
+        "922a0c56": "scored",
+        "d6da3938": "scored",
+        "f43926d9": "scored",
+        "f61a096f": "scored"
+      },
+      "completion_tokens": {
+        "0c6b0c60": 25,
+        "6d975a08": 10,
+        "89a20f48": 7,
+        "922a0c56": 37,
+        "d6da3938": 7,
+        "f43926d9": 7,
+        "f61a096f": 257
+      }
+    },
+    "c3": {
+      "selected_case_count": 7,
+      "scored_case_count": 7,
+      "official_exact_match": "3/7",
+      "official_failure_inclusive_successes_over_selected": 3,
+      "official_metrics_status": "complete",
+      "strict_phrase_set": {
+        "selected": 4,
+        "correct": 2,
+        "failure_inclusive_accuracy": 0.5
+      },
+      "memory_query_latency_seconds": {
+        "mean": 590.5487533511415,
+        "median": 429.7414541670005,
+        "max": 989.6444373749982
+      },
+      "reader_generation_seconds": {
+        "mean": 9.833428571428572,
+        "median": 10.007,
+        "sum": 68.834
+      },
+      "contexts": {
+        "0c6b0c60": "9579cd1bf5a592b1fc9c683a7f32957b6ada642d492edf84fee147759d71e60c",
+        "6d975a08": "3b739781a4bf51b790d820b7fac89455b102e35a9fd4a0f46ee56d1ab72f97a9",
+        "89a20f48": "6dd0330ed123b490403da7c14aff67df9f87307a9104486c87213c7b313499de",
+        "922a0c56": "240408ef58f2961eabe304e92870179275e6963489aa6874789027e7ef902ccd",
+        "d6da3938": "c122f96369d0ddc837e1286c37b52be159273e6d92585d31eb3df30b75b58e6d",
+        "f43926d9": "8abd977bc05625ee3faf79d7c3275c4c1ffa87a748ea4707ac7faeac47b16ffc",
+        "f61a096f": "576f130d3eb924251ad4c67d6cc369199704f710e3d553114cb610ae9190aad0"
+      },
+      "case_official_scores": {
+        "0c6b0c60": true,
+        "6d975a08": true,
+        "89a20f48": false,
+        "922a0c56": false,
+        "d6da3938": true,
+        "f43926d9": false,
+        "f61a096f": false
+      },
+      "case_strict_scores": {
+        "0c6b0c60": false,
+        "6d975a08": true,
+        "89a20f48": null,
+        "922a0c56": null,
+        "d6da3938": true,
+        "f43926d9": null,
+        "f61a096f": false
+      },
+      "case_status": {
+        "0c6b0c60": "scored",
+        "6d975a08": "scored",
+        "89a20f48": "scored",
+        "922a0c56": "scored",
+        "d6da3938": "scored",
+        "f43926d9": "scored",
+        "f61a096f": "scored"
+      },
+      "completion_tokens": {
+        "0c6b0c60": 25,
+        "6d975a08": 12,
+        "89a20f48": 7,
+        "922a0c56": 37,
+        "d6da3938": 135,
+        "f43926d9": 7,
+        "f61a096f": 257
+      }
+    }
+  },
+  "paired_case_deltas": {
+    "0c6b0c60": {
+      "b5_official": true,
+      "c3_official": true,
+      "b5_strict_phrase_set": false,
+      "c3_strict_phrase_set": false,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "6d975a08": {
+      "b5_official": false,
+      "c3_official": true,
+      "b5_strict_phrase_set": false,
+      "c3_strict_phrase_set": true,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "89a20f48": {
+      "b5_official": false,
+      "c3_official": false,
+      "b5_strict_phrase_set": null,
+      "c3_strict_phrase_set": null,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "922a0c56": {
+      "b5_official": false,
+      "c3_official": false,
+      "b5_strict_phrase_set": null,
+      "c3_strict_phrase_set": null,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "d6da3938": {
+      "b5_official": false,
+      "c3_official": true,
+      "b5_strict_phrase_set": false,
+      "c3_strict_phrase_set": true,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "f43926d9": {
+      "b5_official": false,
+      "c3_official": false,
+      "b5_strict_phrase_set": null,
+      "c3_strict_phrase_set": null,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    },
+    "f61a096f": {
+      "b5_official": false,
+      "c3_official": false,
+      "b5_strict_phrase_set": false,
+      "c3_strict_phrase_set": false,
+      "b5_status": "scored",
+      "c3_status": "scored"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+# Run from the repository root. Capture 02 is conditional on the frozen evaluator passing capture 01.
+set -euo pipefail
+capture_dir="$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01"
+
+shasum -a 256 -c evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/freeze-manifest.sha256 >/dev/null
+printf 'Frozen C1 v4 inputs verified.\n'
+if test -e "$capture_dir"; then
+  printf 'Refusing to overwrite existing capture directory: %s\n' "$capture_dir" >&2
+  exit 1
+fi
+
+target/debug/memory-eval run-paired-codex \
+  --plan "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/plan.json" \
+  --tasks "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/tasks.json" \
+  --codex-binary "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex" \
+  --codex-home "$HOME/.codex" \
+  --memory-tool-profile agent_maintenance_v6 \
+  --incumbent-memory-server "$PWD/target/debug/memory_mcp" \
+  --candidate-memory-server "$PWD/target/debug/memory_mcp" \
+  --output-directory "$capture_dir"
+
+target/debug/memory-eval compare-agent-managed \
+  --plan "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/plan.json" \
+  --incumbent "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/incumbent.json" \
+  --candidate "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/candidate.json" \
+  --incumbent-stages "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/agent-managed-incumbent.json" \
+  --candidate-stages "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/agent-managed-candidate.json" \
+  --output "$PWD/evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/agent-managed-comparison.json"
+
+python3 evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/evaluate_c1.py \
+  --tasks evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/tasks.json \
+  --criteria evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/criteria.json \
+  --plan evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/plan.json \
+  --fingerprints evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/fingerprints.json \
+  --incumbent evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/incumbent.json \
+  --candidate evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/candidate.json \
+  --incumbent-stages evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/agent-managed-incumbent.json \
+  --candidate-stages evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/agent-managed-candidate.json \
+  --output evals/paired/c1-agent-managed-correction-recovery-v4-2026-11-25/capture-01/evaluation.json
+
+# Run capture 02 and its comparison/evaluation only if the prior command exits 0
+# and capture-01/evaluation.json contains eligible_for_capture_02=true.

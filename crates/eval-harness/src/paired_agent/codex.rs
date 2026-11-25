@@ -117,7 +117,9 @@ impl CodexPairedBackend {
             | CodexMemoryToolProfile::AgentMaintenanceV2
             | CodexMemoryToolProfile::AgentMaintenanceV3
             | CodexMemoryToolProfile::AgentMaintenanceV4
-            | CodexMemoryToolProfile::AgentMaintenanceV5 => {
+            | CodexMemoryToolProfile::AgentMaintenanceV5
+            | CodexMemoryToolProfile::AgentMaintenanceV6
+            | CodexMemoryToolProfile::AgentMaintenanceV7 => {
                 let executable = std::env::current_exe().map_err(|_| {
                     EvalError::InvalidConfig(
                         "could not resolve the active eval-harness executable".into(),
@@ -126,7 +128,9 @@ impl CodexPairedBackend {
                 Some(hash_file(&executable)?)
             }
             CodexMemoryToolProfile::AgentOperatorPrepared
-            | CodexMemoryToolProfile::RecallOnlyV2 => {
+            | CodexMemoryToolProfile::RecallOnlyV2
+            | CodexMemoryToolProfile::RecallOnlyV3
+            | CodexMemoryToolProfile::RecallOnlyV4 => {
                 return Err(EvalError::InvalidConfig(
                     "internal phase profile cannot be used for a paired run".into(),
                 ));
@@ -161,7 +165,10 @@ impl CodexPairedBackend {
         }
         if !matches!(
             incumbent.memory_tool_profile,
-            CodexMemoryToolProfile::RecallOnly | CodexMemoryToolProfile::RecallOnlyV2
+            CodexMemoryToolProfile::RecallOnly
+                | CodexMemoryToolProfile::RecallOnlyV2
+                | CodexMemoryToolProfile::RecallOnlyV3
+                | CodexMemoryToolProfile::RecallOnlyV4
         ) {
             let expected_reader_config =
                 crate::codex_agent::reader_config_sha256_for_profile(incumbent.memory_tool_profile)
@@ -299,7 +306,17 @@ fn validate_codex_prompt_identity(
             crate::codex_agent::agent_maintenance_v5_system_prompt_sha256(),
             crate::codex_agent::agent_maintenance_v5_task_prompt_sha256(),
         ),
-        CodexMemoryToolProfile::RecallOnlyV2 => (
+        CodexMemoryToolProfile::AgentMaintenanceV6 => (
+            crate::codex_agent::agent_maintenance_v6_system_prompt_sha256(),
+            crate::codex_agent::agent_maintenance_v6_task_prompt_sha256(),
+        ),
+        CodexMemoryToolProfile::AgentMaintenanceV7 => (
+            crate::codex_agent::agent_maintenance_v7_system_prompt_sha256(),
+            crate::codex_agent::agent_maintenance_v7_task_prompt_sha256(),
+        ),
+        CodexMemoryToolProfile::RecallOnlyV2
+        | CodexMemoryToolProfile::RecallOnlyV3
+        | CodexMemoryToolProfile::RecallOnlyV4 => (
             crate::codex_agent::system_instructions_sha256_for_profile(profile),
             crate::codex_agent::task_rules_sha256_for_profile(profile),
         ),
@@ -316,7 +333,10 @@ fn validate_codex_prompt_identity(
     }
     if !matches!(
         profile,
-        CodexMemoryToolProfile::RecallOnly | CodexMemoryToolProfile::RecallOnlyV2
+        CodexMemoryToolProfile::RecallOnly
+            | CodexMemoryToolProfile::RecallOnlyV2
+            | CodexMemoryToolProfile::RecallOnlyV3
+            | CodexMemoryToolProfile::RecallOnlyV4
     ) {
         let expected_host_policy = match profile {
             CodexMemoryToolProfile::AgentMaintenance => {
@@ -334,6 +354,12 @@ fn validate_codex_prompt_identity(
             CodexMemoryToolProfile::AgentMaintenanceV5 => {
                 crate::codex_agent::agent_maintenance_v4_host_policy_sha256()
             }
+            CodexMemoryToolProfile::AgentMaintenanceV6 => {
+                crate::codex_agent::agent_maintenance_v6_host_policy_sha256()
+            }
+            CodexMemoryToolProfile::AgentMaintenanceV7 => {
+                crate::codex_agent::agent_maintenance_v7_host_policy_sha256()
+            }
             CodexMemoryToolProfile::AgentSourceAuthority => {
                 crate::codex_agent::agent_source_authority_host_policy_sha256()
             }
@@ -345,6 +371,8 @@ fn validate_codex_prompt_identity(
             }
             CodexMemoryToolProfile::RecallOnly
             | CodexMemoryToolProfile::RecallOnlyV2
+            | CodexMemoryToolProfile::RecallOnlyV3
+            | CodexMemoryToolProfile::RecallOnlyV4
             | CodexMemoryToolProfile::AgentOperatorPrepared => {
                 return Err(EvalError::InvalidConfig(
                     "read-only phase profile cannot use a write host policy".into(),
@@ -374,7 +402,10 @@ fn validate_evaluator_fingerprint(
 ) -> Result<(), EvalError> {
     if matches!(
         profile,
-        CodexMemoryToolProfile::RecallOnly | CodexMemoryToolProfile::RecallOnlyV2
+        CodexMemoryToolProfile::RecallOnly
+            | CodexMemoryToolProfile::RecallOnlyV2
+            | CodexMemoryToolProfile::RecallOnlyV3
+            | CodexMemoryToolProfile::RecallOnlyV4
     ) {
         return Ok(());
     }
@@ -662,17 +693,7 @@ impl AgentManagedTrialBackend for CodexPairedBackend {
                 &mut self.candidate_schema_validated,
             ),
         };
-        if !matches!(
-            runtime.memory_tool_profile,
-            CodexMemoryToolProfile::AgentManagedMemory
-                | CodexMemoryToolProfile::AgentSourceAuthority
-                | CodexMemoryToolProfile::AgentSourceAuthorityLiteralInput
-                | CodexMemoryToolProfile::AgentMaintenance
-                | CodexMemoryToolProfile::AgentMaintenanceV2
-                | CodexMemoryToolProfile::AgentMaintenanceV3
-                | CodexMemoryToolProfile::AgentMaintenanceV4
-                | CodexMemoryToolProfile::AgentMaintenanceV5
-        ) {
+        if !runtime.memory_tool_profile.supports_agent_managed_trial() {
             return Err(EvalError::InvalidConfig(
                 "agent-managed paired trials require the registered writer tool profile".into(),
             ));
@@ -810,16 +831,11 @@ impl AgentManagedTrialBackend for CodexPairedBackend {
         prompt: &str,
     ) -> Result<crate::paired_agent::AgentObservation, EvalError> {
         validate_managed_runtime(&state.config, &state.product_sha256, &state.codex_sha256)?;
-        if !matches!(
-            state.config.memory_tool_profile,
-            CodexMemoryToolProfile::AgentFormation
-                | CodexMemoryToolProfile::AgentOperatorPrepared
-                | CodexMemoryToolProfile::AgentMaintenance
-                | CodexMemoryToolProfile::AgentMaintenanceV2
-                | CodexMemoryToolProfile::AgentMaintenanceV3
-                | CodexMemoryToolProfile::AgentMaintenanceV4
-                | CodexMemoryToolProfile::AgentMaintenanceV5
-        ) {
+        if !state
+            .config
+            .memory_tool_profile
+            .supports_agent_memory_formation()
+        {
             return Err(EvalError::InvalidConfig(
                 "formation session lost its pinned memory writer profile".into(),
             ));
@@ -1384,6 +1400,66 @@ mod tests {
         identity.task_prompt_sha256 = crate::codex_agent::agent_maintenance_v4_task_prompt_sha256();
         assert!(
             validate_codex_prompt_identity(&identity, CodexMemoryToolProfile::AgentMaintenanceV5)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn maintenance_v6_identity_pins_the_partial_read_retry_contract() {
+        let mut identity = codex_identity();
+        identity.system_prompt_sha256 =
+            crate::codex_agent::agent_maintenance_v6_system_prompt_sha256();
+        identity.task_prompt_sha256 = crate::codex_agent::agent_maintenance_v6_task_prompt_sha256();
+        identity.host_policy_sha256 = crate::codex_agent::agent_maintenance_v6_host_policy_sha256();
+
+        assert!(
+            validate_codex_prompt_identity(&identity, CodexMemoryToolProfile::AgentMaintenanceV6)
+                .is_ok()
+        );
+        assert_eq!(
+            crate::codex_agent::reader_config_sha256_for_profile(
+                CodexMemoryToolProfile::AgentMaintenanceV6
+            ),
+            crate::codex_agent::reader_config_sha256_for_profile(
+                CodexMemoryToolProfile::AgentMaintenanceV5
+            )
+        );
+
+        identity.system_prompt_sha256 =
+            crate::codex_agent::agent_maintenance_v5_system_prompt_sha256();
+        identity.task_prompt_sha256 = crate::codex_agent::agent_maintenance_v5_task_prompt_sha256();
+        assert!(
+            validate_codex_prompt_identity(&identity, CodexMemoryToolProfile::AgentMaintenanceV6)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn maintenance_v7_identity_pins_the_snapshot_consistent_retry_contract() {
+        let mut identity = codex_identity();
+        identity.system_prompt_sha256 =
+            crate::codex_agent::agent_maintenance_v7_system_prompt_sha256();
+        identity.task_prompt_sha256 = crate::codex_agent::agent_maintenance_v7_task_prompt_sha256();
+        identity.host_policy_sha256 = crate::codex_agent::agent_maintenance_v7_host_policy_sha256();
+
+        assert!(
+            validate_codex_prompt_identity(&identity, CodexMemoryToolProfile::AgentMaintenanceV7)
+                .is_ok()
+        );
+        assert_eq!(
+            crate::codex_agent::reader_config_sha256_for_profile(
+                CodexMemoryToolProfile::AgentMaintenanceV7
+            ),
+            crate::codex_agent::reader_config_sha256_for_profile(
+                CodexMemoryToolProfile::AgentMaintenanceV6
+            )
+        );
+
+        identity.system_prompt_sha256 =
+            crate::codex_agent::agent_maintenance_v6_system_prompt_sha256();
+        identity.task_prompt_sha256 = crate::codex_agent::agent_maintenance_v6_task_prompt_sha256();
+        assert!(
+            validate_codex_prompt_identity(&identity, CodexMemoryToolProfile::AgentMaintenanceV7)
                 .is_err()
         );
     }

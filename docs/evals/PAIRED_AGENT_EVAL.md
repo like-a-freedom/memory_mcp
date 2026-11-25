@@ -58,6 +58,14 @@ without LM Studio or any model server. The test target has no OS-specific
 provider dependency and can be run with Cargo on Windows, Linux, and macOS; the
 local smoke below has only been exercised on this macOS laptop.
 
+For an empty historical read, an agent may retry only when response guidance
+explicitly authorizes a query-only refinement. Preserve the returned snapshot
+and every other request argument, retry at most once, and never treat another
+empty response as proof of absence. Partial nonempty results do not invite a
+retry. Agent-workflow registrations must validate that any observed retry
+followed this contract; they must not require a retry merely to qualify a
+workflow unless the frozen tasks guarantee the required guidance exposure.
+
 ## Independent probes and ordinary-workflow qualification
 
 For a provider-neutral ordinary-recall capture, pass
@@ -90,8 +98,9 @@ call budget is consumed, the follow-up request omits `tools`, `tool_choice` and
 `parallel_tool_calls`; `tool_choice: "none"` alone did not stop this local
 provider from returning another call. This screen does not demonstrate a
 memory treatment effect or qualify typed-conflict, agent-managed correction
-or operator-import workflows. Those populations still need separate frozen
-registrations and results.
+or operator-import workflows. Agent-managed correction now has a separate
+frozen C1 pilot, whose failed gate is documented below; typed-conflict and
+operator-import still need their own frozen registrations and results.
 
 If a Chat Completions response includes `reasoning_content` alongside a tool
 call, the adapter forwards that optional field in the next assistant-history
@@ -420,7 +429,7 @@ Record a JSON object with the following fields. The wire types are
 
 | Level | Fields and recording rules |
 |---|---|
-| Bundle | `schema_version: "memory-mcp-agent-observations/v3"`, exported `plan_sha256`, unique capture `run_id`, RFC 3339 UTC `run_started_at` and `run_completed_at`, and `incumbent` and `candidate` arm objects. The scorer continues to read v1, v2 and v3 observations. |
+| Bundle | Use `memory-mcp-agent-observations/v4` for trace-linked read capture, `/v5` when valid-time fingerprints are recorded, or `/v6` when selector fingerprints are recorded; include the exported `plan_sha256`, unique capture `run_id`, RFC 3339 UTC `run_started_at` and `run_completed_at`, and `incumbent` and `candidate` arm objects. The scorer reads historical v1–v6 observations. |
 | Arm | `identity` matching the exported identity for that arm, and `trials` with exactly one entry per planned key, including failed and skipped trials |
 | Trial | Exported `key`, actual `arm_order` (1 or 2), `known_revision_checkpoint` when the task specifies a boundary, and `episode_id_to_event_id` mapping stored episode IDs to their original seed events. Seed fresh stores and record the exact checkpoint used in both arms. |
 | Observation | `status`, `turns_used`, `tool_calls`, `user_clarifications`, `input_tokens`, `output_tokens`, `wall_time_ms`, `trace`, `memory_source_episode_ids`, and optional `final_answer` |
@@ -457,14 +466,14 @@ diagnostic only: task acceptance still requires the existing exact normalized
 answer match, so an answer embedding the accepted value in explanatory text
 still fails the oracle. The classification stores no answer or oracle text and
 does not establish why a value was absent. Paired artifact readers accept v2
-through v6; observation
-readers accept v1 through v3. V1 observations reject model-response diagnostics;
+through v10; observation readers accept v1 through v6. V1 observations reject
+model-response diagnostics;
 v2 rejects the granular classes. Older paired v2-v4 receipts remain valid
 without the new component fields; v5 requires its component fields for every
 attempted trial and rejects v6-only answer classifications; v6 requires the
 answer classification for every schema-valid final answer. V5 artifacts remain
 readable without migration. No response text is persisted in these diagnostics.
-Observation v4 adds `read_capture_status` and `memory_reads`. Each observed read references its request and terminal trace sequence. The offline scorer rejects mismatched call IDs, tools, terminal kinds and observed captures that omit a read. Capture status distinguishes observed, partial and unavailable capture. A text-only reply has an unknown result count.
+Observation v4 adds `read_capture_status` and `memory_reads`. Each observed read references its request and terminal trace sequence. The offline scorer rejects mismatched call IDs, tools, terminal kinds and observed captures that omit a read. Capture status distinguishes observed, partial and unavailable capture. A text-only reply has an unknown result count. Observation v5 adds SHA-256 fingerprints of the normalized request `valid_at` (or legacy `as_of`) and returned snapshot `valid_at`; raw timestamps are not retained. V4 continues to reject these v5-only fields.
 
 As of 2026-11-25, read normalization accepts structured results both as a bare
 MCP `CallToolResult` and inside a JSON-RPC `result` or adapter `payload`
@@ -483,8 +492,21 @@ counts without retaining IDs. The candidate task floor failed (2/4 versus
 3/4); no repeat was allowed. See the report before interpreting these
 diagnostics as an adapter or memory defect.
 
-The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. When a runner supplies query, non-query argument, and response-guidance fingerprints for every captured read, the scorer writes paired v8; v8 validates those digests and preserves them for deterministic retry analysis. Native journals use v5 without the new fingerprints and v6 with them. Observation v1–v3 still replay to v6/v7/v8 as appropriate, and paired v2–v7 artifacts remain readable. Read diagnostics leave existing decision and independent-probe scores intact.
+Observation v6 adds a SHA-256 fingerprint for each field in the fixed
+`assemble_context` selector allowlist. It stores no raw selector values. When
+the private task registers a complete selector expectation, paired v10 adds
+`selector_expectation_registered` and a per-field boolean match map for every
+captured read. The validator requires the complete ten-field map when the
+registration marker is true. The normalizer resolves product defaults and
+equivalent timestamps before hashing. Native receipt journals use v8 when
+selector expectations are registered; historical observations and artifacts
+replay without migration.
 
+The v4 scorer writes paired v7 receipts with bounded read outcomes and trace-local call IDs. When a runner supplies query and non-query argument fingerprints for every captured read, the scorer writes paired v8; response-guidance fingerprints are recorded when available. V8 validates the required request digests and preserves them for deterministic retry analysis. When a v5 capture has the required v8 request fingerprints and the private task registers an expected `valid_at`, the scorer writes paired v9 with independent `requested_valid_at_match` and `returned_valid_at_match` booleans. These checks deliberately do not depend on `known_revision`; full-cutoff-pair diagnostics are emitted only when the task also pins a transaction revision. A missing echo or unregistered revision remains unknown. When a v6 observation and private task register selector expectations, the scorer writes paired v10 with registration status and the complete per-field match map. Native journals use v5 for read capture, v6 for request fingerprints, v7 for registered valid-time expectations, and v8 for selector expectations. Historical observations still replay to compatible paired schemas, and paired v2–v10 artifacts remain readable without migration. Read diagnostics leave existing decision and independent-probe scores intact.
+
+When a v5 observation and private oracle register a valid time, the scorer
+uses paired v9 even if one or both timestamp fingerprints are unavailable;
+the corresponding match is counted as unknown rather than rejecting the run.
 The scorer writes
 `incumbent.json` and `candidate.json` into a new directory. The same frozen plan, task manifest
 and observations produce byte-identical artifacts, which feed
@@ -791,6 +813,26 @@ The `run-paired-codex` adapter accepts the explicit profile
 `--memory-tool-profile agent_maintenance_v2`; the default remains
 `recall_only`. This live adapter is optional. The runner-neutral task and
 scoring contracts remain usable by other runners or offline without Codex.
+
+### Snapshot-consistent retry — maintenance v7
+
+The registered `agent_maintenance_v7` profile pins a separate read-only
+`recall_only_v4` prompt pair for the answer phase. If a successful empty read
+explicitly permits one refinement, the agent may retry once for the same fact
+and subject, copying `context.snapshot.valid_at` and
+`context.snapshot.known_revision` into the retry and omitting legacy `as_of`
+and `known_at`. All other selectors stay fixed. If either snapshot value is
+missing, the agent does not retry; an empty partial snapshot stays partial and
+does not prove absence. This is an opt-in evaluation prompt correction, not a
+product behavior change.
+
+The older `agent_maintenance_v6` prompt and fingerprints remain pinned for
+historical replay. Its instruction to preserve every request argument
+conflicts with B5's snapshot fields, so new B5-aligned screens should use v7.
+Deterministic contract tests verify the prompt, phase, CLI registration, and
+fingerprint separation. They do not demonstrate that a model follows the
+instruction or improves answer quality; that requires a disjoint synthetic
+workflow screen.
 
 ### Current v6 maintenance feasibility — 2026-11-23
 
@@ -1477,7 +1519,14 @@ item and that the annotations refer to sources in that read. For temporal checks
 hash the compact JSON pair `[utc_rfc3339, known_revision]` with SHA-256. Normalize
 the timestamp to UTC with a `Z` suffix before hashing. An unavailable cutoff
 leaves the corresponding field absent in the receipt. A different observed
-cutoff produces `false` even when source coverage passes.
+cutoff produces `false` even when source coverage passes, but compare the full
+cutoff only when the task pins both its valid time and transaction revision.
+If no revision checkpoint is registered, the full-cutoff match is unknown; do
+not synthesize a `None` revision and report a mismatch.
+For diagnosis that has not pinned a transaction revision, observation v5 may
+instead record separate requested and returned valid-time fingerprints. The
+private oracle compares each to its registered valid instant and publishes
+only match booleans; it does not expose dates or fingerprints.
 
 The v7 receipt contains the read outcome, item count and available diagnostics:
 source coverage, annotation match, cutoff matches, completeness and count of
@@ -1485,10 +1534,12 @@ distinct cited sources from that reply. A partial empty read describes the
 reply at that snapshot. V8 adds SHA-256 fingerprints of the exact query,
 arguments with `query` removed, and response guidance; it stores none of those
 texts. This lets a frozen evaluator prove a bounded retry changed only the
-query and followed registered guidance. Legacy observations replay without
-these fields. Keep observations and task manifests private. Published
-artifacts contain scoring outcomes and trace hashes. Task acceptance and
-independent probe results retain their existing scoring rules.
+query and followed registered guidance. V9 adds independent requested and
+returned valid-time match outcomes, without persisting their fingerprints.
+Legacy observations replay without newer fields. Keep observations and task
+manifests private. Published artifacts contain scoring outcomes and trace
+hashes. Task acceptance and independent probe results retain their existing
+scoring rules.
 
 The [C1 recovery screen](../../evals/paired/c1-agent-managed-correction-recovery-v1-2026-11-25/README.md)
 uses the provider-neutral v8 receipt with a standard-library validator. That
@@ -1496,6 +1547,39 @@ validator requires complete read capture, permits one retry only after the
 exact empty-result refinement guidance, checks the query-only change, and
 requires at least one retry exposure per arm. Its status is a workflow screen;
 it does not estimate the causal effect of retries.
+
+The fresh [C1 correction-recovery v6 report](../../evals/paired/c1-agent-managed-correction-recovery-v6-valid-time-2026-11-25/capture-01/REPORT.md)
+passed correction extraction, exact stale-fact invalidation, pre-invalidation
+evidence checks, and independent probes in all four synthetic families per
+arm. However, all sixteen agent-facing reads across both arms were empty and
+task success was 0/4 per arm, below the registered 3/4 floor. The stop rule
+prohibited a second capture. Requested and returned `valid_at` matched on all
+reads, so that axis does not explain the misses. First-query hashes matched
+between arms within each family but did not match the registered exact
+question; non-query argument hashes differed between arms in two of four
+families. Aggregate hashes cannot identify the differing selector or establish
+semantic query adequacy. The captured full-cutoff mismatches are invalid:
+revision was not registered, and the scorer incorrectly compared against a
+synthetic `None` revision. The scorer now leaves that check unknown unless both
+axes are pinned; the frozen capture remains unchanged. No retrieval or
+response-wire change is supported yet. A disjoint synthetic diagnostic must
+compare registered and observed selector shapes before choosing a product
+change.
+
+The later [C1 v7 selector-diagnostic screen](../../evals/paired/c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25/CROSS_CAPTURE_REVIEW.md)
+froze four disjoint histories and the complete ten-field selector allowlist.
+Capture 01 passed all gates (4/4 exact cited tasks per arm); the one permitted
+repeat, capture 02, failed with 0/4 in both arms, so the workflow decision is
+NO-GO and no third capture is allowed. Independent probes, corrections,
+invalidations, and pre-invalidation evidence checks passed 4/4 per arm in both
+captures. Capture 02 had six empty reads per arm; one incumbent read contained
+sufficient evidence but was not used, while the candidate's sole nonempty read
+did not contain sufficient evidence and had a `prohibited_evidence` violation.
+Requested and returned valid times matched all reads. `known_at` and `compact`
+mismatches were common, but they also occurred in the successful capture 01;
+the field booleans do not expose raw values or establish cause. The results
+show unstable agent-facing retrieval and use on this small synthetic cohort,
+not a causal memory defect. Do not change retrieval on this evidence alone.
 
 
 ### Registered recall controls
@@ -1518,8 +1602,27 @@ in that order, with the key fields in the same order as `expected_trials`
 and argument object keys sorted. Use JSON `null` for unknown completeness and
 an empty entry list for live mode. Keep these runs outside promotion comparisons.
 
+Fixed-read entries may also register `presentation: "evidence_action_hint"`.
+The default `current` presentation omits this field, preserving legacy
+registration bytes; a non-default presentation participates in the reader
+fingerprint. The experimental projection runs after reply validation, keeps
+the original returned items and source/call association, and adds a bounded
+action hint to structured guidance. It labels only explicit typed
+contradiction/temporal ambiguity as `clarify_conflict`; empty results and
+unknown or untraceable evidence status become `verify_or_ask`. The hint cannot
+judge semantic answerability and is not part of the product MCP response.
+
 The [November 24 local diagnostic screen](../../evals/paired/recall-read-local-screen-2026-11-24/report.md)
 recovered the registered source and snapshot with fixed reply in both
 historical trials. Neither mode produced a passing final answer. The
 ordinary and contradiction cases did not reach a memory read. The earlier
 qualification decision remains NO-GO.
+
+The [A8 evaluator-only hint screen](../../evals/paired/a8-evidence-action-hint-2026-11-25/README.md)
+ran one matched native Apple Silicon capture on three synthetic families.
+Both arms passed 2/3 exact tasks and returned the registered evidence on all
+three. The hint improved clarification matching on the empty case but did not
+improve task success; the candidate's answer still failed exact acceptance.
+Latency was inconclusive and the paired median was 451ms slower with the hint.
+No product response change or follow-up was authorized by the frozen stop
+rule.

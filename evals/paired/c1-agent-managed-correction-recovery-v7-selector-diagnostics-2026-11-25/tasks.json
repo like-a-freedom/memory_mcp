@@ -1,0 +1,237 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "highmere-dome-shutter-service-code-history",
+        "case_id": "highmere-current-dome-shutter-service-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Highmere Planetarium uses Nimbus-62 as its dome shutter service code. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-selector-v7/highmere/highmere-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Highmere Planetarium's current dome shutter service code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Highmere Planetarium's current dome shutter service code? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-selector-v7-highmere-prior-01",
+          "source_id": "conversation://c1-selector-v7/highmere/highmere-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Highmere Planetarium uses Cinder-18 as its dome shutter service code.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-selector-v7-highmere-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-selector-v7-highmere-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Nimbus-62"
+        ],
+        "forbidden_event_ids": [
+          "c1-selector-v7-highmere-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "fact_types": [],
+            "as_of": null,
+            "valid_at": "2026-11-25T16:00:00Z",
+            "known_at": null,
+            "known_revision": null,
+            "budget": 5,
+            "view_mode": null,
+            "window_start": null,
+            "window_end": null,
+            "compact": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "rillbank-cold-room-monitor-channel-history",
+        "case_id": "rillbank-current-cold-room-monitor-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Rillbank Orchid Seed Vault uses Citron-58 as its cold-room monitor channel. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-selector-v7/rillbank/rillbank-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Rillbank Orchid Seed Vault's current cold-room monitor channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Rillbank Orchid Seed Vault's current cold-room monitor channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-selector-v7-rillbank-prior-01",
+          "source_id": "conversation://c1-selector-v7/rillbank/rillbank-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Rillbank Orchid Seed Vault uses Saffron-12 as its cold-room monitor channel.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-selector-v7-rillbank-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-selector-v7-rillbank-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Citron-58"
+        ],
+        "forbidden_event_ids": [
+          "c1-selector-v7-rillbank-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "fact_types": [],
+            "as_of": null,
+            "valid_at": "2026-11-25T16:00:00Z",
+            "known_at": null,
+            "known_revision": null,
+            "budget": 5,
+            "view_mode": null,
+            "window_start": null,
+            "window_end": null,
+            "compact": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "caldera-migration-radar-sync-key-history",
+        "case_id": "caldera-current-migration-radar-sync-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Caldera Bird Observatory uses Quill-85 as its migration radar sync key. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-selector-v7/caldera/caldera-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T18:00:00+02:00, what is Caldera Bird Observatory's current migration radar sync key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T18:00:00+02:00, what is Caldera Bird Observatory's current migration radar sync key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T18:00:00+02:00",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-selector-v7-caldera-prior-01",
+          "source_id": "conversation://c1-selector-v7/caldera/caldera-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Caldera Bird Observatory uses Pine-44 as its migration radar sync key.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-selector-v7-caldera-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-selector-v7-caldera-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quill-85"
+        ],
+        "forbidden_event_ids": [
+          "c1-selector-v7-caldera-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T18:00:00+02:00",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "fact_types": [],
+            "as_of": null,
+            "valid_at": "2026-11-25T18:00:00+02:00",
+            "known_at": null,
+            "known_revision": null,
+            "budget": 5,
+            "view_mode": null,
+            "window_start": null,
+            "window_end": null,
+            "compact": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "fernwick-salinity-probe-calibration-profile-history",
+        "case_id": "fernwick-current-salinity-probe-calibration-profile",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-25T10:00:00Z: Fernwick Tidal Lab uses Quartz-49 as its salinity probe calibration profile. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-selector-v7/fernwick/fernwick-operations-registry/correction-01, and t_ref=2026-11-25T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-25T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-25T16:00:00Z, what is Fernwick Tidal Lab's current salinity probe calibration profile? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-25T16:00:00Z, what is Fernwick Tidal Lab's current salinity probe calibration profile? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-25T16:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-selector-v7-fernwick-prior-01",
+          "source_id": "conversation://c1-selector-v7/fernwick/fernwick-operations-registry/prior-01",
+          "source_type": "conversation",
+          "content": "Fernwick Tidal Lab uses Mica-13 as its salinity probe calibration profile.",
+          "valid_at": "2026-11-18T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-selector-v7-fernwick-correction-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-selector-v7-fernwick-correction-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Quartz-49"
+        ],
+        "forbidden_event_ids": [
+          "c1-selector-v7-fernwick-prior-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-25T16:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "fact_types": [],
+            "as_of": null,
+            "valid_at": "2026-11-25T16:00:00Z",
+            "known_at": null,
+            "known_revision": null,
+            "budget": 5,
+            "view_mode": null,
+            "window_start": null,
+            "window_end": null,
+            "compact": true
+          }
+        }
+      }
+    }
+  ]
+}

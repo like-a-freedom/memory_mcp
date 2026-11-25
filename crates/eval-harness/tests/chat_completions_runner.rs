@@ -14,12 +14,14 @@ use serde_json::{Value, json};
 struct FakeMemorySession {
     calls: Vec<(String, Value)>,
     schemas: Value,
+    reply_override: Option<Value>,
 }
 
 impl FakeMemorySession {
     fn read_only() -> Self {
         Self {
             calls: Vec::new(),
+            reply_override: None,
             schemas: json!([{
                 "name": "assemble_context",
                 "description": "Read relevant memory",
@@ -32,6 +34,13 @@ impl FakeMemorySession {
             }]),
         }
     }
+
+    fn with_reply(reply: Value) -> Self {
+        Self {
+            reply_override: Some(reply),
+            ..Self::read_only()
+        }
+    }
 }
 
 impl MemoryToolSession for FakeMemorySession {
@@ -42,6 +51,9 @@ impl MemoryToolSession for FakeMemorySession {
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
         let model_query = arguments["query"] == "model query";
         self.calls.push((name.to_owned(), arguments));
+        if let Some(reply) = &self.reply_override {
+            return Ok(reply.clone());
+        }
         if model_query {
             return Ok(json!({"result":{"structuredContent":{"result":[]}}}));
         }
@@ -336,6 +348,261 @@ fn fixed_reply_is_delivered_to_the_original_tool_call() {
     assert_eq!(
         requests[0]["tools"][0]["function"]["name"],
         "assemble_context"
+    );
+}
+
+#[test]
+fn fixed_read_registration_accepts_evidence_action_hint() {
+    use eval_harness::paired_agent::chat_completions_backend::FixedReadInput;
+
+    let parsed = serde_json::from_value::<FixedReadInput>(json!({
+        "key": {
+            "stratum_id":"ordinary",
+            "family_id":"family-a",
+            "case_id":"case-a",
+            "repetition":1,
+            "incumbent_first":true
+        },
+        "arm":"candidate",
+        "arguments":{"query":"registered query","budget":1},
+        "expected_source_events":[],
+        "expected_completeness":null,
+        "presentation":"evidence_action_hint"
+    }));
+
+    if let Err(error) = parsed {
+        panic!("presentation registration was rejected: {error}");
+    }
+}
+
+#[test]
+fn evidence_action_hint_reaches_the_model_with_the_same_returned_source() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let public_reply = json!({
+        "result": {"structuredContent": {
+            "context": {"completeness":"complete"},
+            "guidance":"Original public guidance.",
+            "result": [{"source_episode":"episode:cedar","content":"Cabinet-28","evidence_status":"current"}]
+        }}
+    });
+    let server = MockChatServer::with_responses(vec![
+        model_response(
+            json!({"role":"assistant","content":null,"tool_calls":[{
+                "id":"read-1","type":"function","function":{"name":"assemble_context",
+                "arguments":r#"{"query":"model query","budget":1}"#}
+            }]}),
+            40,
+            12,
+        ),
+        model_response(
+            json!({"role":"assistant","content":r#"{"answer":"Cabinet-28","citations":["episode:cedar"]}"#}),
+            65,
+            18,
+        ),
+    ]);
+    let agent = ChatCompletionsAgent::new(ChatCompletionsConfig::new(
+        server.endpoint.clone(),
+        "test-model",
+    ))
+    .unwrap();
+    let mut product = FakeMemorySession::with_reply(public_reply);
+    let fixed = json!({"query":"registered query","budget":1});
+    let mut memory = RecallMemorySession::new(
+        &mut product,
+        RecallReadMode::FixedReplyWithEvidenceActionHint(fixed.clone()),
+    )
+    .unwrap();
+
+    agent
+        .run_phase(
+            &mut memory,
+            "Where is Cedar?",
+            "Use memory.",
+            "Return JSON.",
+            ChatCompletionsToolProfile::RecallOnly,
+            ChatCompletionBudgets {
+                tool_calls: 1,
+                ..budgets()
+            },
+        )
+        .unwrap();
+
+    let requests = server.requests();
+    let tool = requests[1]["messages"].as_array().unwrap().last().unwrap();
+    let delivered: Value = serde_json::from_str(tool["content"].as_str().unwrap()).unwrap();
+    let content = &delivered["result"]["structuredContent"];
+    assert_eq!(content["result"][0]["source_episode"], "episode:cedar");
+    assert_eq!(
+        content["agent_action_hint"]["action"],
+        "answer_with_sources"
+    );
+    assert_eq!(
+        content["agent_action_hint"]["source_episode_ids"],
+        json!(["episode:cedar"])
+    );
+    assert!(
+        content["guidance"]
+            .as_str()
+            .unwrap()
+            .starts_with("Original public guidance.\nEvaluation-only action hint (not evidence)")
+    );
+    assert!(
+        content["agent_action_hint"]["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("only when the returned evidence directly supports the question")
+    );
+    assert_eq!(product.calls, [("assemble_context".into(), fixed)]);
+}
+
+#[test]
+fn evidence_action_hint_marks_a_typed_conflict_for_clarification() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let public_reply = json!({
+        "result": {"structuredContent": {
+            "context": {"completeness":"partial"},
+            "result": [{
+                "source_episode":"episode:cedar-current",
+                "evidence_status":"conflicting",
+                "reconciliation":{"relations":[{"outcome":"contradiction"}]}
+            }]
+        }}
+    });
+    let mut product = FakeMemorySession::with_reply(public_reply);
+    let mut memory = RecallMemorySession::new(
+        &mut product,
+        RecallReadMode::FixedReplyWithEvidenceActionHint(json!({
+            "query":"registered query","budget":1
+        })),
+    )
+    .unwrap();
+
+    let delivered = memory
+        .call_tool(
+            "assemble_context",
+            json!({"query":"model query","budget":1}),
+        )
+        .unwrap();
+
+    let hint = &delivered["result"]["structuredContent"]["agent_action_hint"];
+    assert_eq!(hint["action"], "clarify_conflict");
+    assert_eq!(hint["source_episode_ids"], json!(["episode:cedar-current"]));
+    assert!(
+        hint["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("do not choose a side")
+    );
+}
+
+#[test]
+fn evidence_action_hint_fails_closed_when_any_item_status_is_unknown_or_missing() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let public_reply = json!({
+        "result": {"structuredContent": {
+            "context": {"completeness":"partial"},
+            "result": [
+                {"source_episode":"episode:known","evidence_status":"current"},
+                {"source_episode":"episode:unknown","evidence_status":"unknown"},
+                {"source_episode":"episode:missing-status"}
+            ]
+        }}
+    });
+    let mut product = FakeMemorySession::with_reply(public_reply);
+    let mut memory = RecallMemorySession::new(
+        &mut product,
+        RecallReadMode::FixedReplyWithEvidenceActionHint(json!({
+            "query":"registered query","budget":1
+        })),
+    )
+    .unwrap();
+
+    let delivered = memory
+        .call_tool(
+            "assemble_context",
+            json!({"query":"model query","budget":1}),
+        )
+        .unwrap();
+
+    let hint = &delivered["result"]["structuredContent"]["agent_action_hint"];
+    assert_eq!(hint["action"], "verify_or_ask");
+    assert_eq!(
+        hint["source_episode_ids"],
+        json!(["episode:known", "episode:missing-status", "episode:unknown"])
+    );
+    assert!(
+        hint["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("do not prove absence")
+    );
+}
+
+#[test]
+fn evidence_action_hint_preserves_an_opaque_public_reply() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let public_reply = json!({
+        "result": {"content":[{"type":"text","text":"OPAQUE_REPLY_SENTINEL"}]}
+    });
+    let mut product = FakeMemorySession::with_reply(public_reply.clone());
+    let mut memory = RecallMemorySession::new(
+        &mut product,
+        RecallReadMode::FixedReplyWithEvidenceActionHint(json!({
+            "query":"registered query","budget":1
+        })),
+    )
+    .unwrap();
+
+    let delivered = memory
+        .call_tool(
+            "assemble_context",
+            json!({"query":"model query","budget":1}),
+        )
+        .unwrap();
+
+    assert_eq!(delivered, public_reply);
+    assert_eq!(product.calls.len(), 1);
+}
+
+#[test]
+fn evidence_action_hint_on_an_empty_partial_read_does_not_claim_absence() {
+    use eval_harness::paired_agent::chat_completions::{RecallMemorySession, RecallReadMode};
+
+    let public_reply = json!({
+        "result": {"structuredContent": {
+            "context": {"completeness":"partial"},
+            "guidance":"The historical context is partial.",
+            "result": []
+        }}
+    });
+    let mut product = FakeMemorySession::with_reply(public_reply);
+    let mut memory = RecallMemorySession::new(
+        &mut product,
+        RecallReadMode::FixedReplyWithEvidenceActionHint(json!({
+            "query":"registered query","budget":1
+        })),
+    )
+    .unwrap();
+
+    let delivered = memory
+        .call_tool(
+            "assemble_context",
+            json!({"query":"model query","budget":1}),
+        )
+        .unwrap();
+
+    let hint = &delivered["result"]["structuredContent"]["agent_action_hint"];
+    assert_eq!(hint["action"], "verify_or_ask");
+    assert_eq!(hint["source_episode_ids"], json!([]));
+    assert!(
+        hint["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("does not prove absence")
     );
 }
 
@@ -1158,6 +1425,7 @@ fn chat_completions_runner_classifies_empty_formation_completion() {
     .expect("loopback endpoint is valid");
     let mut memory = FakeMemorySession {
         calls: Vec::new(),
+        reply_override: None,
         schemas: json!([
             {"name":"ingest", "inputSchema":{"type":"object"}},
             {"name":"extract", "inputSchema":{"type":"object"}}
@@ -1251,6 +1519,7 @@ fn source_authority_formation_accepts_a_non_json_completion_message() {
     .expect("loopback endpoint is valid");
     let mut memory = FakeMemorySession {
         calls: Vec::new(),
+        reply_override: None,
         schemas,
     };
 
@@ -1326,6 +1595,7 @@ fn extract_evidence_telemetry_uses_the_product_default_when_the_argument_is_omit
     .expect("loopback endpoint is valid");
     let mut memory = FakeMemorySession {
         calls: Vec::new(),
+        reply_override: None,
         schemas,
     };
 

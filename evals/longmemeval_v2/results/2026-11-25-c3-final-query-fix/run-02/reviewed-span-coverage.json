@@ -1,0 +1,52 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-reviewed-span-coverage/v1",
+  "reviewed_span_coverage": {
+    "present": 2,
+    "selected": 7,
+    "rate": 0.2857142857142857
+  },
+  "cases": {
+    "0c6b0c60": {
+      "trajectory_id": "4ae82e48",
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "present": false,
+      "matching_text_items": 0
+    },
+    "6d975a08": {
+      "trajectory_id": "2d00b63d",
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "present": true,
+      "matching_text_items": 1
+    },
+    "89a20f48": {
+      "trajectory_id": "4ae82e48",
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "present": false,
+      "matching_text_items": 0
+    },
+    "922a0c56": {
+      "trajectory_id": "06c70de4",
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "present": false,
+      "matching_text_items": 0
+    },
+    "d6da3938": {
+      "trajectory_id": "06c70de4",
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "present": false,
+      "matching_text_items": 0
+    },
+    "f43926d9": {
+      "trajectory_id": "2d00b63d",
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "present": true,
+      "matching_text_items": 3
+    },
+    "f61a096f": {
+      "trajectory_id": "06c70de4",
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "present": false,
+      "matching_text_items": 0
+    }
+  }
+}

@@ -1,0 +1,282 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "incumbent",
+  "run_id": "61199-1795621888841489000-0",
+  "identity_sha256": "def432e4b0dc545eaf4d66ba7b27e00860d90e1ae066a33b128685af96200c97",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "caldera-migration-radar-sync-key-history",
+      "case_id": "caldera-current-migration-radar-sync-key",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "fernwick-salinity-probe-calibration-profile-history",
+      "case_id": "fernwick-current-salinity-probe-calibration-profile",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "highmere-dome-shutter-service-code-history",
+      "case_id": "highmere-current-dome-shutter-service-code",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+      "family_id": "rillbank-cold-room-monitor-channel-history",
+      "case_id": "rillbank-current-cold-room-monitor-channel",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "caldera-migration-radar-sync-key-history",
+        "case_id": "caldera-current-migration-radar-sync-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50399,
+        "output_tokens": 325,
+        "wall_time_ms": 25879
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "ef7b7a5a2edc9e88d16b3775c49f806d75ef6879f71877897e2f95ee8c923a8a",
+        "response_sha256": "69efe26aca539aef1896d68fb1b7aa1e29582ded5b61ad5181af2274690afc33",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-selector-v7-caldera-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3085,
+          "maximum_wire_bytes": 3085
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "fernwick-salinity-probe-calibration-profile-history",
+        "case_id": "fernwick-current-salinity-probe-calibration-profile",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 51391,
+        "output_tokens": 349,
+        "wall_time_ms": 27963
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "345bceb1aaba52fd696a776331920371f892d31a5d8b8104fbe48a8c9b3b6a3f",
+        "response_sha256": "4e0667b98fde5c9f1f81dc07d84033f458ff175074b51734a9c61b06a8287386",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-selector-v7-fernwick-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3095,
+          "maximum_wire_bytes": 3095
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "highmere-dome-shutter-service-code-history",
+        "case_id": "highmere-current-dome-shutter-service-code",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50504,
+        "output_tokens": 327,
+        "wall_time_ms": 27894
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "b82df57a3ff61892423e72bf70a52a6175a94f42940dc36e6caf8edf3ee5a550",
+        "response_sha256": "0818901aec08082bf75491f89bddde059fab959582b2bd27c78da49a0333df71",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-selector-v7-highmere-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3071,
+          "maximum_wire_bytes": 3071
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+        "family_id": "rillbank-cold-room-monitor-channel-history",
+        "case_id": "rillbank-current-cold-room-monitor-channel",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50602,
+        "output_tokens": 344,
+        "wall_time_ms": 25244
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "220524821716e0c1e5640bc3f5d4abea8c54d196af13a44fbd39ed5dae894e48",
+        "response_sha256": "cc272012c33953b8119e0a8c8aa8ec26f3f498c73463a423d076448ca9310186",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-selector-v7-rillbank-correction-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3107,
+          "maximum_wire_bytes": 3107
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "incumbent",
+  "run_id": "14861-1795610778767770000-0",
+  "identity_sha256": "ce5e0e6a692ee2ebfe2cbc929a5c46965a733a69f728f79ad9bb412127a3c553",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "cloudharbor-orchid-records-history",
+      "case_id": "cloudharbor-current-orchid-accession-ledger",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "flintglass-sky-array-history",
+      "case_id": "flintglass-current-telescope-timing-link",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "moonfern-alpine-seed-history",
+      "case_id": "moonfern-current-highland-parcel-index",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery",
+      "family_id": "tidelamp-deep-ocean-history",
+      "case_id": "tidelamp-current-abyssal-calibration-code",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "cloudharbor-orchid-records-history",
+        "case_id": "cloudharbor-current-orchid-accession-ledger",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50434,
+        "output_tokens": 330,
+        "wall_time_ms": 26465
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "1d036d1c9194ff979734167d337fa2bae0c83e53d5e09921ae8b2337fa34d466",
+        "response_sha256": "216346e575f45592b0b440444b99e23f26e2a22260b5c29517e87e422f3cd572",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v5-cloudharbor-orchid-repository-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3105,
+          "maximum_wire_bytes": 3105
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "flintglass-sky-array-history",
+        "case_id": "flintglass-current-telescope-timing-link",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50438,
+        "output_tokens": 331,
+        "wall_time_ms": 27339
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "c62cb16aa0806fed96ebc629f9964a08914f0075d294e177425b95464b68d8b8",
+        "response_sha256": "1751cecb73a8db39b62aab5a89386ac3493b4b3aea9b9ad826086f25239208d8",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v5-flintglass-sky-array-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3049,
+          "maximum_wire_bytes": 3049
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "moonfern-alpine-seed-history",
+        "case_id": "moonfern-current-highland-parcel-index",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50561,
+        "output_tokens": 338,
+        "wall_time_ms": 27014
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "a2803878ba0b581a992682cca04688ec95a84c8d25f24bb5456c9928fe80e366",
+        "response_sha256": "01c7e0e197fbe8d6a70af95fb5138848b9aaa399fee64057b0ab1a3ab9f081e8",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v5-moonfern-alpine-seed-archive-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3149,
+          "maximum_wire_bytes": 3149
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery",
+        "family_id": "tidelamp-deep-ocean-history",
+        "case_id": "tidelamp-current-abyssal-calibration-code",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 51411,
+        "output_tokens": 346,
+        "wall_time_ms": 26458
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "e2cb0abf1fd065db8a7351d2d41bb53170ed5db91d5f16d19f5b68eecb874501",
+        "response_sha256": "6f13cbab13f546db00a810bcf45531de05b38a8d4f6ff053f3721bdfedd34398",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v5-tidelamp-deep-ocean-archive-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3137,
+          "maximum_wire_bytes": 3137
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+{
+  "schema_version": "memory-mcp-agent-managed-run/v6",
+  "arm": "incumbent",
+  "run_id": "32776-1795616520368570000-0",
+  "identity_sha256": "8cbf51af2ea44997e933341c9af5e33a94e4b3ba702b6389400a64f4f5c50c96",
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "amberwick-tide-gauge-calibration-station-history",
+      "case_id": "amberwick-current-tide-gauge-calibration-station",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "bellpine-radar-synchronization-channel-history",
+      "case_id": "bellpine-current-radar-synchronization-channel",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "mossvale-cryo-vial-ledger-key-history",
+      "case_id": "mossvale-current-cryo-vial-ledger-key",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "wrenfield-saltwater-germination-tray-history",
+      "case_id": "wrenfield-current-saltwater-germination-tray",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "stages": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "amberwick-tide-gauge-calibration-station-history",
+        "case_id": "amberwick-current-tide-gauge-calibration-station",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50578,
+        "output_tokens": 346,
+        "wall_time_ms": 28203
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d1c47b0a3bcbee086dc55e29927c379f8cbe4d356eed6af0a17f0ca9d9f680be",
+        "response_sha256": "fe63c320a199ecd7578b5611ef1304d55cc92efdd0e3656d7bb3a1f04b6fef02",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v6-amberwick-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3133,
+          "maximum_wire_bytes": 3133
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "bellpine-radar-synchronization-channel-history",
+        "case_id": "bellpine-current-radar-synchronization-channel",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50515,
+        "output_tokens": 343,
+        "wall_time_ms": 25238
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "d8ca8bf68c252e8dba983cd6cc139f661ce57dfd0cc027b506f3db2e9b18f794",
+        "response_sha256": "7a7b0ac5c51229fc39dc70d9fca2d336af617ef11e7cfc0a042186192bf4e4b0",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v6-bellpine-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3117,
+          "maximum_wire_bytes": 3117
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "mossvale-cryo-vial-ledger-key-history",
+        "case_id": "mossvale-current-cryo-vial-ledger-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 51357,
+        "output_tokens": 352,
+        "wall_time_ms": 27178
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "cdb2c288860feb681a6f90e98904595a4dd86f03447e196e8d3ff6e110733311",
+        "response_sha256": "ee1a70d3944eeee05a103961d2016c0d8408df7faf4db25e6085c82df874c933",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v6-mossvale-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3087,
+          "maximum_wire_bytes": 3087
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "wrenfield-saltwater-germination-tray-history",
+        "case_id": "wrenfield-current-saltwater-germination-tray",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation": {
+        "status": "completed",
+        "turns_used": 1,
+        "tool_calls": 3,
+        "user_clarifications": 0,
+        "input_tokens": 50690,
+        "output_tokens": 357,
+        "wall_time_ms": 27015
+      },
+      "write_operations": [
+        {
+          "tool_name": "memory_decisions/extract",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        },
+        {
+          "tool_name": "memory_decisions/invalidate",
+          "attempts": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "unresolved": 0
+        }
+      ],
+      "successful_ingest_count": 1,
+      "identified_ingest_episode_count": 1,
+      "independent_probe": {
+        "request_sha256": "5657c0f556a9e209a2c4db35214a9625aadc24592c86f570b577bd780754014d",
+        "response_sha256": "903f645cf6354ba7c11cdc3207df08acd6003ccda70103d52a9e2d94327c6d92",
+        "known_revision": 17,
+        "retained_store_bytes": 34308173,
+        "source_event_ids": [
+          "c1-recovery-v6-wrenfield-update-01"
+        ],
+        "unsupported_source_count": 0,
+        "prohibited_source_count": 0,
+        "evidence_success": true
+      },
+      "exact_stale_fact_invalidation_verified": true,
+      "fact_evidence_audit": {
+        "telemetry_trials": 1,
+        "extract_calls": 1,
+        "evidence_requests": 1,
+        "evidence_responses": 1,
+        "evidence_before_invalidation": 1,
+        "response_sizes": {
+          "measured_responses": 1,
+          "total_wire_bytes": 3117,
+          "maximum_wire_bytes": 3117
+        }
+      }
+    }
+  ]
+}

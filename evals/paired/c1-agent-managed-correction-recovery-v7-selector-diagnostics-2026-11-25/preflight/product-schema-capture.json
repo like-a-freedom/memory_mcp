@@ -1,0 +1,66 @@
+{
+  "schema_version": "memory-mcp-independent-probe-capture/v2",
+  "launch_profile": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "NER_EXTRACTOR": "regex",
+    "SURREALDB_DB_NAME": "memory_decisions",
+    "SURREALDB_EMBEDDED": "true",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "episode_id_to_event_id": {},
+  "transport": "stdio",
+  "extractor": "regex",
+  "embeddings_enabled": false,
+  "observation": {
+    "input_sha256": "31aab17c2725767dafbc0d913026a2f0c89fc0fe70c0ea564115660b38ab40d6",
+    "product_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+    "source_event_ids": [],
+    "budget_used": 0,
+    "completed": true
+  },
+  "request": {
+    "budget": 4,
+    "compact": true,
+    "known_revision": 0,
+    "query": "Which synthetic registry value is current?",
+    "valid_at": "2026-11-25T16:00:00+00:00"
+  },
+  "response": {
+    "id": 3,
+    "jsonrpc": "2.0",
+    "result": {
+      "content": [
+        {
+          "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-25T15:46:35.375224Z\",\"known_revision\":0,\"valid_at\":\"2026-11-25T16:00:00Z\"}},\"guidance\":\"No matching items were returned from this partial historical snapshot. You may retry once with a more specific query while keeping the snapshot and all other arguments unchanged. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.\",\"result\":[],\"status\":\"success\"}",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "structuredContent": {
+        "context": {
+          "candidate_scan_truncated": false,
+          "completeness": "partial",
+          "omitted_channels": [
+            "alias expansion",
+            "experience, source episode siblings and source context neighborhoods",
+            "triples, graph edges and community summaries",
+            "semantic ANN and mutable embeddings",
+            "mutable fact access heat",
+            "legacy facts and episodes without committed revision provenance"
+          ],
+          "snapshot": {
+            "known_at": "2026-11-25T15:46:35.375224Z",
+            "known_revision": 0,
+            "valid_at": "2026-11-25T16:00:00Z"
+          }
+        },
+        "guidance": "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query while keeping the snapshot and all other arguments unchanged. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.",
+        "result": [],
+        "status": "success"
+      }
+    }
+  },
+  "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+  "claim_rollout_stage": "evidence"
+}

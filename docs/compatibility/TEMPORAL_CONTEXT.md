@@ -4,7 +4,7 @@ Implemented on the working tree based on `1ae1da4a`; see [deterministic quality 
 
 ## Read contract
 
-`assemble_context` accepts `valid_at` (when the claim applies) and either `known_at` (knowledge committed by that time) or `known_revision` (exact server commit checkpoint). Missing axes use one captured request time. Revision zero represents the empty revisioned history; negative or future revisions are rejected. Tokens belong to one active namespace/history and are not portable between unrelated stores.
+`assemble_context` accepts `valid_at` (when the claim applies) and either `known_at` (knowledge committed by that time) or `known_revision` (exact server commit checkpoint). Missing axes use one captured request time. To repeat an effective snapshot across calls, copy `context.snapshot.valid_at` to `valid_at` and `context.snapshot.known_revision` to `known_revision`; omit `as_of` and `known_at`. Repeating a request with omitted axes captures a new snapshot. Revision zero represents the empty revisioned history; negative or future revisions are rejected. Tokens belong to one active namespace/history and are not portable between unrelated stores.
 
 The existing MCP `as_of` parameter maps to **both** axes. It cannot be combined with any new axis. `known_at` and `known_revision` are mutually exclusive. Malformed explicit timestamps are validation errors. Calls without explicit temporal parameters retain current retrieval. The older Rust `AssembleContextRequest.as_of` service interface is distinct; use the temporal capability for the new snapshot contract.
 

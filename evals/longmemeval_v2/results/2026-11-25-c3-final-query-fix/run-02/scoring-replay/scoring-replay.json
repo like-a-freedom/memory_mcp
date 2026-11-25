@@ -1,0 +1,60 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-prompt-replay/v1",
+  "source_prompt_rows_sha256": "545a780721d74b86866f6edbc50c818119c0ab229afd8c6aa88431cae09ef632",
+  "source_run_id": "2026-11-25-c3-final-query-fix/run-02",
+  "selected_case_ids": [
+    "0c6b0c60",
+    "6d975a08",
+    "89a20f48",
+    "922a0c56",
+    "d6da3938",
+    "f43926d9",
+    "f61a096f"
+  ],
+  "reader_outputs_count": 7,
+  "reader_outputs_sha256": "2b26949aabc81918d6059000f224ec7c0b1ab1d26c664740e86d149e5671e5d5",
+  "reader_generation_seconds": 169.486,
+  "judge_scoring_seconds": 2.284,
+  "scored_case_count": 5,
+  "judge_or_scorer_failure_count": 2,
+  "cases": {
+    "0c6b0c60": "scored",
+    "6d975a08": "scored",
+    "89a20f48": "judge_error",
+    "922a0c56": "scored",
+    "d6da3938": "scored",
+    "f43926d9": "judge_error",
+    "f61a096f": "scored"
+  },
+  "failures": {
+    "89a20f48": {
+      "stage": "judge",
+      "error_type": "ValueError"
+    },
+    "f43926d9": {
+      "stage": "judge",
+      "error_type": "ValueError"
+    }
+  },
+  "official_exact_match": null,
+  "covered_case_exact_match": "2/5",
+  "failure_inclusive_successes_over_selected_denominator": "2/7",
+  "official_metrics_status": "unavailable_due_to_scoring_failure",
+  "query_latency_seconds": {
+    "mean": 590.5487533511415,
+    "median": 429.7414541670005,
+    "p95": 989.6444373749982,
+    "max": 989.6444373749982
+  },
+  "model_configuration": {
+    "reader": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "judge": "/Users/solovey/.cache/lm-studio/models/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+    "reader_endpoint": "http://127.0.0.1:18767/v1",
+    "judge_endpoint": "http://127.0.0.1:18766/v1",
+    "temperature": 0.0,
+    "max_completion_tokens": 256,
+    "reader_enable_thinking": true,
+    "judge_reasoning_effort": "medium",
+    "network": "loopback only; HF offline; no LM Studio endpoint used"
+  }
+}

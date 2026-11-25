@@ -1,5 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::process::Command;
+use std::io::Read;
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use eval_harness::paired::{
     AgentTraceEvent, BootstrapConfig, CaseTrialKey, DevelopmentPilotReport, ExploratoryPilotReport,
@@ -9,6 +12,7 @@ use eval_harness::paired::{
     SharedRunIdentity, TraceEventKind, TrialReceipt, TrialStatus,
 };
 use eval_harness::paired_reliability::PairedReliabilityReport;
+use sha2::{Digest, Sha256};
 
 #[test]
 fn compare_paired_cli_writes_a_reproducible_rejection_report() {
@@ -710,7 +714,6 @@ fn shared_identity() -> SharedRunIdentity {
 fn scores_external_observations_offline_using_the_private_oracle() {
     use eval_harness::paired_agent::PairedTaskManifest;
     use serde_json::json;
-    use sha2::{Digest, Sha256};
 
     let directory = tempfile::tempdir().unwrap();
     let plan_path = directory.path().join("plan.json");
@@ -982,6 +985,41 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         std::fs::read(replay.join("incumbent.json")).unwrap()
     );
 
+    let mut invalid_v4 = v4.clone();
+    invalid_v4["incumbent"]["trials"][0]["observation"]["memory_reads"][0]["requested_valid_at_sha256"] =
+        json!("d".repeat(64));
+    write_json(&observations_path, &invalid_v4);
+    let invalid_v4_run = directory.path().join("invalid-v4-valid-time-field");
+    let output = score(&invalid_v4_run);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("observations v4 cannot contain valid-time read fingerprints")
+    );
+    assert!(!invalid_v4_run.exists());
+
+    let mut invalid_v4_selectors = v4.clone();
+    invalid_v4_selectors["incumbent"]["trials"][0]["observation"]["memory_reads"][0]["selector_arguments_sha256"] = json!({
+        "fact_types": "d".repeat(64),
+        "as_of": "d".repeat(64),
+        "valid_at": "d".repeat(64),
+        "known_at": "d".repeat(64),
+        "known_revision": "d".repeat(64),
+        "budget": "d".repeat(64),
+        "view_mode": "d".repeat(64),
+        "window_start": "d".repeat(64),
+        "window_end": "d".repeat(64),
+        "compact": "d".repeat(64),
+    });
+    write_json(&observations_path, &invalid_v4_selectors);
+    let invalid_v4_selector_run = directory.path().join("invalid-v4-selector-fields");
+    let output = score(&invalid_v4_selector_run);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "observations v4 cannot contain valid-time read fingerprints or selector fingerprints"
+    ));
+    assert!(!invalid_v4_selector_run.exists());
+
     let mut v8_observations = v4.clone();
     for arm in ["incumbent", "candidate"] {
         for trial in v8_observations[arm]["trials"].as_array_mut().unwrap() {
@@ -1006,6 +1044,11 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         v8_artifact["receipts"][0]["read_diagnostics"][0]["request_query_sha256"],
         "a".repeat(64)
     );
+    let mut v8_with_valid_time = v8_artifact.clone();
+    v8_with_valid_time["receipts"][0]["read_diagnostics"][0]["requested_valid_at_match"] =
+        json!(true);
+    let v8_with_valid_time: PairedRunArtifact = serde_json::from_value(v8_with_valid_time).unwrap();
+    assert!(v8_with_valid_time.validate().is_err());
     let mut missing_v8_fingerprint = v8_artifact.clone();
     missing_v8_fingerprint["receipts"][0]["read_diagnostics"][0]
         .as_object_mut()
@@ -1232,6 +1275,496 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     assert!(!invalid_legacy.exists());
 }
 
+fn run_valid_time_observation_fixture(
+    requested_valid_at_sha256: Option<&str>,
+    returned_valid_at_sha256: Option<&str>,
+) -> (tempfile::TempDir, Vec<u8>) {
+    run_valid_time_observation_fixture_with_cutoffs(
+        requested_valid_at_sha256,
+        returned_valid_at_sha256,
+        None,
+        None,
+    )
+}
+
+fn run_valid_time_observation_fixture_with_cutoffs(
+    requested_valid_at_sha256: Option<&str>,
+    returned_valid_at_sha256: Option<&str>,
+    requested_cutoff_sha256: Option<&str>,
+    returned_cutoff_sha256: Option<&str>,
+) -> (tempfile::TempDir, Vec<u8>) {
+    use eval_harness::paired_agent::PairedTaskManifest;
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+
+    let directory = tempfile::tempdir().expect("temporary observation directory");
+    let plan_path = directory.path().join("plan.json");
+    let tasks_path = directory.path().join("tasks.json");
+    let observations_path = directory.path().join("observations.json");
+    let expected = trials();
+    let valid_at = "2026-05-01T10:00:00Z";
+    let manifest: PairedTaskManifest = serde_json::from_value(json!({
+        "schema_version": "memory-mcp-agent-tasks/v2",
+        "tasks": expected.iter().map(|key| json!({
+            "key": key,
+            "prompt": "What is the registered value?",
+            "knowledge_before_event_id": null,
+            "seed_episodes": [{
+                "event_id": "assignment",
+                "source_id": "synthetic-source",
+                "source_type": "document",
+                "content": "The registered value is Juniper.",
+                "valid_at": valid_at
+            }],
+            "oracle": {
+                "accepted_answers": ["Juniper"],
+                "forbidden_event_ids": [],
+                "sufficient_evidence_alternatives": [[["assignment"]]],
+                "needs_clarification": false,
+                "read_expectation": {
+                    "valid_at": valid_at,
+                    "required_claim_annotation_alternatives": []
+                }
+            }
+        })).collect::<Vec<_>>()
+    }))
+    .expect("valid task manifest");
+    let mut shared = shared_identity();
+    shared.corpus_sha256 = manifest.corpus_sha256().expect("corpus hash");
+    shared.oracle_sha256 = manifest.oracle_sha256().expect("oracle hash");
+    let product = product_identity("unknown-time-fixture", '1');
+    let plan = PairedEvaluationPlan {
+        schema_version: PAIRED_PLAN_SCHEMA_V2.into(),
+        plan_id: "valid-time-unknown-fixture".into(),
+        stage: PairedEvaluationStage::DevelopmentPilot,
+        pilot_report_sha256: None,
+        power_analysis_sha256: None,
+        planned_independent_families: 2,
+        expected_trials: expected.clone(),
+        shared_identity: shared.clone(),
+        incumbent_product: product.clone(),
+        candidate_product: product.clone(),
+        declared_tool_schema_change: None,
+        bootstrap: BootstrapConfig {
+            seed: 7,
+            draws: 1_000,
+            confidence_level_basis_points: 9_500,
+        },
+        promotion_criteria: None,
+    };
+    let arm = |incumbent: bool| {
+        let final_answer = json!({"answer":"Juniper","citations":["episode-1"]}).to_string();
+        let final_answer_sha256 = hex::encode(Sha256::digest(final_answer.as_bytes()));
+        json!({
+            "identity": {"shared": shared, "product": product},
+            "trials": expected.iter().map(|key| json!({
+                "key": key,
+                "arm_order": if incumbent == key.incumbent_first { 1 } else { 2 },
+                "known_revision_checkpoint": null,
+                "episode_id_to_event_id": {"episode-1":"assignment"},
+                "observation": {
+                    "trace": [
+                        {"sequence":1,"turn":1,"kind":"agent_turn_started"},
+                        {"sequence":2,"turn":1,"kind":"memory_read","call_id":"read","tool_name":"assemble_context","payload_sha256":digest('a')},
+                        {"sequence":3,"turn":1,"kind":"tool_response","call_id":"read","tool_name":"assemble_context","payload_sha256":digest('b')},
+                        {"sequence":4,"turn":1,"kind":"final_answer","payload_sha256":final_answer_sha256},
+                        {"sequence":5,"turn":1,"kind":"agent_turn","input_tokens":10,"output_tokens":5}
+                    ],
+                    "final_answer": final_answer,
+                    "memory_source_episode_ids": ["episode-1"],
+                    "memory_write_episode_ids": [],
+                    "read_capture_status": "observed",
+                    "memory_reads": [{
+                        "request_sequence":2,
+                        "response_sequence":3,
+                        "outcome":"empty",
+                        "item_count":0,
+                        "request_query_sha256":digest('c'),
+                        "non_query_arguments_sha256":digest('d'),
+                        "response_guidance_sha256":null,
+                        "requested_valid_at_sha256":requested_valid_at_sha256,
+                        "evidence": if let Some(valid_at_sha256) = returned_valid_at_sha256 {
+                            json!({
+                                "source_episode_ids":[],
+                                "claim_annotations":[],
+                                "completeness":"partial",
+                                "requested_cutoff_sha256":requested_cutoff_sha256,
+                                "returned_cutoff_sha256":returned_cutoff_sha256,
+                                "returned_valid_at_sha256":valid_at_sha256
+                            })
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }],
+                    "turns_used":1,
+                    "tool_calls":1,
+                    "user_clarifications":0,
+                    "input_tokens":10,
+                    "output_tokens":5,
+                    "wall_time_ms":100,
+                    "status":"completed"
+                }
+            })).collect::<Vec<_>>()
+        })
+    };
+    let observations = json!({
+        "schema_version":"memory-mcp-agent-observations/v5",
+        "plan_sha256":plan.sha256().expect("plan hash"),
+        "run_id":"valid-time-unknown-run",
+        "run_started_at":fixed_run_start(),
+        "run_completed_at":fixed_run_start() + chrono::Duration::seconds(5),
+        "incumbent":arm(true),
+        "candidate":arm(false)
+    });
+    write_json(&plan_path, &plan);
+    write_json(&tasks_path, &manifest);
+    write_json(&observations_path, &observations);
+    let score = |folder: &std::path::Path| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+        command
+            .env_clear()
+            .arg("score-paired-observations")
+            .arg("--plan")
+            .arg(&plan_path)
+            .arg("--tasks")
+            .arg(&tasks_path)
+            .arg("--observations")
+            .arg(&observations_path)
+            .arg("--output-directory")
+            .arg(folder);
+        bounded_command_output(&mut command, Duration::from_secs(30))
+            .expect("score observation bundle")
+    };
+
+    let output_directory = directory.path().join("scored");
+    let result = score(&output_directory);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let bytes = std::fs::read(output_directory.join("candidate.json")).expect("paired artifact");
+    (directory, bytes)
+}
+
+#[test]
+fn registered_valid_time_with_unavailable_fingerprints_replays_as_unknown_v9() {
+    let (_directory, bytes) = run_valid_time_observation_fixture(None, None);
+    let artifact: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON artifact");
+
+    assert_eq!(artifact["schema_version"], "memory-mcp-agent-paired/v9");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+    assert!(read.get("requested_valid_at_match").is_none());
+    assert!(read.get("returned_valid_at_match").is_none());
+    assert!(!String::from_utf8_lossy(&bytes).contains("2026-05-01T10:00:00Z"));
+}
+
+#[test]
+fn valid_time_diagnostic_replay_is_byte_identical() {
+    let (_first_directory, first) = run_valid_time_observation_fixture(None, None);
+    let (_second_directory, second) = run_valid_time_observation_fixture(None, None);
+
+    assert_eq!(first, second);
+}
+
+#[test]
+fn matching_requested_and_returned_valid_times_are_boolean_and_redacted() {
+    let expected = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let (_directory, bytes) = run_valid_time_observation_fixture(Some(&expected), Some(&expected));
+    let artifact: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON artifact");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+
+    assert_eq!(read["requested_valid_at_match"], true);
+    assert_eq!(read["returned_valid_at_match"], true);
+    assert!(!String::from_utf8_lossy(&bytes).contains(&expected));
+}
+
+#[test]
+fn requested_valid_time_match_is_independent_of_returned_snapshot_mismatch() {
+    let expected = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let wrong = hex::encode(Sha256::digest(b"2026-05-01T09:00:00Z"));
+    let (_directory, bytes) = run_valid_time_observation_fixture(Some(&expected), Some(&wrong));
+    let artifact: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON artifact");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+
+    assert_eq!(read["requested_valid_at_match"], true);
+    assert_eq!(read["returned_valid_at_match"], false);
+}
+
+#[test]
+fn returned_snapshot_match_is_independent_of_requested_valid_time_mismatch() {
+    let expected = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let wrong = hex::encode(Sha256::digest(b"2026-05-01T09:00:00Z"));
+    let (_directory, bytes) = run_valid_time_observation_fixture(Some(&wrong), Some(&expected));
+    let artifact: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON artifact");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+
+    assert_eq!(read["requested_valid_at_match"], false);
+    assert_eq!(read["returned_valid_at_match"], true);
+}
+
+#[test]
+fn unregistered_revision_does_not_produce_full_cutoff_matches() {
+    let valid_at = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let requested = hex::encode(Sha256::digest(br#"["2026-05-01T10:00:00Z",7]"#));
+    let returned = hex::encode(Sha256::digest(br#"["2026-05-01T10:00:00Z",8]"#));
+    let (_directory, bytes) = run_valid_time_observation_fixture_with_cutoffs(
+        Some(&valid_at),
+        Some(&valid_at),
+        Some(&requested),
+        Some(&returned),
+    );
+    let artifact: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON artifact");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+
+    assert_eq!(read["requested_valid_at_match"], true);
+    assert_eq!(read["returned_valid_at_match"], true);
+    assert!(read.get("requested_cutoff_match").is_none());
+    assert!(read.get("returned_cutoff_match").is_none());
+}
+
+#[test]
+fn selector_diagnostics_compare_registered_arguments_without_persisting_values() {
+    use eval_harness::paired_agent::PairedTaskManifest;
+    use serde_json::{Value, json};
+
+    let valid_at_fingerprint = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let (directory, _) = run_valid_time_observation_fixture(
+        Some(&valid_at_fingerprint),
+        Some(&valid_at_fingerprint),
+    );
+    let plan_path = directory.path().join("plan.json");
+    let tasks_path = directory.path().join("tasks.json");
+    let observations_path = directory.path().join("observations.json");
+
+    let mut manifest: PairedTaskManifest =
+        serde_json::from_slice(&std::fs::read(&tasks_path).unwrap()).unwrap();
+    for task in &mut manifest.tasks {
+        task.oracle
+            .read_expectation
+            .as_mut()
+            .unwrap()
+            .selector_arguments = Some(BTreeMap::from([
+            ("fact_types".into(), json!(["decision"])),
+            ("valid_at".into(), json!("2026-05-01T10:00:00Z")),
+            ("budget".into(), json!(5)),
+            ("compact".into(), json!(true)),
+        ]));
+    }
+
+    let mut plan: PairedEvaluationPlan =
+        serde_json::from_slice(&std::fs::read(&plan_path).unwrap()).unwrap();
+    plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
+    let mut observations: Value =
+        serde_json::from_slice(&std::fs::read(&observations_path).unwrap()).unwrap();
+    observations["schema_version"] = json!("memory-mcp-agent-observations/v6");
+    observations["plan_sha256"] = json!(plan.sha256().unwrap());
+
+    let actual_request = json!({
+        "query": "PRIVATE QUERY SENTINEL",
+        "fact_types": ["profile"],
+        "valid_at": "2026-05-01T11:00:00+01:00",
+        "budget": 5,
+        "view_mode": "timeline"
+    });
+    for arm in ["incumbent", "candidate"] {
+        observations[arm]["identity"]["shared"] =
+            serde_json::to_value(&plan.shared_identity).unwrap();
+        for trial in observations[arm]["trials"].as_array_mut().unwrap() {
+            for read in trial["observation"]["memory_reads"].as_array_mut().unwrap() {
+                read["selector_arguments_sha256"] =
+                    selector_fingerprints_for_fixture(&actual_request);
+            }
+        }
+    }
+    write_json(&plan_path, &plan);
+    write_json(&tasks_path, &manifest);
+    write_json(&observations_path, &observations);
+
+    let score = |folder: &std::path::Path| -> std::io::Result<Output> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+        command
+            .env_clear()
+            .arg("score-paired-observations")
+            .arg("--plan")
+            .arg(&plan_path)
+            .arg("--tasks")
+            .arg(&tasks_path)
+            .arg("--observations")
+            .arg(&observations_path)
+            .arg("--output-directory")
+            .arg(folder);
+        bounded_command_output(&mut command, Duration::from_secs(30))
+    };
+    let first_directory = directory.path().join("selector-scored-01");
+    let first = score(&first_directory).expect("score selector observation bundle");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let artifact_bytes = std::fs::read(first_directory.join("candidate.json")).unwrap();
+    let artifact: Value = serde_json::from_slice(&artifact_bytes).unwrap();
+
+    assert_eq!(artifact["schema_version"], "memory-mcp-agent-paired/v10");
+    let read = &artifact["receipts"][0]["read_diagnostics"][0];
+    assert_eq!(read["selector_expectation_registered"], true);
+    let matches = &read["selector_argument_matches"];
+    assert_eq!(matches["fact_types"], false);
+    assert_eq!(matches["valid_at"], true);
+    assert_eq!(matches["budget"], true);
+    assert_eq!(matches["view_mode"], false);
+    assert_eq!(matches["compact"], true);
+    assert_eq!(matches["as_of"], true);
+    for private in ["PRIVATE QUERY SENTINEL", "profile", "decision", "timeline"] {
+        assert!(!String::from_utf8_lossy(&artifact_bytes).contains(private));
+    }
+
+    let mut missing_diagnostic = artifact.clone();
+    missing_diagnostic["receipts"][0]["read_diagnostics"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("selector_argument_matches");
+    let missing_diagnostic: PairedRunArtifact = serde_json::from_value(missing_diagnostic).unwrap();
+    assert!(missing_diagnostic.validate().is_err());
+
+    let replay_directory = directory.path().join("selector-scored-02");
+    let replay = score(&replay_directory).expect("replay selector observation bundle");
+    assert!(
+        replay.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
+    assert_eq!(
+        artifact_bytes,
+        std::fs::read(replay_directory.join("candidate.json")).unwrap()
+    );
+}
+
+#[test]
+fn registered_selector_read_without_selector_fingerprints_fails_offline_cli() {
+    use eval_harness::paired_agent::PairedTaskManifest;
+    use serde_json::Value;
+
+    let valid_at = hex::encode(Sha256::digest(b"2026-05-01T10:00:00Z"));
+    let (directory, _) = run_valid_time_observation_fixture(Some(&valid_at), Some(&valid_at));
+    let plan_path = directory.path().join("plan.json");
+    let tasks_path = directory.path().join("tasks.json");
+    let observations_path = directory.path().join("observations.json");
+
+    let mut plan: PairedEvaluationPlan =
+        serde_json::from_slice(&std::fs::read(&plan_path).unwrap()).unwrap();
+    let mut tasks: PairedTaskManifest =
+        serde_json::from_slice(&std::fs::read(&tasks_path).unwrap()).unwrap();
+    for task in &mut tasks.tasks {
+        task.oracle
+            .read_expectation
+            .as_mut()
+            .unwrap()
+            .selector_arguments = Some(BTreeMap::from([(
+            "valid_at".into(),
+            serde_json::json!("2026-05-01T10:00:00Z"),
+        )]));
+    }
+    plan.shared_identity.corpus_sha256 = tasks.corpus_sha256().unwrap();
+    plan.shared_identity.oracle_sha256 = tasks.oracle_sha256().unwrap();
+
+    let mut observations: Value =
+        serde_json::from_slice(&std::fs::read(&observations_path).unwrap()).unwrap();
+    observations["schema_version"] = serde_json::json!("memory-mcp-agent-observations/v6");
+    observations["plan_sha256"] = serde_json::json!(plan.sha256().unwrap());
+    let shared_identity = serde_json::to_value(&plan.shared_identity).unwrap();
+    for arm in ["incumbent", "candidate"] {
+        observations[arm]["identity"]["shared"] = shared_identity.clone();
+        for trial in observations[arm]["trials"].as_array_mut().unwrap() {
+            for read in trial["observation"]["memory_reads"].as_array_mut().unwrap() {
+                read.as_object_mut()
+                    .unwrap()
+                    .remove("selector_arguments_sha256");
+            }
+        }
+    }
+
+    write_json(&plan_path, &plan);
+    write_json(&tasks_path, &tasks);
+    write_json(&observations_path, &observations);
+    let output_directory = directory.path().join("missing-selector-fingerprints");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+    command
+        .env_clear()
+        .arg("score-paired-observations")
+        .arg("--plan")
+        .arg(&plan_path)
+        .arg("--tasks")
+        .arg(&tasks_path)
+        .arg("--observations")
+        .arg(&observations_path)
+        .arg("--output-directory")
+        .arg(&output_directory);
+    let output = bounded_command_output(&mut command, Duration::from_secs(30))
+        .expect("score registered selector observations");
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("observations v6 require selector fingerprints for every read"),
+        "unexpected scorer error: {stderr}"
+    );
+    assert!(!output_directory.exists());
+}
+
+fn selector_fingerprints_for_fixture(arguments: &serde_json::Value) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+
+    const FIELDS: [&str; 10] = [
+        "fact_types",
+        "as_of",
+        "valid_at",
+        "known_at",
+        "known_revision",
+        "budget",
+        "view_mode",
+        "window_start",
+        "window_end",
+        "compact",
+    ];
+    let mut fingerprints = Map::new();
+    for field in FIELDS {
+        let value = arguments
+            .get(field)
+            .cloned()
+            .unwrap_or_else(|| match field {
+                "fact_types" => json!([]),
+                "as_of" | "valid_at" | "known_at" | "known_revision" | "view_mode"
+                | "window_start" | "window_end" => Value::Null,
+                "budget" => json!(5),
+                "compact" => json!(true),
+                _ => unreachable!(),
+            });
+        let value = if matches!(
+            field,
+            "as_of" | "valid_at" | "known_at" | "window_start" | "window_end"
+        ) {
+            value
+                .as_str()
+                .and_then(|timestamp| chrono::DateTime::parse_from_rfc3339(timestamp).ok())
+                .map(|timestamp| {
+                    json!(
+                        timestamp
+                            .with_timezone(&chrono::Utc)
+                            .to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+                    )
+                })
+                .unwrap_or(value)
+        } else {
+            value
+        };
+        let bytes = serde_json::to_vec(&value).unwrap();
+        fingerprints.insert(field.into(), json!(hex::encode(Sha256::digest(bytes))));
+    }
+    Value::Object(fingerprints)
+}
+
 fn product_identity(revision: &str, fingerprint: char) -> ProductRunIdentity {
     ProductRunIdentity {
         revision: revision.into(),
@@ -1342,6 +1875,55 @@ fn write_json(path: &std::path::Path, value: &impl serde::Serialize) {
         serde_json::to_vec_pretty(value).expect("serialize test fixture"),
     )
     .expect("write test fixture");
+}
+
+fn bounded_command_output(command: &mut Command, timeout: Duration) -> std::io::Result<Output> {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| std::io::Error::other("child stdout pipe is unavailable"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| std::io::Error::other("child stderr pipe is unavailable"))?;
+    let stdout_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stderr.read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let deadline = Instant::now() + timeout;
+    let (status, timed_out) = loop {
+        if let Some(status) = child.try_wait()? {
+            break (status, false);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break (child.wait()?, true);
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| std::io::Error::other("stdout reader thread panicked"))??;
+    let mut stderr = stderr_reader
+        .join()
+        .map_err(|_| std::io::Error::other("stderr reader thread panicked"))??;
+    if timed_out {
+        stderr.extend_from_slice(b"\nchild process exceeded its test timeout and was killed\n");
+    }
+    Ok(Output {
+        status,
+        stdout,
+        stderr,
+    })
 }
 
 fn fixed_run_start() -> chrono::DateTime<chrono::Utc> {

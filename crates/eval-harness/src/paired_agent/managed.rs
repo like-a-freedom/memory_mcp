@@ -191,7 +191,9 @@ impl AgentManagedTaskManifest {
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV2
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV3
                 | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV4
-                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5,
+                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5
+                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV6
+                | crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV7,
                 false,
             ) => Ok(()),
             (
@@ -276,6 +278,18 @@ impl AgentManagedTaskManifest {
                     crate::codex_agent::agent_maintenance_v5_system_prompt_sha256(),
                     crate::codex_agent::agent_maintenance_v5_task_prompt_sha256(),
                     crate::codex_agent::agent_maintenance_v4_host_policy_sha256(),
+                    crate::codex_agent::agent_maintenance_v4_simulator_sha256(),
+                ),
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV6 => (
+                    crate::codex_agent::agent_maintenance_v6_system_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v6_task_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v6_host_policy_sha256(),
+                    crate::codex_agent::agent_maintenance_v4_simulator_sha256(),
+                ),
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV7 => (
+                    crate::codex_agent::agent_maintenance_v7_system_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v7_task_prompt_sha256(),
+                    crate::codex_agent::agent_maintenance_v7_host_policy_sha256(),
                     crate::codex_agent::agent_maintenance_v4_simulator_sha256(),
                 ),
                 crate::codex_agent::CodexMemoryToolProfile::AgentSourceAuthority => (
@@ -1963,7 +1977,7 @@ mod tests {
     use crate::paired::TrialStatus;
 
     #[test]
-    fn maintenance_v5_fingerprints_only_the_changed_recall_behavior() {
+    fn maintenance_v6_fingerprints_pin_partial_read_recovery_and_portable_host_policy() {
         let manifest: AgentManagedTaskManifest = serde_json::from_str(include_str!(
             "../../../../evals/paired/c1-agent-managed-correction-codex-direct-mlx-2026-11-25/tasks.json"
         ))
@@ -1978,13 +1992,35 @@ mod tests {
                 crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV5,
             )
             .expect("v5 fingerprints");
+        let v6 = manifest
+            .fingerprints_for_profile(
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV6,
+            )
+            .expect("v6 fingerprints");
+        let v7 = manifest
+            .fingerprints_for_profile(
+                crate::codex_agent::CodexMemoryToolProfile::AgentMaintenanceV7,
+            )
+            .expect("v7 fingerprints");
 
         assert_ne!(v4.system_prompt_sha256, v5.system_prompt_sha256);
         assert_ne!(v4.task_prompt_sha256, v5.task_prompt_sha256);
+        assert_ne!(v5.system_prompt_sha256, v6.system_prompt_sha256);
+        assert_ne!(v5.task_prompt_sha256, v6.task_prompt_sha256);
+        assert_ne!(v6.system_prompt_sha256, v7.system_prompt_sha256);
+        assert_ne!(v6.task_prompt_sha256, v7.task_prompt_sha256);
         assert_eq!(v4.host_policy_sha256, v5.host_policy_sha256);
+        assert_ne!(v5.host_policy_sha256, v6.host_policy_sha256);
+        assert_eq!(v6.host_policy_sha256, v7.host_policy_sha256);
         assert_eq!(v4.retry_policy_sha256, v5.retry_policy_sha256);
+        assert_eq!(v5.retry_policy_sha256, v6.retry_policy_sha256);
+        assert_eq!(v6.retry_policy_sha256, v7.retry_policy_sha256);
         assert_eq!(v4.simulator_sha256, v5.simulator_sha256);
+        assert_eq!(v5.simulator_sha256, v6.simulator_sha256);
+        assert_eq!(v6.simulator_sha256, v7.simulator_sha256);
         assert_eq!(v4.protocol_config_sha256, v5.protocol_config_sha256);
+        assert_eq!(v5.protocol_config_sha256, v6.protocol_config_sha256);
+        assert_eq!(v6.protocol_config_sha256, v7.protocol_config_sha256);
     }
 
     #[test]

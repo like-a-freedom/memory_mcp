@@ -1,0 +1,189 @@
+{
+  "schema_version": "memory-mcp-agent-managed-tasks/v1",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "mossvale-cryo-vial-ledger-key-history",
+        "case_id": "mossvale-current-cryo-vial-ledger-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Mossvale Glacier Herbarium uses Orchid-74 as its cryo-vial ledger key. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v6/mossvale/mossvale-glacier-herbarium/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Mossvale Glacier Herbarium's current cryo-vial ledger key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Mossvale Glacier Herbarium's current cryo-vial ledger key? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v6-mossvale-old-01",
+          "source_id": "conversation://c1-recovery-v6/mossvale/mossvale-glacier-herbarium/original-01",
+          "source_type": "conversation",
+          "content": "Mossvale Glacier Herbarium uses Basalt-31 as its cryo-vial ledger key.",
+          "valid_at": "2026-11-04T08:00:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v6-mossvale-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v6-mossvale-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Orchid-74"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v6-mossvale-old-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-24T12:00:00Z",
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "amberwick-tide-gauge-calibration-station-history",
+        "case_id": "amberwick-current-tide-gauge-calibration-station",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Amberwick Tidal Observatory uses Beacon-45 as its tide-gauge calibration station. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v6/amberwick/amberwick-tidal-observatory/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Amberwick Tidal Observatory's current tide-gauge calibration station? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Amberwick Tidal Observatory's current tide-gauge calibration station? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v6-amberwick-old-01",
+          "source_id": "conversation://c1-recovery-v6/amberwick/amberwick-tidal-observatory/original-01",
+          "source_type": "conversation",
+          "content": "Amberwick Tidal Observatory uses Silt-62 as its tide-gauge calibration station.",
+          "valid_at": "2026-11-05T09:30:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v6-amberwick-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v6-amberwick-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Beacon-45"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v6-amberwick-old-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-24T12:00:00Z",
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "bellpine-radar-synchronization-channel-history",
+        "case_id": "bellpine-current-radar-synchronization-channel",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Bellpine Meteorology Lab uses Lantern-93 as its radar synchronization channel. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v6/bellpine/bellpine-meteorology-lab/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Bellpine Meteorology Lab's current radar synchronization channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Bellpine Meteorology Lab's current radar synchronization channel? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v6-bellpine-old-01",
+          "source_id": "conversation://c1-recovery-v6/bellpine/bellpine-meteorology-lab/original-01",
+          "source_type": "conversation",
+          "content": "Bellpine Meteorology Lab uses Cumulus-18 as its radar synchronization channel.",
+          "valid_at": "2026-11-06T11:15:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v6-bellpine-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v6-bellpine-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Lantern-93"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v6-bellpine-old-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-24T12:00:00Z",
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "wrenfield-saltwater-germination-tray-history",
+        "case_id": "wrenfield-current-saltwater-germination-tray",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "formation_prompt": "Please maintain project memory. The user supplied this durable correction: Correction, valid from 2026-11-23T10:00:00Z: Wrenfield Coastal Seed Bank uses Morrow-26 as its saltwater germination tray. Call extract exactly once with that exact sentence as inline content, source_type=conversation, source_id=conversation://c1-recovery-v6/wrenfield/wrenfield-coastal-seed-bank/update-01, and t_ref=2026-11-23T10:00:00Z. Do not call ingest separately. Verify the extracted correction before invalidating, then invalidate only the exact superseded fact with t_invalid=2026-11-23T10:00:00Z and reason=Superseded by this user correction. If any prerequisite fails, do not invalidate and ask for clarification.",
+      "recall_prompt": "As of 2026-11-24T12:00:00Z, what is Wrenfield Coastal Seed Bank's current saltwater germination tray? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+      "independent_probe": {
+        "query": "As of 2026-11-24T12:00:00Z, what is Wrenfield Coastal Seed Bank's current saltwater germination tray? Cite only the supporting memory source. If memory does not support a current answer, say unknown.",
+        "valid_at": "2026-11-24T12:00:00Z",
+        "context_budget": 8192
+      },
+      "seed_episodes": [
+        {
+          "event_id": "c1-recovery-v6-wrenfield-old-01",
+          "source_id": "conversation://c1-recovery-v6/wrenfield/wrenfield-coastal-seed-bank/original-01",
+          "source_type": "conversation",
+          "content": "Wrenfield Coastal Seed Bank uses Seagrass-57 as its saltwater germination tray.",
+          "valid_at": "2026-11-07T13:45:00Z"
+        }
+      ],
+      "target_write_event_id": "c1-recovery-v6-wrenfield-update-01",
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "c1-recovery-v6-wrenfield-update-01"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Morrow-26"
+        ],
+        "forbidden_event_ids": [
+          "c1-recovery-v6-wrenfield-old-01"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-11-24T12:00:00Z",
+          "required_claim_annotation_alternatives": []
+        }
+      }
+    }
+  ]
+}

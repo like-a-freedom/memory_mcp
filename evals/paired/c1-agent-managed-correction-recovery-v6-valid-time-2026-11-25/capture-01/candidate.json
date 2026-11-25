@@ -1,0 +1,645 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v9",
+  "arm": "candidate",
+  "run_id": "32776-1795616520368570000-0",
+  "run_started_at": "2026-11-25T14:22:00.368598Z",
+  "run_completed_at": "2026-11-25T14:29:15.180825Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "codex-cli",
+      "agent_version": "0.171.0-alpha.13",
+      "model": "gpt-6.1-sol",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 7200
+      },
+      "system_prompt_sha256": "abd2a2e1fc473ed6a37419bb00f4fa101f7711670a78ef20f569ab15b85583ee",
+      "task_prompt_sha256": "1b9dc6977e1cad79e0195400b5bb60d24f0f97d9a9884ae3a0292565978324a8",
+      "host_policy_sha256": "2df1be214f58e0edbb8514121f93d427cc8a8d3709d0dff16b26d5a61088e239",
+      "transport": "stdio",
+      "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+      "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+      "judge_config_sha256": null,
+      "corpus_sha256": "09b103f16c02e87bfd419627e51c2e84c2a841f20c805e8ff74a901bb9429ee2",
+      "oracle_sha256": "32d0e7bf243807186c6a28541a074390c882593bdcc59784858a81c4d7bdfddb",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+      "provider_fingerprints": {
+        "codex_cli": "3b6d00deea5fabc50ad34be1872b8e4ead1638d23c68fabb7837edc07f0cf1e0",
+        "memory_eval_cli": "bb0d5845da7ecf61c74113edba1803a978f0ec2963930d837943f3eda128e10e"
+      },
+      "context_budget_tokens": 65536,
+      "tool_call_budget": 8,
+      "turn_budget": 8,
+      "output_token_budget": 1024,
+      "wall_time_budget_ms": 120000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+      "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+      "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+      "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "mossvale-cryo-vial-ledger-key-history",
+      "case_id": "mossvale-current-cryo-vial-ledger-key",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "amberwick-tide-gauge-calibration-station-history",
+      "case_id": "amberwick-current-tide-gauge-calibration-station",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "bellpine-radar-synchronization-channel-history",
+      "case_id": "bellpine-current-radar-synchronization-channel",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "agent_managed_correction_recovery_valid_time",
+      "family_id": "wrenfield-saltwater-germination-tray-history",
+      "case_id": "wrenfield-current-saltwater-germination-tray",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "ccce631a02f3798c7a71d9aaa21c771f003567f6e0c7e6089544549b587c5e2a",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        },
+        {
+          "request_sequence": 4,
+          "response_sequence": 5,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "13393dc06ba010287596a5ae2dda0712016a07f1ddbfe5a434378445a150c824",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "amberwick-tide-gauge-calibration-station-history",
+        "case_id": "amberwick-current-tide-gauge-calibration-station",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 33154,
+      "output_tokens": 181,
+      "wall_time_ms": 19323,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "7207e497967e5a4b60f87ce499bf0913076c55faebee32d3d5754ebd9ac39d00",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "2c037d0cf93346e46cce728969c79f3bd114d34dfe4e20b76776166e8d99a271",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 33154,
+          "output_tokens": 181
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "a734038461901a920624d5869327476c64149ca834b1967df910abad88307061",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        },
+        {
+          "request_sequence": 4,
+          "response_sequence": 5,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "6b332829c36b5b1ea80be25ba1de9ce06e9d7851ef72dbb3183ff707ad8c9c89",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "bellpine-radar-synchronization-channel-history",
+        "case_id": "bellpine-current-radar-synchronization-channel",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 33151,
+      "output_tokens": 180,
+      "wall_time_ms": 18824,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "57299114f7d8000734e8ddefddd50c1a4ffc5c76fe7c5717623e2328c9d0530c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "7faf492ad07652427bb4822a44926f1b7b65b1595c734623abfbc1f6c38ed65f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 33151,
+          "output_tokens": 180
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "0969a9b0408a98722b8d97cbbf4d57bf98a823cdbcfe9a371b8dfb554e3d43bf",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        },
+        {
+          "request_sequence": 4,
+          "response_sequence": 5,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "52f885a5c02cfd7c43c4e3fabf5461be74a4d2577b23612ccd2bfe9d50f264c6",
+          "non_query_arguments_sha256": "8b03cb2390caaa33f3afb07176ed65c17a030750de192725403b3b1e4b0e339a",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "mossvale-cryo-vial-ledger-key-history",
+        "case_id": "mossvale-current-cryo-vial-ledger-key",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 33164,
+      "output_tokens": 185,
+      "wall_time_ms": 21462,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "84bf873d809923ed4a4cf8bf1003f468ef58f416a243c5ea37a4c99b3ea4881a",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "0ca06dbd5bd1ddf88557902c2c82a8b4d96a161a62d3c28836136561284901fd",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "aa15d576ceab121bec69960d3d5e40c39de877a855db920834ccb15a6296d310",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 33164,
+          "output_tokens": 185
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 2,
+          "response_sequence": 3,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "bfd7cff334fd9540784cb23ab2574703f939d1a72a940b79a7433daa6e0b7794",
+          "non_query_arguments_sha256": "6b0822dff85187ac6604c2ecaa1330819a7699432fe13d55fd3cb9906a729a19",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        },
+        {
+          "request_sequence": 4,
+          "response_sequence": 5,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "33a813d26fe8b20fc9779dda82b2ce2ae5783177c9c57fbebdd18475f353aed5",
+          "non_query_arguments_sha256": "6b0822dff85187ac6604c2ecaa1330819a7699432fe13d55fd3cb9906a729a19",
+          "response_guidance_sha256": "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "returned_cutoff_match": false,
+          "source_coverage": false,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "key": {
+        "stratum_id": "agent_managed_correction_recovery_valid_time",
+        "family_id": "wrenfield-saltwater-germination-tray-history",
+        "case_id": "wrenfield-current-saltwater-germination-tray",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": false,
+      "task_oracle_passed": false,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": false,
+        "accepted_answer_match": "no_accepted_value_mentioned",
+        "required_evidence_cited": false,
+        "clarification_matches": true
+      },
+      "turns_used": 1,
+      "tool_calls": 2,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 33126,
+      "output_tokens": 184,
+      "wall_time_ms": 19770,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "62558d1e6b05b31dd9872db7356834d293e19716be4b6778bce8781c463af042",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "48ef747fd33fdc9cc5c9f6e7c94f965ce1568b40ac49ee126f9d5c9f19d5434c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "d7b3db7513dbaae00a055dc3922584307b6a4b53016a418fdeb2fe92b930bd16",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-2",
+          "tool_name": "memory_decisions/assemble_context",
+          "error_class": null,
+          "payload_sha256": "48ef747fd33fdc9cc5c9f6e7c94f965ce1568b40ac49ee126f9d5c9f19d5434c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 1,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 7,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 33126,
+          "output_tokens": 184
+        }
+      ]
+    }
+  ]
+}

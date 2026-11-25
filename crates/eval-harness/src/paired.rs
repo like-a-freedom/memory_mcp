@@ -378,9 +378,44 @@ pub const PAIRED_ARTIFACT_SCHEMA_V5: &str = "memory-mcp-agent-paired/v5";
 pub const PAIRED_ARTIFACT_SCHEMA_V7: &str = "memory-mcp-agent-paired/v7";
 pub const PAIRED_ARTIFACT_SCHEMA_V6: &str = "memory-mcp-agent-paired/v6";
 pub const PAIRED_ARTIFACT_SCHEMA_V8: &str = "memory-mcp-agent-paired/v8";
+pub const PAIRED_ARTIFACT_SCHEMA_V9: &str = "memory-mcp-agent-paired/v9";
+pub const PAIRED_ARTIFACT_SCHEMA_V10: &str = "memory-mcp-agent-paired/v10";
 pub const PAIRED_COMPARISON_SCHEMA_V2: &str = "memory-mcp-agent-comparison/v2";
 pub const PAIRED_PLAN_SCHEMA_V2: &str = "memory-mcp-agent-plan/v2";
 pub const PAIRED_PILOT_REPORT_SCHEMA_V3: &str = "memory-mcp-agent-pilot-report/v3";
+
+pub(crate) fn paired_artifact_schema_for_reads(
+    has_read_capture: bool,
+    has_complete_request_fingerprints: bool,
+    has_registered_valid_time_expectation: bool,
+    has_registered_selector_expectation: bool,
+) -> Result<&'static str, EvalError> {
+    if has_registered_selector_expectation && !has_read_capture {
+        return Err(EvalError::InvalidInput(
+            "selector diagnostics require captured read observations".into(),
+        ));
+    }
+    if !has_read_capture {
+        return Ok(PAIRED_ARTIFACT_SCHEMA_V6);
+    }
+    if (has_registered_valid_time_expectation || has_registered_selector_expectation)
+        && !has_complete_request_fingerprints
+    {
+        return Err(EvalError::InvalidInput(
+            "registered read diagnostics require complete request fingerprints for every captured read".into(),
+        ));
+    }
+    if !has_complete_request_fingerprints {
+        return Ok(PAIRED_ARTIFACT_SCHEMA_V7);
+    }
+    if has_registered_selector_expectation {
+        Ok(PAIRED_ARTIFACT_SCHEMA_V10)
+    } else if has_registered_valid_time_expectation {
+        Ok(PAIRED_ARTIFACT_SCHEMA_V9)
+    } else {
+        Ok(PAIRED_ARTIFACT_SCHEMA_V8)
+    }
+}
 pub const PAIRED_EXPLORATORY_PILOT_REPORT_SCHEMA_V1: &str =
     "memory-mcp-agent-exploratory-pilot-report/v1";
 
@@ -612,6 +647,8 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V6
                 | PAIRED_ARTIFACT_SCHEMA_V7
                 | PAIRED_ARTIFACT_SCHEMA_V8
+                | PAIRED_ARTIFACT_SCHEMA_V9
+                | PAIRED_ARTIFACT_SCHEMA_V10
         ) {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported paired artifact schema {:?}",
@@ -654,6 +691,8 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V6
                 | PAIRED_ARTIFACT_SCHEMA_V7
                 | PAIRED_ARTIFACT_SCHEMA_V8
+                | PAIRED_ARTIFACT_SCHEMA_V9
+                | PAIRED_ARTIFACT_SCHEMA_V10
         ) && self
             .receipts
             .iter()
@@ -669,11 +708,13 @@ impl PairedRunArtifact {
                 | PAIRED_ARTIFACT_SCHEMA_V6
                 | PAIRED_ARTIFACT_SCHEMA_V7
                 | PAIRED_ARTIFACT_SCHEMA_V8
+                | PAIRED_ARTIFACT_SCHEMA_V9
+                | PAIRED_ARTIFACT_SCHEMA_V10
         ) && self.receipts.iter().any(|receipt| {
             receipt.status != TrialStatus::Skipped && receipt.task_oracle_diagnostics.is_none()
         }) {
             return Err(EvalError::InvalidInput(
-                "paired artifact v5-v6 requires task-oracle component diagnostics for every attempted trial".into(),
+                "paired artifact v5-v10 requires task-oracle component diagnostics for every attempted trial".into(),
             ));
         }
         for receipt in &self.receipts {
@@ -682,15 +723,62 @@ impl PairedRunArtifact {
                 receipt.read_capture_status,
                 &receipt.read_diagnostics,
             ) {
-                (PAIRED_ARTIFACT_SCHEMA_V8, Some(status), Some(reads)) => {
+                (
+                    PAIRED_ARTIFACT_SCHEMA_V8
+                    | PAIRED_ARTIFACT_SCHEMA_V9
+                    | PAIRED_ARTIFACT_SCHEMA_V10,
+                    Some(status),
+                    Some(reads),
+                ) => {
                     for read in reads {
+                        if self.schema_version == PAIRED_ARTIFACT_SCHEMA_V8
+                            && (read.requested_valid_at_match.is_some()
+                                || read.returned_valid_at_match.is_some())
+                        {
+                            return Err(EvalError::InvalidInput(
+                                "paired artifact v8 cannot contain valid-time read diagnostics"
+                                    .into(),
+                            ));
+                        }
+                        if self.schema_version == PAIRED_ARTIFACT_SCHEMA_V10 {
+                            match (
+                                read.selector_expectation_registered,
+                                read.selector_argument_matches.is_some(),
+                            ) {
+                                (Some(true), true) | (Some(false), false) => {}
+                                _ => {
+                                    return Err(EvalError::InvalidInput(
+                                        "paired artifact v10 requires selector registration and match diagnostics for every read".into(),
+                                    ));
+                                }
+                            }
+                        } else if read.selector_expectation_registered.is_some()
+                            || read.selector_argument_matches.is_some()
+                        {
+                            return Err(EvalError::InvalidInput(
+                                "paired artifacts v2-v9 cannot contain selector match diagnostics"
+                                    .into(),
+                            ));
+                        }
+                        if let Some(matches) = &read.selector_argument_matches
+                            && (matches.len()
+                                != crate::paired_agent::tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS.len()
+                                || crate::paired_agent::tool_results::ASSEMBLE_CONTEXT_SELECTOR_FIELDS
+                                    .iter()
+                                    .any(|field| !matches.contains_key(*field)))
+                        {
+                            return Err(EvalError::InvalidInput(
+                                "paired selector diagnostics do not match the fixed field set"
+                                    .into(),
+                            ));
+                        }
                         for digest in [
                             read.request_query_sha256.as_deref(),
                             read.non_query_arguments_sha256.as_deref(),
                         ] {
                             let Some(digest) = digest else {
                                 return Err(EvalError::InvalidInput(
-                                    "paired artifact v8 read diagnostics require request fingerprints".into(),
+                                    "paired artifact v8-v10 read diagnostics require request fingerprints".into(),
                                 ));
                             };
                             validate_sha256("read request", digest)?;
@@ -708,6 +796,8 @@ impl PairedRunArtifact {
                             item_count: read.item_count,
                             request_query_sha256: read.request_query_sha256.clone(),
                             non_query_arguments_sha256: read.non_query_arguments_sha256.clone(),
+                            selector_arguments_sha256: None,
+                            requested_valid_at_sha256: None,
                             response_guidance_sha256: read.response_guidance_sha256.clone(),
                             evidence: None,
                         })
@@ -723,9 +813,13 @@ impl PairedRunArtifact {
                         read.request_query_sha256.is_some()
                             || read.non_query_arguments_sha256.is_some()
                             || read.response_guidance_sha256.is_some()
+                            || read.requested_valid_at_match.is_some()
+                            || read.returned_valid_at_match.is_some()
+                            || read.selector_expectation_registered.is_some()
+                            || read.selector_argument_matches.is_some()
                     }) {
                         return Err(EvalError::InvalidInput(
-                            "paired artifact v7 cannot contain v8 request fingerprints".into(),
+                            "paired artifact v7 cannot contain v8 request fingerprints or later diagnostics".into(),
                         ));
                     }
                     let associations = reads
@@ -737,6 +831,8 @@ impl PairedRunArtifact {
                             item_count: read.item_count,
                             request_query_sha256: None,
                             non_query_arguments_sha256: None,
+                            selector_arguments_sha256: None,
+                            requested_valid_at_sha256: None,
                             response_guidance_sha256: None,
                             evidence: None,
                         })
@@ -747,11 +843,19 @@ impl PairedRunArtifact {
                         &receipt.trace,
                     )?;
                 }
-                (PAIRED_ARTIFACT_SCHEMA_V7 | PAIRED_ARTIFACT_SCHEMA_V8, None, None)
-                    if receipt.status == TrialStatus::Skipped => {}
+                (
+                    PAIRED_ARTIFACT_SCHEMA_V7
+                    | PAIRED_ARTIFACT_SCHEMA_V8
+                    | PAIRED_ARTIFACT_SCHEMA_V9
+                    | PAIRED_ARTIFACT_SCHEMA_V10,
+                    None,
+                    None,
+                ) if receipt.status == TrialStatus::Skipped => {}
                 (version, None, None)
                     if version != PAIRED_ARTIFACT_SCHEMA_V7
-                        && version != PAIRED_ARTIFACT_SCHEMA_V8 => {}
+                        && version != PAIRED_ARTIFACT_SCHEMA_V8
+                        && version != PAIRED_ARTIFACT_SCHEMA_V9
+                        && version != PAIRED_ARTIFACT_SCHEMA_V10 => {}
                 _ => {
                     return Err(EvalError::InvalidInput(
                         "read diagnostics do not match paired artifact version".into(),
@@ -770,12 +874,16 @@ impl PairedRunArtifact {
             }
             if matches!(
                 self.schema_version.as_str(),
-                PAIRED_ARTIFACT_SCHEMA_V6 | PAIRED_ARTIFACT_SCHEMA_V7 | PAIRED_ARTIFACT_SCHEMA_V8
+                PAIRED_ARTIFACT_SCHEMA_V6
+                    | PAIRED_ARTIFACT_SCHEMA_V7
+                    | PAIRED_ARTIFACT_SCHEMA_V8
+                    | PAIRED_ARTIFACT_SCHEMA_V9
+                    | PAIRED_ARTIFACT_SCHEMA_V10
             ) && diagnostics.accepted_answer_match.is_some()
                 != diagnostics.final_answer_schema_valid
             {
                 return Err(EvalError::InvalidInput(
-                    "paired artifact v6 requires answer-match diagnostics for every valid final answer".into(),
+                    "paired artifact v6-v10 requires answer-match diagnostics for every valid final answer".into(),
                 ));
             }
         }
@@ -3112,6 +3220,40 @@ fn validate_bootstrap_config(config: &BootstrapConfig) -> Result<(), EvalError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_time_registration_selects_v9_even_when_observation_is_unknown() {
+        assert_eq!(
+            paired_artifact_schema_for_reads(true, true, true, false).unwrap(),
+            PAIRED_ARTIFACT_SCHEMA_V9
+        );
+    }
+
+    #[test]
+    fn complete_request_fingerprints_without_valid_time_select_v8() {
+        assert_eq!(
+            paired_artifact_schema_for_reads(true, true, false, false).unwrap(),
+            PAIRED_ARTIFACT_SCHEMA_V8
+        );
+    }
+
+    #[test]
+    fn valid_time_registration_requires_complete_request_fingerprints() {
+        assert!(paired_artifact_schema_for_reads(true, false, true, false).is_err());
+    }
+
+    #[test]
+    fn registered_selector_diagnostics_select_v10() {
+        assert_eq!(
+            paired_artifact_schema_for_reads(true, true, true, true).unwrap(),
+            PAIRED_ARTIFACT_SCHEMA_V10
+        );
+    }
+
+    #[test]
+    fn registered_selector_diagnostics_require_capture() {
+        assert!(paired_artifact_schema_for_reads(false, true, true, true).is_err());
+    }
 
     fn identity(model: &str) -> PairedRunIdentity {
         PairedRunIdentity {

@@ -130,7 +130,15 @@ async fn assemble_context_inner<T: ToolContext>(
             });
             let count = results.len();
             let guidance = if let Some(metadata) = assembly.metadata.as_ref() {
-                if metadata
+                let is_partial =
+                    metadata.completeness == crate::models::ContextCompleteness::Partial;
+                if is_partial && count == 0 && metadata.candidate_scan_truncated {
+                    "The historical candidate scan was truncated and returned no items. You may retry once with a narrower query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. An empty retry still does not establish absence; verify against the source."
+                } else if is_partial && count == 0 {
+                    "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source."
+                } else if !is_partial {
+                    context_guidance(count > 0)
+                } else if metadata
                     .omitted_channels
                     .iter()
                     .any(|channel| channel.starts_with("claim relations"))
@@ -205,6 +213,106 @@ mod tests {
         chrono::DateTime::parse_from_rfc3339(value)
             .expect("test timestamp")
             .with_timezone(&chrono::Utc)
+    }
+
+    struct TruncatedHistoricalContext;
+
+    impl ToolContext for TruncatedHistoricalContext {
+        fn record(&self, _event: ToolEvent) {}
+
+        async fn ingest(
+            &self,
+            _request: crate::models::IngestRequest,
+            _access: Option<crate::models::AccessPayload>,
+        ) -> Result<String, MemoryError> {
+            panic!("assemble_context must not reach ingest")
+        }
+
+        async fn extract(
+            &self,
+            _episode_id: &str,
+            _access: Option<crate::models::AccessPayload>,
+            _zero_shot_labels: Option<&[String]>,
+        ) -> Result<crate::models::ExtractResult, MemoryError> {
+            panic!("assemble_context must not reach extract")
+        }
+
+        async fn resolve(
+            &self,
+            _candidate: crate::models::EntityCandidate,
+            _access: Option<crate::models::AccessPayload>,
+        ) -> Result<String, MemoryError> {
+            panic!("assemble_context must not reach resolve")
+        }
+
+        async fn explain(
+            &self,
+            _request: crate::models::ExplainRequest,
+            _access: Option<crate::models::AccessPayload>,
+        ) -> Result<Vec<crate::models::ExplainItem>, MemoryError> {
+            panic!("assemble_context must not reach explain")
+        }
+
+        async fn invalidate(
+            &self,
+            _request: crate::models::InvalidateRequest,
+            _access: Option<crate::models::AccessPayload>,
+        ) -> Result<(), MemoryError> {
+            panic!("assemble_context must not reach invalidate")
+        }
+
+        async fn assemble_context(
+            &self,
+            _request: AssembleContextRequest,
+        ) -> Result<Vec<crate::models::AssembledContextItem>, MemoryError> {
+            panic!("historical parameters must use assemble_context_temporal")
+        }
+
+        async fn assemble_context_temporal(
+            &self,
+            _request: AssembleContextRequest,
+            _temporal: TemporalContextQuery,
+        ) -> Result<ContextAssemblyResult, MemoryError> {
+            Ok(ContextAssemblyResult {
+                items: Vec::new(),
+                metadata: Some(crate::models::ContextAssemblyMetadata {
+                    snapshot: crate::models::ContextSnapshot {
+                        valid_at: timestamp("2026-11-21T00:00:00Z"),
+                        known_at: timestamp("2026-11-25T00:00:00Z"),
+                        known_revision: 0,
+                    },
+                    completeness: crate::models::ContextCompleteness::Partial,
+                    candidate_scan_truncated: true,
+                    omitted_channels: vec!["historical fact scan".into()],
+                }),
+            })
+        }
+
+        async fn find_episode(
+            &self,
+            _episode_id: &str,
+        ) -> Result<Option<crate::models::Episode>, MemoryError> {
+            panic!("assemble_context must not reach find_episode")
+        }
+    }
+
+    #[tokio::test]
+    async fn truncated_empty_partial_historical_read_authorizes_only_bounded_retry() {
+        let mut params = params();
+        params.valid_at = Some("2026-11-21T00:00:00Z".into());
+        params.known_revision = Some(0);
+
+        let response = assemble_context(&TruncatedHistoricalContext, params)
+            .await
+            .expect("return the bounded historical result");
+
+        assert!(response.result.as_array().is_some_and(Vec::is_empty));
+        assert_eq!(
+            response.guidance.as_deref(),
+            Some(
+                "The historical candidate scan was truncated and returned no items. You may retry once with a narrower query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. An empty retry still does not establish absence; verify against the source."
+            )
+        );
     }
 
     #[test]
