@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust workspace, async-trait, reqwest, serde_json, Tokio, существующие storage/reembed/recovery ports. Новые зависимости не нужны.
 
-**Spec:** [Дизайн](../specs/2026-11-26-automatic-embedding-input-type-design.md). Код реализован и основные проверки пройдены; чекбоксы ниже фиксируют исходный план, а не актуальный статус каждого предложенного теста. Live smoke NVIDIA и сравнительная оценка качества остаются невыполненными: API key NVIDIA недоступен.
+**Spec:** [Дизайн](../specs/2026-11-26-automatic-embedding-input-type-design.md). Код реализован и основные проверки пройдены; чекбоксы ниже фиксируют исходный план, а не актуальный статус каждого предложенного теста. Live smoke NVIDIA на синтетическом тексте подтвердил ответы passage/query размерностью 2048; сравнительная оценка качества не выполнялась.
 
 ## Global Constraints
 
