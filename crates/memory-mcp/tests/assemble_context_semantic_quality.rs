@@ -3185,3 +3185,129 @@ async fn candidate_reranking_document_includes_the_same_speaker_context_of_a_fol
         "the candidate must not inherit later source turns: {candidate_document:#?}"
     );
 }
+
+async fn terminal_scope_items(
+    query: &str,
+    content: &str,
+) -> Vec<memory_mcp::models::AssembledContextItem> {
+    let service = common::make_service()
+        .await
+        .with_claim_rollout_stage("evidence")
+        .expect("production evidence stage");
+    service
+        .add_fact(
+            "note",
+            content,
+            content,
+            "episode:independent-scope-control",
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("scope control fact");
+    AssembleContextCapability::assemble_context_from_service(&service, assemble_request(query))
+        .await
+        .expect("public scope assembly")
+}
+
+#[tokio::test]
+async fn terminal_project_scope_keeps_independently_grounded_policy() {
+    let items = terminal_scope_items(
+        "backup setup and retention policy in orbit_store",
+        "Backup setup uses a thirty-day retention policy.",
+    )
+    .await;
+    assert_eq!(items.len(), 1, "project spelling is not topical evidence");
+}
+
+#[tokio::test]
+async fn terminal_project_scope_does_not_supply_topical_support() {
+    let items = terminal_scope_items(
+        "backup setup and retention policy in orbit_store",
+        "orbit_store tracks office furniture and purchasing receipts.",
+    )
+    .await;
+    assert!(items.is_empty(), "a namespace alone cannot ground a policy");
+}
+
+#[tokio::test]
+async fn terminal_project_scope_rejects_explicit_other_project_membership() {
+    let items = terminal_scope_items(
+        "backup setup and retention policy in orbit_store",
+        "Backup setup uses a thirty-day retention policy. It belongs to comet_store, not orbit_store.",
+    )
+    .await;
+    assert!(
+        items.is_empty(),
+        "matching topics cannot override excluded ownership"
+    );
+}
+
+#[tokio::test]
+async fn terminal_project_scope_keeps_a_separate_qualified_target() {
+    let items = terminal_scope_items(
+        "archive_17 backup setup and retention policy in orbit_store",
+        "archive_18 backup setup uses a thirty-day retention policy.",
+    )
+    .await;
+    assert!(
+        items.is_empty(),
+        "a project scope cannot erase the requested archive"
+    );
+}
+
+#[tokio::test]
+async fn terminal_identifier_for_an_explicit_value_keeps_its_identity() {
+    let items = terminal_scope_items(
+        "What backup retention value is stored in orbit_store?",
+        "The backup retention value is thirty days in comet_store.",
+    )
+    .await;
+    assert!(
+        items.is_empty(),
+        "an explicit value target is not a project scope"
+    );
+}
+
+#[tokio::test]
+async fn terminal_project_scope_rejects_other_named_project_with_the_same_topics() {
+    let items = terminal_scope_items(
+        "backup setup and retention policy in orbit_store",
+        "Backup setup and retention policy belongs to comet_store.",
+    )
+    .await;
+    assert!(
+        items.is_empty(),
+        "topical support cannot override different explicit ownership"
+    );
+}
+
+#[tokio::test]
+async fn terminal_identifier_for_an_explicit_artifact_keeps_its_identity() {
+    let items = terminal_scope_items(
+        "Which backup retention artifact is stored in orbit_store?",
+        "The backup retention artifact is a manifest stored in comet_store.",
+    )
+    .await;
+    assert!(
+        items.is_empty(),
+        "an explicit artifact target is not a project scope"
+    );
+}
+
+#[tokio::test]
+async fn terminal_project_scope_keeps_selected_policy_beside_unrelated_ownership() {
+    let items = terminal_scope_items(
+        "backup setup and retention policy in orbit_store",
+        "orbit_store backup setup uses a thirty-day retention policy. Archive belongs to comet_store.",
+    )
+    .await;
+    assert_eq!(
+        items.len(),
+        1,
+        "unrelated ownership is not the policy owner"
+    );
+}

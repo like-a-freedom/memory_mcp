@@ -166,7 +166,7 @@ pub(super) fn build_query_evidence(
     let without_urls = strip_url_tokens(raw);
     let (cleaned_query, scope_reference) = strip_project_scope(&without_urls);
     let mut qualified_references = extract_qualified_references(&cleaned_query);
-    qualified_references.extend(extract_qualified_references(raw));
+    qualified_references.extend(extract_url_references(raw));
     let qualified_references = unique_terms(qualified_references);
     let reference_terms = reference_component_terms(&cleaned_query);
     let explicit_calendar_date = parse_explicit_calendar_date(&cleaned_query);
@@ -1943,11 +1943,35 @@ fn candidate_conflicts_with_query_reference(query: &QueryEvidence, content: &str
         }
     }
 
+    let scope_terms = query
+        .scope_reference
+        .as_deref()
+        .map(search_query_terms)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|term| !matches!(term.as_str(), "project" | "projects"))
+        .collect::<Vec<_>>();
     content
         .split(['.', '!', '?', '\n'])
         .filter(|sentence| !sentence.trim().is_empty())
         .any(|sentence| {
             let lower = sentence.to_lowercase();
+            if !scope_terms.is_empty()
+                && has_sufficient_term_support(query, &content_topic_matches(query, sentence))
+            {
+                let declared_owner = lower
+                    .split_once("belongs to ")
+                    .or_else(|| lower.split_once("part of "));
+                if let Some((_, owner)) = declared_owner {
+                    let owner = owner.split(',').next().unwrap_or(owner).trim();
+                    if is_lowercase_namespace_name(owner) {
+                        let owner_terms = search_query_terms(owner);
+                        if !scope_terms.iter().all(|term| owner_terms.contains(term)) {
+                            return true;
+                        }
+                    }
+                }
+            }
             let Some((membership, excluded)) = lower.split_once(", not ") else {
                 return false;
             };
@@ -1955,6 +1979,11 @@ fn candidate_conflicts_with_query_reference(query: &QueryEvidence, content: &str
                 return false;
             }
             let excluded_terms = search_query_terms(excluded);
+            if !scope_terms.is_empty()
+                && scope_terms.iter().all(|term| excluded_terms.contains(term))
+            {
+                return true;
+            }
             query
                 .content_terms
                 .iter()
@@ -2555,8 +2584,62 @@ fn strip_url_tokens(raw: &str) -> String {
         .join(" ")
 }
 
+fn is_lowercase_namespace_name(name: &str) -> bool {
+    name.contains('_')
+        && name.split('_').all(|part| {
+            !part.is_empty() && part.chars().all(|character| character.is_ascii_lowercase())
+        })
+}
+
 fn strip_project_scope(raw: &str) -> (String, Option<String>) {
     let words = raw.split_whitespace().collect::<Vec<_>>();
+    // A terminal locative namespace is scope, not an exact content target.
+    // Keep technical values/artifacts, numeric IDs and uppercase symbols exact.
+    if words.len() >= 3 {
+        let marker = words.len() - 2;
+        let name = words[marker + 1]
+            .trim_matches(|character: char| !character.is_alphanumeric() && character != '_');
+        let has_explicit_value_target = words[..marker]
+            .iter()
+            .filter_map(|word| clean_word(word))
+            .any(|word| {
+                matches!(
+                    word.as_str(),
+                    "value"
+                        | "values"
+                        | "artifact"
+                        | "artifacts"
+                        | "file"
+                        | "files"
+                        | "field"
+                        | "fields"
+                        | "key"
+                        | "keys"
+                        | "function"
+                        | "functions"
+                        | "variable"
+                        | "variables"
+                        | "table"
+                        | "tables"
+                        | "constant"
+                        | "constants"
+                        | "symbol"
+                        | "symbols"
+                        | "parameter"
+                        | "parameters"
+                        | "setting"
+                        | "settings"
+                        | "option"
+                        | "options"
+                )
+            });
+        if clean_word(words[marker]).is_some_and(|word| word == "in" || word == "within")
+            && is_lowercase_namespace_name(name)
+            && !has_explicit_value_target
+        {
+            return (words[..marker].join(" "), Some(name.to_owned()));
+        }
+    }
     let Some(project_index) = words.iter().position(|word| {
         clean_word(word).is_some_and(|cleaned| cleaned == "project" || cleaned == "projects")
     }) else {
