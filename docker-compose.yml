@@ -47,7 +47,7 @@
 
 services:
   surrealdb:
-    image: surrealdb/surrealdb:v3.3.2
+    image: surrealdb/surrealdb:latest
     platform: linux/amd64
     # Bound the database's memory so it cannot drive the host into swap. 512M is
     # several times the current working set; raise via `SURREALDB_MEM_LIMIT` if a
