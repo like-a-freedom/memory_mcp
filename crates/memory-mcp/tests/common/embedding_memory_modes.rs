@@ -156,6 +156,15 @@ impl DbClient for ReembedBatchObserverDb {
         Ok(result)
     }
 
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        self.inner.transaction_query(sql, vars, namespace).await
+    }
+
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
         self.inner.apply_migrations(namespace).await
     }
@@ -339,6 +348,15 @@ impl DbClient for AnnEvidenceDb {
             return Ok(Value::Array(rows));
         }
         self.inner.query(sql, vars, namespace).await
+    }
+
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        self.inner.transaction_query(sql, vars, namespace).await
     }
 
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
