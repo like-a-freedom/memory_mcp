@@ -330,34 +330,56 @@ fn send_request(
 #[cfg(all(feature = "eval-support", unix))]
 #[test]
 fn blocked_gliner_refresh_does_not_delay_initialize() {
-    use std::io::{Read, Write};
+    use std::io::Read;
     use std::net::TcpListener;
     use std::sync::mpsc;
     use std::thread;
     use std::time::Duration;
 
-    // Bind a TCP listener; the test is the resolver client. The fixture
-    // accepts the connection, reads the request, writes a partial response,
-    // and blocks until the test signals the gate.
+    // Withhold headers so both HEAD and GET requests remain blocked. Sending
+    // headers with a long body would not block a HEAD resolver request.
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    listener
+        .set_nonblocking(true)
+        .expect("nonblocking listener");
     let addr = listener.local_addr().expect("addr");
     let (gate_tx, gate_rx) = mpsc::channel::<()>();
+    let (entered_tx, entered_rx) = mpsc::channel();
     let server_handle = thread::spawn(move || {
-        if let Some(Ok(mut stream)) = listener.incoming().next() {
-            let mut buf = [0u8; 1024];
-            let _ = stream.set_read_timeout(Some(Duration::from_millis(100)));
-            let _ = stream.read(&mut buf);
-            // Send headers with a large content-length so the client
-            // keeps reading. The body never arrives, which keeps the
-            // refresh fetch blocked while we drive `initialize`.
-            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n");
-            let _ = stream.flush();
-            let _ = gate_rx.recv();
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(5)))
+                        .expect("read timeout");
+                    let mut buf = [0u8; 1024];
+                    assert!(stream.read(&mut buf).expect("resolver request") > 0);
+                    entered_tx.send(()).expect("report blocked resolver");
+                    let _ = gate_rx.recv_timeout(Duration::from_secs(30));
+                    return;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    if std::time::Instant::now() >= deadline {
+                        return;
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("accept resolver request: {error}"),
+            }
         }
     });
 
+    struct OwnedChild(std::process::Child);
+    impl Drop for OwnedChild {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
     let temp = TempDir::new().expect("temp");
-    let mut child = Command::new(binary())
+    let child = Command::new(binary())
         .arg("serve")
         // This assertion requires the refresh lifecycle INFO marker. The
         // test process may inherit a stricter RUST_LOG filter from its caller.
@@ -381,6 +403,8 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("start stdio MCP server");
+    let mut child = OwnedChild(child);
+    let child = &mut child.0;
     let mut stdin = child.stdin.take().expect("server stdin");
     let stdout = child.stdout.take().expect("server stdout");
     let stderr = child.stderr.take().expect("server stderr");
@@ -398,7 +422,6 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
             .collect::<Vec<String>>()
     });
 
-    let started = std::time::Instant::now();
     let initialize = send_request(
         &mut stdin,
         &responses,
@@ -411,24 +434,29 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
         }),
         Duration::from_secs(10),
     );
-    let elapsed = started.elapsed();
     assert!(
         initialize.get("id").and_then(serde_json::Value::as_i64) == Some(1),
         "initialize did not return: {initialize}"
     );
-    // The fixture is still blocked when `initialize` returns, which proves
-    // the refresh task did not block readiness. We don't constrain a tight
-    // wall-clock budget because embedded SurrealDB startup varies.
-    assert!(
-        elapsed < Duration::from_secs(5),
-        "initialize took {elapsed:?}; refresh must not delay it"
-    );
+    entered_rx
+        .recv_timeout(Duration::from_secs(30))
+        .expect("background resolver must reach the blocked endpoint");
+    // Initialize has returned while the resolver cannot complete: the fixture
+    // sends no headers until the gate is released below. The refresh may be
+    // scheduled before or after initialization; neither requires completion.
 
     // Unblock the HTTP fixture so the child can exit cleanly.
     let _ = gate_tx.send(());
     let _ = server_handle.join();
     drop(stdin);
-    let _ = child.wait();
+    let exit_deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while child.try_wait().expect("poll server exit").is_none() {
+        assert!(
+            std::time::Instant::now() < exit_deadline,
+            "server shutdown timed out"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
     let stderr_lines = stderr_handle.join().expect("stderr reader");
     // The refresh task must have started, which means the fixture saw
     // the resolver HEAD request; the gate ensures the response never
