@@ -311,5 +311,239 @@
       "native_fact_multiset_sha256": "84f4ee403e6d11097d0987c287a74271fccab29d1b8851668dbc17c3132fe11e"
     }
   ],
-  "acceptance_limits": "Source-only preparation proves exact persisted binding compatibility, not retrieval scores or held-out accuracy. Existing queries, labels, coverage and six quality floors remain unchanged."
+  "acceptance_limits": "Source-only preparation proves exact persisted binding compatibility, not retrieval scores or held-out accuracy. Existing queries, labels, coverage and six quality floors remain unchanged.",
+  "quality_validation": {
+    "method": "Frozen source-grounded development contracts; same queries, labels, source populations and six native 1.0 floors. No official benchmark or held-out accuracy claim.",
+    "attempts": [
+      {
+        "artifact": "native-quality-r28-before-scope.json",
+        "sha256": "e005bd3ec39d2e719162ed7e3e00e6503bc4b96e9817973519df47d29a6a8098",
+        "exit_code": 1,
+        "verdict": "quality_failed",
+        "duration_ms": 215691,
+        "total_cases": 37,
+        "passed": 36,
+        "invalid": 0,
+        "native_passed": 36,
+        "native_total": 37,
+        "native_metrics": {
+          "answerable_non_abstention_rate": 0.96875,
+          "answerable_non_abstention_rate_applicable_count": 32.0,
+          "duplicate_free_rate": 1.0,
+          "duplicate_free_rate_applicable_count": 37.0,
+          "precision_macro": 0.96875,
+          "precision_macro_applicable_count": 32.0,
+          "prohibited_free_rate": 1.0,
+          "prohibited_free_rate_applicable_count": 37.0,
+          "required_group_recall": 0.9347826086956522,
+          "required_group_recall_applicable_count": 46.0,
+          "unknown_abstention_rate": 1.0,
+          "unknown_abstention_rate_applicable_count": 5.0
+        },
+        "logging_original_metrics": {
+          "answerable_non_abstention_rate": 0.0,
+          "duplicate_free_rate": 1.0,
+          "precision_macro": 0.0,
+          "prohibited_free_rate": 1.0,
+          "required_group_recall": 0.0
+        },
+        "logging_original_group_evidence": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 3
+        }
+      },
+      {
+        "artifact": "native-quality-r28-scope-only.json",
+        "sha256": "f047857685bee6c3dec3afdd71ed7a50557a571c7d5f4ee42d3e5fd3e13f261b",
+        "exit_code": 1,
+        "verdict": "quality_failed",
+        "duration_ms": 278230,
+        "total_cases": 154,
+        "passed": 153,
+        "invalid": 0,
+        "native_passed": 36,
+        "native_total": 37,
+        "native_metrics": {
+          "answerable_non_abstention_rate": 1.0,
+          "answerable_non_abstention_rate_applicable_count": 32.0,
+          "duplicate_free_rate": 1.0,
+          "duplicate_free_rate_applicable_count": 37.0,
+          "precision_macro": 1.0,
+          "precision_macro_applicable_count": 32.0,
+          "prohibited_free_rate": 1.0,
+          "prohibited_free_rate_applicable_count": 37.0,
+          "required_group_recall": 0.9565217391304348,
+          "required_group_recall_applicable_count": 46.0,
+          "unknown_abstention_rate": 1.0,
+          "unknown_abstention_rate_applicable_count": 5.0
+        },
+        "logging_original_metrics": {
+          "answerable_non_abstention_rate": 1.0,
+          "duplicate_free_rate": 1.0,
+          "precision_macro": 1.0,
+          "prohibited_free_rate": 1.0,
+          "required_group_recall": 0.3333333333333333
+        },
+        "logging_original_group_evidence": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      {
+        "artifact": "native-quality-r28-release-final.json",
+        "sha256": "f9f44071af3e247c18f6e10a3db64e44594ea1aed7b40e7d6153fbaef29ac1f6",
+        "exit_code": 0,
+        "verdict": "passed",
+        "duration_ms": 272621,
+        "total_cases": 154,
+        "passed": 154,
+        "invalid": 0,
+        "native_passed": 37,
+        "native_total": 37,
+        "native_metrics": {
+          "answerable_non_abstention_rate": 1.0,
+          "answerable_non_abstention_rate_applicable_count": 32.0,
+          "duplicate_free_rate": 1.0,
+          "duplicate_free_rate_applicable_count": 37.0,
+          "precision_macro": 1.0,
+          "precision_macro_applicable_count": 32.0,
+          "prohibited_free_rate": 1.0,
+          "prohibited_free_rate_applicable_count": 37.0,
+          "required_group_recall": 1.0,
+          "required_group_recall_applicable_count": 46.0,
+          "unknown_abstention_rate": 1.0,
+          "unknown_abstention_rate_applicable_count": 5.0
+        },
+        "logging_original_metrics": {
+          "answerable_non_abstention_rate": 1.0,
+          "duplicate_free_rate": 1.0,
+          "precision_macro": 1.0,
+          "prohibited_free_rate": 1.0,
+          "required_group_recall": 1.0
+        },
+        "logging_original_group_evidence": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      }
+    ],
+    "red_controls": [
+      {
+        "test": "preparation_rejects_invalid_claim_configuration_before_loading_provider",
+        "exit_code": 101,
+        "variant": "Original harness runtime before shared ClaimConfig parsing; provider error incorrectly preceded invalid claim configuration.",
+        "raw_log_sha256": "4405a23a701ea807e0ee4ba3aec3d629ba11dec6b8983a2695b802c266f6976d"
+      },
+      {
+        "test": "terminal_project_scope_keeps_independently_grounded_policy",
+        "exit_code": 101,
+        "variant": "Final lexical-only public control with only original raw-query qualified-reference union restored, then final production source restored.",
+        "raw_log_sha256": "c9c194b63f678cfd86c0f62e3ef16836f65289304bd01c3eda11d36d74959193"
+      },
+      {
+        "test": "negative_reranker_retains_independently_complete_facet_after_packaging",
+        "exit_code": 101,
+        "variant": "Final terminal-scope repair with original facet_admitted predicate; verified facet proof was lost after packaging.",
+        "raw_log_sha256": "ca61ecedd7409e0f0147cb4d010b3d646dcb3aa5e4813e9ebbb8289d84ec5989"
+      }
+    ],
+    "green_verification": [
+      {
+        "check": "native_preparation_cli",
+        "command": "cargo test -p eval-harness --test native_preparation --locked",
+        "exit_code": 0,
+        "passed": 4,
+        "ignored": 0,
+        "raw_log_sha256": "1060ebde2e9382170ef284e435ed15e5f76282e13b87ae3d8ab4b849d7dca457"
+      },
+      {
+        "check": "retrieval_quality_unit",
+        "command": "cargo test -p eval-harness retrieval_quality --lib --locked",
+        "exit_code": 0,
+        "passed": 27,
+        "ignored": 0,
+        "raw_log_sha256": "3e162cf707de42dd54cfb1abe03cabdbf4b8c7171be5f67f4683e140beca9d8a"
+      },
+      {
+        "check": "terminal_scope_controls",
+        "command": "cargo test -p memory_mcp --features eval-support --test assemble_context_semantic_quality terminal_ --locked",
+        "exit_code": 0,
+        "passed": 8,
+        "ignored": 0,
+        "raw_log_sha256": "54fa856d64d6895694c315bab2c7565505103f90d89e5bdef6faf19490bb98be"
+      },
+      {
+        "check": "admission_unit",
+        "command": "cargo test -p memory_mcp --features eval-support --lib memory::retrieval::admission --locked",
+        "exit_code": 0,
+        "passed": 106,
+        "ignored": 0,
+        "raw_log_sha256": "aa7af1d0446aa1d3adf44bbc1903b8c401e29c209eb09e653c1a4a103fa478c5"
+      },
+      {
+        "check": "final_public_semantic_and_reranking",
+        "command": "cargo test -p memory_mcp --features eval-support --test assemble_context_semantic_quality --locked",
+        "exit_code": 0,
+        "passed": 50,
+        "ignored": 1,
+        "raw_log_sha256": "463faaf58869079b5f0f7174627531763b5a976f7921dd13b941a9d2cfdd8875"
+      },
+      {
+        "check": "reranking_unit",
+        "command": "cargo test -p memory_mcp --features eval-support --lib rerank --locked",
+        "exit_code": 0,
+        "passed": 5,
+        "ignored": 0,
+        "raw_log_sha256": "af7cc1c0915662da1ba6966a57419ec5d35c8c5c07e2ffe5c72ee954bf4d4a74"
+      }
+    ],
+    "final_run": {
+      "command": "env -u MEMORY_CLAIM_ROLLOUT_STAGE EMBEDDINGS_ENABLED=true EMBEDDINGS_PROVIDER=local-candle EMBEDDINGS_MODEL=intfloat/multilingual-e5-small EMBEDDINGS_MODEL_DIR=\"$PWD/target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3\" RETRIEVAL_RERANKER_MODEL_DIR=\"$PWD/target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825\" RETRIEVAL_RERANKER_ADMISSION_FLOOR=0 /tmp/memory-eval-release-final-reranking run --profile evals/profiles/release.json --baseline evals/baselines/one-active-namespace-release.json --artifact target/evals/release-final-reranking.json",
+      "claim_stage_env": "unset; production default evidence validated by native runtime fingerprint",
+      "binary_sha256": "631e87a00bb65357c238831b28880f59a4d210a955a9fd5af00d56551c7577d4",
+      "raw_log_sha256": "67ad913a02ff1cfeb7fad60556f8cd47034457682dda260505bb73c44da9db2b",
+      "runtime_fingerprint": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "3715339f31c628cb37551c71c4b9c388886a4eb15f17112a0aba9aee11021f1a",
+        "corpus_revision": "r28-native-identity-admission-v2",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno|identity-admission=v2",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno|identity-admission=v2",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c"
+      },
+      "source_sha256": {
+        "crates/eval-harness/src/suites/retrieval_quality.rs": "22ec0720af9cd1806a8e5c2637e777f103f9f98f8bf0d460754f92ed789da419",
+        "crates/eval-harness/tests/native_preparation.rs": "c0643ef41f78c420d0ec91722861e7cf7e552abc1ecb3d44007133b7a3ae76d4",
+        "crates/memory-mcp/src/memory/retrieval/admission.rs": "3459a6568c40bd1c37756a45db4fee6f69267040d37c7169d2d896eb2291e80c",
+        "crates/memory-mcp/src/memory/retrieval/reranking.rs": "1a7ff23b42827a582d5ddea4db72096ed32546a3edc0ac3ca929d5c6feffb8c3",
+        "crates/memory-mcp/tests/assemble_context_semantic_quality.rs": "8aaebd65ab4b531260ce0673a12759c2b1bbf8d20e5a48aa9ec888d0055623b4"
+      }
+    },
+    "fix_boundaries": {
+      "scope": "Terminal in/within lowercase snake_case namespace without digits, except explicit value/artifact/technical-target queries. Other exact references and source/time/access checks remain. Explicit ownership conflicts apply to topic-bearing ownership statements; unrelated ownership statements cannot invalidate a selected-project policy.",
+      "reranking": "Record the existing measured secondary-facet proof even when independent admission already retained the candidate. No change to model scores, floor0, facet-completeness rule or response bounds. Weak lexical words spread across incomplete facets still fail the negative-reranker control."
+    },
+    "limits": "All 37 native cases are existing development regressions. Timing is descriptive under concurrent host load. No general language-understanding, unseen-source accuracy or agent-reader outcome claim follows."
+  }
 }

@@ -45,3 +45,15 @@ The deployed default remains without a reranker; activation requires an explicit
 Interpret evidence limits literally: the film date is approximate, the January planning chronology is underspecified, and a planned Japanese mansion stay does not prove real-estate purchase. Task 16 excerpts do not establish current worktree/review status. These cases test retrieval of useful support and qualifying context, not correctness of a generated final answer. No official full LoCoMo/LongMemEval score is claimed.
 
 The original dated bowling case (`locomo-conv-47-001`) keeps its full two-session source population and original question with output budget `5`. The `logging-sink` case is the one-item response-budget boundary; it tests real candidate retrieval under a one-item response limit.
+
+## r28 native validation and regression repairs
+
+The native refresh exposed two separate retrieval defects without changing any case, source, label or acceptance floor:
+
+- [`native-quality-r28-before-scope.json`](native-quality-r28-before-scope.json): 36/37 native cases passed. `logging-original` returned no evidence because its terminal `in memory_mcp` scope became a mandatory content identifier; all three required groups were missed.
+- [`native-quality-r28-scope-only.json`](native-quality-r28-scope-only.json): 153/154 release cases passed, including 36/37 native cases. Scope admission recovered the answerable case, but final reranking lost two required groups. A previously verified secondary-facet proof was omitted when lexical evidence had already retained the candidate.
+- [`native-quality-r28-release-final.json`](native-quality-r28-release-final.json): all 154 release cases passed, including all 37 native cases and all six unchanged 1.0 native floors. This run used the pinned E5/mMARCO models, admission floor `0`, the production default `evidence` stage, and the existing release baseline. Its 272.621-second duration is descriptive under concurrent host load.
+
+[`native-preparation-refresh-r28.json`](native-preparation-refresh-r28.json) records report digests, runtime/model identities, frozen executable and source hashes, and the independent RED/GREEN checks. Eight public lexical scope controls cover exact targets, other-project ownership and mixed sources; two additional negative-reranker controls distinguish a complete independent facet from weak words spread across incomplete facets. The final public semantic suite passed 50 tests with one intentionally ignored test; 106 admission unit tests and five existing reranking-related unit tests also passed. Raw compilation logs are not duplicated in the corpus.
+
+The repairs have a finite contract: terminal lowercase namespace scope is distinct from an explicit value/artifact target, and existing facet proof survives both reranking stages. They do not change source/time/access eligibility, model scores, thresholds or response limits. These are closed development regressions, not a held-out accuracy estimate, a full official benchmark score or evidence of improved agent-reader answers.
