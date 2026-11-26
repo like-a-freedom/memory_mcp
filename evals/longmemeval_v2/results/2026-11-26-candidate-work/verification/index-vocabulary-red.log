@@ -1,0 +1,20 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.18s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 1 test
+INDEX_VOCABULARY_ALLOCATIONS 50031
+
+thread 'index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys' (6516547) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:182:5:
+a2000-key dictionary with2004 terms must fit the30000-call allocation budget; observed 50031
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... FAILED
+
+failures:
+
+failures:
+    index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

@@ -1,0 +1,343 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.06s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/0327c2eaa1c46c5a/out/conversation_neighborhood-0327c2eaa1c46c5a)
+
+running 35 tests
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... FAILED
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... FAILED
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... FAILED
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... FAILED
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... FAILED
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test dated_team_question_recovers_its_adjacent_answer ... FAILED
+test denied_adjacent_answer_is_not_returned ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... FAILED
+test named_subject_source_question_recovers_its_adjacent_answer ... FAILED
+test original_dog_adoption_query_excludes_a_later_puppy_session ... FAILED
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... FAILED
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... FAILED
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+
+failures:
+
+---- a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object stdout ----
+
+thread 'a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object' (7814924) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1117:5:
+the requested adoption evidence should remain available: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer stdout ----
+
+thread 'an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer' (7815093) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1053:5:
+the requested adoption context should remain available: []
+
+---- anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query stdout ----
+
+thread 'anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query' (7815169) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:991:5:
+the requested adoption year should remain available: []
+
+---- answer_replaces_a_question_only_turn_in_context_assembly stdout ----
+
+thread 'answer_replaces_a_question_only_turn_in_context_assembly' (7815333) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1274:5:
+the answer to the selected question turn should be returned with its own provenance: []
+
+---- answer_replaces_its_matching_question_when_the_context_budget_allows_both stdout ----
+
+thread 'answer_replaces_its_matching_question_when_the_context_budget_allows_both' (7815655) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1321:5:
+return the answer that resolves the selected question: [
+    AssembledContextItem {
+        fact_id: "fact:79dc36edffe51979cf5bd022",
+        content: "Mira: I signed with a new sports team today.",
+        quote: "Mira: I signed with a new sports team today.",
+        source_episode: "episode:db99e078a1470f6267c0fc4a",
+        confidence: 0.005,
+        relevance: Some(
+            0.0024052766705515024,
+        ),
+        grounding: Some(
+            0.525,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "matched_query_terms": Array [
+                String("2023"),
+                String("may"),
+                String("mira"),
+                String("team"),
+            ],
+            "retrieval_admission": Object {
+                "basis": String("lexical"),
+                "community": Null,
+                "explicit_date_admitted": Bool(true),
+                "graph_anchor_origin": Null,
+                "hop_count": Null,
+                "matched_content_terms": Array [
+                    String("team"),
+                    String("mira"),
+                ],
+                "matched_index_key_terms": Array [
+                    String("mira"),
+                ],
+                "matched_references": Array [],
+                "policy_version": String("retrieval-admission-v1"),
+                "repeated_topic": Null,
+                "resolved_entity_ids": Array [],
+                "semantic_similarity": Null,
+            },
+            "source_episode_id": String("episode:db99e078a1470f6267c0fc4a"),
+            "source_id": String("chat:meeting-c:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=temporal fts=0.00 access_count=0 confidence=0.01 relevance=0.00 grounding=0.53 alignment=1.01 semantic=disabled matched lexical query=\"Which team did Mira sign with on 21 May 2023?\" and active at 2026-11-26",
+        retrieval_tier: Some(
+            "temporal",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "lexical",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+
+---- dated_team_question_recovers_its_adjacent_answer stdout ----
+
+thread 'dated_team_question_recovers_its_adjacent_answer' (7815751) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:869:5:
+the dated question should resolve to its adjacent answer: []
+
+---- named_answer_in_adjacent_turn_survives_context_assembly stdout ----
+NEIGHBOR_DIAGNOSTIC Ok([Object {"content": String("Mira: I signed with a new sports team today."), "episode_id": String("episode:dc88a4b2c65df60841b5c33c"), "policy_tags": Array [], "scope": Null, "source_group": String("chat:meeting-a"), "source_id": String("chat:meeting-a:1"), "source_lineage": Null, "source_position": Number(1), "source_type": String("conversation"), "t_ingested": String("2026-11-26T18:30:41.217415Z"), "t_ref": String("2023-05-21T12:00:00Z"), "visibility_scope": Null}, Object {"content": String("Owen: Which team did you sign with?"), "episode_id": String("episode:b705fb878d63f0ad1ee096f2"), "policy_tags": Array [], "scope": Null, "source_group": String("chat:meeting-a"), "source_id": String("chat:meeting-a:2"), "source_lineage": Null, "source_position": Number(2), "source_type": String("conversation"), "t_ingested": String("2026-11-26T18:30:41.258073Z"), "t_ref": String("2023-05-21T12:00:00Z"), "visibility_scope": Null}, Object {"content": String("Mira: The Minnesota Wolves! I am excited to play for them."), "episode_id": String("episode:b3942b82b158d3ea29d511df"), "policy_tags": Array [], "scope": Null, "source_group": String("chat:meeting-a"), "source_id": String("chat:meeting-a:3"), "source_lineage": Null, "source_position": Number(3), "source_type": String("conversation"), "t_ingested": String("2026-11-26T18:30:41.278303Z"), "t_ref": String("2023-05-21T12:00:00Z"), "visibility_scope": Null}])
+
+thread 'named_answer_in_adjacent_turn_survives_context_assembly' (7816024) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:146:5:
+the answer should be returned as an extracted fact with provenance, not a raw episode: [
+    AssembledContextItem {
+        fact_id: "fact:5907a4e9e2755781aba5be8d",
+        content: "Mira: I signed with a new sports team today.",
+        quote: "Mira: I signed with a new sports team today.",
+        source_episode: "episode:dc88a4b2c65df60841b5c33c",
+        confidence: 0.005,
+        relevance: Some(
+            0.0024052766705515024,
+        ),
+        grounding: Some(
+            0.525,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "matched_query_terms": Array [
+                String("2023"),
+                String("may"),
+                String("mira"),
+                String("team"),
+            ],
+            "retrieval_admission": Object {
+                "basis": String("lexical"),
+                "community": Null,
+                "explicit_date_admitted": Bool(true),
+                "graph_anchor_origin": Null,
+                "hop_count": Null,
+                "matched_content_terms": Array [
+                    String("team"),
+                    String("mira"),
+                ],
+                "matched_index_key_terms": Array [
+                    String("mira"),
+                ],
+                "matched_references": Array [],
+                "policy_version": String("retrieval-admission-v1"),
+                "repeated_topic": Null,
+                "resolved_entity_ids": Array [],
+                "semantic_similarity": Null,
+            },
+            "source_episode_id": String("episode:dc88a4b2c65df60841b5c33c"),
+            "source_id": String("chat:meeting-a:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=temporal fts=0.00 access_count=0 confidence=0.01 relevance=0.00 grounding=0.53 alignment=1.01 semantic=disabled matched lexical query=\"Which team did Mira sign with on 21 May 2023?\" and active at 2026-11-26",
+        retrieval_tier: Some(
+            "temporal",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "lexical",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+
+---- named_subject_source_question_recovers_its_adjacent_answer stdout ----
+
+thread 'named_subject_source_question_recovers_its_adjacent_answer' (7816046) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:196:5:
+the named-subject source question should retain its adjacent answer: [
+    AssembledContextItem {
+        fact_id: "episode_fallback:episode:9de32e9bfb7d14c1b0fccdf7",
+        content: "Mira: I signed with a new sports team today.",
+        quote: "Mira: I signed with a new sports team today.",
+        source_episode: "episode:9de32e9bfb7d14c1b0fccdf7",
+        confidence: 0.5079021621956977,
+        relevance: Some(
+            0.6666666666666666,
+        ),
+        grounding: Some(
+            0.6666666666666666,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "episode_fallback": Bool(true),
+            "reference_time": String("2023-05-21T12:00:00Z"),
+            "source_context": Object {
+                "group": String("chat:named-source-question"),
+                "position": Number(1),
+            },
+            "source_episode": String("episode:9de32e9bfb7d14c1b0fccdf7"),
+            "source_id": String("chat:named-source-question:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=fallback fts=2.00 access_count=0 confidence=0.51 grounding=0.67 semantic=disabled matched episode content query=\"team mira sign\" and active at 2026-11-26",
+        retrieval_tier: Some(
+            "fallback",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: None,
+    },
+]
+
+---- original_dog_adoption_query_excludes_a_later_puppy_session stdout ----
+
+thread 'original_dog_adoption_query_excludes_a_later_puppy_session' (7816073) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1879:5:
+the original dogs' duration should remain available: []
+
+---- possessive_source_question_matches_the_named_subjects_answer_slot stdout ----
+
+thread 'possessive_source_question_matches_the_named_subjects_answer_slot' (7816162) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:485:5:
+the source question's possessive pronoun should resolve to its bare adjacent answer: [
+    AssembledContextItem {
+        fact_id: "fact:ed4758bcb0052fe80ab5e618",
+        content: "Mira: I use several programming languages every day.",
+        quote: "Mira: I use several programming languages every day.",
+        source_episode: "episode:d3d9be5779cee1fe016cc9dc",
+        confidence: 0.005,
+        relevance: Some(
+            0.0014918114954974738,
+        ),
+        grounding: Some(
+            0.5625,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "matched_query_terms": Array [
+                String("mira"),
+                String("programming"),
+                String("language"),
+            ],
+            "retrieval_admission": Object {
+                "basis": String("lexical"),
+                "community": Null,
+                "explicit_date_admitted": Bool(false),
+                "graph_anchor_origin": Null,
+                "hop_count": Null,
+                "matched_content_terms": Array [
+                    String("mira"),
+                    String("programming"),
+                    String("language"),
+                ],
+                "matched_index_key_terms": Array [
+                    String("mira"),
+                ],
+                "matched_references": Array [],
+                "policy_version": String("retrieval-admission-v1"),
+                "repeated_topic": Null,
+                "resolved_entity_ids": Array [],
+                "semantic_similarity": Null,
+            },
+            "source_episode_id": String("episode:d3d9be5779cee1fe016cc9dc"),
+            "source_id": String("chat:favorite-language:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=fallback fts=6.00 access_count=0 confidence=0.01 relevance=0.00 grounding=0.56 alignment=1.02 semantic=disabled matched lexical query=\"What is Mira's favorite programming language?\" and active at 2026-11-26",
+        retrieval_tier: Some(
+            "fallback",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "lexical",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+
+---- query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window stdout ----
+
+thread 'query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window' (7816185) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1745:5:
+the answer turn should be returned: []
+
+
+failures:
+    a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object
+    an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer
+    anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query
+    answer_replaces_a_question_only_turn_in_context_assembly
+    answer_replaces_its_matching_question_when_the_context_budget_allows_both
+    dated_team_question_recovers_its_adjacent_answer
+    named_answer_in_adjacent_turn_survives_context_assembly
+    named_subject_source_question_recovers_its_adjacent_answer
+    original_dog_adoption_query_excludes_a_later_puppy_session
+    possessive_source_question_matches_the_named_subjects_answer_slot
+    query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window
+
+test result: FAILED. 24 passed; 11 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.97s
+
+error: test failed, to rerun pass `-p memory_mcp --test conversation_neighborhood`

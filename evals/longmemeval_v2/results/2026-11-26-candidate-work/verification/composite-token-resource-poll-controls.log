@@ -1,0 +1,59 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.25s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 21 tests
+INDEX_VOCABULARY_ALLOCATIONS 6045
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 11
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+LEXICAL_SET_ALLOCATIONS 21
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10010244 single=8206196 additional=1804048
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+FACT_HYDRATION_ALLOCATIONS 47870
+EPISODE_BATCH_ALLOCATED_BYTES eight=10276868 single=8206120 additional=2070748
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10330000 single=8206279 additional=2123721
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_FALLBACK_ALLOCATIONS 70227
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 114765
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=8 allocations=182994
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 74704
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 788006
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 19771
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=316313
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=337632
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=546346
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 21066
+test public_repeated_query_read_reuses_grounding_spans ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 1004216
+
+thread 'public_composite_source_tokens_reuse_their_repeated_word_parts' (7255747) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:504:5:
+eight long repeated-vocabulary sources must fit the million-call application budget; observed 1004216
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... FAILED
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=64 allocations=873152
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 20412
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+failures:
+
+failures:
+    public_composite_source_tokens_reuse_their_repeated_word_parts
+
+test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.53s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

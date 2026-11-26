@@ -74,7 +74,7 @@ implements phase cancellation without rerunning or relabeling those model trials
 - [x] Production crate and full harness tests, Python targets, required strict workspace clippy, fmt and diff checks.
 - [x] Independent combined review, fix significant findings through TDD, final report and prepare verified changes for commit. Preserve this implementation plan until user acceptance.
 
-Final verification: native product2807pass/45ignored; harness925pass/22ignored;0failed. Python target48pass, fullLongMem49pass/5skip, optimizedaudit10pass. Exact workspace clippy/fmt/diff exit0. Clippy required only moving an existing cfg(test) block after eval-support items; exact pre-capture source reconstruction is hash-verified, then6 public stage scenarios passed again. No function body changed after model captures. Independent code review and report-vs-raw review completed; GTV report wording corrected. Final report: `docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md`; logs/identities: `evals/paired/memory-quality-repairs-2026-11-26/verification.json`.
+Historical Task1–5 verification: native product2807pass/45ignored; harness925pass/22ignored;0failed. Python target48pass, fullLongMem49pass/5skip, optimizedaudit10pass. Exact workspace clippy/fmt/diff exit0. Clippy required only moving an existing cfg(test) block after eval-support items; exact pre-capture source reconstruction is hash-verified, then6 public stage scenarios passed again. No function body changed after model captures. Independent code review and report-vs-raw review completed; GTV report wording corrected. Final report: `docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md`; logs/identities: `evals/paired/memory-quality-repairs-2026-11-26/verification.json`.
 
 ## Task 6 — Real phase cancellation and durable timeout artifacts
 
@@ -110,14 +110,22 @@ are gone, successful/failed receipts survive. This is phase cancellation only:
 setup, store formation and probes require their own existing process/run bounds.
 No model experiment or memory-quality improvement is inferred from this test.
 
-## Task 7 — Full saved-history retrieval: bounded diagnosis and equivalent repair
+## Task 7 — Full saved-history retrieval: bounded diagnosis, cost repair and evidence selection
 
-This task follows the report's P1 action, not a rerun of stopped C1. Current
-diagnostic status: **source carrier 2/2; no completed full context; equivalent
-query/ranking/set repairs implemented, full-history acceptance still pending**.
-Original seven answers remain 2/7. Opt-in captured attempts are resource failures,
-not absent-candidate scores. All attempts, amendments and original snapshot hashes
-remain in `evals/longmemeval_v2/results/2026-11-26-full-history/`.
+Implementation and registered evaluation are complete through Step5. Final
+`topical-tabs-final` retains the original primary pair2/2 within unchanged30s read /
+45s process limits; final release passes native8/8. Seven original answers have
+been re-evaluated once under the unchanged local reader/judge protocol:
+4/7 strict independent, all7 retained. This closes execution and
+reporting, not all memory-quality debt; C2 remains NO-GO. The original6d single
+reviewed-source metric remains a miss, while the separately registered authentic
+alternative block is now complete; these are distinct observations.
+
+**Comparison boundary:** SQL hydration, term dictionaries and score reuse require
+behavioral equivalence to the independent old oracle. Subsequent query-surface,
+selection and packing changes intentionally repair reproduced evidence loss;
+these require separate positive/negative public cases and full-store acceptance,
+not a claim of equivalence of every final answer to the defective baseline.
 
 **Files and ownership:**
 
@@ -127,8 +135,11 @@ remain in `evals/longmemeval_v2/results/2026-11-26-full-history/`.
   and shared source projection; query shape stays in the owning context.
 - `crates/memory-mcp/src/knowledge/knowledge_store.rs`:
   `select_facts_filtered(ContextFactQuery) -> Result<Vec<Value>, MemoryError>` and
-  `select_facts_for_lexical_terms(&str, &[String], i32, &[String]) ->
-  Result<Vec<Vec<Value>>, MemoryError>`; preserve these consumer contracts.
+  `select_lexical_fact_candidates(&str, &[String], i32, &[String]) ->
+  Result<Vec<Value>, MemoryError>`; the sole old consumer immediately flattened
+  and deduplicated grouped rows. Keep first-hit score/order and every independent
+  term limit, then hydrate unique identities inside each batch statement. The
+  obsolete grouped port is removed; no parallel compatibility wrapper remains.
 - `crates/memory-mcp/tests/retrieval_query_projection.rs` and
   `retrieval_query_batching.rs`: actual embedded-store projection and ordered
   per-term behavior; extend here rather than add a second evaluation framework.
@@ -172,14 +183,14 @@ not promoted because the hypothesis sounds plausible.
   equivalence in Step 1, unchanged source isolation and temporal selectors.
   Measure actual query plan/payload and cost under a fixed native profile; a
   textual SQL assertion alone is not evidence of lower resource use.
-- [ ] **Step 4: One bounded matched full-store capture.** Before running, freeze
+- [x] **Step 4: One bounded matched full-store capture.** Before running, freeze
   the final candidate binary/source hashes, unchanged inputs/budget/query and
   source-span acceptance. Use one process per case with explicit external timeout,
   and copy time outside read cost. Require completed stage receipts and both
   reviewed spans in final context (2/2); retain all timeouts and partial receipts.
   Existing debug diagnostics are resource-failure evidence; a release-profile
   improvement needs a matched baseline, not cross-profile timing subtraction.
-- [ ] **Step 5: Acceptance and delivery.** Run the current eight-case deterministic
+- [x] **Step 5: Acceptance and delivery.** Run the current eight-case deterministic
   gate without regressions, full affected crate/harness tests, mandatory strict
   workspace clippy/fmt. Only then re-evaluate the seven frozen answers with their
   unchanged reader/judge contract under a separately registered local budget.
@@ -191,99 +202,56 @@ The wider P2/P3 proposals in the repair report (independent entity generalizatio
 cross-client citation transport and confirmation study) remain separate future
 work, not checkmarks earned by this follow-up.
 
-**Task 7 measured outcome, 26 November:** independent wide-SQL oracle and actual
-execution-plan resource RED → GREEN pass; projection16, batching7, public source
-stages6 and term-set2 controls pass. Candidate metrics/maxima are reused without
-changing ordering or score arithmetic. Shared set normalization preserves exact
-vocabulary and ordered/count-valued callers; allocation RED30,044 → GREEN54 on
-the fixed repeated-source control, plus128 fixed-seed vocabulary cases. These
-are equivalence/resource observations, not full-history quality acceptance.
+**Current execution evidence (26 November):**
 
-Matched opt-level3 baseline/narrow SQL calls sum4.655→2.773s (dropdown7 calls)
-and28.184→9.319s (toolbar15 calls); both variants fail to complete contexts.
-All15 registered development process attempts are retained. Final original-bound
-candidate produces0/2 contexts, source carriers2/2; a separately registered
-120/150s diagnostic also produces0/2. No seven-answer rerun or C2 admission.
-See `evals/longmemeval_v2/results/2026-11-26-narrow-fts/README.md` and `summary.json`.
+- Final root: `evals/longmemeval_v2/results/2026-11-26-candidate-work/`.
+  `topical-tabs-final`, `native-gate-topical`, `original-seven-post-topical` and
+  `verification/topical-tabs-current` are current acceptance. README/progress and
+  candidate-summary retain earlier failures, invalid source-drift attempts and
+  superseded hypotheses without treating them as fresh acceptance.
+- Master14d14b46 plus42 pinned source/test hashes; same sources across final
+  native gates, full-store captures and release. Original snapshot unchanged;
+  private stores and owned local servers cleaned. Source guard failures do not
+  authorize reuse of older model outcomes on changed sources.
+- Actual lexical pools:242/252 first-ID facts,96/97 exact key lists and96/97 key
+  dictionary builds per pool. Admission separately constructs228/300 raw+URL
+  dictionaries on114/150 lists. No global once-only claim. Independent wide-SQL
+  oracle preserves source payloads, per-term limits, score/order and visibility.
+- Allocation control3669865→838002 caller-poll allocations, unchanged1M cap;
+  storage/background polls excluded. This is not RSS or full-history latency.
+- Conversation36/stage44/resource22 pass. New tab-list regressions had runtime
+  RED→GREEN: short/nested groups, preceding buttons, mixed button requests,
+  neighboring groups and structural-role-only list contamination. The cap control
+  confirms unions over2048B remain bounded. Exact source offsets preserved;
+  benchmark answers/source IDs are not production selection inputs.
+- Gold directory source is actual rank40 / first-source rank40 of148; source
+  diversity alone cannot justify promotion. Final original6d gold coverage is
+  still scored separately from authentic4ae block completeness. Pure-tab support
+  is finite; inverse mixed-role intent remains a future independently tested scope.
+- Production2856/0/45, harness929/0/22, scoped111/0/0 (pass/fail/ignored).
+  Workspace/diagnostic clippy, fmt/diff exit0. Python55pass/5skip; five protocol
+  subprocess controls pass (four faults and one complete-capture regression). Cargo totals include existing lints/doctests.
+- Native8/8 has no_regressions,0invalid/unobserved and qualifies the exact release
+  SHA. Model entry verifies that identity and both binary-integrity flags plus
+  primary-pair registration/outcomes and snapshot integrity.
+- One preregistered final original-seven replay: official scorer and independent
+  answer contract reported separately; actual source spans, answers, format,
+  errors and latency retain denominator7. Text-only reader adapter does not
+  observe exact citations/source IDs; native source linkage is a different seam.
+  No unchanged retries select success. Partial reader/judge errors retain
+  available prompt metrics but fail acceptance, verified with public controls.
+- Span metric v2 preserves exact whole-span semantics including exact JSON-string
+  representation. Prior v1 retained; no fuzzy/recursive decode, join or changed
+  accepted answers. Upstream malformed backslash-b instruction is documented,
+  left unchanged in the comparable protocol and not inferred as the cause of errors.
+- Source-refresh access cost remains an earlier pinned stage observation: five
+  durable updates about6.23s in two overlapping waves, packing0.328s. A redesign
+  requires new controlled evidence; fire-and-forget is not equivalent.
 
-**Follow-up before Step 4 can pass:**
-
-1. [x] Caller-owned source-linked capture retains completed stages after future
-   cancellation or storage error; four public controls cover interruption,
-   access exclusion, original error and single-read identity. Missing-API compile
-   checks are setup; runtime reuse RED and future-owned-recorder mutation are
-   recorded separately. A120/150s full dropdown diagnostic observes the reviewed
-   source through ranked fact candidates86.146s and episode candidates114.305s;
-   selection/packing unknown. Capture does not survive SIGKILL by itself.
-2. [x] Reuse immutable per-episode sort scores and response lexical features;
-   stream sentence normalization preserving global quote/episode preprocessing,
-   full text, limits and earliest tied winner. Fixed16-source public read retains
-   exact ID order/confidence/grounding; caller-thread allocations534786→114542
-   under unchanged200000 bound. Two literal controls and128 independently scored
-   old-traversal cases pass; public temporal/access controls pass. This establishes
-   equivalent bounded work on the control, not full-history latency acceptance.
-3. [x] Schema inventory completed:33/33 current local-profile migrations applied,
-   no static checksum mismatch (dynamic embedding008 excluded), actual indexes
-   recorded. Graph execution plans still need inspection before changing indexes.
-   Many edge calls do not establish missing indexes or the sole cause.
-   Preserve historical formation and compare any separately registered rebuilt
-   store explicitly; never silently migrate the original snapshot to pass.
-4. [ ] Measure actual lexical candidate inventory before another optimization.
-   Under the same frozen whole-store/query/time/source contract, retain bounded
-   count/digest metadata: record count, total/max content and index-key bytes,
-   unique exact contents/source identities, completed channels and per-record work.
-   Persist completed boundaries incrementally so outer process death cannot erase
-   them; raw text stays in explicit source-filtered evidence only. Inspect payload
-   hydration/graph plans separately from application normalization. Current20s
-   samples differ: dropdown application metrics, toolbar also SQL/value cloning;
-   they do not establish one dominant cause for the whole read.
-5. [ ] If duplicate exact content is measured, public resource RED then minimal
-   request-local immutable feature reuse or same-statement deduplicated hydration.
-   Compare exact scores, ordered IDs, source/provenance/quotes and valid/transaction
-   visibility against independent oracles, including index-only matches and ties.
-   Keep all candidate caps, fallback terms and source limits. If measurements point
-   elsewhere, ledger the evidence and change this mechanism before coding.
-   A bounded preliminary metadata diagnostic observed427 total facts, but the
-   full-table character/hash projection itself exceeded45s. A separate first-row
-   observation has66026 content characters and2193 distinct raw index keys
-   (37471 characters total). This is not actual query-pool telemetry or evidence
-   of duplicate raw keys. First establish a resource control for membership-only
-   index-key vocabulary reuse, preserving duplicate query hits, index-only
-   matching, wrapped values, anchor weighting and exact order. Do not infer its
-   latency benefit from that single row. Avoid high-overhead SQL per-key mappers
-   when collecting the still-missing actual-pool metadata.
-6. [ ] Re-register the final source/binary after the diagnosed repair; one bounded
-   capture per case must yield complete receipts and both exact reviewed spans
-   under the original30s acceptance, plus native8/8. Only then register the seven
-   unchanged reader/judge tasks and evaluate answers separately.
-
-Additional follow-up evidence:
-`evals/longmemeval_v2/results/2026-11-26-stage-progress/README.md`.
-Preliminary metadata evidence:
-`evals/longmemeval_v2/results/2026-11-26-payload-inventory/README.md`.
-All five new process attempts retained: one partial120/150s diagnostic and two
-30/45s pairs, before/after streaming. Both pairs produce0/2 completed contexts;
-the final two are externally killed45.187/45.116s with no returned partial/final
-receipt. Fifteen earlier narrow-FTS attempts remain unchanged, total20 development
-process attempts on two exposed cases. No new seven-answer run, no C2 admission.
-
-Follow-up verification: native production2817pass/0fail/45ignored, harness929/
-0/22, opt-in public53/0/0; native gate8/8,no_regressions,0invalid/unobserved.
-Required workspace clippy, diagnostic clippy and fmt pass. Sandbox run retained
-7 FSEvents/startup failures and1 MCP initialization timeout; unchanged-source
-native full run passes. Ignored is not passed; totals include existing lints and
-doctests. This verifies the equivalent repairs, not Step4/5 acceptance.
-
-The first combined production run exposed11 controlled-adapter failures: naive
-`(SELECT` counts treated nested projections as extra batch reads. A new public
-MockDbClient scenario observed5 groups instead of2 before fixing the shared
-test-only outer-group reader. Real SQL equivalence targets already passed;
-existing output assertions and group-count validation remain in place.
-
-Latest verification: native production2810pass/0fail/45ignored, harness929pass/
-0fail/22ignored, opt-in public targets41pass. Native current gate8/8,
-no_regressions=true,0invalid/unobserved. Strict workspace and opt-in clippy/fmt
-pass. Source-inventory lint updated for the intentionally fused helper; normal
-child-module layout satisfies unchanged source-tree rules. All intermediate
-verification failures retained. This closes verification of these equivalent
-repairs, **not Step4 full-history acceptance or the seven-answer evaluation**.
+**Explicit remaining scope:** the exploratory 32-source fetch case still loses
+its target before ranking. A synthetic union proof does not close this defect.
+Future work must reproduce that fetch boundary through the public interface and
+repair bounded candidate coverage without increasing caps blindly. Full-store
+2/2 remains exposed development evidence. P2 entity generalization, cross-client
+citation transport and P3 independent confirmation remain future work; C2 is
+NO-GO. Historical and fresh model outcomes must stay separate from retrieval.

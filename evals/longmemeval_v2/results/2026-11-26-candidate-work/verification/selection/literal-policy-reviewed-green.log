@@ -1,0 +1,76 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.91s
+     Running tests/assemble_context_semantic_quality.rs (target/debug/build/memory_mcp/a447ccc60f42bfdf/out/assemble_context_semantic_quality-a447ccc60f42bfdf)
+
+running 41 tests
+test eval_service_rejects_non_finite_or_out_of_range_thresholds ... ok
+test eval_service_rejects_invalid_namespace_and_claim_stage ... ok
+test episode_fallback_cannot_bypass_negative_cross_encoder_evidence ... ok
+test community_summary_admits_a_persisted_member_fact_with_only_one_fact_term ... ok
+test episode_fallback_keeps_an_explicit_event_in_the_requested_month_when_referenced_later ... ok
+test episode_fallback_rejects_an_explicit_event_outside_the_requested_month ... ok
+test bare_entity_context_includes_a_traceable_one_hop_neighbor ... ok
+test episode_reranker_can_recover_a_relevant_passage_beyond_the_lexical_head ... ok
+test calendar_query_reranking_receives_the_persisted_source_episode_reference_time ... ok
+test eval_service_constructs_from_injected_provider_and_explicit_stage ... ok
+test episode_fallback_rejects_a_single_keyword_match_for_a_multiterm_query ... ok
+test episode_reranker_can_recover_a_single_anchor_passage_for_each_participant ... ok
+test broad_prefix_with_an_attribute_does_not_admit_unrelated_entity_traits ... ok
+test calendar_query_reranking_receives_the_persisted_fact_valid_time ... ok
+test candidate_reranking_document_includes_only_its_immediate_source_question ... ok
+test reranker_cannot_veto_fact_with_exact_date_subject_and_event_support ... ignored, diagnostic requires the pinned multilingual-e5-small bundle
+test calendar_admission_keeps_speaker_attribution_across_sentences_in_one_turn ... ok
+test candidate_reranking_document_includes_the_same_speaker_context_of_a_follow_up_answer ... ok
+test compound_identifiers_do_not_supply_explicit_subject_support ... ok
+2026-11-26T17:48:17.741462Z ERROR  op=assemble_context.error  req=req_0001  duration_ms=25  args={}  result.error_code=storage
+test eval_service_rejects_query_vectors_that_do_not_match_the_persisted_index ... ok
+test lexical_episode_admission_rejects_explicitly_excluded_project_membership ... ok
+2026-11-26T17:48:17.761530Z  WARN  op=embedding.generate.error  duration_ms=0  args.input_chars=32  args.provider=eval-component-outage  result.error=[redacted]  result.error_code=validation  result.generated_embeddings=0
+2026-11-26T17:48:17.761632Z  WARN  op=embedding.query_skipped  error_code=validation  provider=eval-component-outage
+test negative_cross_encoder_evidence_rejects_a_high_cosine_lexical_fact ... ok
+test fact_reranker_scores_candidates_before_response_budget_truncation ... ok
+test positive_reranker_cannot_rescue_episode_with_explicitly_excluded_project_membership ... ok
+test provider_outage_keeps_the_lexical_retrieval_path_available ... ok
+test irrelevant_episode_cannot_replace_a_reranked_relevant_fact ... ok
+test lexical_hit_keeps_its_real_ann_similarity_in_verbose_evidence ... ok
+test reranker_floor_still_applies_when_only_a_month_period_supports_the_fact ... ok
+test higher_scoring_partial_episode_does_not_replace_a_complementary_fact ... ok
+test negative_reranker_logit_preserves_grounded_facts_and_rejects_weak_semantics ... ok
+test personal_planning_uses_a_self_profile_with_a_matching_activity_anchor ... ok
+test high_level_semantic_paraphrase_survives_zero_lexical_grounding ... ok
+test qualified_reference_with_topic_support_survives_a_below_floor_reranker_score ... ok
+test historical_read_does_not_use_a_mutated_embedding_for_ann_candidate_selection ... ok
+test reranker_order_controls_budget_selection_over_lexical_term_frequency ... ok
+test reranking_retains_the_exact_persisted_source_identity_for_a_document_fragment ... ok
+test reranking_can_recover_the_relevant_candidate_below_the_first_twenty_ann_hits ... ok
+test semantic_admission_survives_a_lexical_channel_with_sparse_word_overlap ... ok
+test unicode_conjunction_is_assembled_with_its_scoped_http_evidence ... ok
+test semantic_provider_receives_the_original_natural_language_question ... ok
+test scoped_secondary_facets_keep_complementary_evidence_and_reject_generic_http_diagnostics ... ok
+
+test result: ok. 40 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 17 tests
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test diagnostic_source_observation_respects_request_policy ... ok
+test compound_when_question_requires_event_time_from_the_source ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+2026-11-26T17:48:19.795516Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+

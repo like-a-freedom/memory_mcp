@@ -1,0 +1,20 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.67s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 1 test
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=64 allocations=1219530
+
+thread 'public_distinct_index_lists_reuse_shared_token_normalization' (6918318) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:285:5:
+642000-key facts must fit the one-million-call application budget (storage excluded); observed 1219530
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_distinct_index_lists_reuse_shared_token_normalization ... FAILED
+
+failures:
+
+failures:
+    public_distinct_index_lists_reuse_shared_token_normalization
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 2.87s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

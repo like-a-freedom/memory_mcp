@@ -1,0 +1,5 @@
+{
+  "valid_read_observations": 0,
+  "failure": "Cargo stdout contained trailing non-JSON bytes after build-finished; no read was started",
+  "action": "Fresh build logs and corrected read-only timer before the registered pair"
+}

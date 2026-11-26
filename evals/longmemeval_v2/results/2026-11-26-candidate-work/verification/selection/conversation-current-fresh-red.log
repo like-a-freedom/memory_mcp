@@ -1,0 +1,86 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.82s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/0327c2eaa1c46c5a/out/conversation_neighborhood-0327c2eaa1c46c5a)
+
+running 1 test
+test named_answer_in_adjacent_turn_survives_context_assembly ... FAILED
+
+failures:
+
+---- named_answer_in_adjacent_turn_survives_context_assembly stdout ----
+
+thread 'named_answer_in_adjacent_turn_survives_context_assembly' (7838278) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:144:5:
+the answer should be returned as an extracted fact with provenance, not a raw episode: [
+    AssembledContextItem {
+        fact_id: "fact:5907a4e9e2755781aba5be8d",
+        content: "Mira: I signed with a new sports team today.",
+        quote: "Mira: I signed with a new sports team today.",
+        source_episode: "episode:dc88a4b2c65df60841b5c33c",
+        confidence: 0.005,
+        relevance: Some(
+            0.0024052766705515024,
+        ),
+        grounding: Some(
+            0.525,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "matched_query_terms": Array [
+                String("2023"),
+                String("may"),
+                String("mira"),
+                String("team"),
+            ],
+            "retrieval_admission": Object {
+                "basis": String("lexical"),
+                "community": Null,
+                "explicit_date_admitted": Bool(true),
+                "graph_anchor_origin": Null,
+                "hop_count": Null,
+                "matched_content_terms": Array [
+                    String("team"),
+                    String("mira"),
+                ],
+                "matched_index_key_terms": Array [
+                    String("mira"),
+                ],
+                "matched_references": Array [],
+                "policy_version": String("retrieval-admission-v1"),
+                "repeated_topic": Null,
+                "resolved_entity_ids": Array [],
+                "semantic_similarity": Null,
+            },
+            "source_episode_id": String("episode:dc88a4b2c65df60841b5c33c"),
+            "source_id": String("chat:meeting-a:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=temporal fts=0.00 access_count=0 confidence=0.01 relevance=0.00 grounding=0.53 alignment=1.01 semantic=disabled matched lexical query=\"Which team did Mira sign with on 21 May 2023?\" and active at 2026-11-26",
+        retrieval_tier: Some(
+            "temporal",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "lexical",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    named_answer_in_adjacent_turn_survives_context_assembly
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.43s
+
+error: test failed, to rerun pass `-p memory_mcp --test conversation_neighborhood`

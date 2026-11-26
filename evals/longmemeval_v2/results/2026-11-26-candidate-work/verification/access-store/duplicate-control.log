@@ -1,0 +1,10 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.00s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/526bba5550d0e6e4/out/memory_mcp-526bba5550d0e6e4)
+
+running 1 test
+2026-11-26T16:35:03.416950Z ERROR  op=assemble_context.access_track_error  access.allowed_tags=null  access.caller_id=null  access.content_type=null  access.session_vars=null  access.transport=null  args={}  result.error_code=storage
+test memory::retrieval::tests::failed_middle_access_does_not_drop_duplicate_or_later_writes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2069 filtered out; finished in 0.01s
+

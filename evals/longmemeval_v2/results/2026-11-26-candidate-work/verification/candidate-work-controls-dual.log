@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.82s
+     Running tests/lexical_candidate_hydration.rs (target/debug/build/memory_mcp/64428c2b50b10cb3/out/lexical_candidate_hydration-64428c2b50b10cb3)
+
+running 1 test
+test lexical_candidate_union_keeps_first_hit_score_and_all_source_fields ... FAILED
+
+failures:
+
+---- lexical_candidate_union_keeps_first_hit_score_and_all_source_fields stdout ----
+
+thread 'lexical_candidate_union_keeps_first_hit_score_and_all_source_fields' (6638393) panicked at crates/memory-mcp/tests/lexical_candidate_hydration.rs:63:10:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query failed: Parse error: Missing group idiom `fact_id` in statement selection\n --> [1:4276]\n  |\n1 | ... GROUP BY fact_id) ORDER BY term_rank ASC, ft_score DESC, t_valid DESC, fa...\n  |              ^^^^^^^\n --> [1:662]\n  |\n1 | ...M (SELECT array::min([term_rank, ft_score, record, t_valid, fact_id]) AS h...\n  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Idiom missing here\n")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    lexical_candidate_union_keeps_first_hit_score_and_all_source_fields
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_candidate_hydration`

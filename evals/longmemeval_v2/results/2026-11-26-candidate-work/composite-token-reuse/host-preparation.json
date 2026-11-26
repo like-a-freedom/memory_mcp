@@ -1,0 +1,153 @@
+{
+  "observed_at": "2026-11-26T16:57:11.827810+00:00",
+  "processes": [
+    {
+      "pid": 83865,
+      "ppid": 83859,
+      "elapsed": "00:22",
+      "cpu_percent": "11.7",
+      "executable_name": "cargo"
+    },
+    {
+      "pid": 84814,
+      "ppid": 84434,
+      "elapsed": "00:09",
+      "cpu_percent": "0.0",
+      "executable_name": "cargo"
+    },
+    {
+      "pid": 85086,
+      "ppid": 83865,
+      "elapsed": "00:06",
+      "cpu_percent": "56.8",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85121,
+      "ppid": 84814,
+      "elapsed": "00:05",
+      "cpu_percent": "55.4",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85244,
+      "ppid": 83865,
+      "elapsed": "00:04",
+      "cpu_percent": "62.1",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85566,
+      "ppid": 83865,
+      "elapsed": "00:01",
+      "cpu_percent": "56.7",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85574,
+      "ppid": 83865,
+      "elapsed": "00:01",
+      "cpu_percent": "58.7",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85592,
+      "ppid": 83865,
+      "elapsed": "00:01",
+      "cpu_percent": "61.2",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85606,
+      "ppid": 83865,
+      "elapsed": "00:01",
+      "cpu_percent": "58.3",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85620,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "41.7",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85623,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "49.3",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85627,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "42.3",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85628,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "25.5",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85634,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "19.1",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85635,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "19.6",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85638,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "6.5",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85639,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "4.5",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85640,
+      "ppid": 83865,
+      "elapsed": "00:00",
+      "cpu_percent": "1.7",
+      "executable_name": "rustc"
+    },
+    {
+      "pid": 85641,
+      "ppid": 85165,
+      "elapsed": "00:00",
+      "cpu_percent": "2.4",
+      "executable_name": "clang"
+    },
+    {
+      "pid": 85648,
+      "ppid": 85641,
+      "elapsed": "00:00",
+      "cpu_percent": "0.0",
+      "executable_name": "clang"
+    },
+    {
+      "pid": 85649,
+      "ppid": 85628,
+      "elapsed": "00:00",
+      "cpu_percent": "0.0",
+      "executable_name": "clang"
+    }
+  ],
+  "scope": "Compact build process observation during preparation; not proof of load in previous captures."
+}

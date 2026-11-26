@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--bin",
+    "memory_mcp"
+  ],
+  "exit_code": 0,
+  "seconds": 361.85781983300694,
+  "binary": "/Users/solovey/Documents/dev/memory_mcp/target/candidate-work-accepted/release/memory_mcp",
+  "sha256": "ddedc858b21932c6e41e7fd31d75b05abdd259b1dfa16bed37eb28ad7682092b"
+}

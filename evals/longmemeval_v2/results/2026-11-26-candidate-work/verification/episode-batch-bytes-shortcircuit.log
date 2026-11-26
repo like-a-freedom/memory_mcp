@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.04s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 1 test
+
+thread 'episode_term_batch_bounds_repeated_source_allocation_bytes' (7018179) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:571:23:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query failed: Parse error: Unexpected token `END` expected delimiter `}`\n --> [1:577]\n  |\n1 | ...alse] END END; } AS matched_terms FROM episode WHERE t_ref <= type::dateti...\n  |              ^^^\n --> [1:63]\n  |\n1 | ...d, t_ref, { LET $normalized = string::lowercase(content); RETURN IF $norma...\n  |              ^ expected this delimiter to close\n")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test episode_term_batch_bounds_repeated_source_allocation_bytes ... FAILED
+
+failures:
+
+failures:
+    episode_term_batch_bounds_repeated_source_allocation_bytes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

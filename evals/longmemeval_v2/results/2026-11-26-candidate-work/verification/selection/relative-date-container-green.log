@@ -1,0 +1,82 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+warning: unused variable: `command`
+   --> crates/memory-mcp/src/memory/retrieval.rs:188:9
+    |
+188 |         command: &crate::memory::api::RecallCommand,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_command`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `memory_mcp` (lib) generated 1 warning (run `cargo fix --lib -p memory_mcp` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.12s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 22 tests
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+test unicode_lowercase_shrinking_to_one_byte_keeps_the_existing_search_vocabulary ... ok
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+test public_repeated_query_read_reuses_grounding_spans ... ok
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... ok
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.11s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 36 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test compound_when_question_preserves_a_source_with_the_event_date ... ok
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test compound_when_question_requires_event_time_from_the_source ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test excluded_label_is_not_reported_as_requested_control_membership ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test excludes_label_has_no_positive_membership_priority ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test excepted_label_has_no_positive_membership_priority ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test later_toolbar_request_does_not_prefer_the_old_visible_container ... ok
+test explicitly_hidden_control_question_keeps_its_matching_hidden_group ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test no_longer_included_label_has_no_positive_membership_priority ... ok
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test replacement_quote_is_not_reported_as_a_requested_control_label ... ok
+test quoted_visibility_word_inside_escaped_label_is_not_an_attribute ... ok
+test quoted_popup_attributes_do_not_hide_visible_control_labels ... ok
+test quoted_visibility_word_inside_popup_value_is_not_an_attribute ... ok
+test separate_visible_button_names_do_not_form_one_requested_label ... ok
+test relative_date_question_keeps_its_matching_unknown_container ... ok
+2026-11-26T18:17:57.389725Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test unnamed_container_without_attributes_still_blocks_outer_visibility ... ok
+test unknown_nearest_container_does_not_inherit_outer_visibility ... ok
+test visible_control_container_confirms_an_unqualified_toolbar_question ... ok
+test unknown_visibility_keeps_the_prior_nearest_group_ordering ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test visible_controls_outrank_a_hidden_copy_near_the_lexical_window ... ok
+test visible_word_in_hidden_control_name_is_not_a_visibility_attribute ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.10s
+

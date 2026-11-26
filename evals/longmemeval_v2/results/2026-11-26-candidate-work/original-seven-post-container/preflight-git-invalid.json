@@ -1,0 +1,11 @@
+{
+  "schema": "original-seven-preflight-invalid/v1",
+  "status": "invalid_preflight",
+  "memory_reads": 0,
+  "reader_calls": 0,
+  "judge_calls": 0,
+  "cause": "Staged upstream is an archive without .git; git rev-parse walked to the memory_mcp parent repository.",
+  "reported_parent_head": "14d14b467f9c668967ef7aa3ae9e00380b2cd2d9",
+  "expected_upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "repair": "Compare all staged source bytes with the retained commit-named upstream archive, as in the prior provenance audit; retain archive SHA and per-file hashes before any evaluation."
+}

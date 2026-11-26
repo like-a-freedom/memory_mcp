@@ -1,0 +1,17 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.43s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/526bba5550d0e6e4/out/memory_mcp-526bba5550d0e6e4)
+
+running 8 tests
+test memory::fact_access_store::tests::record_fact_access_rejects_invalid_record_ids ... ok
+test memory::fact_access_store::tests::record_fact_access_leaves_an_absent_record_alone ... ok
+test memory::fact_access_store::tests::record_fact_access_binds_forged_record_ids_as_values ... ok
+test memory::fact_access_store::tests::record_fact_access_saturates_at_the_lower_bound ... ok
+test memory::fact_access_store::tests::record_fact_access_saturates_instead_of_wrapping ... ok
+test memory::fact_access_store::tests::record_fact_access_accumulates_from_the_stored_count ... ok
+test memory::fact_access_store::tests::fact_access_preserves_concurrent_vector_write ... ok
+test memory::fact_access_store::tests::concurrent_access_updates_do_not_lose_increments ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 2061 filtered out; finished in 0.40s
+

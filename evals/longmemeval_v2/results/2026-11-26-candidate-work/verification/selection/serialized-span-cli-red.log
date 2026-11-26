@@ -1,0 +1,24 @@
+F
+======================================================================
+FAIL: test_complete_serialized_source_with_literal_backslash_keeps_coverage (evals.longmemeval_v2.test_reviewed_span_cli.ReviewedSpanCliTests.test_complete_serialized_source_with_literal_backslash_keeps_coverage)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reviewed_span_cli.py", line 40, in test_complete_serialized_source_with_literal_backslash_keeps_coverage
+    self.assertEqual(report["reviewed_span_coverage"], {
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "present": 1, "selected": 1, "rate": 1.0,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    })
+    ^^
+AssertionError: {'present': 0, 'selected': 1, 'rate': 0.0} != {'present': 1, 'selected': 1, 'rate': 1.0}
+- {'present': 0, 'rate': 0.0, 'selected': 1}
+?             ^          ^
+
++ {'present': 1, 'rate': 1.0, 'selected': 1}
+?             ^          ^
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.166s
+
+FAILED (failures=1)

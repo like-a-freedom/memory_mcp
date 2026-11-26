@@ -1,0 +1,11 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+error[E0560]: struct `memory::retrieval::types::RankedContextFact` has no field named `reranking_available`
+    --> crates/memory-mcp/src/memory/retrieval/ranking.rs:2090:13
+     |
+2090 |             reranking_available: false,
+     |             ^^^^^^^^^^^^^^^^^^^ `memory::retrieval::types::RankedContextFact` does not have this field
+     |
+     = note: all struct fields are already assigned
+
+For more information about this error, try `rustc --explain E0560`.
+error: could not compile `memory_mcp` (lib test) due to 1 previous error

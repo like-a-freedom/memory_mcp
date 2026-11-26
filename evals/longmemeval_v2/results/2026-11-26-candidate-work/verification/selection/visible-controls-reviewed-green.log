@@ -1,0 +1,47 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+error[E0599]: no method named `candidates` found for struct `memory_mcp::eval_support::retrieval::ContextEvidenceCapture` in the current scope
+  --> crates/memory-mcp/tests/long_history_stage_evidence.rs:51:41
+   |
+51 |         serde_json::to_string(&observer.candidates().unwrap()).unwrap()
+   |                                         ^^^^^^^^^^ method not found in `memory_mcp::eval_support::retrieval::ContextEvidenceCapture`
+
+error[E0599]: no method named `select_episode_candidates` found for struct `EpisodeContextStore` in the current scope
+   --> crates/memory-mcp/tests/lexical_term_set_resource.rs:633:10
+    |
+632 |     let result = store
+633 |         .select_episode_candidates("2026-05-01T00:00:00Z", &terms, 4, &[])
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `select_episode_by_id` with a similar name, but with different arguments
+   --> crates/memory-mcp/src/memory/episode_context_store.rs:147:4
+
+error[E0599]: no method named `candidates` found for struct `memory_mcp::eval_support::retrieval::ContextEvidenceCapture` in the current scope
+  --> crates/memory-mcp/tests/long_history_stage_evidence.rs:57:26
+   |
+57 |     let pools = observer.candidates().unwrap();
+   |                          ^^^^^^^^^^ method not found in `memory_mcp::eval_support::retrieval::ContextEvidenceCapture`
+
+error[E0599]: no method named `select_episode_candidates` found for struct `EpisodeContextStore` in the current scope
+   --> crates/memory-mcp/tests/lexical_term_set_resource.rs:654:10
+    |
+653 |     let single = store
+654 |         .select_episode_candidates("2026-05-01T00:00:00Z", &["alpha".into()], 4, &[])
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `select_episode_by_id` with a similar name, but with different arguments
+   --> crates/memory-mcp/src/memory/episode_context_store.rs:147:4
+
+error[E0599]: no method named `select_lexical_fact_candidates` found for struct `KnowledgeStoreClient` in the current scope
+   --> crates/memory-mcp/tests/lexical_term_set_resource.rs:543:10
+    |
+542 |     let rows = store
+543 |         .select_lexical_fact_candidates("2026-05-01T00:00:00Z", &terms, 50, &[])
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `select_facts_ann` with a similar name, but with different arguments
+   --> crates/memory-mcp/src/knowledge/knowledge_store.rs:261:4
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `memory_mcp` (test "lexical_term_set_resource") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `memory_mcp` (test "long_history_stage_evidence") due to 2 previous errors

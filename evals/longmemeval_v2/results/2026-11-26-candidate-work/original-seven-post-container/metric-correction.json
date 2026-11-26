@@ -1,0 +1,28 @@
+{
+  "schema": "source-presence-measurement-correction/v1",
+  "source_changes": {
+    "evals/longmemeval_v2/long_history_diagnosis.py": {
+      "registered_before": "ff572a122b3e737302f57addde41964f20e3ac42fdad7eeb3bb21a1df19d97af",
+      "corrected_after": "9c7b5b3480840921233a1c7bf703bab4c676ab768168be206e359438fcbd8ed4"
+    },
+    "evals/longmemeval_v2/reviewed_span_coverage.py": {
+      "registered_before": "07ac4af003ccd0de6469f4686aaa4a564a5b840c0b1cbfd285426db5b64639ca",
+      "corrected_after": "ff552349fb683535ae0b375f7bf1aef521dbb2c63d5579f6e1d9b0475151cb57"
+    }
+  },
+  "cause": "Legacy partial newline/tab decoder does not recognize the complete JSON-serialized source containing protected literal backslashes or escaped quotes.",
+  "version": "reviewed-span-coverage/v2; exact complete source forms within one item; not decoded readability or answer quality",
+  "original_v1_result_retained": true,
+  "new_accepted_answers": false,
+  "new_model_calls": false,
+  "negative_controls": [
+    "truncation",
+    "split between items",
+    "changed literal escape",
+    "changed quoted label",
+    "extra recursive escaping"
+  ],
+  "red_log": "verification/selection/serialized-span-cli-red.log",
+  "green_log": "verification/selection/serialized-span-cli-boundaries.log",
+  "same_corrected_metric_applied_to_baseline_and_candidate": true
+}

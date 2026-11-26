@@ -1,0 +1,72 @@
+{
+  "schema": "full-history-diagnostic/v1",
+  "base_revision": "afcce64c9e58dda1eee1b67dcc2ac4fa9aeb3e6e",
+  "trajectory_count": 100,
+  "trajectory_file_sha256": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+  "snapshot_file_sha256": {
+    "LOCK": "c44c5a0d5f47c2be4045a04fe3ce254711a231fdee879b845610568b33595ce0",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "2037771f83909280e0014c5d7765af813734983cd8a770fa74d2b170d2eb2edf",
+    "vlog/00000000000000000002.vlog": "bbe8e8701fb570d6a96974f0a5ef73d1f4108c54ef6279461029a1e99619d355",
+    "vlog/00000000000000000003.vlog": "ec529d22010a42b0a6bbb8b485d1fb3a7c58d0c7f39334a300890bbb2beb2337",
+    "wal/00000000000000000302.wal": "e7b86747da86b5aeb96398fe90ed9c4e84a67bc40b8175d0ad55dd94621fb987"
+  },
+  "cases": {
+    "0c6b0c60": {
+      "trajectory_id": "4ae82e48",
+      "trajectory_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "trajectory_bytes": 382024,
+      "segment_index": 0,
+      "segment_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+      "query": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "required_serialized_span": "\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '\u2022 Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '\u2022'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible"
+    },
+    "f61a096f": {
+      "trajectory_id": "06c70de4",
+      "trajectory_sha256": "ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90",
+      "trajectory_bytes": 4677154,
+      "segment_index": 4,
+      "segment_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+      "query": "I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.",
+      "required_serialized_span": "\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'"
+    }
+  },
+  "limits": {
+    "read_seconds": 30,
+    "child_seconds": 45,
+    "models": false
+  },
+  "policy": "Each case reads a separate disposable full-store copy. No reformation, no filtered store, no model answers; all outcomes retained. Missing stages stay unknown. Embeddings disabled, existing historical formation unchanged.",
+  "diagnostic_amendment": "One registered post-repair full-store capture per case. Exact-content and exact-key-list dictionaries are local to each lexical pool; actual builder counts are flushed, not inferred from candidate counts. Independent set vocabulary and public read resource controls pass original30000/1000000 bounds. All original30s/45s/source/query/budget/time/policy/full-store criteria unchanged. No models, no reduction of candidate caps or fallback terms.",
+  "candidate_source_sha256": {
+    "crates/memory-mcp/src/eval_support/retrieval.rs": "4f8fa750dc5f40d414e574209816d0b394a0e1f9eb914f5415ef88dfd159f1ff",
+    "crates/memory-mcp/src/knowledge/knowledge_store.rs": "32a37ca6cfce21cccdf12cd5bc72636a887076bf59983780c43fd44147ec156e",
+    "crates/memory-mcp/src/knowledge/queries.rs": "d8f3836e0db011ed9297b2806337848525fbf178c8529161a4ad81fd5d765a4c",
+    "crates/memory-mcp/src/memory/retrieval.rs": "968fb52f0b81531c2840e19105a48e06b1bec47d950112d205c77afff5e98679",
+    "crates/memory-mcp/src/memory/retrieval/admission.rs": "e0beb267eff31ec843acbe4e61a76072e1db9647512a21c91dc46251947d35ba",
+    "crates/memory-mcp/src/memory/retrieval/budget.rs": "a54e236fcc028fe0d9138adf5905eda552262bba63e86359a0cd03bca048d62b",
+    "crates/memory-mcp/src/memory/retrieval/diagnostics.rs": "36756bf68d3c4618faec2367de297b494d1f1fa646d15958bffa68073062e864",
+    "crates/memory-mcp/src/memory/retrieval/experience.rs": "270fcbfe98d26b92f478efd289acb01867002f877b98432e2cd713201b637066",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "4c5972d7b2455f71b5863af3a8a1ab07aed995dcb5877a724133a5899bf69c93",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "7695019d1e8eb37fb4e66ad2705d86c8afbecc0e9efb06397f0b9fc236a84088",
+    "crates/memory-mcp/src/memory/retrieval/ranking.rs": "921bdbff74a84e5316602bb03bbc5ccd53f2599e2da2a2117ccaa9750461320d",
+    "crates/memory-mcp/src/memory/retrieval/views.rs": "b086b1a6bb24422ef8a9ece86bf54a51e0a37c58f5e38c855f1a589cab6de33e",
+    "crates/memory-mcp/src/shared/search.rs": "e4da61c6ac218024c0071d03ba9972ead0371bb54a31a7dd9d22664d68462926",
+    "crates/memory-mcp/src/shared/search_lexical.rs": "ed99658a761f43a17d13949af8b2653a8b199c000ac41d9b3042abad44c8a327",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "ce6d9f050f79310ac3c9984e6e1680ff9e3ae5a239ee6865d7aa6a8eced204ee",
+    "crates/memory-mcp/tests/lexical_candidate_hydration.rs": "898122ce8cbf50d942216ee80b5d2cd12cd68adadddfde3414e47cf1aef6e1b9",
+    "crates/memory-mcp/tests/lexical_term_set_resource.rs": "68b94f69072fb8dcd3054480903ef4b92949e1bf07257b5bd6dd91a3dbcfc256",
+    "crates/memory-mcp/tests/retrieval_partial_evidence.rs": "101d41e706c467983cf21b73c8c894c1382ba0553600403b5dae75a9d833279e",
+    "crates/memory-mcp/tests/retrieval_query_projection.rs": "800e9310368e3db9f2688e9dd5720255a163b184ac5c44f48454202b0a68c5d1",
+    "crates/memory-mcp/src/memory/retrieval/graph.rs": "48e6f3a075422b73fbd7aa6ad2bf5629555a022bd4df04cfcddbb145c4a38415",
+    "crates/memory-mcp/tests/graph_read_concurrency.rs": "68132fd12180f812ef10303efaebc514fb76e2fe82221c3ec3b5f10d1a545087",
+    "crates/memory-mcp/src/shared/temporal.rs": "2664a934d75449b699f0f64c15d5977c87fc693ea8daa45fadf0f17da92e6768",
+    "crates/memory-mcp/tests/graph_batch_query_regression.rs": "d5508f66009e26eafd58ab484f138636baa971568e86023c2657e9540d45543b"
+  },
+  "profile": {
+    "CARGO_PROFILE_TEST_OPT_LEVEL": "3"
+  },
+  "amendment": "One capture per exposed case after exact-key admission memoization and graph endpoint materialization. Same32seed endpoint ORs, complete temporal predicate, original order, single-statement read view; no global date bitmap per batch. Same30s/45s, sources, whole snapshot, query, budget5, policy. No models. Warm isolated query experiment is diagnostic only; no speedup claim."
+}

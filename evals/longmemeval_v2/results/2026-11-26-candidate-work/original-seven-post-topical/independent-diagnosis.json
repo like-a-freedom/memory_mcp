@@ -1,0 +1,207 @@
+{
+  "schema": "memory-mcp-long-history-diagnosis/v1",
+  "answer_contract": "strict normalized phrase-set equality against independently reviewed accepted answers; unlisted valid paraphrases may be false negatives",
+  "stage_contract": "full-span absence is conservative; marker presence alone never establishes semantic sufficiency; missing intermediate receipts stay unknown",
+  "source_presence_contract": "complete verified span in one text item: raw, legacy newline/tab escapes, or exact JSON-string serialization; not decoded readability or semantic sufficiency",
+  "selected": 7,
+  "correct": 4,
+  "complete_reviewed_spans": 4,
+  "reader_failures_with_complete_evidence": 2,
+  "latency_seconds": {
+    "observed": 7,
+    "median": 38.410751625022385,
+    "max": 44.89665966699249
+  },
+  "cases": {
+    "0c6b0c60": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "source_presence_representations": [
+        "json_string_serialized",
+        "legacy_saved_text"
+      ],
+      "delivered_support_markers": {
+        "Past 24 hours": true,
+        "Past week": true,
+        "Past month": true,
+        "Past year": true,
+        "All time": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3868,
+      "context_was_truncated": false,
+      "answer_kind": "closed_list",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Past 24 hours, Past week, Past month, Past year, All time",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 38.410751625022385
+    },
+    "6d975a08": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "source_presence_representations": [],
+      "delivered_support_markers": {
+        "link 'Forums'": true,
+        "link 'Tags'": true,
+        "link 'Alphabetical'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3542,
+      "context_was_truncated": false,
+      "answer_kind": "closed_list",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Forums, Tags, Alphabetical",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 41.08988816701458
+    },
+    "89a20f48": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "source_presence_representations": [
+        "json_string_serialized",
+        "legacy_saved_text"
+      ],
+      "delivered_support_markers": {
+        "link 'All time'": true,
+        "image 'A tense emoji'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3599,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Based on the memory context provided, specifically the accessibility tree from the first snippet (state_index 3, step 3), we can see the structure of the \"From\" dropdown menu on the forum page (specifically `/f/movies`).\n\nThe list items under the \"From\" button are:\n1.  `Past 24 hours`\n2.  `Past week`\n3.  `Past month`\n4.  `Past year`\n5.  `All time`\n\nThe question asks what time-range option appears **below** \"All time\" in the dropdown. Looking at the list, \"All time\" is the last item in the visible list. There are no items listed after \"All time\" in the provided accessibility tree.\n\nHowever, often in these types of questions, if the list is exhaustive in the UI, the answer might be that there is no option, or the question implies a different order. Let's re-read carefully.\n\nThe list is:\n[153] link '• Past 24 hours'\n[155] link 'Past week'\n[157] link 'Past month'\n[159] link 'Past year'\n[",
+      "reader_verdict": "incorrect",
+      "failure_localization": "reader_use_with_complete_reviewed_evidence",
+      "query_seconds": 40.170616124989465
+    },
+    "922a0c56": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "source_presence_representations": [],
+      "delivered_support_markers": {
+        "button 'Reset'": false,
+        "button 'Create Order'": false
+      },
+      "context_nonempty": true,
+      "context_tokens": 3711,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Based on the standard Magento 2 admin interface for customer detail pages, the top toolbar typically contains the following actions in this order:\n1.  **Back**\n2.  **Edit**\n3.  **Reset** (or sometimes \"Reset Password\" depending on version/context, but often just \"Reset\" in the context of account actions or specific extensions)\n4.  **Create Order**\n5.  **Send Email** (or similar)\n\nHowever, looking at the specific sequence requested: \"between 'Reset' and 'Create Order'\".\n\nIn the standard Magento 2 Admin Customer View page (`adminhtml/customer/index/view`), the toolbar buttons are usually:\n*   Back\n*   Edit\n*   **Reset** (This button is often present to reset the customer's password or similar, though in some versions it might be labeled differently or hidden).\n*   **Create Order**\n*   Send Email\n\nWait, let's look closer at the standard Magento 2 toolbar for a customer.\nThe buttons are typically:\n1.  Back\n2.  Edit\n3.  **Reset** (This is often a dropdown or a specific button to reset the password).\n4.  **Create",
+      "reader_verdict": "incorrect",
+      "failure_localization": "end_to_end_failure_stage_unknown",
+      "query_seconds": 44.89665966699249
+    },
+    "d6da3938": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "source_presence_representations": [],
+      "delivered_support_markers": {
+        "button 'Create Order'": true,
+        "button 'Reset Password'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 714,
+      "context_was_truncated": false,
+      "answer_kind": "single_value",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Reset Password",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 38.36593158298638
+    },
+    "f43926d9": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "source_presence_representations": [
+        "json_string_serialized",
+        "legacy_saved_text"
+      ],
+      "delivered_support_markers": {
+        "link 'Tags'": true,
+        "link 'Alphabetical'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 2876,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Based on the provided memory context, specifically the accessibility tree for the \"All forums\" page (state index 0 of the second JSON object, or the first JSON object's state 0 which shows the same navigation structure), the navigation tabs above the forum list are:\n\n1.  `Forums` (link [110] or [113])\n2.  `Tags` (link [112] or [115])\n3.  `Alphabetical` (link [114] or [117])\n\nLooking closely at the list items in the `main` section of the \"All forums\" page:\n-   [110] link 'Forums'\n-   [112] link 'Tags'\n-   [114] link 'Alphabetical'\n\nThere is no tab explicitly listed *between* `Tags` and `Alphabetical` in the provided accessibility tree snippet. The list items are sequential: [110], [111] (listitem), [112] (link Tags), [113] (listitem), [114] (link Alphabetical).\n\nHowever, let's",
+      "reader_verdict": "incorrect",
+      "failure_localization": "reader_use_with_complete_reviewed_evidence",
+      "query_seconds": 36.18121987499762
+    },
+    "f61a096f": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "source_presence_representations": [
+        "json_string_serialized"
+      ],
+      "delivered_support_markers": {
+        "button '\\ue626 Back'": false,
+        "button 'Login as Customer'": true,
+        "button 'Delete Customer'": true,
+        "button 'Reset'": true,
+        "button 'Create Order'": true,
+        "button 'Reset Password'": true,
+        "button 'Force Sign-In'": true,
+        "button 'Save and Continue Edit'": true,
+        "button 'Save Customer'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3665,
+      "context_was_truncated": false,
+      "answer_kind": "count",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "nine",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 36.68616004099022
+    }
+  },
+  "input_sha256": {
+    "cohort": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+    "trajectories": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+    "truth": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+    "prompts": "bbc8c885085e05b2262eb91f2aad2c7acc6986955e95f0de3f2035c15c68b360",
+    "readers": "84d63531b798a4be7eab97aef05ff1627aecdddd57fbc4671d3386e5ec1a5e10"
+  },
+  "input_paths": {
+    "cohort": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/small-web-text-cohort.json",
+    "trajectories": "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+    "truth": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json",
+    "prompts": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/prompt_rows.jsonl",
+    "readers": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/diagnostic-readers.jsonl"
+  }
+}

@@ -1,0 +1,21 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.99s
+     Running tests/equivalent_alias_reads.rs (target/debug/build/memory_mcp/887735e5649b3b21/out/equivalent_alias_reads-887735e5649b3b21)
+
+running 1 test
+
+thread 'different_content_index_analyzer_keeps_the_alias_read' (6964006) panicked at crates/memory-mcp/tests/equivalent_alias_reads.rs:213:5:
+assertion `left == right` failed: analyzer equivalence must apply to the actual content index
+  left: 1
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test different_content_index_analyzer_keeps_the_alias_read ... FAILED
+
+failures:
+
+failures:
+    different_content_index_analyzer_keeps_the_alias_read
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p memory_mcp --test equivalent_alias_reads`

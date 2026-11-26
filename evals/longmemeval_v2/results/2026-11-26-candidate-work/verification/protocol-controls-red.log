@@ -1,0 +1,63 @@
+FFFF
+======================================================================
+FAIL: test_judge_failure_retains_all_prompt_source_measurements (__main__.ProtocolControls.test_judge_failure_retains_all_prompt_source_measurements)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 41, in test_judge_failure_retains_all_prompt_source_measurements
+    def test_judge_failure_retains_all_prompt_source_measurements(self):self.partial_control()
+                                                                        ~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 38, in partial_control
+    self.assertTrue((root/'partial-analysis.json').exists(),r.stderr)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : Traceback (most recent call last):
+  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmp77x4unq1/current/analyze.py", line 12, in <module>
+    assert len(native)==len(readers)==len(prompts)==7
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+
+======================================================================
+FAIL: test_reader_failure_retains_all_prompt_source_measurements (__main__.ProtocolControls.test_reader_failure_retains_all_prompt_source_measurements)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 42, in test_reader_failure_retains_all_prompt_source_measurements
+    def test_reader_failure_retains_all_prompt_source_measurements(self):self.partial_control(reader_error=True)
+                                                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 38, in partial_control
+    self.assertTrue((root/'partial-analysis.json').exists(),r.stderr)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : Traceback (most recent call last):
+  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmp__5jbdor/current/analyze.py", line 12, in <module>
+    assert len(native)==len(readers)==len(prompts)==7
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+
+======================================================================
+FAIL: test_rejects_a_native_gate_for_another_release (__main__.ProtocolControls.test_rejects_a_native_gate_for_another_release)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 22, in test_rejects_a_native_gate_for_another_release
+    def test_rejects_a_native_gate_for_another_release(self):self.gate_control(mismatch=True)
+                                                             ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 21, in gate_control
+    self.assertIn('native gate must qualify the exact unchanged release binary',r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'native gate must qualify the exact unchanged release binary' not found in 'Traceback (most recent call last):\n  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpf1inj1ds/artifacts/current/capture.py", line 54, in <module>\n    source[p] = digest(repo / p)\n                ~~~~~~^^^^^^^^^^\n  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpf1inj1ds/artifacts/current/capture.py", line 27, in digest\n    with path.open("rb") as stream:\n         ~~~~~~~~~^^^^^^\n  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/pathlib/__init__.py", line 970, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/private/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpf1inj1ds/evals/longmemeval_v2/scored_coverage.py\'\n'
+
+======================================================================
+FAIL: test_rejects_changed_gate_binary (__main__.ProtocolControls.test_rejects_changed_gate_binary)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 23, in test_rejects_changed_gate_binary
+    def test_rejects_changed_gate_binary(self):self.gate_control(changed=True)
+                                               ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/protocol_controls.py", line 21, in gate_control
+    self.assertIn('native gate must qualify the exact unchanged release binary',r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'native gate must qualify the exact unchanged release binary' not found in 'Traceback (most recent call last):\n  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpnq5kx9yl/artifacts/current/capture.py", line 54, in <module>\n    source[p] = digest(repo / p)\n                ~~~~~~^^^^^^^^^^\n  File "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpnq5kx9yl/artifacts/current/capture.py", line 27, in digest\n    with path.open("rb") as stream:\n         ~~~~~~~~~^^^^^^\n  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/pathlib/__init__.py", line 970, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/private/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/tmpnq5kx9yl/evals/longmemeval_v2/scored_coverage.py\'\n'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.928s
+
+FAILED (failures=4)

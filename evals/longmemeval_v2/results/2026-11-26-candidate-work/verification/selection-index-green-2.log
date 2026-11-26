@@ -1,0 +1,9 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.55s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 1 test
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.36s
+

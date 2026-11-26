@@ -1,0 +1,27 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.94s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 5 tests
+LEXICAL_SET_ALLOCATIONS 40
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+INDEX_VOCABULARY_ALLOCATIONS 18052
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+EPISODE_FALLBACK_ALLOCATIONS 116693
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS 1017897
+
+thread 'public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order' (6538833) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:236:5:
+eight2000-key facts must fit the one-million-call application budget (storage excluded); observed 1017897
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... FAILED
+
+failures:
+
+failures:
+    public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

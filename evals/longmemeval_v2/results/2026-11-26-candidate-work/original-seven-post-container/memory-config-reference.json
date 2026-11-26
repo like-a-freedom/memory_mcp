@@ -1,0 +1,8 @@
+{
+  "memory_type": "memory_mcp",
+  "memory_params": {
+    "binary": "/Users/solovey/Documents/dev/memory_mcp/target/candidate-work-accepted/release/memory_mcp",
+    "db_path": "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/candidate-original-seven-ifu0sebz/build/working-store",
+    "formation_method": "ordered-segments-v1"
+  }
+}

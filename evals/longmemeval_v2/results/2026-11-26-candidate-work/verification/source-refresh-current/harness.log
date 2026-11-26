@@ -1,0 +1,1216 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.22s
+     Running unittests src/lib.rs (target/debug/build/eval-harness/094cc5dcdb91f098/out/eval_harness-094cc5dcdb91f098)
+
+running 574 tests
+test adapters::tests::facts_for_case_generates_stable_ids ... ok
+test adapters::tests::facts_have_no_embedding_by_default ... ok
+test adapters::tests::facts_preserve_content_without_partition_metadata ... ok
+test adapters::tests::imported_fact_is_visible_to_retrieval ... ok
+test adapters::tests::importer_persists_valid_facts ... ok
+test adapters::tests::importer_rejects_embedding_without_model ... ok
+test adapters::tests::importer_rejects_empty_content ... ok
+test artifact::tests::duplicate_expected_ids_are_invalid ... ok
+test artifact::tests::empty_run_is_invalid ... ok
+test artifact::tests::missing_outcome_for_expected_case_is_invalid ... ok
+test artifact::tests::outcome_for_unexpected_case_is_invalid ... ok
+test artifact::tests::selected_case_must_appear_exactly_once ... ok
+test artifact::tests::v2_artifact_cannot_fall_back_to_bare_expected_ids ... ok
+test artifact::tests::v2_expected_cases_are_scoped_by_suite ... ok
+test artifact::tests::valid_single_case_artifact_passes ... ok
+test artifact::tests::wrong_schema_version_is_invalid ... ok
+test benchmark::tests::contention_normalizes_by_completed_operations ... ok
+test benchmark::tests::multi_window_exceeds_single_window ... ok
+test benchmark::tests::ner_fixture_loads_window_texts ... ok
+test benchmark::tests::zero_elapsed_returns_zero_throughput ... ok
+test benchmark::tests::zero_operations_returns_zero_latency ... ok
+test cli::tests::agent_managed_comparison_requires_plan_both_arms_and_stage_receipts ... ok
+test cli::tests::agent_workflow_qualification_requires_both_paired_captures_and_all_frozen_inputs ... ok
+test cli::tests::chat_completions_runner_command_accepts_a_response_format_config ... ok
+test cli::tests::chat_completions_runner_command_accepts_a_sampling_config ... ok
+test cli::tests::chat_completions_runner_command_accepts_request_parameters_config ... ok
+test cli::tests::chat_completions_task_fingerprint_command_accepts_a_response_format_config ... ok
+test cli::tests::chat_completions_task_fingerprint_command_accepts_a_sampling_config ... ok
+test cli::tests::chat_completions_task_fingerprint_command_accepts_an_optional_endpoint ... ok
+test cli::tests::chat_completions_task_fingerprint_command_accepts_request_parameters_config ... ok
+test cli::tests::chat_completions_task_fingerprint_command_parses ... ok
+test cli::tests::managed_task_fingerprint_command_takes_only_a_task_manifest ... ok
+test cli::tests::paired_agent_run_accepts_a_legacy_common_claim_stage_override ... ok
+test cli::tests::paired_agent_run_accepts_an_explicit_local_codex_home ... ok
+test cli::tests::paired_agent_run_keeps_recall_only_as_default_and_accepts_opt_in_write_profile ... ok
+test cli::tests::paired_agent_run_leaves_legacy_stage_resolution_to_the_plan ... ok
+test cli::tests::paired_agent_run_requires_both_product_binaries_and_a_task_manifest ... ok
+test cli::tests::paired_codex_runner_accepts_the_new_maintenance_profile ... ok
+test cli::tests::paired_codex_runner_accepts_the_v6_partial_read_profile ... ok
+test cli::tests::paired_codex_runner_accepts_the_v7_snapshot_consistent_profile ... ok
+test cli::tests::paired_comparison_requires_both_arms_plan_and_output ... ok
+test cli::tests::pilot_summary_requires_two_run_directories_and_an_output ... ok
+test cli::tests::provider_neutral_chat_completions_runner_accepts_independent_probes_only_for_recall ... ok
+test cli::tests::provider_neutral_chat_completions_runner_command_parses_without_codex_arguments ... ok
+test cli::tests::public_synthetic_trace_capture_requires_explicit_cli_opt_in ... ok
+test codex_agent::tests::classifies_codex_mcp_approval_policy_errors ... ok
+test codex_agent::tests::classifies_mcp_result_when_codex_also_emits_a_wrapper_error ... ok
+test codex_agent::tests::classifies_tool_errors_from_mcp_text_content ... ok
+test codex_agent::tests::classifies_tool_errors_without_retaining_provider_error_text ... ok
+test codex_agent::tests::codex_api_key_is_forwarded_only_to_the_child_environment ... ok
+test codex_agent::tests::codex_http_mcp_config_uses_loopback_url_and_keeps_bearer_out_of_arguments ... ok
+test codex_agent::tests::codex_invocation_isolated_to_one_read_tool_without_shell_or_web ... ok
+test codex_agent::tests::does_not_count_fact_evidence_when_the_returned_quote_is_empty ... ok
+test codex_agent::tests::does_not_count_fact_evidence_without_explicit_request ... ok
+test codex_agent::tests::does_not_count_reextracting_an_existing_episode_as_a_new_ingest ... ok
+test codex_agent::tests::extracts_episode_id_from_json_text_mcp_result_without_retaining_memory_text ... ok
+test codex_agent::tests::failed_memory_read_retains_request_snapshot_cutoff_without_response_evidence ... ok
+test codex_agent::tests::fingerprints_read_arguments_and_guidance_without_persisting_text ... ok
+test codex_agent::tests::formation_invocation_exposes_only_ingest_and_extract ... ok
+test codex_agent::tests::literal_source_authority_workflow_uses_read_only_candidate_formation_after_import ... ok
+test codex_agent::tests::local_codex_home_is_used_for_auth_while_trial_home_stays_separate ... ok
+test codex_agent::tests::maintenance_invocation_exposes_only_registered_memory_tools ... ok
+test codex_agent::tests::maintenance_v2_invocation_uses_the_pinned_2048_token_reader_limit ... ok
+test codex_agent::tests::maintenance_v3_invocation_exposes_only_tools_needed_by_inline_extract_workflow ... ok
+test codex_agent::tests::maintenance_v5_uses_a_separate_read_only_recovery_profile ... ok
+test codex_agent::tests::maintenance_v6_is_admitted_to_trial_and_memory_formation_phases ... ok
+test codex_agent::tests::maintenance_v6_uses_the_partial_history_retry_contract ... ok
+test codex_agent::tests::maintenance_v7_preserves_both_snapshot_axes_on_an_authorized_retry ... ok
+test codex_agent::tests::memory_tool_profiles_are_narrow_and_reject_unknown_or_duplicate_tools ... ok
+test codex_agent::tests::missing_turn_usage_is_invalid_instead_of_becoming_zero_cost ... ok
+test codex_agent::tests::parses_tool_trace_usage_and_final_answer_without_persisting_payloads ... ok
+test codex_agent::tests::preserves_partial_trace_when_wall_time_ends_during_a_turn ... ok
+test codex_agent::tests::records_episode_created_by_inline_extract_for_hidden_scoring ... ok
+test codex_agent::tests::records_only_episode_identifiers_from_memory_results_for_hidden_scoring ... ok
+test codex_agent::tests::records_requested_and_returned_fact_evidence_without_persisting_content ... ok
+test codex_agent::tests::records_usage_for_a_failed_model_turn ... ok
+test codex_agent::tests::registered_memory_write_tools_are_traced_as_writes_without_retaining_payloads ... ok
+test codex_agent::tests::rejects_codex_tool_calls_outside_the_read_only_memory_allow_list ... ok
+test codex_agent::tests::rejects_fact_evidence_trace_when_extract_response_is_missing ... ok
+test codex_agent::tests::rejects_process_output_that_never_started_a_model_turn ... ok
+test codex_agent::tests::requires_citations_in_the_structured_final_answer ... ok
+test codex_agent::tests::source_authority_workflow_uses_read_only_candidate_formation_after_import ... ok
+test codex_agent::tests::system_prompt_file_matches_the_registered_digest_and_is_removed_by_guard ... ok
+test codex_agent::tests::transient_exact_invalidation_inputs_are_scored_in_memory_and_not_serialized ... ok
+test corpus::adapters::tests::dataset_kind_from_str_roundtrip ... ok
+test corpus::adapters::tests::every_case_has_stable_id_and_nonempty_stratum ... ok
+test corpus::adapters::tests::locomo_adapter_normalizes ... ok
+test corpus::adapters::tests::longmemeval_adapter_normalizes ... ok
+test corpus::adapters::tests::longmemeval_rejects_mismatched_sessions ... ok
+test corpus::adapters::tests::personamem_adapter_normalizes ... ok
+test corpus::adapters::tests::personamem_pinned_csv_and_jsonl_normalize_together ... ok
+test corpus::adapters::tests::prefeval_adapter_normalizes ... ok
+test corpus::adapters::tests::prefeval_upstream_array_format_normalizes ... ok
+test corpus::manifest::tests::absolute_data_file_is_rejected ... ok
+test corpus::manifest::tests::absolute_revision_is_rejected ... ok
+test corpus::manifest::tests::case_count_mismatch_is_rejected ... ok
+test corpus::manifest::tests::corpus_id_parent_traversal_is_rejected ... ok
+test corpus::manifest::tests::dot_is_not_a_data_file ... ok
+test corpus::manifest::tests::empty_license_is_rejected ... ok
+test corpus::manifest::tests::empty_revision_is_rejected ... ok
+test corpus::manifest::tests::head_revision_is_rejected ... ok
+test corpus::manifest::tests::latest_revision_is_rejected ... ok
+test corpus::manifest::tests::main_revision_is_rejected ... ok
+test corpus::manifest::tests::manifest_metadata_cannot_be_replaced_by_corpus_data ... ok
+test corpus::manifest::tests::master_revision_is_rejected ... ok
+test corpus::manifest::tests::mutable_url_is_rejected ... ok
+test corpus::manifest::tests::non_hex_sha256_is_rejected ... ok
+test corpus::manifest::tests::parent_traversal_in_data_file_is_rejected ... ok
+test corpus::manifest::tests::too_short_sha256_is_rejected ... ok
+test corpus::manifest::tests::unknown_manifest_fields_are_rejected ... ok
+test corpus::manifest::tests::valid_manifest_parses ... ok
+test corpus::manifest::tests::wrong_schema_version_is_rejected ... ok
+test corpus::manifest::tests::zero_byte_size_is_rejected ... ok
+test corpus::manifest::tests::zero_case_count_is_rejected ... ok
+test corpus::selection::tests::sample_is_independent_of_input_order ... ok
+test corpus::selection::tests::sample_rejects_empty_case_ids ... ok
+test corpus::selection::tests::sample_rejects_missing_stratum ... ok
+test corpus::selection::tests::shard_rejects_index_out_of_bounds ... ok
+test corpus::selection::tests::shard_rejects_zero_count ... ok
+test corpus::selection::tests::shard_union_covers_all_cases ... ok
+test domain::tests::case_id_accepts_valid_string ... ok
+test domain::tests::case_id_rejects_empty_string ... ok
+test domain::tests::case_key_same_in_both_suites_is_duplicate ... ok
+test domain::tests::case_outcome_invalid_requires_reason ... ok
+test domain::tests::case_outcome_passed_rejects_reason ... ok
+test domain::tests::case_outcome_rejects_non_finite_metrics ... ok
+test domain::tests::case_status_serializes_with_the_truth_contract_names ... ok
+test domain::tests::corpus_split_serializes_with_snake_case ... ok
+test domain::tests::empty_suite_or_case_id_is_rejected ... ok
+test domain::tests::eval_mode_serializes_with_snake_case ... ok
+test domain::tests::eval_profile_serializes_with_snake_case ... ok
+test domain::tests::label_trust_serializes_with_snake_case ... ok
+test domain::tests::metric_evidence_classification_serializes ... ok
+test domain::tests::metric_evidence_retrieval_serializes ... ok
+test domain::tests::one_access_failure_overrides_a_passing_high_precision_gate ... ok
+test domain::tests::run_completeness_shard_validates ... ok
+test domain::tests::same_local_id_in_two_suites_is_not_a_duplicate ... ok
+test domain::tests::suite_id_accepts_valid_string ... ok
+test domain::tests::suite_id_rejects_empty_string ... ok
+test gate::tests::baseline_without_budget_ignores_regression ... ok
+test gate::tests::hard_floor_fails_below ... ok
+test gate::tests::hard_floor_passes_above ... ok
+test gate::tests::missing_metric_is_explicitly_invalid ... ok
+test gate::tests::nan_gate_observation_is_invalid ... ok
+test gate::tests::negative_infinity_gate_observation_is_invalid ... ok
+test gate::tests::no_floor_no_budget_always_passes ... ok
+test gate::tests::non_finite_suite_summary_metric_is_invalid_at_release_gate ... ok
+test gate::tests::positive_infinity_gate_observation_is_invalid ... ok
+test gate::tests::regression_fails_even_above_the_hard_floor ... ok
+test gate::tests::regression_within_budget_passes ... ok
+test merge::tests::four_shard_merge_covers_all_cases ... ok
+test merge::tests::merge_accepts_same_case_ids_across_suites ... ok
+test merge::tests::merge_rejects_duplicate_case_ids ... ok
+test merge::tests::merge_rejects_empty_shards ... ok
+test merge::tests::merge_rejects_profile_mismatch ... ok
+test merge::tests::merge_rejects_schema_mismatch ... ok
+test merge::tests::merge_single_shard_passthrough ... ok
+test merge::tests::merged_classification_metrics_aggregate_instead_of_first_wins ... ok
+test merge::tests::merged_verdict_reflects_quality_failures ... ok
+test metrics::tests::case_with_no_relevant_ids_is_invalid ... ok
+test metrics::tests::classification_perfect ... ok
+test metrics::tests::classification_precision_requires_predicted_positives ... ok
+test metrics::tests::classification_recall_requires_actual_positives ... ok
+test metrics::tests::classification_with_all_three_counts ... ok
+test metrics::tests::classification_zero_population_is_invalid ... ok
+test metrics::tests::empty_metric_input_is_invalid ... ok
+test metrics::tests::mrr_uses_first_relevant_rank_in_full_ranking ... ok
+test metrics::tests::partial_recall_at_k ... ok
+test metrics::tests::recall_at_five_counts_hit_at_rank_one ... ok
+test metrics::tests::recall_at_five_ignores_a_hit_at_rank_six ... ok
+test metrics::tests::render_case_metrics_all_zero_classification_renders_vacuous_success ... ok
+test metrics::tests::render_case_metrics_classification_matches_classification_metrics ... ok
+test metrics::tests::render_case_metrics_missed_all_positives_renders_zero_precision ... ok
+test metrics::tests::render_case_metrics_ratio_and_count_use_explicit_name ... ok
+test metrics::tests::render_case_metrics_retrieval_matches_retrieval_metrics ... ok
+test metrics::tests::render_case_metrics_retrieval_uses_cutoff_in_key ... ok
+test metrics::tests::top_1_hit_rate_counts_first_position_only ... ok
+test paired::tests::any_hard_violation_fails_the_promotion_invariant ... ok
+test paired::tests::cluster_bootstrap_repeats_independent_families_with_a_reproducible_interval ... ok
+test paired::tests::comparison_is_invariant_to_balanced_arm_execution_order ... ok
+test paired::tests::comparison_rejects_an_identically_omitted_trial_from_both_arms ... ok
+test paired::tests::comparison_validation_recomputes_confidence_interval_from_family_deltas ... ok
+test paired::tests::completed_trial_cannot_exceed_the_per_turn_context_budget ... ok
+test paired::tests::confirmatory_plan_serialization_omits_the_default_stage ... ok
+test paired::tests::development_pilot_plan_does_not_require_results_that_only_exist_after_the_pilot ... ok
+test paired::tests::development_pilot_report_rejects_reusing_the_same_runner_session ... ok
+test paired::tests::development_pilot_report_uses_retest_means_at_the_family_level ... ok
+test paired::tests::failed_agent_task_is_charged_the_full_turn_budget ... ok
+test paired::tests::gate_reports_insufficient_evidence_when_a_paired_interval_crosses_the_margin ... ok
+test paired::tests::granular_final_answer_diagnostics_require_the_v4_paired_artifact_schema ... ok
+test paired::tests::legacy_product_identity_roundtrips_without_a_rollout_stage_field ... ok
+test paired::tests::legacy_receipts_without_a_checkpoint_remain_readable_and_unchanged ... ok
+test paired::tests::metric_aggregation_weights_history_families_not_repeated_agent_attempts ... ok
+test paired::tests::model_failure_trace_can_record_a_closed_normalized_error_class ... ok
+test paired::tests::model_response_diagnostics_require_the_v3_paired_artifact_schema ... ok
+test paired::tests::ordinary_trace_event_cannot_record_a_normalized_error_class ... ok
+test paired::tests::paired_arms_must_record_the_same_knowledge_revision_checkpoint ... ok
+test paired::tests::paired_artifact_rejects_a_same_alias_run_outside_its_preregistered_window ... ok
+test paired::tests::paired_comparison_rejects_artifacts_with_different_invocation_windows ... ok
+test paired::tests::paired_run_rejects_a_case_omitted_from_one_arm ... ok
+test paired::tests::paired_run_rejects_a_different_agent_model ... ok
+test paired::tests::pilot_plan_cannot_be_promoted_or_compare_different_products ... ok
+test paired::tests::preregistered_arm_order_must_be_balanced_within_each_stratum ... ok
+test paired::tests::promotion_cannot_change_margins_after_the_results_are_seen ... ok
+test paired::tests::promotion_passes_only_when_all_three_primary_gates_improve ... ok
+test paired::tests::promotion_rejects_an_ordinary_workflow_resource_regression_hidden_by_other_strata ... ok
+test paired::tests::promotion_rejects_memory_recall_gain_when_agent_task_success_worsens ... ok
+test paired::tests::promotion_rejects_primary_gains_with_a_material_latency_regression ... ok
+test paired::tests::receipt_rejects_a_negative_knowledge_revision_checkpoint ... ok
+test paired::tests::repair_turn_counter_must_match_failed_tool_turns_in_trace ... ok
+test paired::tests::run_artifact_hash_is_stable_when_trial_receipt_order_changes ... ok
+test paired::tests::run_receipt_must_follow_the_preregistered_arm_order ... ok
+test paired::tests::serialized_bootstrap_interval_reproduces_after_json_roundtrip ... ok
+test paired::tests::shared_identity_can_pin_a_requested_alias_without_claiming_a_provider_revision ... ok
+test paired::tests::timed_out_attempt_can_record_a_started_turn_without_provider_usage ... ok
+test paired::tests::timeout_remains_in_task_denominator_and_uses_maximum_interaction_charge ... ok
+test paired::tests::timeout_trace_can_record_a_closed_normalized_error_class ... ok
+test paired::tests::token_totals_must_match_per_turn_trace_usage ... ok
+test paired::tests::tool_failure_status_requires_a_failed_tool_call_in_the_trace ... ok
+test paired::tests::trace_cannot_drop_a_failed_tool_call_while_retaining_its_task_receipt ... ok
+test paired::tests::trace_schema_rejects_unrecognized_free_form_error_details ... ok
+test paired::tests::v5_and_v6_artifacts_enforce_their_task_oracle_diagnostic_contracts ... ok
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server ... ok
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read ... ok
+test paired_agent::chat_completions::tests::default_sampler_preserves_legacy_greedy_parameters ... ok
+test paired_agent::chat_completions::tests::endpoint_fingerprint_hashes_the_effective_url_and_normalizes_trailing_slashes ... ok
+test paired_agent::chat_completions::tests::rejects_endpoint_that_can_transmit_evaluation_data_off_loopback ... ok
+test paired_agent::chat_completions::tests::response_format_fingerprint_is_stable_and_changes_with_the_registered_schema ... ok
+test paired_agent::chat_completions::tests::sampler_fingerprint_is_stable_and_changes_with_effective_parameters ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_min_p_outside_unit_interval ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_nonpositive_repeat_penalty ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_presence_penalty_outside_supported_range ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_temperature_outside_supported_range ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_top_p_outside_unit_interval ... ok
+test paired_agent::chat_completions::tests::sampler_rejects_zero_top_k ... ok
+test paired_agent::chat_completions_backend::tests::current_fixed_read_presentation_is_omitted_from_legacy_registration_bytes ... ok
+test paired_agent::chat_completions_backend::tests::evidence_action_hint_requires_a_matching_fixed_read_fingerprint ... ok
+test paired_agent::chat_completions_backend::tests::frozen_v1_local_pilot_is_rejected_after_the_recall_prompt_fingerprint_changes ... ok
+test paired_agent::chat_completions_backend::tests::live_recall_registration_accepts_a_development_pilot_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_accepts_a_hash_pinned_provider_neutral_local_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_accepts_only_request_parameters_registered_by_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_accepts_only_the_response_format_registered_by_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_accepts_sampler_settings_pinned_by_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_a_codex_pinned_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_a_plan_response_format_when_the_active_config_is_missing ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_a_plan_without_an_endpoint_fingerprint ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_a_response_format_missing_from_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_a_response_format_that_differs_from_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_an_endpoint_that_differs_from_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_request_parameters_that_differ_from_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_sampler_settings_missing_from_the_frozen_plan ... ok
+test paired_agent::chat_completions_backend::tests::runner_preflight_rejects_sampler_settings_that_differ_from_the_frozen_plan ... ok
+test paired_agent::codex::tests::agent_managed_prompt_identity_is_distinct_from_read_only_identity ... ok
+test paired_agent::codex::tests::agent_managed_prompt_identity_rejects_an_unregistered_host_policy ... ok
+test paired_agent::codex::tests::agent_managed_prompt_identity_rejects_an_unregistered_retry_policy ... ok
+test paired_agent::codex::tests::agent_managed_run_requires_the_active_evaluator_binary_fingerprint ... ok
+test paired_agent::codex::tests::candidate_seed_must_reproduce_the_prepared_revision ... ok
+test paired_agent::codex::tests::codex_backend_accepts_distinct_stages_pinned_by_the_plan ... ok
+test paired_agent::codex::tests::codex_prompt_identity_rejects_an_unregistered_system_prompt ... ok
+test paired_agent::codex::tests::codex_prompt_identity_rejects_unregistered_task_rules ... ok
+test paired_agent::codex::tests::common_rollout_override_cannot_replace_registered_per_arm_stages ... ok
+test paired_agent::codex::tests::legacy_plan_defaults_both_rollout_stages_to_evidence ... ok
+test paired_agent::codex::tests::live_stdio_seed_captures_the_pre_correction_revision ... ignored, requires MEMORY_MCP_PAIRED_STDIO_BINARY pointing to a built memory_mcp binary
+test paired_agent::codex::tests::maintenance_profile_has_its_own_prompt_and_host_policy_identity ... ok
+test paired_agent::codex::tests::maintenance_v5_identity_pins_the_recovery_recall_phase ... ok
+test paired_agent::codex::tests::maintenance_v6_identity_pins_the_partial_read_retry_contract ... ok
+test paired_agent::codex::tests::maintenance_v7_identity_pins_the_snapshot_consistent_retry_contract ... ok
+test paired_agent::codex::tests::paired_plan_hash_binds_distinct_rollout_stages ... ok
+test paired_agent::codex::tests::paired_plan_rejects_a_stage_pinned_for_only_one_arm ... ok
+test paired_agent::codex::tests::rollout_stage_resolution_uses_each_registered_arm_stage ... ok
+test paired_agent::codex::tests::source_authority_identity_pins_role_specific_prompts_and_host_policy ... ok
+test paired_agent::independent::tests::comparison_rejects_wrong_arm_and_reports_independent_denominator ... ok
+test paired_agent::independent::tests::independent_envelope_roundtrips_offline_and_rejects_legacy_semantics ... ok
+test paired_agent::independent::tests::matching_captured_knowledge_selector_allows_correct_qualification ... ok
+test paired_agent::independent::tests::missing_probe_never_falls_back_to_agent_coverage ... ok
+test paired_agent::independent::tests::offline_capture_cannot_score_a_tool_error_as_success ... ok
+test paired_agent::independent::tests::offline_capture_requires_the_complete_seeded_history_even_when_empty ... ok
+test paired_agent::independent::tests::offline_envelope_rejects_observation_detached_from_raw_response ... ok
+test paired_agent::independent::tests::ordinary_workflow_failure_blocks_confirmation_despite_passing_probes ... ok
+test paired_agent::independent::tests::ordinary_workflow_qualifies_only_when_both_captures_pass_every_gate ... ok
+test paired_agent::independent::tests::paired_independent_probe_uses_each_plan_pinned_rollout_stage ... ok
+test paired_agent::independent::tests::paired_probe_is_independent_of_agent_selected_sources ... ok
+test paired_agent::independent::tests::paired_probe_rejects_changed_launch_configuration ... ok
+test paired_agent::independent::tests::real_public_probe_composes_with_paired_agent_runner_without_credentials ... ignored, requires MEMORY_DECISIONS_SERVER_BIN; real isolated stdio composition
+test paired_agent::independent::tests::registered_temporal_read_cannot_qualify_from_answer_and_probe_alone ... ok
+test paired_agent::independent::tests::wrong_captured_knowledge_selector_blocks_otherwise_correct_qualification ... ok
+test paired_agent::managed::tests::exact_stale_invalidation_requires_read_response_before_write_request ... ok
+test paired_agent::managed::tests::exact_stale_invalidation_requires_the_previously_read_forbidden_fact_id ... ok
+test paired_agent::managed::tests::inline_extract_counts_as_one_ingest_only_when_it_returns_an_episode_id ... ok
+test paired_agent::managed::tests::inline_extract_episode_attribution_preserves_legacy_ingest_receipts ... ok
+test paired_agent::managed::tests::maintenance_v6_fingerprints_pin_partial_read_recovery_and_portable_host_policy ... ok
+test paired_agent::managed::tests::managed_runner_publishes_registered_snapshot_retry_artifacts ... ok
+test paired_agent::managed::tests::post_write_probe_uses_the_same_trial_state_after_fresh_recall ... ok
+test paired_agent::tests::accepted_value_in_an_explanatory_answer_is_diagnosed_without_passing_the_oracle ... ok
+test paired_agent::tests::accepted_value_substring_inside_a_different_word_is_not_a_mention ... ok
+test paired_agent::tests::corpus_hash_binds_the_temporal_boundary_event ... ok
+test paired_agent::tests::direct_memory_success_is_separate_from_a_wrong_agent_answer ... ok
+test paired_agent::tests::exact_revision_prompt_is_prepared_once_and_shared_by_both_arms ... ok
+test paired_agent::tests::manifest_hashes_bind_public_corpus_and_private_oracle_separately ... ok
+test paired_agent::tests::manifest_rejects_oracle_without_an_accepted_answer ... ok
+test paired_agent::tests::manifest_rejects_snapshot_retry_expectation_before_schema_v3 ... ok
+test paired_agent::tests::manifest_requires_one_placeholder_and_a_seeded_knowledge_boundary ... ok
+test paired_agent::tests::paired_plan_executes_counterbalanced_arms_and_publishes_oracle_scored_receipts ... ok
+test paired_agent::tests::paired_preparation_cannot_change_the_preregistered_history ... ok
+test paired_agent::tests::read_receipt_journal_stays_v5_without_request_fingerprints ... ok
+test paired_agent::tests::read_receipt_journal_uses_v6_for_request_fingerprints_without_raw_text ... ok
+test paired_agent::tests::registered_valid_time_publishes_timed_journal_with_unknown_match ... ok
+test paired_agent::tests::revision_prompt_replacement_requires_exactly_one_marker ... ok
+test paired_agent::tests::run_refuses_existing_output_before_invoking_the_agent ... ok
+test paired_agent::tests::separate_paired_invocations_receive_distinct_runner_ids ... ok
+test paired_agent::tests::unrelated_forbidden_source_fails_without_claiming_temporal_leakage ... ok
+test paired_agent::tests::unsupported_citations_fail_task_score_and_record_a_hard_violation ... ok
+test paired_agent::tool_results::tests::blank_legacy_time_does_not_conflict_with_valid_time_registration ... ok
+test paired_agent::tool_results::tests::extracts_fact_to_source_pairs_from_structured_read ... ok
+test paired_agent::tool_results::tests::failed_tool_result_cannot_supply_exact_invalidation_evidence ... ok
+test paired_agent::tool_results::tests::invalid_or_absent_requested_valid_at_has_no_fingerprint ... ok
+test paired_agent::tool_results::tests::read_evidence_fingerprints_snapshot_valid_at_without_retaining_timestamp ... ok
+test paired_agent::tool_results::tests::read_request_fingerprints_change_only_when_query_changes ... ok
+test paired_agent::tool_results::tests::reads_empty_result_from_supported_response_envelope ... ok
+test paired_agent::tool_results::tests::reads_structured_evidence_from_adapter_payload_envelope ... ok
+test paired_agent::tool_results::tests::reads_structured_evidence_from_json_rpc_tool_result_envelope ... ok
+test paired_agent::tool_results::tests::registered_selector_rejects_negative_knowledge_revision ... ok
+test paired_agent::tool_results::tests::reports_unknown_for_unrecognized_response_envelope ... ok
+test paired_agent::tool_results::tests::response_guidance_is_fingerprinted_without_retaining_its_text ... ok
+test paired_agent::tool_results::tests::selector_fingerprints_clamp_budget_to_server_maximum ... ok
+test paired_agent::tool_results::tests::selector_fingerprints_clamp_budget_to_server_minimum ... ok
+test paired_agent::tool_results::tests::selector_fingerprints_normalize_default_values ... ok
+test paired_agent::tool_results::tests::selector_fingerprints_treat_blank_legacy_time_as_unset ... ok
+test paired_agent::tool_results::tests::selector_fingerprints_treat_current_view_as_default ... ok
+test paired_agent::tool_results::tests::selector_window_timestamps_accept_the_server_minute_precision ... ok
+test paired_agent::tool_results::tests::successful_fact_source_pairs_require_a_successful_nonempty_tool_result ... ok
+test paired_agent::tool_results::tests::valid_at_fingerprints_normalize_offsets_and_accept_legacy_as_of ... ok
+test paired_http::tests::ephemeral_http_key_formats_os_entropy_as_a_uuid_v4_api_key ... ok
+test paired_http::tests::ephemeral_http_key_keeps_random_secret_bytes_outside_the_uuid ... ok
+test paired_http::tests::isolated_http_seed_uses_the_public_stateless_mcp_contract ... ok
+test paired_http::tests::live_http_binary_accepts_an_isolated_paired_seed ... ignored, requires a memory_mcp_http binary built with streamable-http,test-fixtures
+test paired_power::tests::plans_exact_sample_size_from_family_level_discordance_bound ... ok
+test paired_power::tests::rejects_more_discordant_families_than_independent_families ... ok
+test paired_power::tests::reports_infeasible_power_when_the_preregistered_sample_cap_is_too_small ... ok
+test perf::artifact::tests::digest_is_sha256_hex_of_the_bytes ... ok
+test perf::artifact::tests::round_trip_preserves_every_field ... ok
+test perf::artifact::tests::unknown_artifact_schema_is_rejected ... ok
+test perf::artifact::tests::writes_are_byte_stable_and_keys_sorted ... ok
+test perf::db_observer::tests::beyond_cap_templates_merge_into_one_overflow_record ... ok
+test perf::db_observer::tests::classify_follows_the_rule_table ... ok
+test perf::db_observer::tests::digits_and_hashes_inside_literals_do_not_leak_into_the_template ... ok
+test perf::db_observer::tests::normalize_replaces_literals_and_numbers_to_one_template ... ok
+test perf::db_observer::tests::observe_from_two_threads_keeps_both ... ok
+test perf::db_observer::tests::record_ids_collapse_into_one_template ... ok
+test perf::db_observer::tests::same_template_in_both_phases_yields_one_record_per_phase ... ok
+test perf::profile::tests::assemble_scale_requires_queries ... ok
+test perf::profile::tests::empty_scales_are_validation_error ... ok
+test perf::profile::tests::gate_direction_defaults_to_lower_is_better ... ok
+test perf::profile::tests::gate_scenario_must_exist_in_profile ... ok
+test perf::profile::tests::happy_path_reads_all_fields ... ok
+test perf::profile::tests::non_monotonic_scales_are_validation_error ... ok
+test perf::profile::tests::stdio_driver_is_unsupported ... ok
+test perf::profile::tests::unknown_scenario_id_is_validation_error ... ok
+test perf::profile::tests::unknown_schema_version_is_schema_error ... ok
+test perf::profile::tests::zero_budget_seconds_is_validation_error ... ok
+test perf::reducer::tests::empty_slice_is_none ... ok
+test perf::reducer::tests::fewer_than_three_points_has_no_exponent ... ok
+test perf::reducer::tests::latency_key_is_scenario_dot_metric ... ok
+test perf::reducer::tests::nearest_rank_percentiles_and_totals ... ok
+test perf::reducer::tests::non_positive_baseline_has_no_ratio ... ok
+test perf::reducer::tests::ratio_divides_current_by_baseline ... ok
+test perf::reducer::tests::scaling_exponent_of_quadratic_growth ... ok
+test perf::reducer::tests::single_sample_collapses_percentiles ... ok
+test perf::reducer::tests::sql_key_is_class_prefixed ... ok
+test perf::reducer::tests::throughput_is_episodes_per_second ... ok
+test perf::reducer::tests::zero_total_duration_has_no_throughput ... ok
+test perf::sampler::tests::mac_sampler_reports_disk_writes ... ok
+test perf::sampler::tests::parse_proc_io_rejects_missing_field ... ok
+test perf::sampler::tests::parse_proc_io_returns_disk_bytes_and_op_counts ... ok
+test perf::sampler::tests::parse_proc_status_rejects_missing_field ... ok
+test perf::sampler::tests::parse_proc_status_returns_rss_swap_hwm_in_kib ... ok
+test perf::sampler::tests::self_sampler_reports_rss_on_supported_platform ... ok
+test perf::verdict::tests::exit_codes_follow_the_contract ... ok
+test perf::verdict::tests::gate_metric_missing_from_baseline_is_invalid ... ok
+test perf::verdict::tests::host_platform_mismatch_is_invalid ... ok
+test perf::verdict::tests::host_tag_mismatch_is_invalid ... ok
+test perf::verdict::tests::identical_artifacts_pass ... ok
+test perf::verdict::tests::lower_throughput_regresses_when_higher_is_better ... ok
+test perf::verdict::tests::p95_regression_beyond_ratio_is_regressed_with_key_and_values ... ok
+test perf::verdict::tests::profile_digest_mismatch_is_invalid ... ok
+test perf::verdict::tests::sample_count_below_min_samples_is_invalid ... ok
+test perf::verdict::tests::without_baseline_gates_are_skipped ... ok
+test profile::claim_stage_tests::explicit_shadow_stage_remains_available_as_a_control ... ok
+test profile::claim_stage_tests::memory_decision_execution_options_are_rejected_for_another_suite ... ok
+test profile::claim_stage_tests::omitted_memory_decision_stage_means_the_product_default ... ok
+test profile::tests::baseline_required_gate_is_explicitly_supported ... ok
+test profile::tests::external_profiles_pin_distinct_corpus_roots_and_coverage ... ok
+test profile::tests::frozen_v4_candidate_profile_pins_its_historical_shadow_stage ... ok
+test profile::tests::gate_rejects_undeclared_suite ... ok
+test profile::tests::gate_rejects_unsupported_target_selectors ... ok
+test profile::tests::gate_requires_floor_or_budget ... ok
+test profile::tests::loads_real_pr_profile ... ok
+test profile::tests::memory_decisions_profile_can_select_the_product_default_rollout ... ok
+test profile::tests::ner_quality_profile_loads_with_expected_suites ... ok
+test profile::tests::nightly_profile_allows_missing_coverage ... ok
+test profile::tests::pr_profile_rejects_duplicate_suite_ids ... ok
+test profile::tests::pr_profile_rejects_empty_suites ... ok
+test profile::tests::pr_profile_rejects_missing_expected_coverage ... ok
+test profile::tests::pr_profile_rejects_unknown_fields ... ok
+test profile::tests::pr_profile_rejects_wrong_schema_version ... ok
+test profile::tests::pr_profile_rejects_zero_budget ... ok
+test profile::tests::retrieval_quality_is_a_hard_gate_in_pr_release_and_nightly ... ok
+test profile::tests::unsupported_memory_decision_primary_stages_are_rejected ... ok
+test profile::tests::valid_profile_parses ... ok
+test reducer::tests::classification_empty_predictions_returns_zeroes ... ok
+test reducer::tests::classification_no_evidence_returns_zeroes ... ok
+test reducer::tests::classification_summary_sums_confusion_counts_before_f1 ... ok
+test reducer::tests::ratio_reducer_aggregates_child_ratios ... ok
+test reducer::tests::ratio_reducer_rejects_missing_or_zero_denominator ... ok
+test reducer::tests::retrieval_cutoff_appears_in_metric_key ... ok
+test reducer::tests::retrieval_empty_evidence_returns_zeroes ... ok
+test reducer::tests::retrieval_summary_uses_all_cases ... ok
+test reranker_calibration::tests::configured_floor_reports_inclusive_admission_counts ... ok
+test reranker_calibration::tests::learns_a_nonzero_separating_boundary_from_development_scores ... ok
+test reranker_calibration::tests::negative_logits_can_be_relevant_on_independent_data ... ok
+test reranker_calibration::tests::nonfinite_configured_floor_fails_closed ... ok
+test reranker_calibration::tests::nonfinite_scores_fail_closed ... ok
+test reranker_calibration::tests::separating_boundary_has_an_interior_margin_for_repeat_inference ... ok
+test runner::tests::deadline_retains_completed_and_unstarted_cases ... ok
+test runner::tests::progress_reports_only_selected_suites_in_order ... ok
+test runner::tests::release_run_rejects_47_cases_when_exact_coverage_is_48 ... ok
+test runner::tests::release_run_rejects_49_cases_when_exact_coverage_is_48 ... ok
+test runner::tests::run_persists_suite_fingerprints_in_the_artifact ... ok
+test runner::tests::run_uses_the_silent_default_reporter ... ok
+test suites::action_grounding::tests::action_grounding_produces_outcomes ... ok
+test suites::action_grounding::tests::high_risk_always_requires_verification ... ok
+test suites::action_grounding::tests::low_risk_with_context_executes ... ok
+test suites::action_grounding::tests::low_risk_without_context_requires_verification ... ok
+test suites::capacity::tests::capacity_suite_produces_outcomes ... ok
+test suites::claims::ingestion_time_tests::eval_ingest_preserves_server_owned_transaction_time ... ok
+test suites::claims::tests::covers_all_schema_outcomes_and_isolation_boundaries ... ok
+test suites::claims::tests::expected_same_boundary_relation_is_true_positive ... ok
+test suites::claims::tests::fixture_loads ... ok
+test suites::claims::tests::invalid_reference_time_invalidates_the_case ... ok
+test suites::claims::tests::lineage_matches_expected_relation_by_fact_ids ... ok
+test suites::claims::tests::lineage_rejects_mismatched_fact_ids ... ok
+test suites::claims::tests::namespace_mismatch_isolation_is_distinct_from_policy_mismatch ... ok
+test suites::claims::tests::persisted_relation_requires_exact_boundary_metadata ... ok
+test suites::claims::tests::same_boundary_warning_is_not_an_isolation_violation ... ok
+test suites::claims::tests::same_namespace_different_policy_tags_are_not_namespace_isolation ... ok
+test suites::claims::tests::source_id_substring_is_not_an_exact_match ... ok
+test suites::claims::tests::trust_mismatch_is_not_namespace_isolation ... ok
+test suites::claims::tests::unexpected_same_boundary_warning_is_false_positive ... ok
+test suites::end_to_end::tests::e2e_pipeline_completes ... ok
+test suites::end_to_end::tests::expected_ids_equal_all_fixture_ids ... ok
+test suites::external_retrieval::tests::answer_proxy_matches_tokens_without_claiming_document_recall ... ok
+test suites::external_retrieval::tests::external_case_construction ... ok
+test suites::external_retrieval::tests::external_suite_expected_ids_equal_loaded_cases ... ok
+test suites::extraction::tests::fixture_loads ... ok
+test suites::extraction::tests::single_extraction_case_produces_valid_outcome ... ok
+test suites::extraction::tests::warning_case_detects_contradiction ... ok
+test suites::lifecycle::tests::lifecycle_gate_produces_outcomes ... ok
+test suites::memory_decisions::acceptance::tests::cross_build_acceptance_enforces_both_registered_binary_hashes ... ok
+test suites::memory_decisions::acceptance::tests::explicitly_pinned_candidate_configuration_can_differ_from_incumbent ... ok
+test suites::memory_decisions::acceptance::tests::frozen_positive_gain_accepts_repeatable_candidate ... ok
+test suites::memory_decisions::acceptance::tests::hard_violation_defeats_positive_gain ... ok
+test suites::memory_decisions::acceptance::tests::incompatible_schema_cannot_be_compared ... ok
+test suites::memory_decisions::acceptance::tests::missing_case_is_invalid ... ok
+test suites::memory_decisions::acceptance::tests::missing_repeat_observation_is_invalid ... ok
+test suites::memory_decisions::acceptance::tests::no_gain_is_a_completed_rejection ... ok
+test suites::memory_decisions::acceptance::tests::one_reused_case_cannot_hide_behind_another_fresh_capture ... ok
+test suites::memory_decisions::acceptance::tests::primary_channel_accepts_only_the_observed_public_stage_gain ... ok
+test suites::memory_decisions::acceptance::tests::primary_channel_rejects_binary_outside_frozen_plan ... ok
+test suites::memory_decisions::acceptance::tests::primary_channel_rejects_candidate_resource_ceiling_regression ... ok
+test suites::memory_decisions::acceptance::tests::primary_channel_rejects_missing_complete_observation ... ok
+test suites::memory_decisions::acceptance::tests::primary_channel_reports_shared_safety_failure_without_calling_it_a_regression ... ok
+test suites::memory_decisions::acceptance::tests::reused_artifact_cannot_substitute_for_a_second_capture ... ok
+test suites::memory_decisions::acceptance::tests::unpinned_candidate_configuration_still_fails ... ok
+test suites::memory_decisions::acceptance::tests::unsafe_current_role_cannot_be_paid_for_by_other_family_wins ... ok
+test suites::memory_decisions::cases::tests::accepts_a_valid_full_history_and_prefix_boundary ... ok
+test suites::memory_decisions::cases::tests::corpus_rejects_oracle_evidence_beyond_knowledge_boundary ... ok
+test suites::memory_decisions::cases::tests::oracle_v2_accepts_role_expectations_for_a_temporal_snapshot ... ok
+test suites::memory_decisions::cases::tests::oracle_v2_rejects_role_expectations_without_a_temporal_snapshot ... ok
+test suites::memory_decisions::cases::tests::rejects_a_blank_explicit_history_family_id ... ok
+test suites::memory_decisions::cases::tests::rejects_duplicate_event_ids ... ok
+test suites::memory_decisions::cases::tests::rejects_required_source_also_declared_forbidden ... ok
+test suites::memory_decisions::cases::tests::rejects_unknown_correction_target ... ok
+test suites::memory_decisions::comparison::tests::changed_disposition_fails_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::changed_score_fails_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::changed_source_order_fails_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::changed_temporal_observation_fails_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::different_product_or_corpus_identity_fails_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::duplicate_case_ids_fail_replay_comparison ... ok
+test suites::memory_decisions::comparison::tests::equal_semantic_results_allow_different_receipt_locations_and_hashes ... ok
+test suites::memory_decisions::diagnostic_helper_tests::evidence_diagnostic_keeps_its_ingest_and_extract_receipts ... ok
+test suites::memory_decisions::diagnostic_helper_tests::exact_revision_support_requires_both_valid_time_and_revision_fields ... ok
+test suites::memory_decisions::diagnostic_helper_tests::explain_receives_retrieved_context_as_the_documented_json_string ... ok
+test suites::memory_decisions::diagnostic_helper_tests::one_as_of_property_does_not_claim_independent_temporal_cutoffs ... ok
+test suites::memory_decisions::diagnostic_helper_tests::temporal_probe_uses_checkpoint_immediately_before_its_knowledge_boundary ... ok
+test suites::memory_decisions::diagnostic_helper_tests::valid_and_known_time_properties_establish_independent_temporal_cutoffs ... ok
+test suites::memory_decisions::merge_compatibility_tests::merged_shards_match_full_run_memory_decision_reduction ... ok
+test suites::memory_decisions::normalization::tests::citation_binds_only_through_the_observed_episode_id ... ok
+test suites::memory_decisions::normalization::tests::cited_content_must_contain_the_returned_claim_text ... ok
+test suites::memory_decisions::normalization::tests::compact_response_without_relations_keeps_the_role_unknown ... ok
+test suites::memory_decisions::normalization::tests::contradiction_relation_is_an_observable_conflict ... ok
+test suites::memory_decisions::normalization::tests::correction_relation_marks_superseded_fact_as_historical ... ok
+test suites::memory_decisions::normalization::tests::empty_partial_snapshot_is_unknown_without_matching_guidance_text ... ok
+test suites::memory_decisions::normalization::tests::explain_payload_does_not_replace_missing_retrieval_citations ... ok
+test suites::memory_decisions::normalization::tests::malformed_structured_payload_is_not_scored_as_an_empty_answer ... ok
+test suites::memory_decisions::normalization::tests::missing_source_citation_is_unbound_evidence ... ok
+test suites::memory_decisions::normalization::tests::no_memory_responses_are_unobservable_not_unknown ... ok
+test suites::memory_decisions::normalization::tests::snapshot_evidence_status_is_used_for_compact_temporal_items ... ok
+test suites::memory_decisions::reducer_tests::reducer_does_not_invent_scores_for_invalid_cases ... ok
+test suites::memory_decisions::reducer_tests::reducer_rejects_a_missing_score_on_a_valid_case ... ok
+test suites::memory_decisions::reducer_tests::reducer_sums_ratio_evidence_for_quality_failures ... ok
+test suites::memory_decisions::scoring::tests::any_complete_alternative_evidence_set_succeeds ... ok
+test suites::memory_decisions::scoring::tests::budget_overflow_fails_the_probe ... ok
+test suites::memory_decisions::scoring::tests::correct_claim_cited_to_the_wrong_source_fails ... ok
+test suites::memory_decisions::scoring::tests::correct_disposition_without_source_support_scores_zero ... ok
+test suites::memory_decisions::scoring::tests::cutoff_probe_without_exact_revision_keeps_failure_visible ... ok
+test suites::memory_decisions::scoring::tests::evidence_without_a_public_relation_does_not_claim_conflict_decision_is_wrong ... ok
+test suites::memory_decisions::scoring::tests::future_source_leakage_fails_supported_evidence ... ok
+test suites::memory_decisions::scoring::tests::harmless_historical_mention_does_not_break_supported_correction ... ok
+test suites::memory_decisions::scoring::tests::old_value_marked_current_fails_decision ... ok
+test suites::memory_decisions::scoring::tests::open_conflict_requires_both_sides ... ok
+test suites::memory_decisions::scoring::tests::ordinary_probe_scores_primary_observation_even_when_temporal_diagnostic_differs ... ok
+test suites::memory_decisions::scoring::tests::separate_cutoff_probe_scores_the_exact_revision_observation ... ok
+test suites::memory_decisions::scoring::tests::supported_resolution_requires_its_authoritative_source ... ok
+test suites::memory_decisions::scoring::tests::unknown_empty_result_is_a_safe_refusal ... ok
+test suites::memory_decisions::scoring::tests::unobservable_evidence_role_does_not_count_as_a_decision ... ok
+test suites::memory_decisions::scoring::tests::unrelated_evidence_fails_unknown_case ... ok
+test suites::memory_decisions::scoring::tests::unsupported_time_contract_has_zero_probe_success_despite_visible_evidence ... ok
+test suites::ner_quality::tests::extra_and_missing_mentions_are_scored ... ok
+test suites::ner_quality::tests::perfect_extractor_passes_all_cases ... ok
+test suites::ner_quality::tests::typed_diagnostic_punishes_label_mismatch ... ok
+test suites::poisoning::tests::poisoning_suite_produces_outcomes ... ok
+test suites::registry::tests::every_known_suite_builds_and_has_a_matching_reducer ... ok
+test suites::registry::tests::registry_reducer_matches_built_suite_reducer ... ok
+test suites::registry::tests::retrieval_quality_suite_requires_an_explicit_corpus_root ... ok
+test suites::registry::tests::unknown_suite_is_rejected_by_builder_and_falls_back_to_count_reducer ... ok
+test suites::response_size::tests::reducer_rejects_missing_response_class ... ok
+test suites::response_size::tests::reducer_reports_independent_response_classes ... ok
+test suites::retrieval::tests::breadth_decisions_retrieve_each_source_without_quarterly_digests ... ok
+test suites::retrieval::tests::breadth_product_decisions_cover_march_and_april_without_old_summaries ... ok
+test suites::retrieval::tests::case_ids_are_deterministic ... ok
+test suites::retrieval::tests::episode_fallback_scores_its_persisted_source_identity ... ok
+test suites::retrieval::tests::fixture_loads_and_has_cases ... ok
+test suites::retrieval::tests::gold_selectors_resolve_to_seeded_fact_id_groups_before_retrieval ... ok
+test suites::retrieval::tests::id_retrieval_evidence_deduplicates_before_counting_covered_groups ... ok
+test suites::retrieval::tests::local_reducer_omits_metrics_when_no_case_has_applicable_evidence ... ok
+test suites::retrieval::tests::local_reducer_uses_weighted_group_recall_and_legacy_metric_ids ... ok
+test suites::retrieval::tests::single_case_produces_valid_outcome ... ok
+test suites::retrieval::tests::unrelated_synthetic_item_does_not_inherit_episode_gold ... ok
+test suites::retrieval_quality::cases::native_preparation_records_independent_reranker_model_identity ... ok
+test suites::retrieval_quality::cases::tests::current_native_case_does_not_require_an_absolute_transaction_cutoff ... ok
+test suites::retrieval_quality::cases::tests::native_case_accepts_a_snapshot_after_a_durable_source_operation ... ok
+test suites::retrieval_quality::cases::tests::native_manifest_can_label_source_episode_fallback_evidence ... ok
+test suites::retrieval_quality::cases::tests::native_manifest_records_case_tags_and_preparation_identity ... ok
+test suites::retrieval_quality::cases::tests::native_manifest_rejects_duplicate_case_ids ... ok
+test suites::retrieval_quality::cases::tests::native_preparation_records_local_model_file_digests ... ok
+test suites::retrieval_quality::cases::tests::reranked_runtime_cannot_pass_an_unreranked_native_manifest ... ok
+test suites::retrieval_quality::reducer_tests::case_tags_are_preserved_in_the_artifact_evidence_even_for_invalid_cases ... ok
+test suites::retrieval_quality::reducer_tests::native_retrieval_quality_labels_every_artifact_end_to_end ... ok
+test suites::retrieval_quality::reducer_tests::quality_case_fails_when_a_required_evidence_group_is_missing ... ok
+test suites::retrieval_quality::reducer_tests::quality_case_fails_when_it_returns_unlabeled_noise ... ok
+test suites::retrieval_quality::reducer_tests::reducer_keeps_all_invalid_provider_runs_artifactable_without_fake_metrics ... ok
+test suites::retrieval_quality::reducer_tests::reducer_uses_frozen_ratio_evidence_and_preserves_metric_applicability ... ok
+test suites::retrieval_quality::scoring::tests::answerable_empty_is_false_abstention_and_unknown_empty_is_valid_abstention ... ok
+test suites::retrieval_quality::scoring::tests::expected_order_is_checked_only_when_the_case_declares_it ... ok
+test suites::retrieval_quality::scoring::tests::gold_keys_cannot_use_the_reserved_unknown_result_prefix ... ok
+test suites::retrieval_quality::scoring::tests::invalid_gold_and_zero_budget_fail_closed ... ok
+test suites::retrieval_quality::scoring::tests::prohibited_unknown_and_over_budget_ids_are_not_hidden_by_the_oracle ... ok
+test suites::retrieval_quality::scoring::tests::scoring_uses_unique_ids_and_counts_covered_required_groups ... ok
+test suites::retrieval_quality::source_bundle_tests::source_bundle_accepts_the_exact_declared_case_episodes ... ok
+test suites::retrieval_quality::source_bundle_tests::source_bundle_digest_mismatch_invalidates_the_corpus ... ok
+test suites::retrieval_quality::source_bundle_tests::source_bundle_must_contain_the_exact_episodes_used_by_cases ... ok
+test suites::retrieval_quality::source_bundle_tests::source_bundle_symlink_cannot_escape_the_corpus_root ... ok
+test suites::retrieval_quality::trace::tests::diagnostics_keep_negative_candidates_without_changing_inference ... ok
+test suites::tests::no_suite_hard_codes_gate_metric_keys ... ok
+
+test result: ok. 571 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 14.82s
+
+     Running unittests src/main.rs (target/debug/build/eval-harness/2b8a9960de5bc8f9/out/memory_eval-2b8a9960de5bc8f9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/perf_main.rs (target/debug/build/eval-harness/3a67111bf0bf2dd4/out/memory_perf-3a67111bf0bf2dd4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/agent_managed_trial.rs (target/debug/build/eval-harness/a34a04844855c3b6/out/agent_managed_trial-a34a04844855c3b6)
+
+running 16 tests
+test candidate_operator_import_is_preloaded_and_counted_outside_agent_work ... ok
+test independent_post_write_probe_runs_after_formation_and_fresh_recall_in_same_trial_state ... ok
+test literal_source_input_profile_has_its_own_protocol_identity ... ok
+test maintenance_task_fingerprint_is_separate_from_formation_profile ... ok
+test managed_comparison_distinguishes_measured_zero_from_missing_telemetry ... ok
+test managed_comparison_does_not_credit_evidence_returned_after_invalidation ... ok
+test managed_comparison_keeps_formation_budget_separate_from_recall_budget ... ok
+test managed_comparison_reports_fact_evidence_received_before_invalidation ... ok
+test managed_paired_run_counts_unqualified_ingest_as_a_successful_write ... ok
+test managed_paired_run_tracks_unqualified_extract_and_invalidation_names ... ok
+test managed_paired_run_writes_compatible_artifacts_and_reports_pairwise_probe_outcomes ... ok
+test managed_phase_artifact_retains_only_content_free_terminal_failure_diagnostics ... ok
+test operator_file_import_uses_versioned_artifact_without_leaking_fixture_data ... ok
+test operator_import_manifest_rejects_traversal_before_runner_setup ... ok
+test paired_run_retains_unmapped_independent_probe_sources_as_negative_evidence ... ok
+test source_authority_fingerprints_require_the_import_specific_workflow_profile ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+     Running tests/agent_workflow_qualification_cli.rs (target/debug/build/eval-harness/18ee0ba3e8527ad9/out/agent_workflow_qualification_cli-18ee0ba3e8527ad9)
+
+running 1 test
+test cli_blocks_confirmation_when_ordinary_workflow_fails_despite_passing_probes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/artifact_publication.rs (target/debug/build/eval-harness/fb14fafeea63456d/out/artifact_publication-fb14fafeea63456d)
+
+running 2 tests
+test a_pre_rename_write_failure_preserves_the_existing_artifact ... ok
+test a_published_artifact_round_trips_and_leaves_no_temporary_file ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/bounded_recall.rs (target/debug/build/eval-harness/6d21333d2628d50a/out/bounded_recall-6d21333d2628d50a)
+
+running 5 tests
+test excerpt_keeps_the_answer_after_query_terms_at_a_window_edge ... ok
+test independent_readers_return_identical_evidence_from_one_store ... ok
+test oversized_episode_returns_a_bounded_verbatim_witness_late_in_the_source ... ok
+test oversized_extracted_fact_returns_bounded_content_and_source_quote ... 2026-11-26T19:04:20.065482Z  WARN  op=embedding.input_truncated  req=req_0005  args.limit=8000  args.original_chars=15690  args.truncated_chars=8000  result={}
+ok
+test short_episode_preserves_its_full_content_and_quote ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+     Running tests/chat_completions_cli.rs (target/debug/build/eval-harness/031ff91d1a1f8753/out/chat_completions_cli-031ff91d1a1f8753)
+
+running 6 tests
+test hash_chat_completions_tasks_emits_provider_request_parameter_fingerprint ... ok
+test hash_chat_completions_tasks_emits_the_response_format_fingerprint ... ok
+test hash_chat_completions_tasks_emits_the_sampler_fingerprint ... ok
+test hash_chat_completions_tasks_rejects_an_invalid_response_format_config ... ok
+test hash_chat_completions_tasks_rejects_an_invalid_sampler_config ... ok
+test hash_chat_completions_tasks_rejects_request_parameters_that_override_protocol_fields ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/chat_completions_runner.rs (target/debug/build/eval-harness/ac226a7def86e621/out/chat_completions_runner-ac226a7def86e621)
+
+running 35 tests
+test chat_completions_agent_executes_an_allowed_mcp_tool_and_records_only_receipt_metadata ... ok
+test chat_completions_agent_preserves_optional_reasoning_for_tool_followup_without_recording_it ... ok
+test chat_completions_agent_sends_one_combined_system_message ... ok
+test chat_completions_agent_sends_registered_provider_parameters_on_every_turn ... ok
+test chat_completions_agent_sends_registered_response_format_on_tool_and_final_turns ... ok
+test chat_completions_agent_sends_registered_sampling_parameters ... ok
+test chat_completions_client_refuses_redirects_even_to_another_loopback_url ... ok
+test chat_completions_runner_classifies_empty_formation_completion ... ok
+test chat_completions_runner_classifies_final_answer_schema_mismatch_without_retaining_it ... ok
+test chat_completions_runner_classifies_non_json_final_answer_without_retaining_it ... ok
+test chat_completions_runner_configuration_cannot_send_task_data_to_non_loopback_hosts ... ok
+test chat_completions_runner_distinguishes_request_send_failure_without_retaining_content ... ok
+test chat_completions_runner_distinguishes_response_body_read_failure_without_retaining_content ... ok
+test chat_completions_runner_never_executes_a_tool_outside_the_phase_allow_list ... ok
+test chat_completions_runner_records_a_trace_event_for_a_clarification_answer ... ok
+test chat_completions_runner_records_malformed_provider_output_as_a_model_failure ... ok
+test chat_completions_runner_records_only_http_status_for_provider_rejection ... ok
+test empty_read_reports_zero_items ... ok
+test evidence_action_hint_fails_closed_when_any_item_status_is_unknown_or_missing ... ok
+test evidence_action_hint_marks_a_typed_conflict_for_clarification ... ok
+test evidence_action_hint_on_an_empty_partial_read_does_not_claim_absence ... ok
+test evidence_action_hint_preserves_an_opaque_public_reply ... ok
+test evidence_action_hint_reaches_the_model_with_the_same_returned_source ... ok
+test extract_evidence_telemetry_uses_the_product_default_when_the_argument_is_omitted ... ok
+test fixed_read_registration_accepts_evidence_action_hint ... ok
+test fixed_reply_is_delivered_to_the_original_tool_call ... ok
+test jsonrpc_read_error_remains_a_failed_read ... ok
+test local_chat_completions_smoke_executes_a_public_memory_tool ... ignored, opt-in loopback smoke; configure any local OpenAI-compatible Chat Completions server
+test loopback_read_normalizes_only_the_matched_structured_reply ... ok
+test phase_rejects_an_unrepresentable_deadline_before_any_model_request ... ok
+test read_error_does_not_become_empty_memory ... ok
+test source_authority_control_candidate_keeps_the_write_profile ... ok
+test source_authority_formation_accepts_a_non_json_completion_message ... ok
+test text_only_loopback_reply_has_unknown_read_outcome ... ok
+test turn_budget_exhaustion_is_recorded_in_the_normalized_trace ... ok
+
+test result: ok. 34 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/codex_agent_runner.rs (target/debug/build/eval-harness/49d52c104d3a2223/out/codex_agent_runner-49d52c104d3a2223)
+
+running 12 tests
+test completion_without_observed_start_does_not_fabricate_read_timing ... ok
+test concurrent_reads_keep_elapsed_timing_with_the_matching_response ... ok
+test kills_fake_codex_when_aggregate_output_token_budget_is_exceeded ... ok
+test kills_fake_codex_when_jsonl_output_byte_budget_is_exceeded ... ok
+test kills_fake_codex_when_tool_call_budget_is_exceeded ... ok
+test kills_fake_codex_when_turn_budget_is_exceeded ... ok
+test kills_fake_codex_when_wall_time_budget_expires ... ok
+test launches_fake_codex_with_isolated_mcp_and_removes_temporary_schema ... ok
+test maintenance_v2_profile_runs_through_agent_runner ... ok
+test maintenance_v4_profile_uses_only_memory_tools_needed_for_safe_correction ... ok
+test text_only_tool_reply_has_unknown_read_outcome ... ok
+test write_profile_enables_only_registered_memory_mutations_and_keeps_shell_disabled ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.91s
+
+     Running tests/corpus_preparation.rs (target/debug/build/eval-harness/96145736fcd40c4a/out/corpus_preparation-96145736fcd40c4a)
+
+running 9 tests
+test a_cached_known_corpus_with_an_invalid_case_count_is_refused_without_fetching ... ok
+test a_corrupted_cached_corpus_is_rejected_without_refetching ... ok
+test a_failed_fetch_allows_a_later_preparation_to_succeed ... ok
+test a_same_size_download_with_the_wrong_hash_is_rejected_before_publication ... ok
+test a_wrong_download_size_is_rejected_before_publication ... ok
+test an_auxiliary_hash_failure_removes_the_unpublished_staging_directory ... ok
+test an_invalid_case_count_is_not_published_for_a_known_corpus ... ok
+test an_invalid_immutable_source_url_is_rejected_before_fetching ... ok
+test preparation_publishes_verified_bytes_and_manifest_then_uses_the_cache_without_fetching ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/current_memory_regression.rs (target/debug/build/eval-harness/7bbc14398a4ea306/out/current_memory_regression-7bbc14398a4ea306)
+
+running 18 tests
+test a_changed_second_answer_is_not_a_repeatable_read ... ok
+test a_compound_unit_cannot_satisfy_a_quantity_assertion ... ok
+test a_contracted_negation_is_not_positive_evidence ... ok
+test a_curly_apostrophe_negation_is_not_positive_evidence ... ok
+test a_negated_assertion_is_not_positive_evidence ... ok
+test a_new_temporal_failure_cannot_hide_behind_an_unchanged_primary_score ... ok
+test a_numeric_prefix_cannot_satisfy_a_registered_assertion ... ok
+test a_textual_rate_cannot_satisfy_a_capacity_assertion ... ok
+test an_honestly_recorded_changed_read_is_a_quality_failure_not_invalid_evidence ... ok
+test changed_guidance_does_not_change_repeatable_evidence ... ok
+test cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execution ... ok
+test current_gate_rejects_legacy_roles_without_snapshot_cutoffs ... ok
+test failed_offline_grading_is_preserved_when_the_stage_is_retried ... ok
+test historical_capture_preserves_all_three_oracle_scope_failures ... ok
+test new_safety_failure_in_already_failing_case_is_a_regression ... ok
+test office_entry_preserves_correct_evidence_and_explicit_snapshot ... ok
+test similar_name_preserves_correct_evidence_and_explicit_snapshot ... ok
+test single_current_preserves_correct_evidence_and_explicit_snapshot ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.43s
+
+     Running tests/decision_replay_cli.rs (target/debug/build/eval-harness/97565eae7abd2368/out/decision_replay_cli-97565eae7abd2368)
+
+running 1 test
+test compares_normalized_replays_without_a_server_or_agent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/deterministic_acceptance_cli.rs (target/debug/build/eval-harness/de25ea8ebc37913f/out/deterministic_acceptance_cli-de25ea8ebc37913f)
+
+running 3 tests
+test accepts_improvement_without_agent_or_provider_environment ... ok
+test missing_independent_observation_is_invalid_despite_legacy_success ... ok
+test unchanged_candidate_is_rejected_with_a_report ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/deterministic_quality_gate.rs (target/debug/build/eval-harness/4fd6a5914f477c47/out/deterministic_quality_gate-4fd6a5914f477c47)
+
+running 5 tests
+test absent_subject_oracle_shares_a_head_noun_without_matching_the_stored_subject ... ok
+test candidate_meets_frozen_deterministic_memory_quality_gate ... ignored, requires MEMORY_DECISIONS_SERVER_BIN; CI explicitly executes this real-product gate
+test historical_rollout_plan_preserves_frozen_rules_when_pairing_builds ... ok
+test historical_rollout_validates_frozen_corpus_and_acceptance_rules ... ok
+test valid_boundary_oracle_has_an_exact_cutoff_and_a_future_forbidden_event ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_claim_reconciliation.rs (target/debug/build/eval-harness/9f16d92c74b318d6/out/eval_claim_reconciliation-9f16d92c74b318d6)
+
+running 2 tests
+test claim_fixture_covers_every_schema_outcome_and_isolation_boundary ... ok
+test claim_fixture_source_spans_are_well_formed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_extraction.rs (target/debug/build/eval-harness/00b0cb31406af037/out/eval_extraction-00b0cb31406af037)
+
+running 4 tests
+test extraction_fixture_provides_contradiction_warning_coverage ... ok
+test extraction_fixture_provides_document_action_item_coverage ... ok
+test extraction_fixture_provides_experience_fact_type_coverage ... ok
+test harness_extraction_suite ... ignored
+
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_retrieval.rs (target/debug/build/eval-harness/3893a0bf90703997/out/eval_retrieval-3893a0bf90703997)
+
+running 5 tests
+test harness_retrieval_suite ... ignored
+test retrieval_fixture_provides_diversity_coverage ... ok
+test retrieval_fixture_provides_graph_and_timeline_tag_coverage ... ok
+test retrieval_fixture_provides_minimum_tier_coverage ... ok
+test retrieval_launcher_rejects_a_quality_failed_case - should panic ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/extract_fact_evidence_contract.rs (target/debug/build/eval-harness/648a1c1434ffa585/out/extract_fact_evidence_contract-648a1c1434ffa585)
+
+running 2 tests
+test oversized_fact_evidence_is_omitted_without_returning_a_partial_pair ... 2026-11-26T19:04:27.558720Z  WARN  op=embedding.input_truncated  req=req_0001  args.limit=8000  args.original_chars=22448  args.truncated_chars=8000  result={}
+ok
+test requested_fact_evidence_has_a_deterministic_wire_size_ceiling ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+     Running tests/extraction_suite_contract.rs (target/debug/build/eval-harness/af2b79c095311e19/out/extraction_suite_contract-af2b79c095311e19)
+
+running 7 tests
+test complete_empty_expectations_accept_no_predictions ... ok
+test complete_entity_expectation_rejects_false_positives ... ok
+test complete_warning_expectation_rejects_additional_contradictions ... ok
+test deadline_retains_declared_reviewed_development_population ... ok
+test primary_fault_retains_reviewed_development_identity ... ok
+test setup_fault_preserves_declared_development_population ... ok
+test unreadable_fixture_remains_invalid_reviewed_development_evidence ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+     Running tests/independent_probe.rs (target/debug/build/eval-harness/5fbda6bf07b975c4/out/independent_probe-5fbda6bf07b975c4)
+
+running 32 tests
+test capture_preserves_the_binding_from_public_episode_ids_to_fixed_events ... ok
+test capture_records_the_public_configuration_passed_to_the_child ... ok
+test duplicate_event_ids_cannot_form_an_independent_history ... ok
+test every_required_group_supports_success ... ok
+test failed_probe_cannot_score_success ... ok
+test fixed_probe_cli_captures_public_stdio_without_agent_credentials ... ok
+test fixed_probe_rejects_a_response_from_another_snapshot ... ok
+test fixed_probe_requires_the_preregistered_retrieval_stage ... ok
+test fixed_stdio_probe_captures_only_its_fresh_history_without_an_agent ... ok
+test fixed_stdio_probe_scores_typed_conflict_under_a_one_item_budget ... ok
+test fixed_stdio_probe_supports_the_registered_legacy_as_of_contract ... ok
+test forbidden_source_defeats_otherwise_complete_evidence ... ok
+test independent_http_probe_uses_a_fresh_tenant_and_the_fixed_snapshot ... ignored, requires MEMORY_MCP_HTTP_PROBE_BINARY built with streamable-http,test-fixtures
+test local_fixture_cannot_claim_to_execute_as_an_arbitrary_principal ... ok
+test malformed_product_fingerprint_is_invalid_even_when_it_matches ... ok
+test missing_independent_observation_is_invalid_instead_of_success ... ok
+test missing_typed_conflict_annotation_fails_even_when_source_coverage_passes ... ok
+test mutually_impossible_oracle_is_invalid ... ok
+test negative_knowledge_revision_cannot_be_a_valid_probe ... ok
+test observation_from_another_principal_is_invalid ... ok
+test observation_from_another_product_is_invalid ... ok
+test observation_with_more_sources_than_returned_items_is_invalid ... ok
+test offline_cli_scores_fixed_probe_without_an_agent_account ... ok
+test one_returned_source_can_match_any_preregistered_conflict_annotation_alternative ... ok
+test one_side_of_a_required_evidence_set_fails ... ok
+test over_budget_evidence_fails ... ok
+test probe_formation_and_read_use_one_process_in_a_fresh_store ... ok
+test required_typed_conflict_annotation_counts_when_only_one_source_fits_the_budget ... ok
+test score_receipt_binds_query_and_private_oracle ... ok
+test score_receipt_binds_the_observation_that_was_scored ... ok
+test uncited_returned_items_cannot_pass_an_empty_evidence_oracle ... ok
+test unknown_probe_schema_is_rejected ... ok
+
+test result: ok. 31 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.40s
+
+     Running tests/memory_decisions_stdio.rs (target/debug/build/eval-harness/94138f085133c7c0/out/memory_decisions_stdio-94138f085133c7c0)
+
+running 20 tests
+test cli_deadline_persists_all_cases_and_leaves_unstarted_attempts_at_zero ... ok
+test cli_default_executes_one_primary_variant_without_diagnostics ... ok
+test cli_explicit_diagnostics_preserve_all_three_isolated_variants ... ok
+test cli_receipt_separates_scenario_stages_from_total_wall_time ... ok
+test cli_tool_deadline_is_invalid_execution_and_reports_the_effective_limit ... ok
+test default_stdio_session_leaves_claim_stage_unset_for_product_configuration ... ok
+test receipt_writes_reject_existing_paths_without_changing_the_saved_bytes ... ok
+test separate_sessions_receive_distinct_store_paths ... ok
+test stdio_bounds_the_initialize_wait_and_kills_the_child_on_timeout ... kill: 13198: No such process
+ok
+test stdio_bounds_tool_calls_and_reaps_a_timed_out_child ... kill: 13220: No such process
+ok
+test stdio_drains_large_stderr_without_blocking_json_rpc ... ok
+test stdio_initializes_without_waiting_for_a_notification_reply_and_buffers_out_of_order_ids ... ok
+test stdio_measured_tool_call_records_success_latency_and_compact_response_bytes ... ok
+test stdio_process_can_resolve_legacy_relative_sources_from_the_registered_root ... ok
+test stdio_process_uses_the_explicit_claim_rollout_stage ... ok
+test stdio_process_uses_the_explicit_shadow_rollback_stage ... ok
+test stdio_rejects_an_mcp_is_error_result ... ok
+test stdio_reports_early_child_exit ... ok
+test whole_run_deadline_also_bounds_a_tool_call_after_initialization ... kill: 13427: No such process
+ok
+test whole_run_deadline_bounds_initialization_and_reaps_the_server ... kill: 13467: No such process
+ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.03s
+
+     Running tests/model_preparation.rs (target/debug/build/eval-harness/b0cacf05b19ad88c/out/model_preparation-b0cacf05b19ad88c)
+
+running 9 tests
+test a_corrupted_cached_bundle_is_rejected_without_silent_reuse ... ok
+test a_truncated_download_never_leaves_a_published_or_staged_bundle ... ok
+test a_verified_cache_is_usable_without_a_network_connection ... ok
+test path_traversal_manifest_is_refused_before_creating_a_cache ... ok
+test publishes_only_a_fully_verified_model_bundle ... ok
+test quantized_bundle_can_pin_tokenizer_and_weights_to_separate_immutable_sources ... ok
+test same_size_wrong_hash_is_never_published ... ok
+test unsafe_file_source_is_refused_before_any_download_or_cache_creation ... ok
+test valid_dotted_hugging_face_model_names_can_be_prepared ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/native_preparation.rs (target/debug/build/eval-harness/9e904213e76b46cf/out/native_preparation-9e904213e76b46cf)
+
+running 3 tests
+test preparation_rejects_duplicate_source_keys_before_loading_the_provider ... ok
+test preparation_requires_a_real_provider_and_never_writes_a_fake_inventory ... ok
+test release_profile_reports_missing_native_provider_as_invalid_coverage ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/ner_corrupt_model.rs (target/debug/build/eval-harness/311d265e9c3abb8f/out/ner_corrupt_model-311d265e9c3abb8f)
+
+running 1 test
+test the_public_extractor_constructor_rejects_a_corrupt_local_onnx_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/ner_fixture_gating.rs (target/debug/build/eval-harness/5f50130d575f57bb/out/ner_fixture_gating-5f50130d575f57bb)
+
+running 7 tests
+test absent_gliner ... ok
+test absent_onnx ... ok
+test absent_vago ... ok
+test fixture_builder_child ... ignored, explicit child fixture executed by each gating scenario
+test incomplete_gliner ... ok
+test incomplete_onnx ... ok
+test incomplete_vago ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/ner_quality_corpus.rs (target/debug/build/eval-harness/4399bdbf82fa9000/out/ner_quality_corpus-4399bdbf82fa9000)
+
+running 2 tests
+test ner_quality_corpus_is_structurally_valid ... ok
+test shared_cases_match_vago_release_parity_corpus ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ner_quality_real_models.rs (target/debug/build/eval-harness/12d90c4c2dc478c3/out/ner_quality_real_models-12d90c4c2dc478c3)
+
+running 10 tests
+test gliner_english_four ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_english_one ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_english_three ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_english_two ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_mixed_one ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_mixed_three ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_mixed_two ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_russian_one ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_russian_three ... ignored, requires the local GLiNER checkpoint; never downloads models
+test gliner_russian_two ... ignored, requires the local GLiNER checkpoint; never downloads models
+
+test result: ok. 0 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/paired_comparison_cli.rs (target/debug/build/eval-harness/70d25a5a9fdcf675/out/paired_comparison_cli-70d25a5a9fdcf675)
+
+running 27 tests
+test a_second_snapshot_retry_exceeds_the_one_retry_limit ... ok
+test changed_stable_selector_is_scored_as_noncompliant ... ok
+test compare_paired_cli_writes_a_reproducible_rejection_report ... ok
+test explicit_null_legacy_selector_is_not_treated_as_omitted ... ok
+test exploratory_cli_compares_distinct_products_for_an_external_runner_without_a_gate ... ok
+test matching_requested_and_returned_valid_times_are_boolean_and_redacted ... ok
+test missing_retry_selector_presence_is_not_counted_as_compliant ... ok
+test missing_returned_snapshot_cannot_be_scored_as_compliant ... ok
+test paired_reliability_cli_counts_only_cases_that_pass_all_preregistered_repetitions ... ok
+test plan_paired_power_cli_uses_family_discordance_from_validated_pilot_summary ... ok
+test recall_capture_rejects_unregistered_read_mode ... ok
+test registered_selector_read_without_selector_fingerprints_fails_offline_cli ... ok
+test registered_valid_time_with_unavailable_fingerprints_replays_as_unknown_v9 ... ok
+test registered_valid_time_without_request_fingerprints_fails_offline_cli ... ok
+test requested_valid_time_match_is_independent_of_returned_snapshot_mismatch ... ok
+test required_snapshot_retry_missing_after_eligible_empty_partial_is_noncompliant ... ok
+test retry_without_registered_guidance_is_noncompliant ... ok
+test returned_snapshot_match_is_independent_of_requested_valid_time_mismatch ... ok
+test scores_external_observations_offline_using_the_private_oracle ... ok
+test selector_diagnostics_compare_registered_arguments_without_persisting_values ... ok
+test snapshot_bound_retry_replay_proves_authorized_state_transition ... ok
+test stale_snapshot_retry_is_scored_as_noncompliant ... ok
+test summarize_pilot_cli_reports_exploratory_arm_outcomes_without_a_promotion_gate ... ok
+test summarize_pilot_cli_writes_family_level_variance_without_a_promotion_gate ... ok
+test unchanged_retry_query_is_scored_as_noncompliant ... ok
+test unregistered_revision_does_not_produce_full_cutoff_matches ... ok
+test valid_time_diagnostic_replay_is_byte_identical ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.48s
+
+     Running tests/paired_prompt_contract.rs (target/debug/build/eval-harness/db87a119ad1e4b34/out/paired_prompt_contract-db87a119ad1e4b34)
+
+running 1 test
+test source_authority_recall_prompt_requires_a_concise_answer_value ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/perf_cli.rs (target/debug/build/eval-harness/9de84e11fc53e470/out/perf_cli-9de84e11fc53e470)
+
+running 5 tests
+test baseline_gates_drive_exit_codes ... ok
+test committed_profiles_load_under_schema_v1 ... ok
+test host_tag_mismatch_is_invalid ... ok
+test run_with_tiny_profile_exits_zero_and_writes_artifact ... ok
+test update_baseline_copies_the_artifact_of_a_passing_run ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.69s
+
+     Running tests/perf_runner.rs (target/debug/build/eval-harness/96f05fcb1a45f833/out/perf_runner-96f05fcb1a45f833)
+
+running 5 tests
+test exhausted_budget_writes_artifact_and_invalid_verdict ... ok
+test runner_catalog_does_not_fragment_record_ids ... ok
+test runner_catalog_splits_assemble_setup_from_timed_phase ... ok
+test runner_catalog_tags_ingest_scale_sql_as_timed_phase ... ok
+test runner_writes_artifact_with_recorded_latency_and_passes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+     Running tests/perf_scenarios.rs (target/debug/build/eval-harness/ce686a7e7ba18575/out/perf_scenarios-ce686a7e7ba18575)
+
+running 6 tests
+test assemble_scale_corpus_is_fact_producing_and_retrievable ... ok
+test build_covers_every_scenario_id ... ok
+test claim_assemble_scenario_measures_only_the_stage_gated_read_path ... ok
+test claim_write_latency_scenario_times_the_production_claim_path ... ok
+test claim_write_performance_scenario_can_run_as_shadow_control ... ok
+test ingest_scale_unique_ids_write_every_episode_and_are_observed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+
+     Running tests/public_synthetic_trace.rs (target/debug/build/eval-harness/a60df51c5c13e6a3/out/public_synthetic_trace-a60df51c5c13e6a3)
+
+running 2 tests
+test a_trace_from_a_different_registered_arm_cannot_be_replayed ... ok
+test synthetic_capture_replays_exact_public_arguments_and_binds_response_identity ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recall_session_reuse.rs (target/debug/build/eval-harness/b1504aeff1e0a9c0/out/recall_session_reuse-b1504aeff1e0a9c0)
+
+running 2 tests
+test checkpoint_recall_reuses_seed_session_but_isolates_each_arm ... ok
+test paired_phase_deadline_returns_observation_after_killing_the_server ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.94s
+
+     Running tests/reranker_calibration.rs (target/debug/build/eval-harness/fdaf0d3172c66bca/out/reranker_calibration-fdaf0d3172c66bca)
+
+running 3 tests
+test calibration_command_accepts_source_pairs_and_an_output_artifact ... ok
+test native_calibration_distinguishes_fitted_quality_from_the_applied_boundary ... ignored, requires independently reviewed pairs and verified native model caches; set operational floor to zero
+test pinned_model_preparation_is_a_real_cli_operation ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/response_size_public_tool.rs (target/debug/build/eval-harness/3b745fd7500a8e20/out/response_size_public_tool-3b745fd7500a8e20)
+
+running 5 tests
+test explain_public_envelope_fits_32768_bytes_in_compact_mode ... ok
+test explain_public_envelope_fits_32768_bytes_in_verbose_mode ... ok
+test explain_source_continuations_reconstruct_original_unicode ... ok
+test explicit_source_range_keeps_a_fitting_quote_when_the_window_must_shrink ... ok
+test metadata_only_provenance_does_not_repeat_source_bodies ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+     Running tests/source_authority_codex_runner.rs (target/debug/build/eval-harness/2aa04c32f6c0925b/out/source_authority_codex_runner-2aa04c32f6c0925b)
+
+running 1 test
+test incumbent_receives_literal_source_content_and_candidate_import_is_isolated_from_agent_workspaces ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/storage_release_gates.rs (target/debug/build/eval-harness/5a0cc1dda3cabafc/out/storage_release_gates-5a0cc1dda3cabafc)
+
+running 56 tests
+test a_a_noise_above_three_percent_is_invalid ... ok
+test action_pair_set_accepts_complete_backfill_without_request_samples ... ok
+test action_pair_set_needs_completion_and_durable_facts_without_request_samples ... ok
+test action_pair_set_rejects_different_fact_work_between_sides ... ok
+test action_pair_set_rejects_missing_durable_verification ... ok
+test action_pair_set_rejects_unpersisted_facts ... ok
+test baseline_quality_outcomes_must_all_pass ... ok
+test complete_comparable_performance_pair_set_passes ... ok
+test corpus_case_split_and_label_trust_must_match_quality_outcomes ... ok
+test cpu_point_regression_is_rejected ... ok
+test database_cpu_point_regression_is_rejected_separately_from_app_cpu ... ok
+test different_cache_mode_is_invalid ... ok
+test different_host_is_invalid ... ok
+test different_measurement_case_is_invalid ... ok
+test different_memory_budget_is_invalid ... ok
+test different_model_revision_is_invalid ... ok
+test different_provider_is_invalid ... ok
+test disabled_embedding_mode_passes_with_nonsemantic_retrieval ... ok
+test disabled_embedding_mode_rejects_an_ann_workload ... ok
+test disabled_embedding_mode_rejects_observed_embedding_activity ... ok
+test disabled_stored_embedding_mode_passes_without_semantic_reads ... ok
+test duplicate_performance_pair_ids_are_invalid ... ok
+test equal_nonzero_baseline_and_candidate_error_rates_are_invalid ... ok
+test extra_performance_pairs_are_invalid ... ok
+test failed_release_budget_cannot_be_hidden_by_passing_case_summary ... ok
+test identical_quality_metrics_pass_for_comparable_complete_artifacts ... ok
+test increased_error_rate_is_rejected_without_dropping_failed_attempts ... ok
+test insufficient_pairs_is_invalid ... ok
+test insufficient_requests_is_invalid ... ok
+test latency_p50_point_regression_is_rejected ... ok
+test latency_p99_point_regression_is_rejected_even_when_p95_is_unchanged ... ok
+test latency_point_regression_is_rejected ... ok
+test measured_revision_must_match_declared_candidate_commit ... ok
+test missing_baseline_is_invalid ... ok
+test missing_database_cpu_evidence_is_invalid ... ok
+test more_than_one_thousand_request_samples_is_invalid ... ok
+test more_than_thirty_warmup_requests_is_invalid ... ok
+test native_quality_has_zero_regression ... ignored, requires immutable parent and candidate native release evaluation artifacts
+test non_linux_host_is_invalid ... ok
+test non_retrieval_quality_regression_within_floor_and_budget_is_rejected ... ok
+test one_lost_required_fact_rejects_quality ... ok
+test paired_latency_point_estimate_uses_median_not_mean ... ok
+test paired_run_order_must_be_balanced_and_pinned ... ok
+test perfect_quality_cannot_hide_missing_cases ... ok
+test performance_case_dimension_must_match_the_paired_embedding_mode ... ok
+test performance_case_inventory_must_be_complete ... ok
+test performance_pair_set_meets_release_contract ... ignored, requires immutable native Linux amd64 performance A/A and A/B artifacts
+test quality_comparison_requires_coverage_for_every_release_profile_suite ... ok
+test quality_floor_pass_does_not_allow_baseline_regression ... ok
+test startup_action_pair_set_accepts_durable_readiness_without_fake_requests ... ok
+test throughput_point_regression_is_rejected ... ok
+test wide_uncertainty_is_inconclusive ... ok
+test wrong_dimension_is_invalid ... ok
+test wrong_model_is_invalid ... ok
+test zero_configured_dimension_is_invalid_even_when_embeddings_are_disabled ... ok
+test zero_success_baseline_is_invalid ... ok
+
+test result: ok. 54 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+     Running tests/suite_deadline.rs (target/debug/build/eval-harness/458fb403455cb7b4/out/suite_deadline-458fb403455cb7b4)
+
+running 2 tests
+test external_deadline_drops_workers_and_preserves_case_progress ... ok
+test same_suite_deadline_preserves_completed_running_and_unstarted_cases ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/surreal_query_efficiency.rs (target/debug/build/eval-harness/848a0a5bcb3d70c3/out/surreal_query_efficiency-848a0a5bcb3d70c3)
+
+running 27 tests
+test remote_evidence_accepts_complete_equivalent_pair ... ok
+test remote_evidence_accepts_idle_resource_windows_without_request_samples ... ok
+test remote_evidence_accepts_the_embeddings_disabled_profile ... ok
+test remote_evidence_accepts_unchanged_partial_recall ... ok
+test remote_evidence_rejects_a_manifest_digest_that_does_not_match_its_ids ... ok
+test remote_evidence_rejects_changed_rank_order_even_when_scores_match ... ok
+test remote_evidence_rejects_cross_schema_comparison ... ok
+test remote_evidence_rejects_emulated_as_native ... ok
+test remote_evidence_rejects_incompatible_v1_schema ... ok
+test remote_evidence_rejects_lost_quality_case ... ok
+test remote_evidence_rejects_missing_db_cpu ... ok
+test remote_evidence_rejects_missing_relevant_fact ... ok
+test remote_evidence_rejects_missing_samples_and_resources ... ok
+test remote_evidence_rejects_missing_session_attach_counter ... ok
+test remote_evidence_rejects_quality_limit_changes ... ok
+test remote_evidence_rejects_quality_scores_inconsistent_with_ranked_ids ... ok
+test remote_evidence_rejects_replacing_a_relevant_result ... ok
+test remote_evidence_rejects_reusing_one_run_as_both_sides_of_a_pair ... ok
+test remote_evidence_rejects_scenarios_missing_from_the_frozen_manifest ... ok
+test remote_evidence_rejects_throughput_inconsistent_with_duration ... ok
+test remote_evidence_rejects_unknown_schema_version ... ok
+test remote_evidence_rejects_unpaired_resource_windows ... ok
+test remote_evidence_rejects_zero_embedding_dimension ... ok
+test remote_evidence_rejects_zero_throughput_with_successful_samples ... ok
+test remote_evidence_reports_unsupported_persisted_schema ... ok
+test remote_evidence_round_trips_through_the_persisted_artifact_contract ... ok
+test remote_evidence_serializes_paired_resources_and_session_counters ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/verified_decision_replay.rs (target/debug/build/eval-harness/6efb2637a16af944/out/verified_decision_replay-6efb2637a16af944)
+
+running 18 tests
+test archived_capture_cannot_hide_a_changed_second_read ... ok
+test archived_capture_cannot_omit_the_registered_second_read ... ok
+test archived_raw_receipts_match_the_actual_registered_corpus ... ok
+test archived_raw_receipts_reconstruct_the_registered_replay ... ok
+test changed_checkpoint_cannot_attest_the_registered_history ... ok
+test changed_extractor_cannot_reuse_the_registered_configuration ... ok
+test changed_private_oracle_cannot_redefine_registered_success ... ok
+test changed_seed_payload_cannot_attest_the_registered_history ... ok
+test detached_decision_score_is_rejected_even_when_repeated ... ok
+test detached_primary_temporal_score_is_rejected ... ok
+test diagnostic_extractor_cannot_differ_from_registered_configuration ... ok
+test diagnostic_formation_cannot_substitute_for_missing_primary_formation ... ok
+test extraction_without_a_successful_response_cannot_attest_formation ... ok
+test missing_raw_receipts_never_degrade_to_index_only_acceptance ... ok
+test primary_only_capture_cannot_hide_a_changed_second_read ... ok
+test primary_only_capture_cannot_omit_the_registered_second_read ... ok
+test primary_only_receipts_regrade_without_requiring_rollout_diagnostics ... ok
+test self_consistent_but_changed_probe_request_is_not_registered ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+
+   Doc-tests eval_harness
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

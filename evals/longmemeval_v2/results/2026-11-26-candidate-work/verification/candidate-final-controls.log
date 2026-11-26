@@ -1,0 +1,101 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.16s
+     Running tests/graph_batch_query_regression.rs (target/debug/build/memory_mcp/d635a5a1b2355c78/out/graph_batch_query_regression-d635a5a1b2355c78)
+
+running 6 tests
+test graph_batches_do_not_rescan_the_global_valid_time_bitmap ... ok
+test staged_graph_read_excludes_future_validity_and_ingestion ... ok
+test batch_graph_lookup_preserves_bitemporal_invalidation_boundaries ... ok
+test batch_graph_lookup_preserves_literal_rows_for_hostile_ids_and_self_loops ... ok
+test batch_graph_lookup_keeps_all_rows_across_the_32_seed_boundary ... ok
+test batch_graph_lookup_uses_endpoint_indexes_with_many_unrelated_edges ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.72s
+
+     Running tests/graph_read_concurrency.rs (target/debug/build/memory_mcp/fc670cf3015d675f/out/graph_read_concurrency-fc670cf3015d675f)
+
+running 4 tests
+test cancelling_public_read_drops_all_pending_graph_batches ... ok
+test later_graph_failure_cancels_an_earlier_pending_batch ... ok
+test public_read_overlaps_four_graph_batches_without_starting_a_fifth ... ok
+test reverse_batch_completion_preserves_the_first_sorted_graph_path ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/lexical_candidate_hydration.rs (target/debug/build/memory_mcp/64428c2b50b10cb3/out/lexical_candidate_hydration-64428c2b50b10cb3)
+
+running 1 test
+test lexical_candidate_union_keeps_first_hit_score_and_all_source_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 13 tests
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_repeated_query_read_reuses_grounding_spans ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 9 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+2026-11-26T14:51:25.715320Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+
+     Running tests/retrieval_partial_evidence.rs (target/debug/build/memory_mcp/6c5569c979e00a17/out/retrieval_partial_evidence-6c5569c979e00a17)
+
+running 6 tests
+test cancelled_public_read_retains_completed_source_stage_without_claiming_selection ... ok
+test failed_public_read_does_not_expose_a_policy_excluded_source ... ok
+test one_capture_cannot_merge_stages_from_two_public_reads ... ok
+test failed_public_read_retains_source_evidence_and_original_storage_error ... ok
+test public_read_observes_actual_time_visible_candidate_payload_without_source_text ... ok
+test duplicate_query_grounding_can_choose_a_different_source_sentence ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 17 tests
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test batched_lexical_sort_discards_full_sources_before_each_term_limit ... ok
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test archival_existence_does_not_read_fact_payload ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+

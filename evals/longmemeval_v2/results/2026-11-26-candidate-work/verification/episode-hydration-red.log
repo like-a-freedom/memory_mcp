@@ -1,0 +1,24 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.66s
+     Running tests/episode_candidate_hydration.rs (target/debug/build/memory_mcp/ea1a13cef669e86b/out/episode_candidate_hydration-ea1a13cef669e86b)
+
+running 1 test
+test episode_term_candidates_return_each_payload_once_in_first_hit_order ... FAILED
+
+failures:
+
+---- episode_term_candidates_return_each_payload_once_in_first_hit_order stdout ----
+
+thread 'episode_term_candidates_return_each_payload_once_in_first_hit_order' (6866014) panicked at crates/memory-mcp/tests/episode_candidate_hydration.rs:19:5:
+assertion `left == right` failed: full source payload must be returned only on its first term hit; cap must not refill
+  left: 8
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    episode_term_candidates_return_each_payload_once_in_first_hit_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p memory_mcp --test episode_candidate_hydration`

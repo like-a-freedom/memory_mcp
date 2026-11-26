@@ -1,0 +1,5 @@
+    Checking memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Checking xtask v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/xtask)
+    Checking ui v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/ui)
+    Checking eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.79s

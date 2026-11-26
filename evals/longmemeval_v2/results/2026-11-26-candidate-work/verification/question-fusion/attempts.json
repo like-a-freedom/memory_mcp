@@ -1,0 +1,7 @@
+{
+  "final_output_only_proposal": "passed due episode fallback; not RED for fusion",
+  "first_stage_proposal": "invalid fixture: fact ingestion time now after historical as_of, ranked fact stage empty",
+  "corrected_fixture": "explicit fixed valid and knowledge timestamps; literal source present; genuine runtimeRED grounding0.75 versus0.23461538461538464",
+  "required_invariant": "Same question with only answer-format instruction must not dilute source grounding during fusion. Original raw query remains for temporal/admission/first-person/rationale.",
+  "full_capture": "composite-token-reuse: dropdownPASS25.332s; toolbarcompleted30.045s/no target selected. Process exit101 with external wait-timeout flag, not proof of SIGKILL.62 full exposed development processes."
+}

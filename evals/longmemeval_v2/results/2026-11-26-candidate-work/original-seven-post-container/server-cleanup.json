@@ -1,0 +1,12 @@
+[
+  {
+    "role": "reader",
+    "pid": 16669,
+    "exit_code": -15
+  },
+  {
+    "role": "judge",
+    "pid": 16683,
+    "exit_code": -15
+  }
+]

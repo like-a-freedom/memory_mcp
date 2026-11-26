@@ -1,0 +1,27 @@
+{
+  "schema": "original-seven-offline-analysis-registration/v1",
+  "registered_before_reader_outputs": true,
+  "metrics": [
+    "all-seven failure-inclusive native scorer coverage, reader/judge errors, unavailable native aggregate stays unavailable",
+    "existing strict independent reviewed-answer contract across all seven actual captured readers; no new accepted answers",
+    "reviewed span in actual prompt_rows, regardless of native judge completion",
+    "all seven query durations, token counts and truncation; descriptive comparison only"
+  ],
+  "baseline_boundary": "Previous original-seven-post-container is one complete raw256 pass, same original pinned questions/prompts/models/snapshot: native3/7 and strict3/7. Compare casewise without dropping misses; this exposed seven-case before/after is descriptive development evidence, not independent causal benefit. Older archive raw256 was incomplete and concise512 used a different protocol.",
+  "no_additional_model_calls": true,
+  "input_sha256": {
+    "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+    "evals/longmemeval_v2/long_history_diagnosis.py": "9c7b5b3480840921233a1c7bf703bab4c676ab768168be206e359438fcbd8ed4",
+    "evals/longmemeval_v2/exact_answer_quality.py": "12b65ee62dd77b74bf3db83caa10d7f8d5289c1b90aae68d2de49630fe48dd60",
+    "evals/longmemeval_v2/reviewed_span_coverage.py": "ff552349fb683535ae0b375f7bf1aef521dbb2c63d5579f6e1d9b0475151cb57",
+    "evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/score-coverage.json": "e784eb05ccd80f6bfdd9625d4683cdfabb64a2e1a35cd32228173673b86150b4",
+    "evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1/replay.json": "9fa3e685ecc6f2dacf44808214508a03cf46f626d990228e8940bd7bff0d514d",
+    "evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-container/scores/prompt_rows.jsonl": "98942210cc6f5052fbd935c3995508334eb2a997dbe9c9489fd10ec73107fc42",
+    "evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-container/scores/per_question.jsonl": "3fd6e8212c0f2448811a2db4118fc0eb50a61bb18f1981b5f18c74b6df0f7435",
+    "evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/analyze.py": "3bd1f2aaf29a1b1a860ac1fefbe8045ee814e8b599e0631274a4cf357536799b",
+    "evals/longmemeval_v2/results/2026-11-26-candidate-work/topical-tabs-final/registration.json": "1d25ecc3aa4e7329b542d781fc3e6ce91478460f33bffec02f563cb317f3b0c5"
+  },
+  "additional_metric": "Exact entire preregistered alternative directory block in one actual reader text item; original single-reviewed-span measure/answers unchanged. Native full-store receipt must separately prove actual source identity.",
+  "analysis_amendment_before_capture": "Before any new model/reader outputs, public script controls exposed two protocol gaps. Bind native gate product SHA and both binary-integrity flags to release SHA. If reader/judge capture is incomplete, preserve all7 scheduled cases and all available prompt source measurements in partial-analysis.json, reject final acceptance; never drop a case. Successful full-capture metric formulas and accepted answers remain unchanged. Model entry also verifies original primary pair process outcomes, registration identity and snapshot integrity.",
+  "capture_script_sha256": "9a65aaa612492c15abeb0bff63bec750695b175ee43d5baa72fc41507e2d3ced"
+}

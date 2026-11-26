@@ -1,0 +1,190 @@
+{
+  "schema": "full-history-read-cost-breakdown/v1",
+  "note": "Observed wall intervals, overlapping update durations must not be summed. Query observer and pipeline clocks start separately at read setup; no CPU or causal engine-cost attribution.",
+  "cases": {
+    "0c6b0c60": {
+      "source_log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/source-refresh-14d14b46/0c6b0c60.log",
+      "source_sha256": "85c1d104cb14f8c4a5cd077ccbc7ef07935532e055cd80fdd17a6a9dc7541364",
+      "phases": [
+        {
+          "elapsed_ms": 11605.053542,
+          "stage": "channels.completed"
+        },
+        {
+          "elapsed_ms": 11636.920917,
+          "stage": "subject.resolved"
+        },
+        {
+          "elapsed_ms": 11710.954708,
+          "stage": "topics.completed"
+        },
+        {
+          "elapsed_ms": 14847.750042,
+          "stage": "fusion.completed"
+        },
+        {
+          "elapsed_ms": 17748.270208,
+          "stage": "admission.completed"
+        },
+        {
+          "elapsed_ms": 19819.584583,
+          "stage": "selection.completed"
+        }
+      ],
+      "access_updates": [
+        {
+          "completion_ms": 21741.991875,
+          "duration_ms": 165.719,
+          "start_ms": 21576.272875
+        },
+        {
+          "completion_ms": 21742.041958,
+          "duration_ms": 1819.365,
+          "start_ms": 19922.676958
+        },
+        {
+          "completion_ms": 21777.183333,
+          "duration_ms": 200.928,
+          "start_ms": 21576.255333
+        },
+        {
+          "completion_ms": 21784.756375,
+          "duration_ms": 1833.524,
+          "start_ms": 19951.232375
+        },
+        {
+          "completion_ms": 21810.810332999998,
+          "duration_ms": 26.018,
+          "start_ms": 21784.792332999998
+        }
+      ],
+      "access_update_interval_ms": 1888.1333749999976,
+      "evidence_stages": [
+        {
+          "stage": "formation",
+          "elapsed_ms": 0.470667
+        },
+        {
+          "stage": "ranked_fact_candidates",
+          "elapsed_ms": 14847.918833
+        },
+        {
+          "stage": "subject_scoped_fact_candidates",
+          "elapsed_ms": 16107.323417
+        },
+        {
+          "stage": "admitted_fact_candidates",
+          "elapsed_ms": 17743.563917
+        },
+        {
+          "stage": "bounded_fact_candidates",
+          "elapsed_ms": 17748.447125
+        },
+        {
+          "stage": "episode_candidates",
+          "elapsed_ms": 19291.913916999998
+        },
+        {
+          "stage": "selected_pre_packaging",
+          "elapsed_ms": 21797.377333
+        },
+        {
+          "stage": "packed_context",
+          "elapsed_ms": 21942.531458
+        }
+      ]
+    },
+    "f61a096f": {
+      "source_log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/source-refresh-14d14b46/f61a096f.log",
+      "source_sha256": "c48e6741c7d8adbab6313c8c58bf88805dcf0b4b025376d30c9b884ebdbbc59e",
+      "phases": [
+        {
+          "elapsed_ms": 12235.101167,
+          "stage": "channels.completed"
+        },
+        {
+          "elapsed_ms": 12279.920292,
+          "stage": "subject.resolved"
+        },
+        {
+          "elapsed_ms": 12347.897167,
+          "stage": "topics.completed"
+        },
+        {
+          "elapsed_ms": 16172.9025,
+          "stage": "fusion.completed"
+        },
+        {
+          "elapsed_ms": 18658.607459,
+          "stage": "admission.completed"
+        },
+        {
+          "elapsed_ms": 21566.319334,
+          "stage": "selection.completed"
+        }
+      ],
+      "access_updates": [
+        {
+          "completion_ms": 25455.908832999998,
+          "duration_ms": 3711.409,
+          "start_ms": 21744.499832999998
+        },
+        {
+          "completion_ms": 25486.763833,
+          "duration_ms": 3744.551,
+          "start_ms": 21742.212833
+        },
+        {
+          "completion_ms": 25513.127125,
+          "duration_ms": 3768.621,
+          "start_ms": 21744.506125
+        },
+        {
+          "completion_ms": 25521.993416,
+          "duration_ms": 3777.484,
+          "start_ms": 21744.509416
+        },
+        {
+          "completion_ms": 27969.737250000002,
+          "duration_ms": 2447.716,
+          "start_ms": 25522.02125
+        }
+      ],
+      "access_update_interval_ms": 6227.5244170000005,
+      "evidence_stages": [
+        {
+          "stage": "formation",
+          "elapsed_ms": 0.551459
+        },
+        {
+          "stage": "ranked_fact_candidates",
+          "elapsed_ms": 16173.385959000001
+        },
+        {
+          "stage": "subject_scoped_fact_candidates",
+          "elapsed_ms": 16175.057709
+        },
+        {
+          "stage": "admitted_fact_candidates",
+          "elapsed_ms": 18650.837834
+        },
+        {
+          "stage": "bounded_fact_candidates",
+          "elapsed_ms": 18659.059542000003
+        },
+        {
+          "stage": "episode_candidates",
+          "elapsed_ms": 20896.586
+        },
+        {
+          "stage": "selected_pre_packaging",
+          "elapsed_ms": 27965.669167
+        },
+        {
+          "stage": "packed_context",
+          "elapsed_ms": 28293.205084
+        }
+      ]
+    }
+  }
+}

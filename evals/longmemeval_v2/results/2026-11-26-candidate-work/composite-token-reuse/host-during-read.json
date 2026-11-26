@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-11-26T16:58:08.367559+00:00",
+  "processes": [
+    {
+      "pid": 83865,
+      "ppid": 83859,
+      "elapsed": "01:19",
+      "cpu_percent": "0.0",
+      "executable_name": "cargo"
+    },
+    {
+      "pid": 86122,
+      "ppid": 83865,
+      "elapsed": "00:09",
+      "cpu_percent": "98.6",
+      "executable_name": "rustc"
+    }
+  ],
+  "case_logs_present": [
+    "0c6b0c60.log"
+  ],
+  "scope": "One contemporaneous compact build-process observation. No normalization or adjusted deadline; preserves actual raw process outcomes."
+}

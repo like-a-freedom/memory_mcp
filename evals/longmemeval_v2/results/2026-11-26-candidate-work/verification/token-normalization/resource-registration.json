@@ -1,0 +1,27 @@
+{
+  "schema": "corrected-allocation-comparison/v1",
+  "measurement": "Count allocations during public caller future polls, excluding each wrapped storage future poll; background runtime tasks excluded. Same permanent2000-ID source8facts, budget5, literal IDs and2048byte excerpts; threshold1000000 unchanged. Baseline is bounded-access-waves normalization; all other current sources unchanged.",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--test",
+    "lexical_term_set_resource",
+    "public_composite_source_tokens",
+    "--",
+    "--nocapture"
+  ],
+  "test_sha256": "fd30e0598dc0f98188b6d36b1f5fdb6b03b28e25ca864e61e434d12708b87899",
+  "candidate_sha256": {
+    "crates/memory-mcp/src/shared/search.rs": "6f4635f9772c716dd5e80b0ec86dd88557d6ad357493fcf3cecf987f2c3943e9",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "e2101dd98782765a5bf3743498d6ea7922fd810761b88d9eed0db24e51982502",
+    "crates/memory-mcp/src/memory/retrieval/budget.rs": "d2c69db031190ec3180b94ee9096689241a162e27a33ab3c786507dba7ef8232"
+  },
+  "baseline_sha256": {
+    "crates/memory-mcp/src/shared/search.rs": "ee9f0b940230fd42c5698f4cc7f2c7dc9c2ec82a9acf316d55abe46bd9243285",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "87147d8cc37b9c72fa446d671262c44a01c531aef818eaaedee7ab288d616fae",
+    "crates/memory-mcp/src/memory/retrieval/budget.rs": "06f353ac05ccb055c5533474d754521a314d0acd55d7414d87ff341743dff554"
+  }
+}

@@ -1,0 +1,17 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.74s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test later_toolbar_request_does_not_prefer_the_old_visible_container ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.33s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test unknown_nearest_container_does_not_inherit_outer_visibility ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.26s
+

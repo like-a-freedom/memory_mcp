@@ -1,0 +1,26 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.68s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+2026-11-26T16:19:36.154637Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.165681Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.174378Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.182653Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.191050Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.199230Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:19:36.207331Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+
+thread 'explicitly_named_controls_survive_competing_generic_toolbar_histories' (7053803) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:36:5:
+explicit source labels must survive generic term density and a limited response budget
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test explicitly_named_controls_survive_competing_generic_toolbar_histories ... FAILED
+
+failures:
+
+failures:
+    explicitly_named_controls_survive_competing_generic_toolbar_histories
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.47s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

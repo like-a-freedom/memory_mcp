@@ -1,0 +1,8 @@
+{
+  "final_acceptance": false,
+  "reason": "TDD continued on source files after the intermediate binary was pinned; source guard rejected final acceptance. Raw outcomes retained; not final-source regression proof.",
+  "changed_sources": [
+    "crates/memory-mcp/src/memory/retrieval/budget.rs",
+    "crates/memory-mcp/tests/long_history_stage_evidence.rs"
+  ]
+}

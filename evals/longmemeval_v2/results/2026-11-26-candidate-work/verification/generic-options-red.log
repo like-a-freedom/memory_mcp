@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.60s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... FAILED
+
+failures:
+
+---- generic_options_group_does_not_replace_a_topical_narrative_answer stdout ----
+
+thread 'generic_options_group_does_not_replace_a_topical_narrative_answer' (6844413) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:178:9:
+generic UI terminology must not displace a topical answer
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    generic_options_group_does_not_replace_a_topical_narrative_answer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.25s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

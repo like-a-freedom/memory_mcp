@@ -1,0 +1,48 @@
+{
+  "schema": "local-runtime-request-log-observations/v1",
+  "interpretation": "Counts are observed server log records, not per-case SDK failure classifications. HTTP200 headers do not prove completed delivery. BrokenPipe lines may duplicate/interleave one traceback; never interpret them as exact failed-attempt counts. Terminal case outcomes remain in score-coverage.json. No model calls made by this analysis.",
+  "runs": {
+    "original-seven-post-container": {
+      "reader": {
+        "http_post_log_records": 11,
+        "broken_pipe_exception_log_lines": 2,
+        "log_sha256": "236b30f2008a90293addce9806ced1ca00b37551e2bc0c68f112b733f6c8fb24"
+      },
+      "judge": {
+        "http_post_log_records": 3,
+        "broken_pipe_exception_log_lines": 0,
+        "log_sha256": "8ceb69c3ef5ad631c747e0587de44fef88319da03779704466d71b277c824efb"
+      },
+      "terminal_case_outcomes": {
+        "0c6b0c60": "scored",
+        "6d975a08": "scored",
+        "89a20f48": "scored",
+        "922a0c56": "scored",
+        "d6da3938": "scored",
+        "f43926d9": "scored",
+        "f61a096f": "scored"
+      }
+    },
+    "original-seven-post-topical": {
+      "reader": {
+        "http_post_log_records": 15,
+        "broken_pipe_exception_log_lines": 3,
+        "log_sha256": "6ad92cbd421e79380f7d72c97e2c159ebb31882018fba4f3e9ea2a0c48559f6e"
+      },
+      "judge": {
+        "http_post_log_records": 3,
+        "broken_pipe_exception_log_lines": 0,
+        "log_sha256": "544a1dcdd9ff77b403e008e8856e58c7f3b354e524a63c32da9f4d4c00801582"
+      },
+      "terminal_case_outcomes": {
+        "0c6b0c60": "scored",
+        "6d975a08": "scored",
+        "89a20f48": "scored",
+        "922a0c56": "scored",
+        "d6da3938": "scored",
+        "f43926d9": "scored",
+        "f61a096f": "scored"
+      }
+    }
+  }
+}

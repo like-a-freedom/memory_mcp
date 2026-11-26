@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.67s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'compound_when_question_requires_event_time_from_the_source' (7589451) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:414:5:
+an undated source cannot supply the date requested in the first clause: [AssembledContextItem { fact_id: "episode_fallback:episode:9914b5b12f797eab5bb461d3", content: "Alice saved a record and then exported the archive.", quote: "Alice saved a record and then exported the archive.", source_episode: "episode:9914b5b12f797eab5bb461d3", confidence: 0.4299436056257331, relevance: Some(0.4), grounding: Some(0.4), semantic_available: Some(false), provenance: Object {"episode_fallback": Bool(true), "reference_time": String("2026-03-01T10:00:00Z"), "source_episode": String("episode:9914b5b12f797eab5bb461d3"), "source_id": String("undated-archive-event"), "source_type": String("chat")}, rationale: "tier=fallback fts=2.00 access_count=0 confidence=0.43 grounding=0.40 semantic=disabled matched episode content query=\"alice save record happened next\" and active at 2026-11-26", retrieval_tier: Some("fallback"), reconciliation: None, evidence_status: None, retrieval_evidence: None }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test compound_when_question_requires_event_time_from_the_source ... FAILED
+
+failures:
+
+failures:
+    compound_when_question_requires_event_time_from_the_source
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

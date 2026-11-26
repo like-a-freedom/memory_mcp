@@ -1,0 +1,9 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.40s
+     Running tests/episode_candidate_hydration.rs (target/debug/build/memory_mcp/ea1a13cef669e86b/out/episode_candidate_hydration-ea1a13cef669e86b)
+
+running 1 test
+test episode_term_candidates_return_each_payload_once_in_first_hit_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+

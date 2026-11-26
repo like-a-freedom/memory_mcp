@@ -1,0 +1,33 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.02s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 24 tests
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test diagnostic_source_observation_respects_request_policy ... ok
+test compound_when_question_requires_event_time_from_the_source ... ok
+test compound_when_question_preserves_a_source_with_the_event_date ... ok
+test excluded_label_is_not_reported_as_requested_control_membership ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test no_longer_included_label_has_no_positive_membership_priority ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test excludes_label_has_no_positive_membership_priority ... ok
+test excepted_label_has_no_positive_membership_priority ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test replacement_quote_is_not_reported_as_a_requested_control_label ... ok
+test visible_controls_outrank_a_hidden_copy_near_the_lexical_window ... ok
+2026-11-26T17:59:55.219246Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
+

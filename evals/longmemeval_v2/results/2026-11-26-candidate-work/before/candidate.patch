@@ -1,0 +1,466 @@
+diff --git a/crates/memory-mcp/src/eval_support/retrieval.rs b/crates/memory-mcp/src/eval_support/retrieval.rs
+index 194da16b..066007b5 100644
+--- a/crates/memory-mcp/src/eval_support/retrieval.rs
++++ b/crates/memory-mcp/src/eval_support/retrieval.rs
+@@ -144,7 +144,7 @@ pub async fn new_eval_reembed_service(
+ /// Immutable source-filtered receipts from the actual context pipeline.
+ /// Raw evidence is returned only to this explicit eval caller, never logged.
+ pub use crate::memory::retrieval::diagnostics::{
+-    ContextEvidence, ContextEvidenceCapture, RetrievalStage,
++    CandidateInventory, CandidateObserver, ContextEvidence, ContextEvidenceCapture, RetrievalStage,
+ };
+ 
+ pub async fn assemble_context_with_evidence(
+diff --git a/crates/memory-mcp/src/memory/retrieval/budget.rs b/crates/memory-mcp/src/memory/retrieval/budget.rs
+index 0eb079a9..6258e963 100644
+--- a/crates/memory-mcp/src/memory/retrieval/budget.rs
++++ b/crates/memory-mcp/src/memory/retrieval/budget.rs
+@@ -361,6 +361,7 @@ pub(super) async fn collect_episode_fallback_items(
+     service: &RetrievalContext,
+     params: &DefaultContextParams<'_>,
+     query: &str,
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+ ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+     let response_budget = params.budget.max(1) as usize;
+     let candidate_budget = super::reranking::candidate_pool_limit(
+@@ -376,6 +377,8 @@ pub(super) async fn collect_episode_fallback_items(
+     )
+     .await?;
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(trace, "episodes.fetched", &episode_records);
+     let query_terms = crate::shared::search::search_query_terms(query);
+     let raw_query = params.raw_query_opt.unwrap_or(query);
+     let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
+diff --git a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+index e002b243..5a986bfb 100644
+--- a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
++++ b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+@@ -1,5 +1,5 @@
+ //! Feature-gated, explicitly requested evaluation receipts. Never production logs.
+-use std::sync::Mutex;
++use std::sync::{Arc, Mutex};
+ use std::time::Instant;
+ 
+ use serde::Serialize;
+@@ -20,6 +20,26 @@ pub struct ContextEvidence {
+     pub items: Vec<AssembledContextItem>,
+ }
+ 
++/// Payload shape at an actual completed candidate boundary; no source text or keys.
++#[derive(Debug, Clone, Serialize)]
++pub struct CandidateInventory {
++    pub stage: String,
++    pub elapsed_ms: f64,
++    pub records: usize,
++    pub content_bytes: usize,
++    pub max_content_bytes: usize,
++    pub index_keys: usize,
++    pub index_key_bytes: usize,
++    pub max_index_key_bytes: usize,
++    pub unique_contents: usize,
++    pub unique_sources: usize,
++}
++
++/// Explicit evaluation sink. Implementations may durably flush each boundary.
++pub trait CandidateObserver: Send + Sync {
++    fn observe(&self, inventory: &CandidateInventory);
++}
++
+ /// One explicitly requested diagnostic read. Owned by the caller so completed
+ /// stages survive cancellation or a storage error in the read future.
+ pub struct ContextEvidenceCapture {
+@@ -34,10 +54,34 @@ impl ContextEvidenceCapture {
+                 read_started: false,
+                 source_episode: source_episode.to_owned(),
+                 stages: Vec::new(),
++                candidates: Vec::new(),
++                observer: None,
+             }),
+         }
+     }
+ 
++    pub fn with_candidate_observer(
++        source_episode: &str,
++        observer: Arc<dyn CandidateObserver>,
++    ) -> Self {
++        let mut capture = Self::new(source_episode);
++        if let Ok(recorder) = capture.recorder.get_mut() {
++            recorder.observer = Some(observer);
++        }
++        capture
++    }
++
++    pub fn candidates(&self) -> Result<Vec<CandidateInventory>, crate::error::MemoryError> {
++        self.recorder
++            .lock()
++            .map(|recorder| recorder.candidates.clone())
++            .map_err(|_| {
++                crate::error::MemoryError::Validation(
++                    "evaluation evidence recorder poisoned".into(),
++                )
++            })
++    }
++
+     pub(super) fn begin(&self) -> Result<String, crate::error::MemoryError> {
+         let mut recorder = self.recorder.lock().map_err(|_| {
+             crate::error::MemoryError::Validation("evaluation evidence recorder poisoned".into())
+@@ -71,6 +115,8 @@ pub(super) struct Recorder {
+     read_started: bool,
+     pub(super) source_episode: String,
+     pub(super) stages: Vec<RetrievalStage>,
++    candidates: Vec<CandidateInventory>,
++    observer: Option<Arc<dyn CandidateObserver>>,
+ }
+ 
+ pub(super) type EvidenceRecorder<'a> = Option<&'a Mutex<Recorder>>;
+@@ -92,3 +138,71 @@ pub(super) fn record(trace: EvidenceRecorder<'_>, stage: &str, items: &[Assemble
+         });
+     }
+ }
++
++pub(super) fn record_candidates(
++    trace: EvidenceRecorder<'_>,
++    stage: &str,
++    records: &[serde_json::Value],
++) {
++    let Some(trace) = trace else { return };
++    use super::filtering::{raw_array, raw_object};
++    use crate::storage::value_helpers::json_string;
++    use std::collections::HashSet;
++    let mut contents = HashSet::new();
++    let mut sources = HashSet::new();
++    let mut inventory = CandidateInventory {
++        stage: stage.to_owned(),
++        elapsed_ms: 0.0,
++        records: records.len(),
++        content_bytes: 0,
++        max_content_bytes: 0,
++        index_keys: 0,
++        index_key_bytes: 0,
++        max_index_key_bytes: 0,
++        unique_contents: 0,
++        unique_sources: 0,
++    };
++    for record in records {
++        let Some(map) = raw_object(record) else {
++            continue;
++        };
++        if let Some(content) = map.get("content").and_then(json_string) {
++            inventory.content_bytes += content.len();
++            inventory.max_content_bytes = inventory.max_content_bytes.max(content.len());
++            contents.insert(content);
++        }
++        if let Some(source) = map
++            .get("source_episode")
++            .or_else(|| map.get("episode_id"))
++            .and_then(json_string)
++        {
++            sources.insert(source);
++        }
++        for key in map
++            .get("index_keys")
++            .and_then(raw_array)
++            .into_iter()
++            .flatten()
++            .filter_map(json_string)
++        {
++            inventory.index_keys += 1;
++            inventory.index_key_bytes += key.len();
++            inventory.max_index_key_bytes = inventory.max_index_key_bytes.max(key.len());
++        }
++    }
++    inventory.unique_contents = contents.len();
++    inventory.unique_sources = sources.len();
++    let observer = if let Ok(mut recorder) = trace.lock() {
++        inventory.elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1000.0;
++        recorder.candidates.push(inventory.clone());
++        recorder.observer.clone()
++    } else {
++        None
++    };
++    // The callback runs after releasing the recorder lock and before expensive
++    // normalization. An explicit caller can flush completed metadata even if
++    // synchronous work later outlives a cooperative deadline.
++    if let Some(observer) = observer {
++        observer.observe(&inventory);
++    }
++}
+diff --git a/crates/memory-mcp/src/memory/retrieval/lexical.rs b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+index 6517d63d..0dcc8c69 100644
+--- a/crates/memory-mcp/src/memory/retrieval/lexical.rs
++++ b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+@@ -28,6 +28,8 @@ pub(crate) struct FactQueryParams<'a> {
+     pub(crate) query_opt: Option<&'a str>,
+     pub(crate) limit: i32,
+     pub(crate) fact_types: &'a [String],
++    #[cfg(feature = "eval-support")]
++    pub(crate) trace: super::diagnostics::EvidenceRecorder<'a>,
+ }
+ 
+ pub(crate) async fn select_fact_records_for_query(
+@@ -47,6 +49,8 @@ pub(crate) async fn select_fact_records_for_query(
+         })
+         .await
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(params.trace, "facts.initial_fetched", &initial);
+     let initial = rank_lexical_candidates(initial, &query_terms);
+ 
+     let Some(_query) = params.query_opt else {
+@@ -70,6 +74,12 @@ pub(crate) async fn select_fact_records_for_query(
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+     let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(
++        params.trace,
++        "facts.term_groups_fetched",
++        &fallback_records,
++    );
+     let mut seen_fact_ids = HashSet::new();
+     fallback_records.retain(|record| {
+         let Some(fact_id) = record
+@@ -81,6 +91,12 @@ pub(crate) async fn select_fact_records_for_query(
+         seen_fact_ids.insert(fact_id)
+     });
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(
++        params.trace,
++        "facts.term_groups_deduplicated",
++        &fallback_records,
++    );
+     let fallback_records = rank_lexical_candidates(fallback_records, &query_terms);
+ 
+     let initial_score = initial.top_query_score;
+@@ -269,6 +285,8 @@ async fn scan_fact_records_by_query_terms(
+         .await
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(params.trace, "facts.scan_fetched", &records);
+     let filtered = records
+         .into_iter()
+         .filter(|record| fact_record_matches_type(record, params.fact_types))
+@@ -1300,6 +1318,8 @@ mod tests {
+                 query_opt: Some("atlas launch checklist"),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1499,6 +1519,8 @@ mod tests {
+                 query_opt: Some("lgbtq support group"),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1577,6 +1599,8 @@ mod tests {
+                 query_opt: Some(query),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1643,6 +1667,8 @@ mod tests {
+                 query_opt: Some(query),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1811,6 +1837,8 @@ mod tests {
+                 query_opt: Some("What degree did I graduate with?"),
+                 limit: 5,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+diff --git a/crates/memory-mcp/src/memory/retrieval/pipeline.rs b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+index 5361b380..48d44c2d 100644
+--- a/crates/memory-mcp/src/memory/retrieval/pipeline.rs
++++ b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+@@ -593,7 +593,13 @@ pub(super) async fn assemble_default_context(
+     // phase expects. The phase boundaries are documented
+     // here so future changes can target a single phase
+     // without disturbing the others.
+-    let channels = retrieve_fact_channels(service, &params).await?;
++    let channels = retrieve_fact_channels(
++        service,
++        &params,
++        #[cfg(feature = "eval-support")]
++        trace,
++    )
++    .await?;
+     let (subject_ids, mentioned_names) = super::alias_expansion::resolve_entity_subject(
+         service,
+         params.raw_query_opt.unwrap_or_default(),
+@@ -1685,6 +1691,7 @@ struct SelectedContext {
+ async fn retrieve_fact_channels(
+     service: &RetrievalContext,
+     params: &DefaultContextParams<'_>,
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+ ) -> Result<RetrievedFactChannels, MemoryError> {
+     let candidate_limit = retrieval_candidate_limit(service, params.budget);
+     let lexical_result = select_fact_records_for_query(
+@@ -1694,6 +1701,8 @@ async fn retrieve_fact_channels(
+             query_opt: params.query_opt,
+             limit: candidate_limit,
+             fact_types: params.fact_types,
++            #[cfg(feature = "eval-support")]
++            trace,
+         },
+     )
+     .await?;
+@@ -1741,6 +1750,8 @@ async fn retrieve_fact_channels(
+                     query_opt: Some(expanded_query),
+                     limit: candidate_limit,
+                     fact_types: params.fact_types,
++                    #[cfg(feature = "eval-support")]
++                    trace,
+                 },
+             )
+             .await?;
+@@ -2045,7 +2056,14 @@ async fn select_context_facts(
+     let (episode_fallback_items, episode_fallback_source_anchors) = if current_query {
+         (Vec::new(), Vec::new())
+     } else if let Some(query) = params.query_opt {
+-        let items = collect_episode_fallback_items(service, params, query).await?;
++        let items = collect_episode_fallback_items(
++            service,
++            params,
++            query,
++            #[cfg(feature = "eval-support")]
++            trace,
++        )
++        .await?;
+         #[cfg(feature = "eval-support")]
+         super::diagnostics::record(trace, "episode_candidates", &items);
+         let mut seen_source_anchors = HashSet::new();
+diff --git a/crates/memory-mcp/tests/full_history_evidence.rs b/crates/memory-mcp/tests/full_history_evidence.rs
+index 801b8077..3712b317 100644
+--- a/crates/memory-mcp/tests/full_history_evidence.rs
++++ b/crates/memory-mcp/tests/full_history_evidence.rs
+@@ -7,6 +7,17 @@ use std::{
+     time::{Duration, Instant},
+ };
+ 
++struct CandidateProgress;
++impl memory_mcp::eval_support::retrieval::CandidateObserver for CandidateProgress {
++    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
++        println!(
++            "FULL_HISTORY_CANDIDATES {}",
++            serde_json::to_string(inventory).unwrap()
++        );
++        std::io::stdout().flush().unwrap();
++    }
++}
++
+ struct QueryProgress(Instant);
+ 
+ impl memory_mcp::eval_support::QueryObserver for QueryProgress {
+@@ -72,7 +83,11 @@ async fn observe(case_id: &str) {
+         "FULL_HISTORY_START {}",
+         serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
+     );
+-    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(episode);
++    let capture =
++        memory_mcp::eval_support::retrieval::ContextEvidenceCapture::with_candidate_observer(
++            episode,
++            Arc::new(CandidateProgress),
++        );
+     let observed = tokio::time::timeout(
+         Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap()),
+         memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
+diff --git a/crates/memory-mcp/tests/retrieval_partial_evidence.rs b/crates/memory-mcp/tests/retrieval_partial_evidence.rs
+index 169fb2ab..83a1dd6c 100644
+--- a/crates/memory-mcp/tests/retrieval_partial_evidence.rs
++++ b/crates/memory-mcp/tests/retrieval_partial_evidence.rs
+@@ -165,3 +165,75 @@ async fn one_capture_cannot_merge_stages_from_two_public_reads() {
+     );
+     assert_eq!(capture.stages().unwrap().len(), 1);
+ }
++
++mod common;
++
++struct Inventories(std::sync::Mutex<Vec<memory_mcp::eval_support::retrieval::CandidateInventory>>);
++impl memory_mcp::eval_support::retrieval::CandidateObserver for Inventories {
++    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
++        self.0.lock().unwrap().push(inventory.clone());
++    }
++}
++
++#[tokio::test]
++async fn public_read_observes_actual_time_visible_candidate_payload_without_source_text() {
++    use memory_mcp::eval_support::retrieval::{
++        ContextEvidenceCapture, assemble_context_recording_evidence,
++    };
++    let (service, db) = common::make_service_with_client().await;
++    for (id, content, source, keys, valid) in [
++        (
++            "fact:probea",
++            "archive source alpha",
++            "episode:probea",
++            vec!["M-42", "Été"],
++            "2026-01-01T00:00:00Z",
++        ),
++        (
++            "fact:probeb",
++            "archive source beta",
++            "episode:probeb",
++            vec!["index-only"],
++            "2026-01-01T00:00:00Z",
++        ),
++        (
++            "fact:future",
++            "archive source future",
++            "episode:future",
++            vec![],
++            "2027-01-01T00:00:00Z",
++        ),
++    ] {
++        db.create(id, json!({"fact_id":id,"fact_type":"observation","content":content,"quote":content,
++            "source_episode":source,"t_valid":valid,"t_ingested":valid,"confidence":0.9,"index_keys":keys,
++            "scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
++            "org", &["t_valid", "t_ingested"]).await.unwrap();
++    }
++    let sink = Arc::new(Inventories(std::sync::Mutex::new(Vec::new())));
++    let capture = ContextEvidenceCapture::with_candidate_observer("episode:probea", sink.clone());
++    let request = serde_json::from_value(
++        json!({"query":"archive source","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"}),
++    )
++    .unwrap();
++    assemble_context_recording_evidence(&service, request, &capture)
++        .await
++        .unwrap();
++    let observed = sink.0.lock().unwrap();
++    let initial = observed
++        .iter()
++        .find(|row| row.stage == "facts.initial_fetched")
++        .expect("actual candidate boundary must be emitted before ranking");
++    assert_eq!(initial.records, 2);
++    assert_eq!(initial.content_bytes, 39);
++    assert_eq!(initial.max_content_bytes, 20);
++    assert_eq!(initial.index_keys, 3);
++    assert_eq!(initial.index_key_bytes, 19);
++    assert_eq!(initial.max_index_key_bytes, 10);
++    assert_eq!(initial.unique_contents, 2);
++    assert_eq!(initial.unique_sources, 2);
++    assert_eq!(capture.candidates().unwrap().len(), observed.len());
++    let serialized = serde_json::to_string(initial).unwrap();
++    assert!(!serialized.contains("archive source"));
++    assert!(!serialized.contains("index-only"));
++    assert!(!serialized.contains("episode:probe"));
++}

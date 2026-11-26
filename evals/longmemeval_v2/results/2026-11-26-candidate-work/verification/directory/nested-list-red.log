@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.07s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test short_tab_list_inside_an_oversized_list_remains_complete ... FAILED
+
+failures:
+
+---- short_tab_list_inside_an_oversized_list_remains_complete stdout ----
+
+thread 'short_tab_list_inside_an_oversized_list_remains_complete' (8064297) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:945:5:
+oversized enclosing list must not hide the short nested tab group
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    short_tab_list_inside_an_oversized_list_remains_complete
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 38 filtered out; finished in 0.33s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

@@ -1,0 +1,135 @@
+[
+  {
+    "name": "workspace-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 16.691356708004605,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/workspace-clippy.log"
+  },
+  {
+    "name": "diagnostic-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support,test-fixtures",
+      "--lib",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "fact_access_payload",
+      "--test",
+      "fact_access_concurrency",
+      "--test",
+      "graph_read_concurrency",
+      "--test",
+      "lexical_candidate_hydration",
+      "--test",
+      "retrieval_partial_evidence",
+      "--test",
+      "full_history_evidence",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "query_scaling_regressions",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 4.404633541998919,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/diagnostic-clippy.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 2.917079750011908,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/fmt.log"
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "crates/memory-mcp",
+      "docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md",
+      "docs/superpowers/plans/2026-11-26-memory-quality-repairs.md"
+    ],
+    "exit_code": 0,
+    "seconds": 0.030122458992991596,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/diff.log"
+  },
+  {
+    "name": "scoped-semantic",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "retrieval_partial_evidence"
+    ],
+    "exit_code": 0,
+    "seconds": 19.84647820799728,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/scoped-semantic.log"
+  },
+  {
+    "name": "production",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "seconds": 355.34909220799454,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/directory-current/production.log"
+  }
+]

@@ -1,0 +1,21 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.33s
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 1 test
+
+thread 'batched_episode_sort_discards_full_sources_before_each_term_limit' (6894449) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:901:5:
+assertion `left == right` failed: each term must discard full source payload before sorting, not merely before union hydration
+  left: String("Filter")
+ right: "SelectProject"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test batched_episode_sort_discards_full_sources_before_each_term_limit ... FAILED
+
+failures:
+
+failures:
+    batched_episode_sort_discards_full_sources_before_each_term_limit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_query_projection`

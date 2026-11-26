@@ -1,0 +1,53 @@
+    Checking memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+error: this `if` statement can be collapsed
+   --> crates/memory-mcp/src/shared/search.rs:115:5
+    |
+115 | /     if let Ok(regex) = EPISODE_REF.as_ref() {
+116 | |         if let Cow::Owned(replaced) = regex.replace_all(&s, " ") {
+117 | |             s = Cow::Owned(replaced);
+118 | |         }
+119 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+115 ~     if let Ok(regex) = EPISODE_REF.as_ref()
+116 ~         && let Cow::Owned(replaced) = regex.replace_all(&s, " ") {
+117 |             s = Cow::Owned(replaced);
+118 ~         }
+    |
+
+error: this `if` statement can be collapsed
+   --> crates/memory-mcp/src/shared/search.rs:122:5
+    |
+122 | /     if s.contains('"')
+123 | |         && let Ok(regex) = QUOTED.as_ref()
+124 | |     {
+125 | |         if let Cow::Owned(replaced) = regex.replace_all(&s, " $1 ") {
+...   |
+128 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+123 ~         && let Ok(regex) = QUOTED.as_ref()
+124 ~         && let Cow::Owned(replaced) = regex.replace_all(&s, " $1 ") {
+125 |             s = Cow::Owned(replaced);
+126 ~         }
+    |
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/memory-mcp/src/memory/retrieval/lexical.rs:581:63
+    |
+581 |     let (content_score, phrase_overlap) = content_term_scores(&content_terms, query_terms);
+    |                                                               ^^^^^^^^^^^^^^ help: change this to: `content_terms`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: could not compile `memory_mcp` (lib) due to 3 previous errors

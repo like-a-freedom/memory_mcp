@@ -1,0 +1,20 @@
+{
+  "schema": "normalization-resource-result/v1",
+  "scope": "Eight distinct facts,2000 changing numeric IDs inside repeated word parts; fixed cutoff/budget5; literal expected IDs and2048byte content/quote. Baseline is pre-normalization bounded-access-waves working tree, not unmodified master.",
+  "measurement": "allocation calls in public caller future polls, excluding wrapped storage polls and background runtime tasks while suspended; not RSS, peak memory or latency",
+  "baseline_allocation_calls": 3669865,
+  "candidate_allocation_calls": 838002,
+  "allocation_call_reduction_fraction": 0.7716531807028324,
+  "unchanged_maximum_calls": 1000000,
+  "resource_tests_passed": 22,
+  "resource_tests_failed": 0,
+  "independence": "Exposed development fixture, not confirmation. Preserve exploratory and invalid-meter logs; corrected original RED and final candidate GREEN are separate. Unicode post-review repair restores original semantics; source identities in resource-final-identities.json.",
+  "regression_controls": {
+    "retrieval": 401,
+    "shared": 87,
+    "public_other": 67,
+    "failed": 0
+  },
+  "full_history_acceptance": "pending; original30s read/45s child; no quality/latency conclusion from resource result",
+  "review": "One Important Unicode shrinking-lowercase defect reproduced and fixed with public literal regression; no other Critical/Important findings."
+}

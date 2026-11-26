@@ -1,0 +1,20 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.83s
+     Running tests/fact_access_payload.rs (target/debug/build/memory_mcp/e287aad17f0c3392/out/fact_access_payload-e287aad17f0c3392)
+
+running 1 test
+ACCESS_WRITE_RETURNED_BYTES 230475
+
+thread 'access_write_does_not_return_the_large_source_afterimage' (6890138) panicked at crates/memory-mcp/tests/fact_access_payload.rs:36:5:
+heat-only write must not return the source body; observed 230475 bytes
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test access_write_does_not_return_the_large_source_afterimage ... FAILED
+
+failures:
+
+failures:
+    access_write_does_not_return_the_large_source_afterimage
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p memory_mcp --test fact_access_payload`

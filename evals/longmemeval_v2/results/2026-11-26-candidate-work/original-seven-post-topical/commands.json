@@ -1,0 +1,65 @@
+[
+  {
+    "name": "processor-preflight",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-c",
+      "from evaluation.harness import get_memory_context_processor; get_memory_context_processor()"
+    ],
+    "exit_code": 0,
+    "external_timeout": false,
+    "elapsed_seconds": 5.492753250000533
+  },
+  {
+    "name": "scored-pass",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.scored_coverage",
+      "--domain",
+      "web",
+      "--questions",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/questions.json",
+      "--haystack",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/haystack.json",
+      "--trajectories",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+      "--memory-state",
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/candidate-original-seven-fi9usg_b/build/memory_state",
+      "--reader-url",
+      "http://127.0.0.1:18767/v1",
+      "--reader-model",
+      "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "--judge-url",
+      "http://127.0.0.1:18766/v1",
+      "--judge-model",
+      "/Users/solovey/.cache/lm-studio/models/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores",
+      "--prompt-workers",
+      "3"
+    ],
+    "exit_code": 0,
+    "external_timeout": false,
+    "elapsed_seconds": 547.6276646660117
+  },
+  {
+    "name": "reviewed-span",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.reviewed_span_coverage",
+      "--cohort",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/small-web-text-cohort.json",
+      "--trajectories",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+      "--per-question",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/per_question.jsonl",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/reviewed-span-coverage.json"
+    ],
+    "exit_code": 0,
+    "external_timeout": false,
+    "elapsed_seconds": 0.4286935839918442
+  }
+]

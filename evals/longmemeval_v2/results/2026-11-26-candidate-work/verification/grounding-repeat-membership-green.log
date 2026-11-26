@@ -1,0 +1,29 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+warning: unused import: `crate::shared::search::search_query_terms`
+  --> crates/memory-mcp/src/memory/retrieval/experience.rs:10:5
+   |
+10 | use crate::shared::search::search_query_terms;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `memory_mcp` (lib) generated 1 warning (run `cargo fix --lib -p memory_mcp` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.76s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 1 test
+LONG_SOURCE_APPLICATION_ALLOCATIONS 1034597
+
+thread 'public_repeated_query_read_reuses_grounding_spans' (6621394) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:433:5:
+eight long repeated-vocabulary sources must fit the million-call application budget; observed 1034597
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_repeated_query_read_reuses_grounding_spans ... FAILED
+
+failures:
+
+failures:
+    public_repeated_query_read_reuses_grounding_spans
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 3.53s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

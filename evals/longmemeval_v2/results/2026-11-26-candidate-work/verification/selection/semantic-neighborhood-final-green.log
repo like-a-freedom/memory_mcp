@@ -1,0 +1,115 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.94s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/80e1a2ae3e3297e3/out/conversation_neighborhood-80e1a2ae3e3297e3)
+
+running 36 tests
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... ok
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test a_source_question_cannot_drop_substantive_post_question_constraints ... ok
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... ok
+test named_subject_source_question_recovers_its_adjacent_answer ... ok
+test denied_adjacent_answer_is_not_returned ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test dated_team_question_recovers_its_adjacent_answer ... ok
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test original_dog_adoption_query_excludes_a_later_puppy_session ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s
+
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 22 tests
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+test unicode_lowercase_shrinking_to_one_byte_keeps_the_existing_search_vocabulary ... ok
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+test public_repeated_query_read_reuses_grounding_spans ... ok
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... ok
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.65s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 36 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test compound_when_question_preserves_a_source_with_the_event_date ... ok
+test compound_when_question_requires_event_time_from_the_source ... ok
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test excluded_label_is_not_reported_as_requested_control_membership ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test excludes_label_has_no_positive_membership_priority ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test excepted_label_has_no_positive_membership_priority ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test explicitly_hidden_control_question_keeps_its_matching_hidden_group ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+test later_toolbar_request_does_not_prefer_the_old_visible_container ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test quoted_visibility_word_inside_escaped_label_is_not_an_attribute ... ok
+test quoted_visibility_word_inside_popup_value_is_not_an_attribute ... ok
+test quoted_popup_attributes_do_not_hide_visible_control_labels ... ok
+test no_longer_included_label_has_no_positive_membership_priority ... ok
+test replacement_quote_is_not_reported_as_a_requested_control_label ... ok
+test unknown_nearest_container_does_not_inherit_outer_visibility ... ok
+test separate_visible_button_names_do_not_form_one_requested_label ... ok
+2026-11-26T18:45:09.251587Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test relative_date_question_keeps_its_matching_unknown_container ... ok
+test unnamed_container_without_attributes_still_blocks_outer_visibility ... ok
+test unknown_visibility_keeps_the_prior_nearest_group_ordering ... ok
+test visible_control_container_confirms_an_unqualified_toolbar_question ... ok
+test visible_controls_outrank_a_hidden_copy_near_the_lexical_window ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test visible_word_in_hidden_control_name_is_not_a_visibility_attribute ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.47s
+

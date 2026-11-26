@@ -1,0 +1,150 @@
+[
+  {
+    "name": "workspace-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 18.130501749983523,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/workspace-clippy.log"
+  },
+  {
+    "name": "diagnostic-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support,test-fixtures",
+      "--lib",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "fact_access_payload",
+      "--test",
+      "fact_access_concurrency",
+      "--test",
+      "graph_read_concurrency",
+      "--test",
+      "lexical_candidate_hydration",
+      "--test",
+      "retrieval_partial_evidence",
+      "--test",
+      "full_history_evidence",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "query_scaling_regressions",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 5.011470166995423,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/diagnostic-clippy.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 3.75725345799583,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/fmt.log"
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "crates/memory-mcp",
+      "docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md",
+      "docs/superpowers/plans/2026-11-26-memory-quality-repairs.md"
+    ],
+    "exit_code": 0,
+    "seconds": 0.04571412497898564,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/diff.log"
+  },
+  {
+    "name": "scoped-semantic",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "retrieval_partial_evidence"
+    ],
+    "exit_code": 0,
+    "seconds": 21.7882450420002,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/scoped-semantic.log"
+  },
+  {
+    "name": "production",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "seconds": 351.11046462500235,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/production.log"
+  },
+  {
+    "name": "harness",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "eval-harness",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "seconds": 107.36899887499749,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/topical-tabs-current/harness.log"
+  }
+]

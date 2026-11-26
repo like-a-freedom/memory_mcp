@@ -1,0 +1,66 @@
+[
+  {
+    "name": "retrieval",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--lib",
+      "memory::retrieval"
+    ],
+    "exit_code": 0,
+    "seconds": 26.13579283299623
+  },
+  {
+    "name": "shared",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--lib",
+      "shared::"
+    ],
+    "exit_code": 0,
+    "seconds": 2.080230958003085
+  },
+  {
+    "name": "public",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "fact_access_payload",
+      "--test",
+      "fact_access_concurrency",
+      "--test",
+      "graph_read_concurrency",
+      "--test",
+      "lexical_candidate_hydration",
+      "--test",
+      "retrieval_partial_evidence",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "query_scaling_regressions"
+    ],
+    "exit_code": 0,
+    "seconds": 49.27384787501069
+  }
+]

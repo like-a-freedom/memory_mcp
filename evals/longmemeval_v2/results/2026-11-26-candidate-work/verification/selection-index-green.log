@@ -1,0 +1,23 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.44s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 1 test
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... FAILED
+
+failures:
+
+---- public_selection_reuses_index_vocabulary_for_index_only_anchors stdout ----
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=2974113
+
+thread 'public_selection_reuses_index_vocabulary_for_index_only_anchors' (6852617) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:277:5:
+322000-key facts must fit the one-million-call application budget (storage excluded); observed 2974113
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    public_selection_reuses_index_vocabulary_for_index_only_anchors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 2.00s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

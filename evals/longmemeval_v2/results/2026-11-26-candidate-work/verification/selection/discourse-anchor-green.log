@@ -1,0 +1,226 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.24s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/80e1a2ae3e3297e3/out/conversation_neighborhood-80e1a2ae3e3297e3)
+
+running 35 tests
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... ok
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... FAILED
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... FAILED
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... FAILED
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test denied_adjacent_answer_is_not_returned ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test dated_team_question_recovers_its_adjacent_answer ... ok
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test named_subject_source_question_recovers_its_adjacent_answer ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... FAILED
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test original_dog_adoption_query_excludes_a_later_puppy_session ... FAILED
+
+failures:
+
+---- an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer stdout ----
+
+thread 'an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer' (7841559) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1051:5:
+the requested adoption context should remain available: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object stdout ----
+
+thread 'a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object' (7841552) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1115:5:
+the requested adoption evidence should remain available: []
+
+---- anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query stdout ----
+
+thread 'anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query' (7841562) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:989:5:
+the requested adoption year should remain available: []
+
+---- query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window stdout ----
+
+thread 'query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window' (7842183) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1743:5:
+the answer turn should be returned: [
+    AssembledContextItem {
+        fact_id: "fact:144265c33daa6a8c0bd78900",
+        content: "Audrey: I got new collars and tags for my dogs.",
+        quote: "Audrey: I got new collars and tags for my dogs.",
+        source_episode: "episode:727823e323c3acba0dfb2dd1",
+        confidence: 0.005,
+        relevance: None,
+        grounding: None,
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "reference_time": String("2023-05-21T12:00:00+00:00"),
+            "retrieval_admission": Object {
+                "basis": String("qualified_source_episode"),
+                "policy_version": String("retrieval-admission-v1"),
+                "related_episode_id": String("episode:1d40d56d2977dc99d6cb1416"),
+                "source_context_group": String("chat:dogs"),
+                "source_context_position": Number(5),
+                "source_context_relation": String("query_related_antecedent"),
+            },
+            "source_context": Object {
+                "group": String("chat:dogs"),
+                "position": Number(1),
+            },
+            "source_episode": String("episode:727823e323c3acba0dfb2dd1"),
+            "source_episode_id": String("episode:727823e323c3acba0dfb2dd1"),
+            "source_id": String("chat:dogs:1"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=source_expanded source-ordered answer to a matching question",
+        retrieval_tier: Some(
+            "source_expanded",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "qualified_source_episode",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+    AssembledContextItem {
+        fact_id: "fact:9249ff69b6d3a30bef52529b",
+        content: "Audrey: Thanks, the dogs love them.",
+        quote: "Audrey: Thanks, the dogs love them.",
+        source_episode: "episode:d2c04ef9e11c7d5c72b873c2",
+        confidence: 0.005,
+        relevance: None,
+        grounding: None,
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("episode_heuristic"),
+            "ingestion_method": String("extraction"),
+            "reference_time": String("2023-05-21T12:00:00+00:00"),
+            "retrieval_admission": Object {
+                "basis": String("qualified_source_episode"),
+                "policy_version": String("retrieval-admission-v1"),
+                "related_episode_id": String("episode:1d40d56d2977dc99d6cb1416"),
+                "source_context_group": String("chat:dogs"),
+                "source_context_position": Number(5),
+                "source_context_relation": String("query_related_antecedent"),
+            },
+            "source_context": Object {
+                "group": String("chat:dogs"),
+                "position": Number(3),
+            },
+            "source_episode": String("episode:d2c04ef9e11c7d5c72b873c2"),
+            "source_episode_id": String("episode:d2c04ef9e11c7d5c72b873c2"),
+            "source_id": String("chat:dogs:3"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=source_expanded source-ordered answer to a matching question",
+        retrieval_tier: Some(
+            "source_expanded",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "qualified_source_episode",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+
+---- original_dog_adoption_query_excludes_a_later_puppy_session stdout ----
+
+thread 'original_dog_adoption_query_excludes_a_later_puppy_session' (7842120) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1877:5:
+the original dogs' duration should remain available: [
+    AssembledContextItem {
+        fact_id: "fact:a6e98b8534557f0d607a3c44",
+        content: "Audrey: Congrats on the new job! So I got these new collars and tags for my dogs - so cute!",
+        quote: "Audrey: Congrats on the new job! So I got these new collars and tags for my dogs - so cute!",
+        source_episode: "episode:89aa234a3e694625ee1f196b",
+        confidence: 0.005,
+        relevance: None,
+        grounding: None,
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "extraction_strategy": String("summary_note_fallback"),
+            "ingestion_method": String("extraction"),
+            "reference_time": String("2023-05-21T12:00:00+00:00"),
+            "retrieval_admission": Object {
+                "basis": String("qualified_source_episode"),
+                "policy_version": String("retrieval-admission-v1"),
+                "related_episode_id": String("episode:fe39a4884cf4b7b68a2f2518"),
+                "source_context_group": String("locomo:conv-44:session_1"),
+                "source_context_position": Number(7),
+                "source_context_relation": String("query_related_antecedent"),
+            },
+            "source_context": Object {
+                "group": String("locomo:conv-44:session_1"),
+                "position": Number(3),
+            },
+            "source_episode": String("episode:89aa234a3e694625ee1f196b"),
+            "source_episode_id": String("episode:89aa234a3e694625ee1f196b"),
+            "source_id": String("locomo:conv-44:session_1:3"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=source_expanded source-ordered answer to a matching question",
+        retrieval_tier: Some(
+            "source_expanded",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: Some(
+            RetrievalEvidence {
+                policy_version: "retrieval-admission-v1",
+                admission_basis: "qualified_source_episode",
+                semantic_similarity: None,
+                graph_anchor_origin: None,
+                hop_count: None,
+            },
+        ),
+    },
+]
+
+
+failures:
+    a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object
+    an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer
+    anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query
+    original_dog_adoption_query_excludes_a_later_puppy_session
+    query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window
+
+test result: FAILED. 30 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.85s
+
+error: test failed, to rerun pass `-p memory_mcp --test conversation_neighborhood`

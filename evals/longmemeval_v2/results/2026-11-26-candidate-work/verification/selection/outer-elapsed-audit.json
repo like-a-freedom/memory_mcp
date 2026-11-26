@@ -1,0 +1,26 @@
+{
+  "scope": "synthetic artifact CLI audit; not production scenario coverage",
+  "cases": [
+    {
+      "variant": "mutated-red",
+      "process_seconds": 45.001,
+      "read_ms": 29000,
+      "expected_strict_pass": false,
+      "actual_strict_pass": true,
+      "contract_check_exit_code": 1,
+      "script_exit_code": 0
+    },
+    {
+      "variant": "green",
+      "process_seconds": 45.001,
+      "read_ms": 29000,
+      "expected_strict_pass": false,
+      "actual_strict_pass": false,
+      "contract_check_exit_code": 0,
+      "script_exit_code": 0
+    }
+  ],
+  "note": "Actual capture-summary CLI on a synthetic late exit; unchanged30/45s closed oracle. Previous successful process timings were within45.",
+  "summary_cli_path": "evals/longmemeval_v2/results/2026-11-26-candidate-work/summarize.py",
+  "summary_cli_sha256": "4f93bbddddee06d76833b7ae2987ecd95665698f521360aa475f31f134374160"
+}

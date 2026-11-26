@@ -1,0 +1,20 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.88s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 1 test
+LONG_SOURCE_APPLICATION_ALLOCATIONS 3669865
+
+thread 'public_composite_source_tokens_reuse_their_repeated_word_parts' (7284135) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:522:5:
+eight long repeated-vocabulary sources must fit the million-call application budget; observed 3669865
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... FAILED
+
+failures:
+
+failures:
+    public_composite_source_tokens_reuse_their_repeated_word_parts
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 20 filtered out; finished in 3.48s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

@@ -1,0 +1,178 @@
+{
+  "schema": "memory-quality-final-verification/v1",
+  "native_platform": "aarch64-apple-darwin",
+  "commands": [
+    {
+      "name": "workspace-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 37.957400749990484,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/workspace-clippy.log"
+    },
+    {
+      "name": "diagnostic-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support,test-fixtures",
+        "--lib",
+        "--test",
+        "episode_candidate_hydration",
+        "--test",
+        "equivalent_alias_reads",
+        "--test",
+        "fact_access_payload",
+        "--test",
+        "fact_access_concurrency",
+        "--test",
+        "graph_read_concurrency",
+        "--test",
+        "lexical_candidate_hydration",
+        "--test",
+        "retrieval_partial_evidence",
+        "--test",
+        "full_history_evidence",
+        "--test",
+        "lexical_term_set_resource",
+        "--test",
+        "retrieval_query_projection",
+        "--test",
+        "retrieval_query_batching",
+        "--test",
+        "long_history_stage_evidence",
+        "--test",
+        "query_scaling_regressions",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 10.830859583977144,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/diagnostic-clippy.log"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.819857750000665,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/fmt.log"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "crates/memory-mcp",
+        "docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md",
+        "docs/superpowers/plans/2026-11-26-memory-quality-repairs.md"
+      ],
+      "exit_code": 0,
+      "seconds": 0.04805329200462438,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/diff.log"
+    },
+    {
+      "name": "scoped-semantic",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--test",
+        "long_history_stage_evidence",
+        "--test",
+        "lexical_term_set_resource",
+        "--test",
+        "episode_candidate_hydration",
+        "--test",
+        "equivalent_alias_reads",
+        "--test",
+        "retrieval_query_projection",
+        "--test",
+        "retrieval_query_batching",
+        "--test",
+        "retrieval_partial_evidence"
+      ],
+      "exit_code": 0,
+      "seconds": 21.019782832998317,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/scoped-semantic.log"
+    },
+    {
+      "name": "production",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "memory_mcp",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "seconds": 369.51107512501767,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/production.log"
+    },
+    {
+      "name": "harness",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "eval-harness",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 118.50605754199205,
+      "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/discourse-current/harness.log"
+    }
+  ],
+  "suites": {
+    "scoped-semantic": {
+      "passed": 103,
+      "failed": 0,
+      "ignored": 0,
+      "target_results": 7,
+      "log_sha256": "5c4789fa4f2901e04e9bd88ec1b948b209ba2e8c96c1de5c93772765b4670b6a"
+    },
+    "production": {
+      "passed": 2855,
+      "failed": 0,
+      "ignored": 45,
+      "target_results": 176,
+      "log_sha256": "adc1200f190f81fbd6dd485d3e1c8884e050931d77f0bd72b0ec64a4948b2e14"
+    },
+    "harness": {
+      "passed": 929,
+      "failed": 0,
+      "ignored": 22,
+      "target_results": 43,
+      "log_sha256": "a48da8f66a9d0681d7803dbd763171edf69c1ea9af898771e85974ea1c389e55"
+    }
+  },
+  "scope_note": "Cargo totals include existing architecture lints and doctests; ignored cases are not passed."
+}

@@ -1,0 +1,177 @@
+Calling `python -m mlx_lm.server...` directly is deprecated. Use `mlx_lm.server...` or `python -m mlx_lm server ...` instead.
+/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py:1894: UserWarning: mlx_lm.server is not recommended for production as it only implements basic security checks.
+  warnings.warn(
+2026-11-26 22:16:26,359 - INFO - Starting httpd at 127.0.0.1 on port 18767...
+127.0.0.1 - - [26/Nov/2026 22:16:26] "GET /v1/models HTTP/1.1" 200 -
+2026-11-26 22:18:31,108 - INFO - Prompt Cache: 0 sequences, 0.00 GB
+2026-11-26 22:18:31,109 - INFO - - assistant: 0 sequences, 0.00 GB
+2026-11-26 22:18:31,109 - INFO - - user: 0 sequences, 0.00 GB
+2026-11-26 22:18:31,109 - INFO - - system: 0 sequences, 0.00 GB
+127.0.0.1 - - [26/Nov/2026 22:18:31] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:18:55,940 - INFO - Prompt processing progress: 119/4046
+2026-11-26 22:19:00,612 - INFO - Prompt processing progress: 2167/4046
+2026-11-26 22:19:05,102 - INFO - Prompt processing progress: 4042/4046
+2026-11-26 22:19:05,105 - INFO - Prompt Cache: 2 sequences, 0.58 GB
+2026-11-26 22:19:05,105 - INFO - - assistant: 0 sequences, 0.00 GB
+2026-11-26 22:19:05,105 - INFO - - user: 1 sequences, 0.42 GB
+2026-11-26 22:19:05,105 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:19:05] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:19:05,248 - INFO - Prompt processing progress: 3/4
+2026-11-26 22:19:05,248 - INFO - Prompt processing progress: 4045/4046
+2026-11-26 22:19:05,333 - INFO - Prompt processing progress: 4046/4046
+2026-11-26 22:19:05,333 - INFO - Prompt processing progress: 4/4
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 58891)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1887, in <lambda>
+    lambda *args, **kwargs: handler_class(
+                            ~~~~~~~~~~~~~^
+        response_generator,
+        ^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ),
+    ^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1211, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 500, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 488, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1352, in do_POST
+    self.handle_completion(request, stop_words)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1715, in handle_completion
+    self.wfile.write(response_json)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+2026-11-26 22:19:12,332 - INFO - Prompt Cache: 4 sequences, 1.42 GB
+2026-11-26 22:19:12,332 - INFO - - assistant: 2 sequences, 0.84 GB
+2026-11-26 22:19:12,332 - INFO - - user: 1 sequences, 0.42 GB
+2026-11-26 22:19:12,332 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:19:12] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:19:17,138 - INFO - Prompt processing progress: 2048/3651
+2026-11-26 22:19:21,006 - INFO - Prompt processing progress: 3647/3651
+2026-11-26 22:19:21,086 - INFO - Prompt processing progress: 3650/3651
+2026-11-26 22:19:21,158 - INFO - Prompt processing progress: 3651/3651
+2026-11-26 22:19:38,087 - INFO - Prompt Cache: 7 sequences, 2.64 GB
+2026-11-26 22:19:38,087 - INFO - - assistant: 4 sequences, 1.66 GB
+2026-11-26 22:19:38,087 - INFO - - user: 2 sequences, 0.82 GB
+2026-11-26 22:19:38,087 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:19:38] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:19:43,223 - INFO - Prompt processing progress: 2048/3659
+2026-11-26 22:19:47,462 - INFO - Prompt processing progress: 3655/3659
+2026-11-26 22:19:47,541 - INFO - Prompt processing progress: 3658/3659
+2026-11-26 22:19:47,609 - INFO - Prompt processing progress: 3659/3659
+2026-11-26 22:20:06,344 - INFO - Prompt Cache: 10 sequences, 3.87 GB
+2026-11-26 22:20:06,344 - INFO - - assistant: 6 sequences, 2.48 GB
+2026-11-26 22:20:06,344 - INFO - - user: 3 sequences, 1.22 GB
+2026-11-26 22:20:06,344 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:20:06] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:20:13,095 - INFO - Prompt processing progress: 2048/3774
+2026-11-26 22:20:18,385 - INFO - Prompt processing progress: 3770/3774
+2026-11-26 22:20:18,478 - INFO - Prompt processing progress: 3773/3774
+2026-11-26 22:20:18,546 - INFO - Prompt processing progress: 3774/3774
+2026-11-26 22:20:37,139 - INFO - Prompt Cache: 10 sequences, 3.84 GB
+2026-11-26 22:20:37,139 - INFO - - assistant: 5 sequences, 2.05 GB
+2026-11-26 22:20:37,139 - INFO - - user: 4 sequences, 1.63 GB
+2026-11-26 22:20:37,139 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:20:37] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:20:37,283 - INFO - Prompt processing progress: 1/1
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 58988)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1887, in <lambda>
+    lambda *args, **kwargs: handler_class(
+                            ~~~~~~~~~~~~~^
+        response_generator,
+        ^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ),
+    ^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1211, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 500, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 488, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1352, in do_POST
+    self.handle_completion(request, stop_words)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py", line 1715, in handle_completion
+    self.wfile.write(response_json)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+2026-11-26 22:20:59,573 - INFO - Prompt Cache: 10 sequences, 3.86 GB
+2026-11-26 22:20:59,574 - INFO - - assistant: 5 sequences, 2.07 GB
+2026-11-26 22:20:59,574 - INFO - - user: 4 sequences, 1.63 GB
+2026-11-26 22:20:59,574 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:20:59] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:21:02,845 - INFO - Prompt processing progress: 773/777
+2026-11-26 22:21:02,957 - INFO - Prompt processing progress: 776/777
+2026-11-26 22:21:03,031 - INFO - Prompt processing progress: 777/777
+2026-11-26 22:21:22,128 - INFO - Prompt Cache: 10 sequences, 3.28 GB
+2026-11-26 22:21:22,129 - INFO - - assistant: 4 sequences, 1.27 GB
+2026-11-26 22:21:22,129 - INFO - - user: 5 sequences, 1.84 GB
+2026-11-26 22:21:22,129 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:21:22] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:21:30,364 - INFO - Prompt processing progress: 2048/2963
+2026-11-26 22:21:33,723 - INFO - Prompt processing progress: 2959/2963
+2026-11-26 22:21:33,823 - INFO - Prompt processing progress: 2962/2963
+2026-11-26 22:21:33,895 - INFO - Prompt processing progress: 2963/2963
+2026-11-26 22:21:52,935 - INFO - Prompt Cache: 10 sequences, 3.16 GB
+2026-11-26 22:21:52,935 - INFO - - assistant: 4 sequences, 1.22 GB
+2026-11-26 22:21:52,935 - INFO - - user: 5 sequences, 1.78 GB
+2026-11-26 22:21:52,935 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:21:52] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:21:53,125 - INFO - Prompt processing progress: 1/1
+2026-11-26 22:22:16,074 - INFO - Prompt Cache: 10 sequences, 3.11 GB
+2026-11-26 22:22:16,074 - INFO - - assistant: 4 sequences, 1.17 GB
+2026-11-26 22:22:16,074 - INFO - - user: 5 sequences, 1.78 GB
+2026-11-26 22:22:16,074 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:22:16] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:22:23,788 - INFO - Prompt processing progress: 2048/3741
+2026-11-26 22:22:30,341 - INFO - Prompt processing progress: 3737/3741
+2026-11-26 22:22:30,440 - INFO - Prompt processing progress: 3740/3741
+2026-11-26 22:22:30,517 - INFO - Prompt processing progress: 3741/3741
+2026-11-26 22:22:46,629 - INFO - Prompt Cache: 10 sequences, 3.31 GB
+2026-11-26 22:22:46,629 - INFO - - assistant: 4 sequences, 1.36 GB
+2026-11-26 22:22:46,629 - INFO - - user: 5 sequences, 1.78 GB
+2026-11-26 22:22:46,629 - INFO - - system: 1 sequences, 0.16 GB
+127.0.0.1 - - [26/Nov/2026 22:22:46] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 22:22:46,798 - INFO - Prompt processing progress: 1/1

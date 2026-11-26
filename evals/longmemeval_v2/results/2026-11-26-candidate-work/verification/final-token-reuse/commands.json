@@ -1,0 +1,140 @@
+[
+  {
+    "name": "production",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "seconds": 787.857137834013,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/production.log"
+  },
+  {
+    "name": "harness",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "eval-harness",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "seconds": 125.84858970798086,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/harness.log"
+  },
+  {
+    "name": "workspace-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 31.098702332994435,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/workspace-clippy.log"
+  },
+  {
+    "name": "diagnostic-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support,test-fixtures",
+      "--lib",
+      "--test",
+      "episode_candidate_hydration",
+      "--test",
+      "equivalent_alias_reads",
+      "--test",
+      "fact_access_payload",
+      "--test",
+      "fact_access_concurrency",
+      "--test",
+      "graph_read_concurrency",
+      "--test",
+      "lexical_candidate_hydration",
+      "--test",
+      "retrieval_partial_evidence",
+      "--test",
+      "full_history_evidence",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "query_scaling_regressions",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 9.024146040988853,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/diagnostic-clippy.log"
+  },
+  {
+    "name": "build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--bin",
+      "memory_mcp",
+      "-p",
+      "eval-harness",
+      "--bin",
+      "memory-eval"
+    ],
+    "exit_code": 0,
+    "seconds": 2.02041154098697,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/build.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 3.1183296669914853,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/fmt.log"
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "crates/memory-mcp",
+      "docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md",
+      "docs/superpowers/plans/2026-11-26-memory-quality-repairs.md"
+    ],
+    "exit_code": 0,
+    "seconds": 0.032698083989089355,
+    "log": "evals/longmemeval_v2/results/2026-11-26-candidate-work/verification/final-token-reuse/diff.log"
+  }
+]

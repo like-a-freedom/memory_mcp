@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.98s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'explicitly_named_controls_survive_competing_generic_toolbar_histories' (7457508) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:38:288:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query statement errors:\nstatement 0: Couldn't coerce value for field `entity_links` of `fact:competing_toolbar0`: Expected `array` but found `NONE`")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test explicitly_named_controls_survive_competing_generic_toolbar_histories ... FAILED
+
+failures:
+
+failures:
+    explicitly_named_controls_survive_competing_generic_toolbar_histories
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.26s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

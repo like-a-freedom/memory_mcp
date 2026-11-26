@@ -1,0 +1,20 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 20.54s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'separate_visible_button_names_do_not_form_one_requested_label' (7648006) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:724:5:
+a label must occur within one actual control name
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test separate_visible_button_names_do_not_form_one_requested_label ... FAILED
+
+failures:
+
+failures:
+    separate_visible_button_names_do_not_form_one_requested_label
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

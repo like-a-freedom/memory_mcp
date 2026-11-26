@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.30s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'diagnostic_observes_admission_between_fusion_and_selection' (7487536) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:348:78:
+completed admission must be separately observable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test diagnostic_observes_admission_between_fusion_and_selection ... FAILED
+
+failures:
+
+failures:
+    diagnostic_observes_admission_between_fusion_and_selection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.28s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

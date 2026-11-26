@@ -1,0 +1,24 @@
+{
+  "status": "invalid-before-build-or-read",
+  "reason": "source identity changed during parallel embedding work",
+  "mismatches": {
+    "crates/memory-mcp/src/config.rs": {
+      "registered": "9c3317566da7e331d22465e297a0cb429087b071f47e9bdb1bea93e0813b576d",
+      "current": "d4bb77e917e18244a4fbd9aea04f65179dba53a88bd3b19695b2fce06d620b7b"
+    },
+    "crates/memory-mcp/src/config/embedding.rs": {
+      "registered": "546e4558e135f2876debc58f7803642f546058efc2c663f013b1e1b5397cea5c",
+      "current": "d662abc1076d0cbcb8edb656e586d8b46b8788163f4b194ac546fb2704d0e169"
+    },
+    "crates/memory-mcp/src/embedding/providers/remote.rs": {
+      "registered": "0b1bbd7eeccaa9f892af623b613dbd4e9dd050174e61f6d42255108283a6fcf9",
+      "current": "2e70864f04a5066d6889f48868dfddeff142bb0cb1abdc7c38cec22b111f6525"
+    },
+    "crates/memory-mcp/src/eval_support/retrieval.rs": {
+      "registered": "4f8fa750dc5f40d414e574209816d0b394a0e1f9eb914f5415ef88dfd159f1ff",
+      "current": "49db1da8711d886bd3a524829b4f16506ceeec6f3a44af110e797584f3e64c21"
+    }
+  },
+  "cases_executed": 0,
+  "current_head": "14d14b467f9c668967ef7aa3ae9e00380b2cd2d9"
+}

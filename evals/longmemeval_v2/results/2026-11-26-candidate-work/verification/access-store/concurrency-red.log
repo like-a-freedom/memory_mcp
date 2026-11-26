@@ -1,0 +1,21 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.32s
+     Running tests/fact_access_concurrency.rs (target/debug/build/memory_mcp/f547a309f91a978c/out/fact_access_concurrency-f547a309f91a978c)
+
+running 1 test
+
+thread 'public_read_awaits_four_access_writes_before_starting_the_next_wave' (7091935) panicked at crates/memory-mcp/tests/fact_access_concurrency.rs:46:2:
+assertion `left == right` failed: independent writes overlap, with a limit of four
+  left: 1
+ right: 4
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_read_awaits_four_access_writes_before_starting_the_next_wave ... FAILED
+
+failures:
+
+failures:
+    public_read_awaits_four_access_writes_before_starting_the_next_wave
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p memory_mcp --test fact_access_concurrency`

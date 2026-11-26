@@ -1,0 +1,74 @@
+[
+  {
+    "name": "current-span-v2",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.reviewed_span_coverage",
+      "--cohort",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/small-web-text-cohort.json",
+      "--trajectories",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+      "--per-question",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/prompt_rows.jsonl",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/source-presence-v2.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.223468457988929
+  },
+  {
+    "name": "baseline-span-v2",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.reviewed_span_coverage",
+      "--cohort",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/small-web-text-cohort.json",
+      "--trajectories",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+      "--per-question",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-container/scores/prompt_rows.jsonl",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/baseline-source-presence-v2.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.21864258300047368
+  },
+  {
+    "name": "strict-phrase-set",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.exact_answer_quality",
+      "--per-question",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/per_question.jsonl",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/strict-phrase-set.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.1069716670026537
+  },
+  {
+    "name": "independent-answer-diagnosis",
+    "command": [
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/env/bin/python",
+      "-m",
+      "evals.longmemeval_v2.long_history_diagnosis",
+      "--cohort",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/small-web-text-cohort.json",
+      "--trajectories",
+      "/Users/solovey/Documents/dev/memory_mcp/target/c4-native/cohort/trajectories.json",
+      "--truth",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json",
+      "--prompts",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/prompt_rows.jsonl",
+      "--readers",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/diagnostic-readers.jsonl",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/independent-diagnosis.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.2761784169997554
+  }
+]

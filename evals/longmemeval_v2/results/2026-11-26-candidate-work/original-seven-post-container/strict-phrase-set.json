@@ -1,0 +1,25 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-exact-phrase-set-accuracy/v1",
+  "metric": "strict normalized phrase-set equality; extra phrases fail",
+  "selected": 4,
+  "correct": 3,
+  "failure_inclusive_accuracy": 0.75,
+  "cases": {
+    "0c6b0c60": {
+      "status": "scored",
+      "score": true
+    },
+    "6d975a08": {
+      "status": "scored",
+      "score": false
+    },
+    "d6da3938": {
+      "status": "scored",
+      "score": true
+    },
+    "f61a096f": {
+      "status": "scored",
+      "score": true
+    }
+  }
+}

@@ -1,0 +1,39 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.02s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/af84624548708eeb/out/memory_mcp-af84624548708eeb)
+
+running 30 tests
+test shared::search::tests::query_term_should_be_soft_anchor_accepts_long_rare_terms_and_short_singletons ... ok
+test shared::search::tests::normalize_text_lowercases_and_collapses_whitespace ... ok
+test shared::search_lexical::tests::fact_match_empty_query_terms ... ok
+test shared::search::tests::query_hard_anchor_terms_detect_numeric_and_mixed_alnum_tokens ... ok
+test shared::search::tests::term_presence_excludes_episode_references_and_function_words ... ok
+test shared::search::tests::preprocess_search_query_drops_question_stopwords_and_short_words ... ok
+test shared::search::tests::ingestion_word_terms_keep_every_russian_word ... ok
+test shared::search::tests::preprocess_search_query_strips_episode_references ... ok
+test shared::search::tests::preprocess_search_query_strips_boolean_operators ... ok
+test shared::search::tests::preprocess_search_query_case_insensitive_episode_ref ... ok
+test shared::search::tests::search_query_terms_normalize_simple_plural_forms ... ok
+test shared::search::tests::search_query_terms_preserve_non_plural_words_ending_with_s ... ok
+test shared::search_lexical::tests::four_digit_year_accepts_years ... ok
+test shared::search::tests::search_query_terms_normalize_case_and_punctuation ... ok
+test shared::search::tests::russian_function_words_are_not_search_evidence ... ok
+test shared::search::tests::mixed_query_matches_russian_case_forms ... ok
+test shared::search::tests::russian_filler_words_are_not_search_evidence ... ok
+test shared::search_lexical::tests::four_digit_year_rejects_non_years ... ok
+test shared::search_lexical::tests::fact_match_empty_when_no_overlap ... ok
+test shared::search_lexical::tests::fact_match_finds_content_overlap ... ok
+test shared::search_lexical::tests::fact_match_finds_index_key_overlap ... ok
+test shared::search_lexical::tests::fact_term_set_includes_content_and_index_keys ... ok
+test shared::search_lexical::tests::text_match_counts_duplicate_query_terms_once ... ok
+test shared::search_lexical::tests::text_match_empty_query_terms ... ok
+test shared::search::tests::preprocess_search_query_handles_quoted_phrases ... ok
+test shared::search_lexical::tests::text_match_empty_when_no_overlap ... ok
+test shared::search_lexical::tests::text_match_finds_overlap ... ok
+test shared::search::tests::term_presence_keeps_a_reference_inside_long_repeated_text ... ok
+test shared::search::tests::term_presence_respects_quote_preprocessing_across_sentence_boundaries ... ok
+test shared::search::tests::search_query_terms_preserve_reference_like_tokens ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 2047 filtered out; finished in 0.01s
+

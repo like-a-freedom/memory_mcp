@@ -1,0 +1,176 @@
+{
+  "all_cases_pass": true,
+  "baseline_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "product_revision": "1e56a992",
+    "suite_id": "memory-decisions"
+  },
+  "candidate_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "8e3bc61dfc0cd4cf06de7a7a3014225e23e3d2b57c964a784ffec18e096340da",
+    "product_revision": "14d14b46+candidate-work-topical-tabs",
+    "suite_id": "memory-decisions"
+  },
+  "cases": [
+    {
+      "case_id": "v10-absent-target",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-similar-name",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-current-snapshot",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-peer-conflict",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-unverified-correction",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-prior-knowledge",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-valid-boundary",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-ordinary-location",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    }
+  ],
+  "counts": {
+    "failed": 0,
+    "invalid": 0,
+    "passed": 8,
+    "unobserved": 0
+  },
+  "current_failures": [],
+  "execution_status": "scored",
+  "grader_identity": {
+    "binary_sha256": "7853c4266c4f743cbfedaf6f0e055f7a968634608ade329de5a8eea7d7a218c5",
+    "comparison_sha256": "a02149e8e7e4dd32ec102f57473c21e8b2e1818a535f0a13e3816c18835a3055",
+    "normalizer_sha256": "9a87982dde02730ae6839515df78297687ea5a4469537fec3bf04b31619c5caf",
+    "protocol": "memory-current-regression/v1",
+    "registration_sha256": "43e47143a979285bf68777ba20837e8c03b8b7f4192e15548ed5a42dcef7ed01",
+    "scorer_sha256": "1f08b96f8b79fc26ac88c76402b3ce06d3b57c8400629bf3c447ff76a326752f",
+    "verification_sha256": "8eaf1070074e49adbed5fdc439e19b58730d6b16304d989c77dae29131671878"
+  },
+  "inputs": {
+    "baseline": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+    "baseline_index_sha256": "665c7a9799df8b95d4e3728ad4b2497abfe60b20f3deb97b2b2aef770028e903",
+    "candidate": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/native-gate-topical/current/index.json",
+    "candidate_index_sha256": "f6cd24d7be4370a88817822abcbe69875b8fec52d14dbdd71ffab284c890d1d9",
+    "corpus": "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/memory-decisions-v10"
+  },
+  "no_regressions": true,
+  "regressions": [],
+  "schema_version": "memory-current-regression/v1"
+}

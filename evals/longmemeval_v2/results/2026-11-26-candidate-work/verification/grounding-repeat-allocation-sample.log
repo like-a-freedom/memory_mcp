@@ -1,0 +1,842 @@
+warning: unused import: `crate::shared::search::search_query_terms`
+  --> crates/memory-mcp/src/memory/retrieval/experience.rs:10:5
+   |
+10 | use crate::shared::search::search_query_terms;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `memory_mcp` (lib) generated 1 warning (run `cargo fix --lib -p memory_mcp` to apply 1 suggestion)
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.92s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 1 test
+ALLOCATION_SAMPLE 250000    0: std::backtrace_rs::backtrace::libunwind::trace
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1: std::backtrace_rs::backtrace::trace_unsynchronized::<<std::backtrace::Backtrace>::create::{closure#0}>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2: <std::backtrace::Backtrace>::create
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/backtrace.rs:331:13
+   3: lexical_term_set_resource::observe_allocation::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:24:59
+   4: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::try_with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+   5: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+   6: lexical_term_set_resource::observe_allocation
+             at ./tests/lexical_term_set_resource.rs:19:17
+   7: <lexical_term_set_resource::CountingAllocator as core::alloc::global::GlobalAlloc>::alloc
+             at ./tests/lexical_term_set_resource.rs:35:9
+   8: __rustc::__rust_alloc
+             at ./tests/lexical_term_set_resource.rs:52:19
+   9: alloc::alloc::alloc
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:158:9
+  10: <alloc::alloc::Global>::alloc_impl_runtime
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:335:73
+  11: <alloc::alloc::Global>::alloc_impl
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:457:9
+  12: <alloc::alloc::Global as core::alloc::Allocator>::allocate
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:575:14
+  13: <alloc::raw_vec::RawVecInner>::try_allocate_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:485:47
+  14: <alloc::raw_vec::RawVecInner>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:453:15
+  15: <alloc::raw_vec::RawVec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:187:20
+  16: <alloc::vec::Vec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:936:20
+  17: <alloc::vec::Vec<u8>>::with_capacity
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:532:9
+  18: alloc::str::convert_while_ascii
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:958:19
+  19: <str>::to_lowercase
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:444:38
+  20: memory_mcp::shared::search::normalize_search_term
+             at ./src/shared/search.rs:267:28
+  21: memory_mcp::shared::search::append_lexical_token::{closure#1}
+             at ./src/shared/search.rs:141:32
+  22: <&mut memory_mcp::shared::search::append_lexical_token::{closure#1} as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:298:21
+  23: core::iter::traits::iterator::Iterator::find_map::check::<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3010:32
+  24: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find_map::check<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  25: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::find_map::<alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3016:14
+  26: <core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter_map.rs:64:19
+  27: <alloc::vec::Vec<alloc::string::String>>::extend_desugared::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4063:44
+  28: <alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_extend::SpecExtend<alloc::string::String, core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>>::spec_extend
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:18:14
+  29: <alloc::vec::Vec<alloc::string::String> as core::iter::traits::collect::Extend<alloc::string::String>>::extend::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4027:9
+  30: memory_mcp::shared::search::append_lexical_token
+             at ./src/shared/search.rs:138:11
+  31: memory_mcp::shared::search::lexical_terms
+             at ./src/shared/search.rs:128:9
+  32: memory_mcp::shared::search::search_query_terms
+             at ./src/shared/search.rs:28:5
+  33: <memory_mcp::shared::search::search_query_terms as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:166:5
+  34: core::iter::adapters::map::map_try_fold::<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:28
+  35: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  36: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  37: core::iter::adapters::map::map_try_fold::<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:21
+  38: <core::str::iter::SplitInclusive<[char; 5]> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  39: <core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  40: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  41: <core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  42: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  43: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::find::<&mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2983:14
+  44: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:98:19
+  45: memory_mcp::memory::retrieval::lexical::best_matching_content_terms
+             at ./src/memory/retrieval/lexical.rs:797:38
+  46: memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}::{closure#1}
+             at ./src/memory/retrieval/lexical.rs:510:37
+  47: <std::collections::hash::map::Entry<&str, alloc::sync::Arc<memory_mcp::memory::retrieval::lexical::ContentLexicalFeatures>>>::or_insert_with::<memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}::{closure#1}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/collections/hash/map.rs:2540:55
+  48: <std::collections::hash::map::Entry<&str, alloc::sync::Arc<memory_mcp::memory::retrieval::lexical::ContentLexicalFeatures>>>::or_try_insert_with::<<std::collections::hash::map::Entry<&str, alloc::sync::Arc<memory_mcp::memory::retrieval::lexical::ContentLexicalFeatures>>>::or_insert_with<memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}::{closure#1}>::{closure#0}, !>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/collections/hash/map.rs:2575:46
+  49: <std::collections::hash::map::Entry<&str, alloc::sync::Arc<memory_mcp::memory::retrieval::lexical::ContentLexicalFeatures>>>::or_insert_with::<memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}::{closure#1}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/collections/hash/map.rs:2540:14
+  50: memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}
+             at ./src/memory/retrieval/lexical.rs:507:18
+  51: core::iter::adapters::map::map_fold::<&serde_json::value::Value, memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, (), memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}, core::iter::traits::iterator::Iterator::for_each::call<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  52: <core::slice::iter::Iter<serde_json::value::Value> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::adapters::map::map_fold<&serde_json::value::Value, memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, (), memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}, core::iter::traits::iterator::Iterator::for_each::call<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>::{closure#0}>::{closure#0}>::{closure#0}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:274:27
+  53: <core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>::{closure#0}>::{closure#0}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  54: <core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}> as core::iter::traits::iterator::Iterator>::for_each::<<alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>::{closure#0}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:901:14
+  55: <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::extend_trusted::<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4097:26
+  56: <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures> as alloc::vec::spec_extend::SpecExtend<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>>::spec_extend
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:27:14
+  57: <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>>::from_iter
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:60:16
+  58: <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures> as alloc::vec::spec_from_iter::SpecFromIter<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures, core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>>::from_iter
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:33:9
+  59: <alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures> as core::iter::traits::collect::FromIterator<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>::from_iter::<core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3958:9
+  60: <core::iter::adapters::map::Map<core::slice::iter::Iter<serde_json::value::Value>, memory_mcp::memory::retrieval::lexical::lexical_candidate_features::{closure#0}> as core::iter::traits::iterator::Iterator>::collect::<alloc::vec::Vec<memory_mcp::memory::retrieval::lexical::LexicalCandidateFeatures>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2100:9
+  61: memory_mcp::memory::retrieval::lexical::lexical_candidate_features
+             at ./src/memory/retrieval/lexical.rs:532:10
+  62: memory_mcp::memory::retrieval::lexical::rank_lexical_candidates
+             at ./src/memory/retrieval/lexical.rs:349:20
+  63: memory_mcp::memory::retrieval::lexical::select_fact_records_for_query::{closure#0}
+             at ./src/memory/retrieval/lexical.rs:104:28
+  64: memory_mcp::memory::retrieval::pipeline::retrieve_fact_channels::{closure#0}
+             at ./src/memory/retrieval/pipeline.rs:1720:6
+  65: memory_mcp::memory::retrieval::pipeline::assemble_default_context::{closure#0}
+             at ./src/memory/retrieval/pipeline.rs:602:6
+  66: memory_mcp::memory::retrieval::assemble_context_inner::{closure#0}
+             at ./src/memory/retrieval.rs:403:14
+  67: <memory_mcp::memory::retrieval::RetrievalPort as memory_mcp::memory::api::ContextRetrievalPort>::retrieve::{closure#0}
+             at ./src/memory/retrieval.rs:175:10
+  68: <core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<memory_mcp::models::request::AssembledContextItem>, memory_mcp::shared::error::MemoryError>> + core::marker::Send>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  69: memory_mcp::memory::api::recall_context::<memory_mcp::memory::retrieval::RetrievalPort, memory_mcp::memory::retrieval_deps::RateLimitDeps>::{closure#0}
+             at ./src/memory/api.rs:117:33
+  70: memory_mcp::memory::retrieval::assemble_context::{closure#0}
+             at ./src/memory/retrieval.rs:128:6
+  71: <memory_mcp::memory::capabilities::assemble_context::AssembleContextCapability>::assemble_context_from_service::{closure#0}
+             at ./src/service/memory_container_shims/memory_capabilities_assemble_context.rs:26:68
+  72: lexical_term_set_resource::assert_long_read_with_bounded_allocations::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:415:94
+  73: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:383:6
+  74: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  75: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+  76: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:167:5
+  77: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:133:5
+  78: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  79: <tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:486:19
+  80: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  81: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  82: <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/scoped.rs:40:9
+  83: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:38
+  84: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+  85: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+  86: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:17
+  87: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  88: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:819:24
+  89: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:216:33
+  90: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/runtime.rs:65:16
+  91: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:204:9
+  92: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:379:52
+  93: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:348:18
+  94: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans
+             at ./tests/lexical_term_set_resource.rs:383:11
+  95: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:377:61
+  96: <lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  97: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  98: test::__rust_begin_short_backtrace::<core::result::Result<(), alloc::string::String>, fn() -> core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:701:18
+  99: test::run_test_in_process::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:74
+ 100: <core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+ 101: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+ 102: std::panicking::catch_unwind::<core::result::Result<(), alloc::string::String>, core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+ 103: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+ 104: test::run_test_in_process
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:27
+ 105: test::run_test::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:645:43
+ 106: test::run_test::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:675:41
+ 107: std::sys::backtrace::__rust_begin_short_backtrace::<test::run_test::{closure#1}, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/backtrace.rs:166:18
+ 108: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:70:13
+ 109: <core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+ 110: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+ 111: std::panicking::catch_unwind::<(), core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+ 112: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+ 113: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:68:26
+ 114: <std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+ 115: <alloc::boxed::Box<dyn core::ops::function::FnOnce<(), Output = ()> + core::marker::Send> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/boxed.rs:2395:9
+ 116: <std::sys::thread::unix::Thread>::new::thread_start
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/thread/unix.rs:127:17
+ 117: __pthread_exit
+
+ALLOCATION_SAMPLE 500000    0: std::backtrace_rs::backtrace::libunwind::trace
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1: std::backtrace_rs::backtrace::trace_unsynchronized::<<std::backtrace::Backtrace>::create::{closure#0}>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2: <std::backtrace::Backtrace>::create
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/backtrace.rs:331:13
+   3: lexical_term_set_resource::observe_allocation::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:24:59
+   4: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::try_with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+   5: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+   6: lexical_term_set_resource::observe_allocation
+             at ./tests/lexical_term_set_resource.rs:19:17
+   7: <lexical_term_set_resource::CountingAllocator as core::alloc::global::GlobalAlloc>::alloc
+             at ./tests/lexical_term_set_resource.rs:35:9
+   8: __rustc::__rust_alloc
+             at ./tests/lexical_term_set_resource.rs:52:19
+   9: alloc::alloc::alloc
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:158:9
+  10: <alloc::alloc::Global>::alloc_impl_runtime
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:335:73
+  11: <alloc::alloc::Global>::alloc_impl
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:457:9
+  12: <alloc::alloc::Global as core::alloc::Allocator>::allocate
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:575:14
+  13: <alloc::raw_vec::RawVecInner>::try_allocate_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:485:47
+  14: <alloc::raw_vec::RawVecInner>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:453:15
+  15: <alloc::raw_vec::RawVec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:187:20
+  16: <alloc::vec::Vec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:936:20
+  17: <alloc::vec::Vec<u8>>::with_capacity
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:532:9
+  18: alloc::str::convert_while_ascii
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:958:19
+  19: <str>::to_lowercase
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:444:38
+  20: memory_mcp::shared::search::normalize_search_term
+             at ./src/shared/search.rs:267:28
+  21: memory_mcp::shared::search::append_lexical_token::{closure#1}
+             at ./src/shared/search.rs:141:32
+  22: <&mut memory_mcp::shared::search::append_lexical_token::{closure#1} as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:298:21
+  23: core::iter::traits::iterator::Iterator::find_map::check::<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3010:32
+  24: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find_map::check<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  25: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::find_map::<alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3016:14
+  26: <core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter_map.rs:64:19
+  27: <alloc::vec::Vec<alloc::string::String>>::extend_desugared::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4063:44
+  28: <alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_extend::SpecExtend<alloc::string::String, core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>>::spec_extend
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:18:14
+  29: <alloc::vec::Vec<alloc::string::String> as core::iter::traits::collect::Extend<alloc::string::String>>::extend::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4027:9
+  30: memory_mcp::shared::search::append_lexical_token
+             at ./src/shared/search.rs:138:11
+  31: memory_mcp::shared::search::lexical_terms
+             at ./src/shared/search.rs:128:9
+  32: memory_mcp::shared::search::search_query_terms
+             at ./src/shared/search.rs:28:5
+  33: <memory_mcp::shared::search::search_query_terms as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:166:5
+  34: core::iter::adapters::map::map_try_fold::<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:28
+  35: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  36: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  37: core::iter::adapters::map::map_try_fold::<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:21
+  38: <core::str::iter::SplitInclusive<[char; 5]> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  39: <core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  40: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  41: <core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  42: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  43: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::find::<&mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2983:14
+  44: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:98:19
+  45: memory_mcp::memory::retrieval::lexical::best_content_scores
+             at ./src/memory/retrieval/lexical.rs:695:29
+  46: <memory_mcp::memory::retrieval::lexical::FactLexicalCache>::features
+             at ./src/memory/retrieval/lexical.rs:646:17
+  47: memory_mcp::memory::retrieval::ranking::build_ranked_context_facts::<memory_mcp::memory::retrieval::fact_decayed_confidence>
+             at ./src/memory/retrieval/ranking.rs:215:38
+  48: memory_mcp::memory::retrieval::pipeline::rank_fact_channels::{closure#0}
+             at ./src/memory/retrieval/pipeline.rs:2021:12
+  49: memory_mcp::memory::retrieval::pipeline::assemble_default_context::{closure#0}
+             at ./src/memory/retrieval/pipeline.rs:640:65
+  50: memory_mcp::memory::retrieval::assemble_context_inner::{closure#0}
+             at ./src/memory/retrieval.rs:403:14
+  51: <memory_mcp::memory::retrieval::RetrievalPort as memory_mcp::memory::api::ContextRetrievalPort>::retrieve::{closure#0}
+             at ./src/memory/retrieval.rs:175:10
+  52: <core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<memory_mcp::models::request::AssembledContextItem>, memory_mcp::shared::error::MemoryError>> + core::marker::Send>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  53: memory_mcp::memory::api::recall_context::<memory_mcp::memory::retrieval::RetrievalPort, memory_mcp::memory::retrieval_deps::RateLimitDeps>::{closure#0}
+             at ./src/memory/api.rs:117:33
+  54: memory_mcp::memory::retrieval::assemble_context::{closure#0}
+             at ./src/memory/retrieval.rs:128:6
+  55: <memory_mcp::memory::capabilities::assemble_context::AssembleContextCapability>::assemble_context_from_service::{closure#0}
+             at ./src/service/memory_container_shims/memory_capabilities_assemble_context.rs:26:68
+  56: lexical_term_set_resource::assert_long_read_with_bounded_allocations::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:415:94
+  57: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:383:6
+  58: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  59: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+  60: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:167:5
+  61: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:133:5
+  62: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  63: <tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:486:19
+  64: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  65: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  66: <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/scoped.rs:40:9
+  67: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:38
+  68: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+  69: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+  70: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:17
+  71: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  72: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:819:24
+  73: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:216:33
+  74: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/runtime.rs:65:16
+  75: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:204:9
+  76: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:379:52
+  77: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:348:18
+  78: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans
+             at ./tests/lexical_term_set_resource.rs:383:11
+  79: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:377:61
+  80: <lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  81: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  82: test::__rust_begin_short_backtrace::<core::result::Result<(), alloc::string::String>, fn() -> core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:701:18
+  83: test::run_test_in_process::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:74
+  84: <core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  85: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  86: std::panicking::catch_unwind::<core::result::Result<(), alloc::string::String>, core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  87: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  88: test::run_test_in_process
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:27
+  89: test::run_test::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:645:43
+  90: test::run_test::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:675:41
+  91: std::sys::backtrace::__rust_begin_short_backtrace::<test::run_test::{closure#1}, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/backtrace.rs:166:18
+  92: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:70:13
+  93: <core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  94: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  95: std::panicking::catch_unwind::<(), core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  96: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  97: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:68:26
+  98: <std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  99: <alloc::boxed::Box<dyn core::ops::function::FnOnce<(), Output = ()> + core::marker::Send> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/boxed.rs:2395:9
+ 100: <std::sys::thread::unix::Thread>::new::thread_start
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/thread/unix.rs:127:17
+ 101: __pthread_exit
+
+ALLOCATION_SAMPLE 750000    0: std::backtrace_rs::backtrace::libunwind::trace
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1: std::backtrace_rs::backtrace::trace_unsynchronized::<<std::backtrace::Backtrace>::create::{closure#0}>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2: <std::backtrace::Backtrace>::create
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/backtrace.rs:331:13
+   3: lexical_term_set_resource::observe_allocation::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:24:59
+   4: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::try_with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+   5: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+   6: lexical_term_set_resource::observe_allocation
+             at ./tests/lexical_term_set_resource.rs:19:17
+   7: <lexical_term_set_resource::CountingAllocator as core::alloc::global::GlobalAlloc>::realloc
+             at ./tests/lexical_term_set_resource.rs:46:9
+   8: __rustc::__rust_realloc
+             at ./tests/lexical_term_set_resource.rs:52:19
+   9: <alloc::raw_vec::RawVecInner>::finish_grow
+  10: <alloc::raw_vec::RawVecInner>::grow_amortized
+  11: <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+  12: <alloc::raw_vec::RawVecInner>::reserve
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:699:17
+  13: <alloc::raw_vec::RawVec<alloc::string::String>>::reserve
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:358:29
+  14: <alloc::vec::Vec<alloc::string::String>>::reserve
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:1381:18
+  15: <alloc::vec::Vec<alloc::string::String>>::extend_desugared::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4067:22
+  16: <alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_extend::SpecExtend<alloc::string::String, core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>>::spec_extend
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:18:14
+  17: <alloc::vec::Vec<alloc::string::String> as core::iter::traits::collect::Extend<alloc::string::String>>::extend::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4027:9
+  18: memory_mcp::shared::search::append_lexical_token
+             at ./src/shared/search.rs:138:11
+  19: memory_mcp::shared::search::lexical_terms
+             at ./src/shared/search.rs:128:9
+  20: memory_mcp::shared::search::search_query_terms
+             at ./src/shared/search.rs:28:5
+  21: <memory_mcp::shared::search::search_query_terms as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:166:5
+  22: core::iter::adapters::map::map_try_fold::<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:28
+  23: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  24: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  25: core::iter::adapters::map::map_try_fold::<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:21
+  26: <core::str::iter::SplitInclusive<[char; 5]> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  27: <core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  28: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  29: <core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  30: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  31: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::find::<&mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2983:14
+  32: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:98:19
+  33: memory_mcp::memory::retrieval::lexical::best_matching_content_terms
+             at ./src/memory/retrieval/lexical.rs:797:38
+  34: memory_mcp::memory::retrieval::lexical::lexical_query_score_for_text
+             at ./src/memory/retrieval/lexical.rs:735:25
+  35: memory_mcp::memory::retrieval::budget::evidence_excerpt_range
+             at ./src/memory/retrieval/budget.rs:81:23
+  36: memory_mcp::memory::retrieval::budget::bound_context_evidence
+             at ./src/memory/retrieval/budget.rs:30:30
+  37: <memory_mcp::memory::retrieval::RetrievalPort as memory_mcp::memory::api::ContextRetrievalPort>::retrieve::{closure#0}
+             at ./src/memory/retrieval.rs:178:9
+  38: <core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<memory_mcp::models::request::AssembledContextItem>, memory_mcp::shared::error::MemoryError>> + core::marker::Send>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  39: memory_mcp::memory::api::recall_context::<memory_mcp::memory::retrieval::RetrievalPort, memory_mcp::memory::retrieval_deps::RateLimitDeps>::{closure#0}
+             at ./src/memory/api.rs:117:33
+  40: memory_mcp::memory::retrieval::assemble_context::{closure#0}
+             at ./src/memory/retrieval.rs:128:6
+  41: <memory_mcp::memory::capabilities::assemble_context::AssembleContextCapability>::assemble_context_from_service::{closure#0}
+             at ./src/service/memory_container_shims/memory_capabilities_assemble_context.rs:26:68
+  42: lexical_term_set_resource::assert_long_read_with_bounded_allocations::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:415:94
+  43: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:383:6
+  44: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  45: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+  46: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:167:5
+  47: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:133:5
+  48: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  49: <tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:486:19
+  50: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  51: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  52: <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/scoped.rs:40:9
+  53: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:38
+  54: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+  55: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+  56: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:17
+  57: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  58: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:819:24
+  59: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:216:33
+  60: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/runtime.rs:65:16
+  61: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:204:9
+  62: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:379:52
+  63: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:348:18
+  64: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans
+             at ./tests/lexical_term_set_resource.rs:383:11
+  65: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:377:61
+  66: <lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  67: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  68: test::__rust_begin_short_backtrace::<core::result::Result<(), alloc::string::String>, fn() -> core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:701:18
+  69: test::run_test_in_process::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:74
+  70: <core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  71: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  72: std::panicking::catch_unwind::<core::result::Result<(), alloc::string::String>, core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  73: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  74: test::run_test_in_process
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:27
+  75: test::run_test::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:645:43
+  76: test::run_test::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:675:41
+  77: std::sys::backtrace::__rust_begin_short_backtrace::<test::run_test::{closure#1}, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/backtrace.rs:166:18
+  78: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:70:13
+  79: <core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  80: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  81: std::panicking::catch_unwind::<(), core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  82: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  83: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:68:26
+  84: <std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  85: <alloc::boxed::Box<dyn core::ops::function::FnOnce<(), Output = ()> + core::marker::Send> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/boxed.rs:2395:9
+  86: <std::sys::thread::unix::Thread>::new::thread_start
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/thread/unix.rs:127:17
+  87: __pthread_exit
+
+ALLOCATION_SAMPLE 1000000    0: std::backtrace_rs::backtrace::libunwind::trace
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1: std::backtrace_rs::backtrace::trace_unsynchronized::<<std::backtrace::Backtrace>::create::{closure#0}>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2: <std::backtrace::Backtrace>::create
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/backtrace.rs:331:13
+   3: lexical_term_set_resource::observe_allocation::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:24:59
+   4: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::try_with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+   5: <std::thread::local::LocalKey<core::cell::Cell<core::option::Option<usize>>>>::with::<lexical_term_set_resource::observe_allocation::{closure#0}, ()>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+   6: lexical_term_set_resource::observe_allocation
+             at ./tests/lexical_term_set_resource.rs:19:17
+   7: <lexical_term_set_resource::CountingAllocator as core::alloc::global::GlobalAlloc>::alloc
+             at ./tests/lexical_term_set_resource.rs:35:9
+   8: __rustc::__rust_alloc
+             at ./tests/lexical_term_set_resource.rs:52:19
+   9: alloc::alloc::alloc
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:158:9
+  10: <alloc::alloc::Global>::alloc_impl_runtime
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:335:73
+  11: <alloc::alloc::Global>::alloc_impl
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:457:9
+  12: <alloc::alloc::Global as core::alloc::Allocator>::allocate
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/alloc.rs:575:14
+  13: <alloc::raw_vec::RawVecInner>::try_allocate_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:485:47
+  14: <alloc::raw_vec::RawVecInner>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:453:15
+  15: <alloc::raw_vec::RawVec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/raw_vec/mod.rs:187:20
+  16: <alloc::vec::Vec<u8>>::with_capacity_in
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:936:20
+  17: <alloc::vec::Vec<u8>>::with_capacity
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/vec/mod.rs:532:9
+  18: alloc::str::convert_while_ascii
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:958:19
+  19: <str>::to_lowercase
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/str.rs:444:38
+  20: memory_mcp::shared::search::normalize_search_term
+             at ./src/shared/search.rs:267:28
+  21: memory_mcp::shared::search::append_lexical_token::{closure#1}
+             at ./src/shared/search.rs:141:32
+  22: <&mut memory_mcp::shared::search::append_lexical_token::{closure#1} as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:298:21
+  23: core::iter::traits::iterator::Iterator::find_map::check::<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3010:32
+  24: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find_map::check<&str, alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  25: <core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}> as core::iter::traits::iterator::Iterator>::find_map::<alloc::string::String, &mut memory_mcp::shared::search::append_lexical_token::{closure#1}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:3016:14
+  26: <core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter_map.rs:64:19
+  27: <alloc::vec::Vec<alloc::string::String>>::extend_desugared::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4063:44
+  28: <alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_extend::SpecExtend<alloc::string::String, core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>>::spec_extend
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:18:14
+  29: <alloc::vec::Vec<alloc::string::String> as core::iter::traits::collect::Extend<alloc::string::String>>::extend::<core::iter::adapters::filter_map::FilterMap<core::str::iter::Split<memory_mcp::shared::search::append_lexical_token::{closure#0}>, memory_mcp::shared::search::append_lexical_token::{closure#1}>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:4027:9
+  30: memory_mcp::shared::search::append_lexical_token
+             at ./src/shared/search.rs:138:11
+  31: memory_mcp::shared::search::lexical_terms
+             at ./src/shared/search.rs:128:9
+  32: memory_mcp::shared::search::search_query_terms
+             at ./src/shared/search.rs:28:5
+  33: <memory_mcp::shared::search::search_query_terms as core::ops::function::FnMut<(&str,)>>::call_mut
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:166:5
+  34: core::iter::adapters::map::map_try_fold::<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:28
+  35: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  36: core::iter::adapters::filter::filter_try_fold::<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:86:44
+  37: core::iter::adapters::map::map_try_fold::<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:21
+  38: <core::str::iter::SplitInclusive<[char; 5]> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, &str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, <str>::trim, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2504:21
+  39: <core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}, core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  40: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::filter::filter_try_fold<&str, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}, core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  41: <core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::map::map_try_fold<&str, alloc::vec::Vec<alloc::string::String>, (), core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>, memory_mcp::shared::search::search_query_terms, core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:157:19
+  42: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::find::check<alloc::vec::Vec<alloc::string::String>, &mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::vec::Vec<alloc::string::String>>>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  43: <core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms> as core::iter::traits::iterator::Iterator>::find::<&mut memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2983:14
+  44: <core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::SplitInclusive<[char; 5]>, <str>::trim>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#0}>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#1}>, memory_mcp::shared::search::search_query_terms>, memory_mcp::memory::retrieval::lexical::local_content_spans::{closure#2}> as core::iter::traits::iterator::Iterator>::next
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/iter/adapters/filter.rs:98:19
+  45: memory_mcp::memory::retrieval::lexical::best_matching_content_terms
+             at ./src/memory/retrieval/lexical.rs:797:38
+  46: memory_mcp::memory::retrieval::lexical::lexical_query_score_for_text
+             at ./src/memory/retrieval/lexical.rs:735:25
+  47: memory_mcp::memory::retrieval::budget::evidence_excerpt_range
+             at ./src/memory/retrieval/budget.rs:81:23
+  48: memory_mcp::memory::retrieval::budget::bound_context_evidence
+             at ./src/memory/retrieval/budget.rs:30:30
+  49: <memory_mcp::memory::retrieval::RetrievalPort as memory_mcp::memory::api::ContextRetrievalPort>::retrieve::{closure#0}
+             at ./src/memory/retrieval.rs:178:9
+  50: <core::pin::Pin<alloc::boxed::Box<dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<memory_mcp::models::request::AssembledContextItem>, memory_mcp::shared::error::MemoryError>> + core::marker::Send>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  51: memory_mcp::memory::api::recall_context::<memory_mcp::memory::retrieval::RetrievalPort, memory_mcp::memory::retrieval_deps::RateLimitDeps>::{closure#0}
+             at ./src/memory/api.rs:117:33
+  52: memory_mcp::memory::retrieval::assemble_context::{closure#0}
+             at ./src/memory/retrieval.rs:128:6
+  53: <memory_mcp::memory::capabilities::assemble_context::AssembleContextCapability>::assemble_context_from_service::{closure#0}
+             at ./src/service/memory_container_shims/memory_capabilities_assemble_context.rs:26:68
+  54: lexical_term_set_resource::assert_long_read_with_bounded_allocations::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:415:94
+  55: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:383:6
+  56: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+  57: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+  58: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:167:5
+  59: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/task/coop/mod.rs:133:5
+  60: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  61: <tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:486:19
+  62: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  63: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  64: <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/scoped.rs:40:9
+  65: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:38
+  66: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+  67: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+  68: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>::{closure#0}>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context.rs:186:17
+  69: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, core::option::Option<()>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  70: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:819:24
+  71: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:216:33
+  72: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/context/runtime.rs:65:16
+  73: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/scheduler/current_thread/mod.rs:204:9
+  74: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:379:52
+  75: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /Users/solovey/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/runtime.rs:348:18
+  76: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans
+             at ./tests/lexical_term_set_resource.rs:383:11
+  77: lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0}
+             at ./tests/lexical_term_set_resource.rs:377:61
+  78: <lexical_term_set_resource::public_repeated_query_read_reuses_grounding_spans::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  79: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  80: test::__rust_begin_short_backtrace::<core::result::Result<(), alloc::string::String>, fn() -> core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:701:18
+  81: test::run_test_in_process::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:74
+  82: <core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  83: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  84: std::panicking::catch_unwind::<core::result::Result<(), alloc::string::String>, core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  85: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure#0}>, core::result::Result<(), alloc::string::String>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  86: test::run_test_in_process
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:724:27
+  87: test::run_test::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:645:43
+  88: test::run_test::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/test/src/lib.rs:675:41
+  89: std::sys::backtrace::__rust_begin_short_backtrace::<test::run_test::{closure#1}, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/backtrace.rs:166:18
+  90: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:70:13
+  91: <core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/panic/unwind_safe.rs:275:9
+  92: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:573:43
+  93: std::panicking::catch_unwind::<(), core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panicking.rs:541:19
+  94: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1}::{closure#0}>, ()>
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/panic.rs:359:14
+  95: std::thread::lifecycle::spawn_unchecked::<test::run_test::{closure#1}, ()>::{closure#1}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/thread/lifecycle.rs:68:26
+  96: <std::thread::lifecycle::spawn_unchecked<test::run_test::{closure#1}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/ops/function.rs:250:5
+  97: <alloc::boxed::Box<dyn core::ops::function::FnOnce<(), Output = ()> + core::marker::Send> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/alloc/src/boxed.rs:2395:9
+  98: <std::sys::thread::unix::Thread>::new::thread_start
+             at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std/src/sys/thread/unix.rs:127:17
+  99: __pthread_exit
+
+LONG_SOURCE_APPLICATION_ALLOCATIONS 1034597
+
+thread 'public_repeated_query_read_reuses_grounding_spans' (6625218) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:438:5:
+eight long repeated-vocabulary sources must fit the million-call application budget; observed 1034597
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_repeated_query_read_reuses_grounding_spans ... FAILED
+
+failures:
+
+failures:
+    public_repeated_query_read_reuses_grounding_spans
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 3.57s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

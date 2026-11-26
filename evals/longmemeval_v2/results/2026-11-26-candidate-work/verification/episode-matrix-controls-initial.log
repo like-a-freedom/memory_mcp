@@ -1,0 +1,85 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.98s
+     Running tests/episode_candidate_hydration.rs (target/debug/build/memory_mcp/1a57fd480da0303d/out/episode_candidate_hydration-1a57fd480da0303d)
+
+running 2 tests
+test episode_candidate_later_batch_keeps_new_winner_without_refilling_seen_caps ... ok
+test episode_term_candidates_return_each_payload_once_in_first_hit_order ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 18 tests
+LEXICAL_SET_ALLOCATIONS 17
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+INDEX_VOCABULARY_ALLOCATIONS 4032
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 7
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10264157 single=8678986 additional=1585171
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+FACT_HYDRATION_ALLOCATIONS 47872
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_FALLBACK_ALLOCATIONS 73874
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 122989
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=8 allocations=155414
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 77188
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 553070
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23046
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=316757
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=284524
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=473706
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23890
+test public_repeated_query_read_reuses_grounding_spans ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=64 allocations=838989
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23229
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.20s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 18 tests
+
+thread 'batched_episode_sort_discards_full_sources_before_each_term_limit' (7033670) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:863:10:
+actual public batched read
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test batched_lexical_sort_discards_full_sources_before_each_term_limit ... ok
+test batched_episode_sort_discards_full_sources_before_each_term_limit ... FAILED
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test archival_existence_does_not_read_fact_payload ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+
+failures:
+
+failures:
+    batched_episode_sort_discards_full_sources_before_each_term_limit
+
+test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_query_projection`

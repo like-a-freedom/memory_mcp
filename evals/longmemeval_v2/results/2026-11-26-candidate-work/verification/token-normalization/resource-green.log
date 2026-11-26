@@ -1,0 +1,49 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 33.91s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 21 tests
+INDEX_VOCABULARY_ALLOCATIONS 6044
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 11
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+LEXICAL_SET_ALLOCATIONS 20
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10009908 single=8206196 additional=1803712
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10278992 single=8206196 additional=2072796
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10332256 single=8206279 additional=2125977
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+FACT_HYDRATION_ALLOCATIONS 47869
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_FALLBACK_ALLOCATIONS 70220
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 128071
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=8 allocations=175751
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 591551
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 70681
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16054
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=327075
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=304947
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=531784
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16999
+test public_repeated_query_read_reuses_grounding_spans ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 837996
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=64 allocations=859318
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16237
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.12s
+

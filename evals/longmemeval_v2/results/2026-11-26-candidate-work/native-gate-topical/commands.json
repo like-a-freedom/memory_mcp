@@ -1,0 +1,32 @@
+[
+  {
+    "name": "run",
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-final-gate-57jm8e8q/memory-eval",
+      "run",
+      "--profile",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/profiles/memory_decisions_current.json",
+      "--artifact",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/native-gate-topical/run.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 55.061872624995885
+  },
+  {
+    "name": "comparison",
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-final-gate-57jm8e8q/memory-eval",
+      "compare-current-memory",
+      "--baseline",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+      "--candidate",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/native-gate-topical/current/index.json",
+      "--corpus",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/memory-decisions-v10",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/native-gate-topical/comparison.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.18605633298284374
+  }
+]

@@ -1,0 +1,206 @@
+diff --git a/crates/memory-mcp/src/memory/retrieval/budget.rs b/crates/memory-mcp/src/memory/retrieval/budget.rs
+index 0eb079a9..93cbfe29 100644
+--- a/crates/memory-mcp/src/memory/retrieval/budget.rs
++++ b/crates/memory-mcp/src/memory/retrieval/budget.rs
+@@ -1,5 +1,5 @@
+ use crate::models::AssembledContextItem;
+-use std::collections::HashSet;
++use std::collections::{HashMap, HashSet};
+ use std::ops::Range;
+ 
+ use super::admission::{build_query_evidence, episode_candidate_is_admitted_at_reference_time};
+@@ -17,7 +17,24 @@ const MAX_EVIDENCE_EXCERPT_BYTES: usize = 2048;
+ 
+ pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query: &str) {
+     let query_terms = crate::shared::search::search_query_terms(query);
+-    for item in items {
++    // Compute ranges before mutating any source. Equal immutable text has the
++    // same excerpt for this query, even when distinct facts cite it. Borrowed
++    // cache keys die before the content/quote buffers are replaced.
++    let ranges = {
++        let mut cache = HashMap::new();
++        items.iter().map(|item| {
++            let content = cache.entry(item.content.as_str())
++                .or_insert_with(|| evidence_excerpt_range(&item.content, &query_terms)).clone();
++            let quote = if item.content == item.quote && content.is_some() {
++                None
++            } else {
++                cache.entry(item.quote.as_str())
++                    .or_insert_with(|| evidence_excerpt_range(&item.quote, &query_terms)).clone()
++            };
++            (content, quote)
++        }).collect::<Vec<_>>()
++    };
++    for (item, (content_range, quote_range)) in items.iter_mut().zip(ranges) {
+         if item.content.len().max(item.quote.len()) <= MAX_EVIDENCE_EXCERPT_BYTES {
+             continue;
+         }
+@@ -27,7 +44,7 @@ pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query:
+ 
+         let same_text = item.content == item.quote;
+         let episode_fallback = item.provenance["episode_fallback"] == true && same_text;
+-        if let Some(range) = evidence_excerpt_range(&item.content, &query_terms) {
++        if let Some(range) = content_range {
+             if episode_fallback {
+                 item.provenance["episode_excerpt"] = serde_json::json!({
+                     "start_byte": range.start,
+@@ -44,7 +61,7 @@ pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query:
+             }
+             item.content = item.content[range].to_owned();
+         }
+-        if let Some(range) = evidence_excerpt_range(&item.quote, &query_terms) {
++        if let Some(range) = quote_range {
+             item.provenance["quote_excerpt"] = excerpt_metadata(&range, item.quote.len());
+             item.quote = item.quote[range].to_owned();
+         }
+@@ -59,7 +76,7 @@ fn excerpt_metadata(range: &Range<usize>, bytes: usize) -> serde_json::Value {
+     })
+ }
+ 
+-fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<usize>> {
++fn evidence_excerpt_range<'a>(text: &'a str, query_terms: &[String]) -> Option<Range<usize>> {
+     if text.len() <= MAX_EVIDENCE_EXCERPT_BYTES {
+         return None;
+     }
+@@ -69,6 +86,14 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
+ 
+     let last_start = text.len() - MAX_EVIDENCE_EXCERPT_BYTES;
+     let margin = MAX_EVIDENCE_EXCERPT_BYTES / 4;
++    // Repeated source windows have the same score for this immutable query.
++    // Borrow only for this excerpt search; no cache outlives or owns the source.
++    let mut scores = HashMap::new();
++    let mut score_text = |window: &'a str| {
++        *scores
++            .entry(window)
++            .or_insert_with(|| super::lexical::lexical_query_score_for_text(window, query_terms))
++    };
+     let mut best_score = None;
+     let mut best_range = 0..0;
+     // Overlap adjacent windows so short evidence can survive a window boundary.
+@@ -78,17 +103,14 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
+     {
+         let start = text.ceil_char_boundary(offset);
+         let end = text.floor_char_boundary(offset + MAX_EVIDENCE_EXCERPT_BYTES);
+-        let overlap = super::lexical::lexical_query_score_for_text(&text[start..end], query_terms);
++        let overlap = score_text(&text[start..end]);
+         if best_score.is_some_and(|(best_overlap, _)| overlap < best_overlap) {
+             continue;
+         }
+         // Prefer room around a match for the words carrying its answer.
+         let inner_start = text.ceil_char_boundary(offset + margin);
+         let inner_end = text.floor_char_boundary(offset + 3 * margin);
+-        let interior_overlap = super::lexical::lexical_query_score_for_text(
+-            &text[inner_start..inner_end],
+-            query_terms,
+-        );
++        let interior_overlap = score_text(&text[inner_start..inner_end]);
+         let score = (overlap, interior_overlap);
+         if best_score.is_none_or(|best| score > best) {
+             best_score = Some(score);
+@@ -98,10 +120,23 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
+     Some(preserve_control_block(text, query_terms, best_range))
+ }
+ 
+-// Keep a short, contiguous accessibility control group intact when the lexical
+-// window intersects it. Both plain trees and JSON-escaped trees occur in episodes.
++// Keep a short, contiguous accessibility control group intact. Explicit UI
++// enumerations rank complete query-bearing groups; other reads keep overlap with
++// the lexical window. Both plain trees and JSON-escaped trees occur in episodes.
+ // The source remains a byte-exact, bounded excerpt with original offsets.
+ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) -> Range<usize> {
++    let is_control_term = |term: &str| {
++        matches!(
++            term,
++            "dropdown" | "toolbar" | "option" | "options" | "button" | "buttons"
++        )
++    };
++    let enumerates_controls = terms.iter().any(|term| is_control_term(term));
++    let topical_terms: Vec<_> = terms
++        .iter()
++        .filter(|term| !is_control_term(term))
++        .cloned()
++        .collect();
+     struct Line {
+         start: usize,
+         end: usize,
+@@ -189,16 +224,43 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>)
+         let end = lines.get(end_index).map_or(text.len(), |line| line.end);
+         let range = first.start..end;
+         if range.len() > MAX_EVIDENCE_EXCERPT_BYTES
+-            || range.start >= original.end
+-            || range.end <= original.start
++            || (!enumerates_controls
++                && (range.start >= original.end || range.end <= original.start))
+         {
+             continue;
+         }
+-        let score = super::lexical::lexical_query_score_for_text(&text[range.clone()], terms);
+-        if score == 0
+-            || best
+-                .as_ref()
+-                .is_some_and(|(best_score, _)| score <= *best_score)
++        let block_score = super::lexical::lexical_query_score_for_text(&text[range.clone()], terms);
++        if block_score == 0
++            || (enumerates_controls
++                && super::lexical::lexical_query_score_for_text(
++                    &text[range.clone()],
++                    &topical_terms,
++                ) == 0)
++        {
++            continue;
++        }
++        // For an enumeration the complete group is the evidence unit, not a
++        // narrative about opening it. Rank eligible groups by their own query
++        // support near the winning narrative; distance precedes lexical tie-breaks
++        // so a different historical UI state cannot win on generic sort words.
++        // No answer labels, source IDs or fixed distance-to-gold enter selection.
++        let start = text.ceil_char_boundary(
++            range
++                .start
++                .saturating_sub((MAX_EVIDENCE_EXCERPT_BYTES - range.len()) / 2),
++        );
++        let end = text.floor_char_boundary((start + MAX_EVIDENCE_EXCERPT_BYTES).min(text.len()));
++        let context_score = if enumerates_controls {
++            super::lexical::lexical_query_score_for_text(&text[start..end], terms)
++        } else {
++            0
++        };
++        let distance =
++            range.start.saturating_sub(original.end) + original.start.saturating_sub(range.end);
++        let score = (std::cmp::Reverse(distance), block_score, context_score);
++        if best
++            .as_ref()
++            .is_some_and(|(best_score, _)| score <= *best_score)
+         {
+             continue;
+         }
+@@ -216,12 +278,6 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>)
+     let adjusted = start..end;
+     // An explicit UI enumeration may need the entire group even when some
+     // lexical context lies outside it; other reads retain the lexical winner.
+-    let enumerates_controls = terms.iter().any(|term| {
+-        matches!(
+-            term.as_str(),
+-            "dropdown" | "toolbar" | "option" | "options" | "button" | "buttons"
+-        )
+-    });
+     if !enumerates_controls
+         && super::lexical::lexical_query_score_for_text(&text[adjusted.clone()], terms)
+             < super::lexical::lexical_query_score_for_text(&text[original.clone()], terms)
+@@ -361,6 +417,7 @@ pub(super) async fn collect_episode_fallback_items(
+     service: &RetrievalContext,
+     params: &DefaultContextParams<'_>,
+     query: &str,
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+ ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+     let response_budget = params.budget.max(1) as usize;
+     let candidate_budget = super::reranking::candidate_pool_limit(
+@@ -376,6 +433,8 @@ pub(super) async fn collect_episode_fallback_items(
+     )
+     .await?;
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(trace, "episodes.fetched", &episode_records);
+     let query_terms = crate::shared::search::search_query_terms(query);
+     let raw_query = params.raw_query_opt.unwrap_or(query);
+     let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);

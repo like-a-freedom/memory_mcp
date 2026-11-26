@@ -1,0 +1,31 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.95s
+     Running tests/fs_watch_integration.rs (target/debug/build/memory_mcp/6e79a094684cd607/out/fs_watch_integration-6e79a094684cd607)
+
+running 14 tests
+test deterministic_failures_do_not_retry_in_the_cycle ... ok
+test watched_snapshot_that_looks_like_loopback_url_is_stored_literally ... ok
+test watched_snapshot_that_looks_like_file_path_is_not_read_again ... ok
+test one_failed_revision_does_not_prevent_next_revision ... ok
+test successful_processing_persists_episode_with_lineage_and_facts ... ok
+test rediscovery_of_same_bytes_does_not_create_second_episode ... ok
+test runtime_drops_supported_file_event_and_shutdown_is_bounded ... ok
+test two_revisions_of_same_path_keep_one_lineage_and_two_episodes ... ok
+test crash_before_record_episode_recovers_through_expected_episode_id ... ok
+test crash_after_discovery_recovers_from_prepared_snapshot ... ok
+test crash_after_stage_ingesting_before_episode_creation_recovers ... ok
+test source_path_deleted_before_restart_does_not_block_recovery ... ok
+test runtime_startup_scan_enqueues_and_processes_existing_files ... ok
+test rename_starts_a_new_lineage ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.28s
+
+     Running tests/fs_watch_process_enabled.rs (target/debug/build/memory_mcp/1acf38ef1ed9ac3d/out/fs_watch_process_enabled-1acf38ef1ed9ac3d)
+
+running 4 tests
+test stdio_close_triggers_bounded_shutdown ... ok
+test corrupt_file_leaves_mcp_responsive ... ok
+test serve_reaches_readiness_and_ingests_startup_file ... ok
+test separate_data_directories_coexist_without_ownership_conflict ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.31s
+

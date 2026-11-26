@@ -1,0 +1,10 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.05s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/526bba5550d0e6e4/out/memory_mcp-526bba5550d0e6e4)
+
+running 1 test
+test shared::search::tests::vocabulary_keeps_every_term_after_memoization_capacity_is_exhausted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2069 filtered out; finished in 0.05s
+

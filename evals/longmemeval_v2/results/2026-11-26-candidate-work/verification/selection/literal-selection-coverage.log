@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.02s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+LITERAL_SELECTION {"final":[["episode_fallback:episode:literal_toolbar0","episode:literal_toolbar0"]],"stages":[{"items":[{"id":"","provenance":{"diagnostic_boundary":"persisted_source_episode"},"tier":null}],"stage":"formation"},{"items":[{"id":"fact:literal_toolbar7","provenance":{"control_label_coverage":1.0,"ingestion_method":"manual","matched_query_terms":["archive","toolbar","export","validate"],"retrieval_admission":{"basis":null,"community":null,"explicit_date_admitted":false,"graph_anchor_origin":null,"hop_count":null,"matched_content_terms":[],"matched_index_key_terms":[],"matched_references":[],"policy_version":"retrieval-admission-v1","repeated_topic":null,"resolved_entity_ids":[],"semantic_similarity":null}},"tier":"fallback"}],"stage":"ranked_fact_candidates"},{"items":[{"id":"fact:literal_toolbar7","provenance":{"control_label_coverage":1.0,"ingestion_method":"manual","matched_query_terms":["archive","toolbar","export","validate"],"retrieval_admission":{"basis":null,"community":null,"explicit_date_admitted":false,"graph_anchor_origin":null,"hop_count":null,"matched_content_terms":[],"matched_index_key_terms":[],"matched_references":[],"policy_version":"retrieval-admission-v1","repeated_topic":null,"resolved_entity_ids":[],"semantic_similarity":null}},"tier":"fallback"}],"stage":"subject_scoped_fact_candidates"},{"items":[{"id":"fact:literal_toolbar7","provenance":{"control_label_coverage":1.0,"ingestion_method":"manual","matched_query_terms":["archive","toolbar","export","validate"],"retrieval_admission":{"basis":"lexical","community":null,"explicit_date_admitted":false,"graph_anchor_origin":null,"hop_count":null,"matched_content_terms":["archive","toolbar","export","validate"],"matched_index_key_terms":[],"matched_references":[],"policy_version":"retrieval-admission-v1","repeated_topic":null,"resolved_entity_ids":[],"semantic_similarity":null}},"tier":"fallback"}],"stage":"admitted_fact_candidates"},{"items":[{"id":"fact:literal_toolbar7","provenance":{"control_label_coverage":1.0,"ingestion_method":"manual","matched_query_terms":["archive","toolbar","export","validate"],"retrieval_admission":{"basis":"lexical","community":null,"explicit_date_admitted":false,"graph_anchor_origin":null,"hop_count":null,"matched_content_terms":["archive","toolbar","export","validate"],"matched_index_key_terms":[],"matched_references":[],"policy_version":"retrieval-admission-v1","repeated_topic":null,"resolved_entity_ids":[],"semantic_similarity":null}},"tier":"fallback"}],"stage":"bounded_fact_candidates"},{"items":[],"stage":"episode_candidates"},{"items":[],"stage":"selected_pre_packaging"},{"items":[],"stage":"packed_context"}]}
+
+thread 'named_source_phrases_outrank_scattered_words_and_index_only_labels' (7599468) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:440:5:
+assertion `left == right` failed: literal source phrases must outrank distributed words and index-only labels
+  left: "episode:literal_toolbar0"
+ right: "episode:literal_toolbar7"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... FAILED
+
+failures:
+
+failures:
+    named_source_phrases_outrank_scattered_words_and_index_only_labels
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.26s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

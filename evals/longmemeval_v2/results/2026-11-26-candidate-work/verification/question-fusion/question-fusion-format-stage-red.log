@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.65s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'response_format_instructions_do_not_dilute_the_same_question_evidence' (7382178) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:345:15:
+index out of bounds: the len is 0 but the index is 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... FAILED
+
+failures:
+
+failures:
+    response_format_instructions_do_not_dilute_the_same_question_evidence
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.90s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

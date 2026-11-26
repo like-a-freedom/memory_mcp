@@ -1,0 +1,92 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.67s
+     Running tests/episode_candidate_hydration.rs (target/debug/build/memory_mcp/1a57fd480da0303d/out/episode_candidate_hydration-1a57fd480da0303d)
+
+running 3 tests
+test episode_membership_preserves_unicode_literal_and_blank_term_semantics ... ok
+test episode_candidate_later_batch_keeps_new_winner_without_refilling_seen_caps ... ok
+test episode_term_candidates_return_each_payload_once_in_first_hit_order ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/equivalent_alias_reads.rs (target/debug/build/memory_mcp/887735e5649b3b21/out/equivalent_alias_reads-887735e5649b3b21)
+
+running 11 tests
+test equivalent_native_and_application_alias_runs_one_lexical_read ... ok
+test native_stem_equivalence_alone_cannot_remove_different_application_query ... ok
+test empty_native_tokens_cannot_establish_equivalence ... ok
+test unavailable_analyzer_keeps_the_alias_read ... ok
+test additional_fulltext_index_cannot_change_alias_equivalence ... ok
+test genuine_alias_keeps_its_independent_read_and_evidence ... ok
+test different_native_tokens_keep_the_application_equivalent_alias ... ok
+test indexing_only_token_equivalence_cannot_remove_an_alias_read ... ok
+test different_content_index_analyzer_keeps_the_alias_read ... ok
+test different_key_index_analyzer_keeps_the_alias_read ... ok
+test incomplete_analyzer_keeps_the_alias_read ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 18 tests
+LEXICAL_SET_ALLOCATIONS 17
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+INDEX_VOCABULARY_ALLOCATIONS 4032
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 7
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10248875 single=8678793 additional=1570082
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+FACT_HYDRATION_ALLOCATIONS 47872
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_FALLBACK_ALLOCATIONS 73850
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 124271
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=8 allocations=155408
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 77176
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 553056
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23034
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=316747
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=284517
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=473691
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23872
+test public_repeated_query_read_reuses_grounding_spans ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=64 allocations=838989
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 23217
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.29s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 18 tests
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test batched_lexical_sort_discards_full_sources_before_each_term_limit ... ok
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test batched_episode_sort_discards_full_sources_before_each_term_limit ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test archival_existence_does_not_read_fact_payload ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+

@@ -1,0 +1,16 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.30s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+2026-11-26T16:20:44.473050Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.483840Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.492480Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.501088Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.509890Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.518808Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:20:44.528374Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+test explicitly_named_controls_survive_competing_generic_toolbar_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.38s
+

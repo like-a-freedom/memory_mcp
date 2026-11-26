@@ -1,0 +1,3 @@
+Sampling process 29768 for 2 seconds with 1 millisecond of run time between samples
+Sampling completed, processing symbols...
+Sample analysis of process 29768 written to file /Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/bounded-access-waves/0c6b0c60-cpu-sample.txt

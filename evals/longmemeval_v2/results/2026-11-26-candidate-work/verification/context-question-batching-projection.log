@@ -1,0 +1,39 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.77s
+     Running tests/retrieval_query_batching.rs (target/debug/build/memory_mcp/6011d5bf5e54d7fb/out/retrieval_query_batching-6011d5bf5e54d7fb)
+
+running 7 tests
+test episode_subqueries_preserve_unicode_casefolded_substring_groups ... ok
+test episode_fallback_batches_terms_without_changing_substring_queries ... ok
+test fact_fallback_batches_term_queries_within_the_rpc_budget ... ok
+test fact_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test episode_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test source_fact_reads_keep_independent_limits_in_batches_of_eight ... ok
+test surreal_subqueries_preserve_each_ordered_fact_score_group ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 18 tests
+test batched_lexical_sort_discards_full_sources_before_each_term_limit ... ok
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test batched_episode_sort_discards_full_sources_before_each_term_limit ... ok
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test archival_existence_does_not_read_fact_payload ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+

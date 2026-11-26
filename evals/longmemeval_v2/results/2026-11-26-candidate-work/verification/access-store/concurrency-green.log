@@ -1,0 +1,20 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.01s
+     Running tests/fact_access_concurrency.rs (target/debug/build/memory_mcp/f547a309f91a978c/out/fact_access_concurrency-f547a309f91a978c)
+
+running 4 tests
+2026-11-26T16:33:57.924595Z ERROR  op=assemble_context.access_track_error  access.allowed_tags=null  access.caller_id=null  access.content_type=null  access.session_vars=null  access.transport=null  args={}  result.error_code=storage
+test public_read_awaits_four_access_writes_before_starting_the_next_wave ... ok
+test cancellation_drops_all_pending_access_writes ... ok
+test failed_access_does_not_cancel_siblings_or_skip_later_facts ... ok
+test public_read_durably_records_all_distinct_fact_accesses_before_returning ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests/fact_access_payload.rs (target/debug/build/memory_mcp/e287aad17f0c3392/out/fact_access_payload-e287aad17f0c3392)
+
+running 1 test
+test access_write_does_not_return_the_large_source_afterimage ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+

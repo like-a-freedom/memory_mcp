@@ -1,0 +1,3 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [optimized + debuginfo] target(s) in 26.63s

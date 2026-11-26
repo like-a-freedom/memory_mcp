@@ -1,0 +1,30 @@
+Calling `python -m mlx_lm.server...` directly is deprecated. Use `mlx_lm.server...` or `python -m mlx_lm server ...` instead.
+/Users/solovey/Documents/dev/memory_mcp/target/c4-native/mlx-env/lib/python3.14/site-packages/mlx_lm/server.py:1894: UserWarning: mlx_lm.server is not recommended for production as it only implements basic security checks.
+  warnings.warn(
+2026-11-26 23:12:29,981 - INFO - Starting httpd at 127.0.0.1 on port 18766...
+127.0.0.1 - - [26/Nov/2026 23:12:30] "GET /v1/models HTTP/1.1" 200 -
+2026-11-26 23:21:22,061 - INFO - Prompt Cache: 0 sequences, 0.00 GB
+2026-11-26 23:21:22,061 - INFO - - assistant: 0 sequences, 0.00 GB
+2026-11-26 23:21:22,061 - INFO - - user: 0 sequences, 0.00 GB
+2026-11-26 23:21:22,061 - INFO - - system: 0 sequences, 0.00 GB
+127.0.0.1 - - [26/Nov/2026 23:21:22] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 23:21:34,427 - INFO - Prompt processing progress: 130/902
+2026-11-26 23:21:34,820 - INFO - Prompt processing progress: 898/902
+2026-11-26 23:21:34,844 - INFO - Prompt processing progress: 901/902
+2026-11-26 23:21:34,863 - INFO - Prompt processing progress: 902/902
+2026-11-26 23:21:35,768 - INFO - Prompt Cache: 4 sequences, 0.32 GB
+2026-11-26 23:21:35,768 - INFO - - assistant: 2 sequences, 0.17 GB
+2026-11-26 23:21:35,768 - INFO - - user: 1 sequences, 0.08 GB
+2026-11-26 23:21:35,768 - INFO - - system: 1 sequences, 0.07 GB
+127.0.0.1 - - [26/Nov/2026 23:21:35] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 23:21:36,192 - INFO - Prompt processing progress: 771/775
+2026-11-26 23:21:36,213 - INFO - Prompt processing progress: 774/775
+2026-11-26 23:21:36,235 - INFO - Prompt processing progress: 775/775
+2026-11-26 23:21:37,936 - INFO - Prompt Cache: 7 sequences, 0.57 GB
+2026-11-26 23:21:37,936 - INFO - - assistant: 4 sequences, 0.33 GB
+2026-11-26 23:21:37,936 - INFO - - user: 2 sequences, 0.17 GB
+2026-11-26 23:21:37,936 - INFO - - system: 1 sequences, 0.07 GB
+127.0.0.1 - - [26/Nov/2026 23:21:37] "POST /v1/chat/completions HTTP/1.1" 200 -
+2026-11-26 23:21:38,948 - INFO - Prompt processing progress: 774/778
+2026-11-26 23:21:38,998 - INFO - Prompt processing progress: 777/778
+2026-11-26 23:21:39,031 - INFO - Prompt processing progress: 778/778

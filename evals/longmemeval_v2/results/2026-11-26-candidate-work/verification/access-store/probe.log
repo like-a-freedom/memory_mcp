@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.17s
+     Running tests/_access_probe.rs (target/debug/build/memory_mcp/01c1aa14f8e4f170/out/_access_probe-01c1aa14f8e4f170)
+
+running 1 test
+PROBE_ID fact:72dae2359d272b755a877236 source_bytes=382024 keys=3384
+PROBE_ACCESS fact:72dae2359d272b755a877236 45.393708ms
+PROBE_ID fact:37f2974c09fc83ab98421ce5 source_bytes=831631 keys=25035
+PROBE_ACCESS fact:37f2974c09fc83ab98421ce5 1.810488875s
+PROBE_ID fact:fe6ba23116a9aa827b8d73c4 source_bytes=977101 keys=25431
+PROBE_ACCESS fact:fe6ba23116a9aa827b8d73c4 1.894517875s
+PROBE_ID fact:07f50ea549db79b8a856800e source_bytes=804658 keys=14436
+PROBE_ACCESS fact:07f50ea549db79b8a856800e 551.540167ms
+PROBE_ID fact:fe3c2170d50df2f639856bb1 source_bytes=1020977 keys=10572
+PROBE_ACCESS fact:fe3c2170d50df2f639856bb1 301.715542ms
+test frozen_store_access_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 19.61s
+

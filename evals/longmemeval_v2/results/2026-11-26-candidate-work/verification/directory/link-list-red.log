@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.86s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test directory_tabs_keep_the_complete_short_link_list ... FAILED
+
+failures:
+
+---- directory_tabs_keep_the_complete_short_link_list stdout ----
+
+thread 'directory_tabs_keep_the_complete_short_link_list' (8053758) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:893:9:
+short link list must remain complete rather than preserve only its surrounding narrative
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    directory_tabs_keep_the_complete_short_link_list
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.29s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

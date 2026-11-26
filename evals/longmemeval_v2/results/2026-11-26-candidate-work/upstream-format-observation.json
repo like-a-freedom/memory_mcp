@@ -1,0 +1,59 @@
+{
+  "schema": "upstream-prompt-format-observation/v1",
+  "source_file": "target/c4-native/upstream/evaluation/harness.py",
+  "source_sha256": "93fe5855a74ad46d7e8b489cebac24de38a9b30ba7ec1de2dd8708bd4aeebdb6",
+  "actual_prompt_rows": "evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-container/scores/prompt_rows.jsonl",
+  "prompt_rows_sha256": "98942210cc6f5052fbd935c3995508334eb2a997dbe9c9489fd10ec73107fc42",
+  "cases": [
+    {
+      "case_id": "0c6b0c60",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "6d975a08",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "89a20f48",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "922a0c56",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "d6da3938",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "f43926d9",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    },
+    {
+      "case_id": "f61a096f",
+      "role": "system",
+      "codepoint": "U+0008",
+      "byte_offset_utf8": 502,
+      "surrounding_repr": "'ise is wrong, provide an explanation in \\x08oxed{} explaining why the question is flawed.'"
+    }
+  ],
+  "interpretation": "Pinned upstream Python string uses an unescaped backslash-b in the false-premise instruction, producing a backspace. Observed in all7 system prompts. This is a protocol defect, not proof of cause for any answer failure. Original comparison preserves the upstream prompt; any repaired prompt belongs to a separately preregistered diagnostic protocol, not retroactive official score."
+}

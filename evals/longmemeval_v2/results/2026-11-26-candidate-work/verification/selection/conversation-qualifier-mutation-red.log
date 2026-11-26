@@ -1,0 +1,65 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.37s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/80e1a2ae3e3297e3/out/conversation_neighborhood-80e1a2ae3e3297e3)
+
+running 1 test
+test a_source_question_cannot_drop_substantive_post_question_constraints ... FAILED
+
+failures:
+
+---- a_source_question_cannot_drop_substantive_post_question_constraints stdout ----
+
+thread 'a_source_question_cannot_drop_substantive_post_question_constraints' (7865604) panicked at crates/memory-mcp/tests/conversation_neighborhood.rs:1921:5:
+neither the source question nor its answer establishes the requested qualification: [
+    AssembledContextItem {
+        fact_id: "episode_fallback:episode:0b265c3cce41c8ede2f866c9",
+        content: "Mira: The Minnesota Wolves!",
+        quote: "Mira: The Minnesota Wolves!",
+        source_episode: "episode:0b265c3cce41c8ede2f866c9",
+        confidence: 0.20790200112078222,
+        relevance: Some(
+            0.06666666666666667,
+        ),
+        grounding: Some(
+            0.06666666666666667,
+        ),
+        semantic_available: Some(
+            false,
+        ),
+        provenance: Object {
+            "episode_fallback": Bool(true),
+            "reference_time": String("2023-05-21T12:00:00Z"),
+            "retrieval_admission": Object {
+                "basis": String("qualified_source_episode"),
+                "policy_version": String("retrieval-admission-v1"),
+                "related_episode_id": String("episode:33a7545735eb85278de49911"),
+                "source_context_group": String("chat:qualified-team"),
+                "source_context_position": Number(1),
+                "source_context_relation": String("adjacent_question_answer"),
+            },
+            "source_context": Object {
+                "group": String("chat:qualified-team"),
+                "position": Number(2),
+            },
+            "source_episode": String("episode:0b265c3cce41c8ede2f866c9"),
+            "source_id": String("chat:qualified-team:2"),
+            "source_type": String("conversation"),
+        },
+        rationale: "tier=fallback fts=1.00 access_count=0 confidence=0.21 grounding=0.07 semantic=disabled source-ordered context for adjacent matching question",
+        retrieval_tier: Some(
+            "fallback",
+        ),
+        reconciliation: None,
+        evidence_status: None,
+        retrieval_evidence: None,
+    },
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_source_question_cannot_drop_substantive_post_question_constraints
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 35 filtered out; finished in 0.36s
+
+error: test failed, to rerun pass `-p memory_mcp --test conversation_neighborhood`

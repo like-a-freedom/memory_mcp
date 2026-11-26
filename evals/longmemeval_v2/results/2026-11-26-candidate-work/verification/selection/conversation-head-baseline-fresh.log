@@ -1,0 +1,43 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/target/candidate-work-head-baseline/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.04s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/0327c2eaa1c46c5a/out/conversation_neighborhood-0327c2eaa1c46c5a)
+
+running 35 tests
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... ok
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... ok
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... ok
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... ok
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... ok
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test dated_team_question_recovers_its_adjacent_answer ... ok
+test denied_adjacent_answer_is_not_returned ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... ok
+test named_subject_source_question_recovers_its_adjacent_answer ... ok
+test original_dog_adoption_query_excludes_a_later_puppy_session ... ok
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... ok
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... ok
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.40s
+

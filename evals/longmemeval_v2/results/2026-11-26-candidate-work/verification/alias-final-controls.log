@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.26s
+     Running tests/equivalent_alias_reads.rs (target/debug/build/memory_mcp/887735e5649b3b21/out/equivalent_alias_reads-887735e5649b3b21)
+
+running 11 tests
+test equivalent_native_and_application_alias_runs_one_lexical_read ... ok
+test native_stem_equivalence_alone_cannot_remove_different_application_query ... ok
+test additional_fulltext_index_cannot_change_alias_equivalence ... ok
+test different_native_tokens_keep_the_application_equivalent_alias ... ok
+test indexing_only_token_equivalence_cannot_remove_an_alias_read ... ok
+test genuine_alias_keeps_its_independent_read_and_evidence ... ok
+test different_content_index_analyzer_keeps_the_alias_read ... ok
+test unavailable_analyzer_keeps_the_alias_read ... ok
+test incomplete_analyzer_keeps_the_alias_read ... ok
+test empty_native_tokens_cannot_establish_equivalence ... ok
+test different_key_index_analyzer_keeps_the_alias_read ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+

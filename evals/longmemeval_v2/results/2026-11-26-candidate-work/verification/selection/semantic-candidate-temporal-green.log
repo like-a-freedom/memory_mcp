@@ -1,0 +1,98 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/80e1a2ae3e3297e3/out/conversation_neighborhood-80e1a2ae3e3297e3)
+
+running 35 tests
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... ok
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test named_subject_source_question_recovers_its_adjacent_answer ... ok
+test dated_team_question_recovers_its_adjacent_answer ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... ok
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test denied_adjacent_answer_is_not_returned ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... ok
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+test original_dog_adoption_query_excludes_a_later_puppy_session ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 36 tests
+test compound_when_question_requires_event_time_from_the_source ... FAILED
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test compound_when_question_preserves_a_source_with_the_event_date ... ok
+test excepted_label_has_no_positive_membership_priority ... ok
+test excluded_label_is_not_reported_as_requested_control_membership ... ok
+test diagnostic_source_observation_respects_request_policy ... ok
+test excludes_label_has_no_positive_membership_priority ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+test later_toolbar_request_does_not_prefer_the_old_visible_container ... ok
+test explicitly_hidden_control_question_keeps_its_matching_hidden_group ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test no_longer_included_label_has_no_positive_membership_priority ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test quoted_popup_attributes_do_not_hide_visible_control_labels ... ok
+test replacement_quote_is_not_reported_as_a_requested_control_label ... ok
+test quoted_visibility_word_inside_popup_value_is_not_an_attribute ... ok
+test quoted_visibility_word_inside_escaped_label_is_not_an_attribute ... ok
+test separate_visible_button_names_do_not_form_one_requested_label ... ok
+test unknown_visibility_keeps_the_prior_nearest_group_ordering ... ok
+test relative_date_question_keeps_its_matching_unknown_container ... ok
+test unknown_nearest_container_does_not_inherit_outer_visibility ... ok
+2026-11-26T18:42:30.477393Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test unnamed_container_without_attributes_still_blocks_outer_visibility ... ok
+test visible_control_container_confirms_an_unqualified_toolbar_question ... ok
+test visible_controls_outrank_a_hidden_copy_near_the_lexical_window ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test visible_word_in_hidden_control_name_is_not_a_visibility_attribute ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+failures:
+
+---- compound_when_question_requires_event_time_from_the_source stdout ----
+
+thread 'compound_when_question_requires_event_time_from_the_source' (7855156) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:470:5:
+an undated source cannot supply the date requested in the first clause: [AssembledContextItem { fact_id: "episode_fallback:episode:9914b5b12f797eab5bb461d3", content: "Alice saved a record and then exported the archive.", quote: "Alice saved a record and then exported the archive.", source_episode: "episode:9914b5b12f797eab5bb461d3", confidence: 0.4299355478526329, relevance: Some(0.4), grounding: Some(0.4), semantic_available: Some(false), provenance: Object {"episode_fallback": Bool(true), "reference_time": String("2026-03-01T10:00:00Z"), "source_episode": String("episode:9914b5b12f797eab5bb461d3"), "source_id": String("undated-archive-event"), "source_type": String("chat")}, rationale: "tier=fallback fts=2.00 access_count=0 confidence=0.43 grounding=0.40 semantic=disabled matched episode content query=\"alice save record happened next\" and active at 2026-11-26", retrieval_tier: Some("fallback"), reconciliation: None, evidence_status: None, retrieval_evidence: None }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    compound_when_question_requires_event_time_from_the_source
+
+test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.19s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

@@ -1,0 +1,19 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.02s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+
+thread 'visible_control_container_confirms_an_unqualified_toolbar_question' (7741051) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:794:5:
+an explicitly visible control container provides stronger observation evidence than an unknown one
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test visible_control_container_confirms_an_unqualified_toolbar_question ... FAILED
+
+failures:
+
+failures:
+    visible_control_container_confirms_an_unqualified_toolbar_question
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 31 filtered out; finished in 0.31s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

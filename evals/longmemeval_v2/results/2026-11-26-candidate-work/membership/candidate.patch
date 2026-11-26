@@ -1,0 +1,1907 @@
+diff --git a/crates/memory-mcp/src/eval_support/retrieval.rs b/crates/memory-mcp/src/eval_support/retrieval.rs
+index 194da16b..d7706e5a 100644
+--- a/crates/memory-mcp/src/eval_support/retrieval.rs
++++ b/crates/memory-mcp/src/eval_support/retrieval.rs
+@@ -144,7 +144,8 @@ pub async fn new_eval_reembed_service(
+ /// Immutable source-filtered receipts from the actual context pipeline.
+ /// Raw evidence is returned only to this explicit eval caller, never logged.
+ pub use crate::memory::retrieval::diagnostics::{
+-    ContextEvidence, ContextEvidenceCapture, RetrievalStage,
++    CandidateInventory, CandidateObserver, ContextEvidence, ContextEvidenceCapture, LexicalWork,
++    RetrievalStage,
+ };
+ 
+ pub async fn assemble_context_with_evidence(
+diff --git a/crates/memory-mcp/src/memory/retrieval/admission.rs b/crates/memory-mcp/src/memory/retrieval/admission.rs
+index 7129351e..1ac71565 100644
+--- a/crates/memory-mcp/src/memory/retrieval/admission.rs
++++ b/crates/memory-mcp/src/memory/retrieval/admission.rs
+@@ -3,7 +3,9 @@ use std::collections::HashSet;
+ use chrono::{DateTime, Datelike, Utc};
+ 
+ use crate::models::AccessPayload;
+-use crate::shared::search::search_query_terms;
++use crate::shared::search::{
++    search_query_term_set, search_query_term_set_many, search_query_terms,
++};
+ 
+ use super::filtering::{fact_allowed_by_access, fact_is_active_at};
+ use super::query_mode::{QueryFlags, query_clauses};
+@@ -841,17 +843,12 @@ fn matched_candidate_topic_terms(
+     query: &QueryEvidence,
+     candidate: &RankedContextFact,
+ ) -> Vec<String> {
+-    let content_terms = search_query_terms(&strip_url_tokens(&candidate.fact.content));
+-    let index_key_terms = candidate
+-        .fact
+-        .index_keys
+-        .iter()
+-        .flat_map(|key| search_query_terms(&strip_url_tokens(key)))
+-        .collect::<Vec<_>>();
++    let content_terms = search_query_term_set(&strip_url_tokens(&candidate.fact.content));
++    let index_key_terms = index_vocabulary_without_urls(&candidate.fact.index_keys);
+     query
+         .content_terms
+         .iter()
+-        .filter(|term| content_terms.contains(term) || index_key_terms.contains(term))
++        .filter(|term| content_terms.contains(term.as_str()) || index_key_terms.contains(term.as_str()))
+         .cloned()
+         .collect()
+ }
+@@ -936,9 +933,7 @@ fn has_timeline_topic_support(query: &QueryEvidence, candidate: &RankedContextFa
+ }
+ 
+ fn has_timeline_topic_support_for_text(query: &QueryEvidence, content: &str) -> bool {
+-    let content_terms = search_query_terms(&strip_url_tokens(content))
+-        .into_iter()
+-        .collect::<HashSet<_>>();
++    let content_terms = search_query_term_set(&strip_url_tokens(content));
+ 
+     query.content_terms.iter().any(|term| {
+         !is_timeline_narration_term(term)
+@@ -1492,9 +1487,7 @@ fn is_literal_reference_recall_request(query: &QueryEvidence) -> bool {
+ }
+ 
+ fn has_sufficient_content_support_for_text(query: &QueryEvidence, content: &str) -> bool {
+-    let candidate_terms = search_query_terms(&strip_url_tokens(content))
+-        .into_iter()
+-        .collect::<HashSet<_>>();
++    let candidate_terms = search_query_term_set(&strip_url_tokens(content));
+     let matched_terms = query
+         .content_terms
+         .iter()
+@@ -1639,9 +1632,7 @@ pub(super) fn episode_candidate_is_rerankable_at_reference_time(
+         return episode_candidate_is_admitted_at_reference_time(query, content, reference_time);
+     }
+ 
+-    let candidate_terms = search_query_terms(&strip_url_tokens(content))
+-        .into_iter()
+-        .collect::<HashSet<_>>();
++    let candidate_terms = search_query_term_set(&strip_url_tokens(content));
+     query
+         .content_terms
+         .iter()
+@@ -1690,10 +1681,23 @@ pub(super) fn admit_ranked_candidates(
+         .collect()
+ }
+ 
++fn index_vocabulary_without_urls(keys: &[String]) -> HashSet<String> {
++    use std::borrow::Cow;
++    let prepared = keys
++        .iter()
++        .map(|key| {
++            if key.contains("://") {
++                Cow::Owned(strip_url_tokens(key))
++            } else {
++                Cow::Borrowed(key.as_str())
++            }
++        })
++        .collect::<Vec<_>>();
++    search_query_term_set_many(prepared.iter().map(|key| key.as_ref()))
++}
++
+ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedContextFact) {
+-    let fact_terms = search_query_terms(&strip_url_tokens(&candidate.fact.content))
+-        .into_iter()
+-        .collect::<HashSet<_>>();
++    let fact_terms = search_query_term_set(&strip_url_tokens(&candidate.fact.content));
+     candidate.evidence.matched_content_terms = query
+         .content_terms
+         .iter()
+@@ -1701,7 +1705,11 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
+         .cloned()
+         .collect();
+ 
+-    let fact_references = candidate_references(&candidate.fact);
++    let fact_references = if query.qualified_references.is_empty() {
++        Vec::new()
++    } else {
++        candidate_references(&candidate.fact)
++    };
+     candidate.evidence.matched_references = query
+         .qualified_references
+         .iter()
+@@ -1709,12 +1717,7 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
+         .cloned()
+         .collect();
+ 
+-    let index_key_terms = candidate
+-        .fact
+-        .index_keys
+-        .iter()
+-        .flat_map(|key| search_query_terms(&strip_url_tokens(key)))
+-        .collect::<HashSet<_>>();
++    let index_key_terms = index_vocabulary_without_urls(&candidate.fact.index_keys);
+     candidate.evidence.matched_index_key_terms = query
+         .content_terms
+         .iter()
+@@ -1744,49 +1747,52 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
+ }
+ 
+ fn candidate_conflicts_with_query_reference(query: &QueryEvidence, content: &str) -> bool {
+-    let denied_references = content
+-        .split(['.', '!', '?', '\n', ';', ','])
+-        .map(str::trim)
+-        .filter_map(|clause| {
+-            let lower = clause.to_ascii_lowercase();
+-            let denied = ["not ", "never ", "except ", "excluding "]
++    if !query.mandatory_reference_alternatives.is_empty() {
++        let denied_references = content
++            .split(['.', '!', '?', '\n', ';', ','])
++            .map(str::trim)
++            .filter_map(|clause| {
++                let lower = clause.to_ascii_lowercase();
++                let denied = ["not ", "never ", "except ", "excluding "]
++                    .iter()
++                    .any(|prefix| lower.starts_with(prefix));
++                (denied && !lower.starts_with("not only "))
++                    .then(|| extract_qualified_references(clause))
++            })
++            .flatten()
++            .collect::<HashSet<_>>();
++        let candidate_references = extract_qualified_references(content);
++        let has_supported_requested_reference =
++            query
++                .mandatory_reference_alternatives
+                 .iter()
+-                .any(|prefix| lower.starts_with(prefix));
+-            (denied && !lower.starts_with("not only "))
+-                .then(|| extract_qualified_references(clause))
+-        })
+-        .flatten()
+-        .collect::<HashSet<_>>();
+-    let candidate_references = extract_qualified_references(content);
+-    let has_supported_requested_reference =
+-        query
++                .any(|reference| {
++                    candidate_references.contains(reference)
++                        && !denied_references.contains(reference)
++                });
++        let denies_requested_reference = query
+             .mandatory_reference_alternatives
+             .iter()
+-            .any(|reference| {
+-                candidate_references.contains(reference) && !denied_references.contains(reference)
+-            });
+-    let denies_requested_reference = query
+-        .mandatory_reference_alternatives
+-        .iter()
+-        .any(|reference| denied_references.contains(reference));
+-    if denies_requested_reference && !has_supported_requested_reference {
+-        return true;
+-    }
++            .any(|reference| denied_references.contains(reference));
++        if denies_requested_reference && !has_supported_requested_reference {
++            return true;
++        }
+ 
+-    let has_exact_reference = candidate_references
+-        .iter()
+-        .any(|reference| query.mandatory_reference_alternatives.contains(reference));
+-    if !has_exact_reference
+-        && query
+-            .mandatory_reference_alternatives
++        let has_exact_reference = candidate_references
+             .iter()
+-            .any(|expected| {
+-                candidate_references
+-                    .iter()
+-                    .any(|actual| reference_family(expected) == reference_family(actual))
+-            })
+-    {
+-        return true;
++            .any(|reference| query.mandatory_reference_alternatives.contains(reference));
++        if !has_exact_reference
++            && query
++                .mandatory_reference_alternatives
++                .iter()
++                .any(|expected| {
++                    candidate_references
++                        .iter()
++                        .any(|actual| reference_family(expected) == reference_family(actual))
++                })
++        {
++            return true;
++        }
+     }
+ 
+     content
+diff --git a/crates/memory-mcp/src/memory/retrieval/budget.rs b/crates/memory-mcp/src/memory/retrieval/budget.rs
+index 0eb079a9..6258e963 100644
+--- a/crates/memory-mcp/src/memory/retrieval/budget.rs
++++ b/crates/memory-mcp/src/memory/retrieval/budget.rs
+@@ -361,6 +361,7 @@ pub(super) async fn collect_episode_fallback_items(
+     service: &RetrievalContext,
+     params: &DefaultContextParams<'_>,
+     query: &str,
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+ ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+     let response_budget = params.budget.max(1) as usize;
+     let candidate_budget = super::reranking::candidate_pool_limit(
+@@ -376,6 +377,8 @@ pub(super) async fn collect_episode_fallback_items(
+     )
+     .await?;
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(trace, "episodes.fetched", &episode_records);
+     let query_terms = crate::shared::search::search_query_terms(query);
+     let raw_query = params.raw_query_opt.unwrap_or(query);
+     let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
+diff --git a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+index e002b243..9db85ba0 100644
+--- a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
++++ b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+@@ -1,5 +1,5 @@
+ //! Feature-gated, explicitly requested evaluation receipts. Never production logs.
+-use std::sync::Mutex;
++use std::sync::{Arc, Mutex};
+ use std::time::Instant;
+ 
+ use serde::Serialize;
+@@ -20,6 +20,37 @@ pub struct ContextEvidence {
+     pub items: Vec<AssembledContextItem>,
+ }
+ 
++/// Payload shape at an actual completed candidate boundary; no source text or keys.
++#[derive(Debug, Clone, Serialize)]
++pub struct CandidateInventory {
++    pub stage: String,
++    pub elapsed_ms: f64,
++    pub records: usize,
++    pub content_bytes: usize,
++    pub max_content_bytes: usize,
++    pub index_keys: usize,
++    pub index_key_bytes: usize,
++    pub max_index_key_bytes: usize,
++    pub unique_contents: usize,
++    pub unique_sources: usize,
++}
++
++/// Actual dictionary construction counts in one completed lexical pool.
++#[derive(Debug, Clone, Serialize)]
++pub struct LexicalWork {
++    pub elapsed_ms: f64,
++    pub records: usize,
++    pub content_dictionaries: usize,
++    pub index_dictionaries: usize,
++}
++
++/// Explicit evaluation sink. Implementations may durably flush each boundary.
++pub trait CandidateObserver: Send + Sync {
++    fn observe(&self, inventory: &CandidateInventory);
++    fn observe_work(&self, _work: &LexicalWork) {}
++    fn observe_phase(&self, _stage: &str, _elapsed_ms: f64) {}
++}
++
+ /// One explicitly requested diagnostic read. Owned by the caller so completed
+ /// stages survive cancellation or a storage error in the read future.
+ pub struct ContextEvidenceCapture {
+@@ -34,10 +65,34 @@ impl ContextEvidenceCapture {
+                 read_started: false,
+                 source_episode: source_episode.to_owned(),
+                 stages: Vec::new(),
++                candidates: Vec::new(),
++                observer: None,
+             }),
+         }
+     }
+ 
++    pub fn with_candidate_observer(
++        source_episode: &str,
++        observer: Arc<dyn CandidateObserver>,
++    ) -> Self {
++        let mut capture = Self::new(source_episode);
++        if let Ok(recorder) = capture.recorder.get_mut() {
++            recorder.observer = Some(observer);
++        }
++        capture
++    }
++
++    pub fn candidates(&self) -> Result<Vec<CandidateInventory>, crate::error::MemoryError> {
++        self.recorder
++            .lock()
++            .map(|recorder| recorder.candidates.clone())
++            .map_err(|_| {
++                crate::error::MemoryError::Validation(
++                    "evaluation evidence recorder poisoned".into(),
++                )
++            })
++    }
++
+     pub(super) fn begin(&self) -> Result<String, crate::error::MemoryError> {
+         let mut recorder = self.recorder.lock().map_err(|_| {
+             crate::error::MemoryError::Validation("evaluation evidence recorder poisoned".into())
+@@ -71,6 +126,8 @@ pub(super) struct Recorder {
+     read_started: bool,
+     pub(super) source_episode: String,
+     pub(super) stages: Vec<RetrievalStage>,
++    candidates: Vec<CandidateInventory>,
++    observer: Option<Arc<dyn CandidateObserver>>,
+ }
+ 
+ pub(super) type EvidenceRecorder<'a> = Option<&'a Mutex<Recorder>>;
+@@ -92,3 +149,97 @@ pub(super) fn record(trace: EvidenceRecorder<'_>, stage: &str, items: &[Assemble
+         });
+     }
+ }
++
++pub(super) fn record_candidates(
++    trace: EvidenceRecorder<'_>,
++    stage: &str,
++    records: &[serde_json::Value],
++) {
++    let Some(trace) = trace else { return };
++    use super::filtering::{raw_array, raw_object};
++    use crate::storage::value_helpers::json_string;
++    use std::collections::HashSet;
++    let mut contents = HashSet::new();
++    let mut sources = HashSet::new();
++    let mut inventory = CandidateInventory {
++        stage: stage.to_owned(),
++        elapsed_ms: 0.0,
++        records: records.len(),
++        content_bytes: 0,
++        max_content_bytes: 0,
++        index_keys: 0,
++        index_key_bytes: 0,
++        max_index_key_bytes: 0,
++        unique_contents: 0,
++        unique_sources: 0,
++    };
++    for record in records {
++        let Some(map) = raw_object(record) else {
++            continue;
++        };
++        if let Some(content) = map.get("content").and_then(json_string) {
++            inventory.content_bytes += content.len();
++            inventory.max_content_bytes = inventory.max_content_bytes.max(content.len());
++            contents.insert(content);
++        }
++        if let Some(source) = map
++            .get("source_episode")
++            .or_else(|| map.get("episode_id"))
++            .and_then(json_string)
++        {
++            sources.insert(source);
++        }
++        for key in map
++            .get("index_keys")
++            .and_then(raw_array)
++            .into_iter()
++            .flatten()
++            .filter_map(json_string)
++        {
++            inventory.index_keys += 1;
++            inventory.index_key_bytes += key.len();
++            inventory.max_index_key_bytes = inventory.max_index_key_bytes.max(key.len());
++        }
++    }
++    inventory.unique_contents = contents.len();
++    inventory.unique_sources = sources.len();
++    let observer = if let Ok(mut recorder) = trace.lock() {
++        inventory.elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1000.0;
++        recorder.candidates.push(inventory.clone());
++        recorder.observer.clone()
++    } else {
++        None
++    };
++    // The callback runs after releasing the recorder lock and before expensive
++    // normalization. An explicit caller can flush completed metadata even if
++    // synchronous work later outlives a cooperative deadline.
++    if let Some(observer) = observer {
++        observer.observe(&inventory);
++    }
++}
++
++pub(super) fn record_work(trace: EvidenceRecorder<'_>, mut work: LexicalWork) {
++    let Some(trace) = trace else { return };
++    let observer = trace.lock().ok().and_then(|recorder| {
++        work.elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1000.0;
++        recorder.observer.clone()
++    });
++    if let Some(observer) = observer {
++        observer.observe_work(&work);
++    }
++}
++
++/// Flush only a completed phase name and read-relative clock; never source data.
++pub(super) fn record_phase(trace: EvidenceRecorder<'_>, stage: &str) {
++    if let Some(trace) = trace {
++        let observation = trace.lock().ok().map(|recorder| {
++            (
++                recorder.observer.clone(),
++                recorder.started.elapsed().as_secs_f64() * 1000.0,
++            )
++        });
++        if let Some((Some(observer), elapsed_ms)) = observation {
++            observer.observe_phase(stage, elapsed_ms);
++        }
++    }
++}
+diff --git a/crates/memory-mcp/src/memory/retrieval/experience.rs b/crates/memory-mcp/src/memory/retrieval/experience.rs
+index 544b40b7..69ca70c9 100644
+--- a/crates/memory-mcp/src/memory/retrieval/experience.rs
++++ b/crates/memory-mcp/src/memory/retrieval/experience.rs
+@@ -82,17 +82,12 @@ pub(crate) fn repeated_topic_evidence_for_query(
+         .filter(|fact| fact.fact_type != FactType::Experience.as_str())
+         .take(5)
+     {
+-        let content_terms = search_query_terms(&fact.content)
+-            .into_iter()
+-            .collect::<HashSet<_>>();
++        let content_terms = crate::shared::search::search_query_term_set(&fact.content);
+         if !content_terms.iter().any(|term| query_terms.contains(term)) {
+             continue;
+         }
+ 
+-        let mut fact_terms = content_terms;
+-        for index_key in &fact.index_keys {
+-            fact_terms.extend(search_query_terms(index_key));
+-        }
++        let fact_terms = crate::shared::search_lexical::fact_term_set(fact);
+         for term in fact_terms {
+             if !query_terms.contains(&term) {
+                 supporting_facts
+diff --git a/crates/memory-mcp/src/memory/retrieval/lexical.rs b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+index 6517d63d..ed163b46 100644
+--- a/crates/memory-mcp/src/memory/retrieval/lexical.rs
++++ b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+@@ -8,9 +8,9 @@ use crate::error::MemoryError;
+ use crate::models::Fact;
+ use crate::shared::search::{
+     query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
+-    search_query_terms, unique_query_terms,
++    search_query_term_set, search_query_term_set_many, search_query_terms, unique_query_terms,
+ };
+-use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap, record_term_set};
++use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap};
+ use crate::storage::ContextFactQuery;
+ use crate::storage::value_helpers::{json_f64, json_string};
+ 
+@@ -28,6 +28,8 @@ pub(crate) struct FactQueryParams<'a> {
+     pub(crate) query_opt: Option<&'a str>,
+     pub(crate) limit: i32,
+     pub(crate) fact_types: &'a [String],
++    #[cfg(feature = "eval-support")]
++    pub(crate) trace: super::diagnostics::EvidenceRecorder<'a>,
+ }
+ 
+ pub(crate) async fn select_fact_records_for_query(
+@@ -47,7 +49,14 @@ pub(crate) async fn select_fact_records_for_query(
+         })
+         .await
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+-    let initial = rank_lexical_candidates(initial, &query_terms);
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(params.trace, "facts.initial_fetched", &initial);
++    let initial = rank_lexical_candidates(
++        initial,
++        &query_terms,
++        #[cfg(feature = "eval-support")]
++        params.trace,
++    );
+ 
+     let Some(_query) = params.query_opt else {
+         return Ok(LexicalQueryResult {
+@@ -70,6 +79,12 @@ pub(crate) async fn select_fact_records_for_query(
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+     let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(
++        params.trace,
++        "facts.term_groups_fetched",
++        &fallback_records,
++    );
+     let mut seen_fact_ids = HashSet::new();
+     fallback_records.retain(|record| {
+         let Some(fact_id) = record
+@@ -81,7 +96,18 @@ pub(crate) async fn select_fact_records_for_query(
+         seen_fact_ids.insert(fact_id)
+     });
+ 
+-    let fallback_records = rank_lexical_candidates(fallback_records, &query_terms);
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(
++        params.trace,
++        "facts.term_groups_deduplicated",
++        &fallback_records,
++    );
++    let fallback_records = rank_lexical_candidates(
++        fallback_records,
++        &query_terms,
++        #[cfg(feature = "eval-support")]
++        params.trace,
++    );
+ 
+     let initial_score = initial.top_query_score;
+     let fallback_score = fallback_records.top_query_score;
+@@ -269,6 +295,8 @@ async fn scan_fact_records_by_query_terms(
+         .await
+         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+ 
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_candidates(params.trace, "facts.scan_fetched", &records);
+     let filtered = records
+         .into_iter()
+         .filter(|record| fact_record_matches_type(record, params.fact_types))
+@@ -297,10 +325,20 @@ struct RankedLexicalCandidates {
+ }
+ 
+ pub(crate) fn rank_lexical_records(records: Vec<Value>, query_terms: &[String]) -> Vec<Value> {
+-    rank_lexical_candidates(records, query_terms).records
++    rank_lexical_candidates(
++        records,
++        query_terms,
++        #[cfg(feature = "eval-support")]
++        None,
++    )
++    .records
+ }
+ 
+-fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> RankedLexicalCandidates {
++fn rank_lexical_candidates(
++    records: Vec<Value>,
++    query_terms: &[String],
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
++) -> RankedLexicalCandidates {
+     if query_terms.is_empty() {
+         return RankedLexicalCandidates {
+             records,
+@@ -309,15 +347,22 @@ fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> Ranke
+         };
+     }
+ 
+-    let anchor_profile = build_lexical_anchor_profile(&records, query_terms);
++    let features = lexical_candidate_features(
++        &records,
++        query_terms,
++        #[cfg(feature = "eval-support")]
++        trace,
++    );
++    let anchor_profile = build_lexical_anchor_profile(&features, query_terms);
+ 
+     // Metrics depend on immutable text/index keys and this candidate pool, not
+     // on the score written below. Compute once rather than tokenize every
+     // source again for both sides of every sort comparison.
+     let mut ranked = records
+         .into_iter()
+-        .map(|mut record| {
+-            let metrics = lexical_record_metrics(&record, query_terms, &anchor_profile);
++        .zip(features)
++        .map(|(mut record, features)| {
++            let metrics = lexical_record_metrics(&features, query_terms, &anchor_profile);
+             let soft_anchor_bonus = if metrics.base_score <= 1 {
+                 metrics.soft_anchor_mass * 0.35
+             } else {
+@@ -384,7 +429,10 @@ fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> Ranke
+     }
+ }
+ 
+-fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> LexicalAnchorProfile {
++fn build_lexical_anchor_profile(
++    records: &[LexicalCandidateFeatures],
++    query_terms: &[String],
++) -> LexicalAnchorProfile {
+     let unique_terms = unique_query_terms(query_terms);
+     if unique_terms.is_empty() {
+         return LexicalAnchorProfile::default();
+@@ -395,9 +443,8 @@ fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> Le
+     let mut doc_freq = HashMap::<String, usize>::new();
+ 
+     for record in records {
+-        let record_terms = record_term_set(record);
+         for term in &unique_terms {
+-            if record_terms.contains(term) {
++            if record.content.vocabulary.contains(term) || record.index_terms.contains(term) {
+                 *doc_freq.entry(term.clone()).or_default() += 1;
+             }
+         }
+@@ -430,29 +477,83 @@ fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> Le
+     }
+ }
+ 
++struct ContentLexicalFeatures {
++    vocabulary: HashSet<String>,
++    best_terms: Vec<String>,
++}
++
++struct LexicalCandidateFeatures {
++    content: std::sync::Arc<ContentLexicalFeatures>,
++    index_terms: std::sync::Arc<HashSet<String>>,
++}
++
++fn lexical_candidate_features(
++    records: &[Value],
++    query_terms: &[String],
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
++) -> Vec<LexicalCandidateFeatures> {
++    // Exact borrowed text keys: no source/ID equivalence assumption and no
++    // digest-collision risk. Different index keys remain separate per record.
++    let mut content_cache = HashMap::new();
++    let mut index_cache = HashMap::new();
++    let features = records
++        .iter()
++        .map(|record| {
++            let content = raw_object(record)
++                .and_then(|map| map.get("content"))
++                .and_then(json_string)
++                .unwrap_or_default();
++            let content = content_cache
++                .entry(content)
++                .or_insert_with(|| {
++                    std::sync::Arc::new(ContentLexicalFeatures {
++                        vocabulary: search_query_term_set(content),
++                        best_terms: best_matching_content_terms(content, query_terms),
++                    })
++                })
++                .clone();
++            let keys = raw_object(record)
++                .and_then(|map| map.get("index_keys"))
++                .and_then(raw_array)
++                .into_iter()
++                .flatten()
++                .filter_map(json_string)
++                .collect::<Vec<_>>();
++            let index_terms = index_cache
++                .entry(keys)
++                .or_insert_with_key(|keys| {
++                    std::sync::Arc::new(search_query_term_set_many(keys.iter().copied()))
++                })
++                .clone();
++            LexicalCandidateFeatures {
++                content,
++                index_terms,
++            }
++        })
++        .collect();
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_work(
++        trace,
++        super::diagnostics::LexicalWork {
++            elapsed_ms: 0.0,
++            records: records.len(),
++            content_dictionaries: content_cache.len(),
++            index_dictionaries: index_cache.len(),
++        },
++    );
++    features
++}
++
+ fn lexical_record_metrics(
+-    record: &Value,
++    features: &LexicalCandidateFeatures,
+     query_terms: &[String],
+     anchor_profile: &LexicalAnchorProfile,
+ ) -> LexicalRecordMetrics {
+-    let content_terms = best_matching_content_terms(
+-        raw_object(record)
+-            .and_then(|map| map.get("content"))
+-            .and_then(json_string)
+-            .unwrap_or_default(),
+-        query_terms,
+-    );
+-    let index_terms = raw_object(record)
+-        .and_then(|map| map.get("index_keys"))
+-        .and_then(raw_array)
+-        .into_iter()
+-        .flatten()
+-        .filter_map(json_string)
+-        .flat_map(search_query_terms)
+-        .collect::<Vec<_>>();
++    let content_terms = &features.content.best_terms;
++    let index_terms = &features.index_terms;
+     let record_terms = content_terms
+         .iter()
+-        .chain(&index_terms)
++        .chain(index_terms.iter())
+         .collect::<HashSet<_>>();
+     let matched_terms = unique_query_terms(query_terms)
+         .into_iter()
+@@ -479,7 +580,11 @@ fn lexical_record_metrics(
+ 
+     let (content_score, phrase_overlap) = content_term_scores(&content_terms, query_terms);
+     LexicalRecordMetrics {
+-        base_score: content_score + query_term_overlap_for_terms(&index_terms, query_terms),
++        base_score: content_score
++            + query_terms
++                .iter()
++                .filter(|term| index_terms.contains(term.as_str()))
++                .count(),
+         phrase_overlap,
+         weighted_overlap,
+         hard_anchor_hits,
+@@ -508,17 +613,38 @@ fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
+         + lexical_index_key_overlap(record, query_terms)
+ }
+ 
++/// Immutable features of one fact, shared by its fusion/grounding decisions.
++pub(crate) struct FactLexicalFeatures<'a> {
++    content: &'a str,
++    content_terms: HashSet<String>,
++    index_terms: HashSet<String>,
++}
++impl<'a> FactLexicalFeatures<'a> {
++    pub(crate) fn new(fact: &'a Fact) -> Self {
++        Self {
++            content: &fact.content,
++            content_terms: search_query_term_set(&fact.content),
++            index_terms: search_query_term_set_many(fact.index_keys.iter().map(String::as_str)),
++        }
++    }
++    pub(crate) fn contains(&self, term: &str) -> bool {
++        self.content_terms.contains(term) || self.index_terms.contains(term)
++    }
++    pub(crate) fn score(&self, query_terms: &[String]) -> usize {
++        lexical_query_score_for_text(self.content, query_terms)
++            + query_terms
++                .iter()
++                .filter(|term| self.index_terms.contains(term.as_str()))
++                .count()
++    }
++}
++
+ pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
+     if query_terms.is_empty() {
+         return 0;
+     }
+ 
+-    let mut fact_terms = search_query_terms(&fact.content)
+-        .into_iter()
+-        .collect::<HashSet<_>>();
+-    for index_key in &fact.index_keys {
+-        fact_terms.extend(search_query_terms(index_key));
+-    }
++    let fact_terms = crate::shared::search_lexical::fact_term_set(fact);
+ 
+     query_terms
+         .iter()
+@@ -570,14 +696,13 @@ fn lexical_ngram_overlap_for_terms(
+         return 0;
+     }
+ 
+-    let record_ngrams = content_terms
+-        .windows(width)
+-        .map(|window| window.join(" "))
+-        .collect::<HashSet<_>>();
+-
++    // Token normalization produces whitespace-free terms. Borrowing windows
++    // preserves their exact sequence without allocating a joined string for
++    // every source occurrence. Duplicate query windows still count separately.
++    let record_ngrams = content_terms.windows(width).collect::<HashSet<_>>();
+     query_terms
+         .windows(width)
+-        .filter(|window| record_ngrams.contains(&window.join(" ")))
++        .filter(|window| record_ngrams.contains(window))
+         .count()
+ }
+ 
+@@ -653,27 +778,26 @@ fn query_term_overlap_for_terms(content_terms: &[String], query_terms: &[String]
+ }
+ 
+ fn lexical_index_key_overlap(record: &Value, query_terms: &[String]) -> usize {
+-    raw_object(record)
+-        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
+-        .and_then(raw_array)
+-        .map(|index_keys| {
+-            let terms = index_keys
+-                .iter()
+-                .filter_map(json_string)
+-                .flat_map(search_query_terms)
+-                .collect::<Vec<_>>();
+-            query_term_overlap_for_terms(&terms, query_terms)
+-        })
+-        .unwrap_or(0)
++    let terms = search_query_term_set_many(
++        raw_object(record)
++            .and_then(|map| map.get("index_keys"))
++            .and_then(raw_array)
++            .into_iter()
++            .flatten()
++            .filter_map(json_string),
++    );
++    query_terms
++        .iter()
++        .filter(|term| terms.contains(term.as_str()))
++        .count()
+ }
+ 
+ fn lexical_index_key_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
+-    let terms = fact
+-        .index_keys
++    let terms = search_query_term_set_many(fact.index_keys.iter().map(String::as_str));
++    query_terms
+         .iter()
+-        .flat_map(|index_key| search_query_terms(index_key))
+-        .collect::<Vec<_>>();
+-    query_term_overlap_for_terms(&terms, query_terms)
++        .filter(|term| terms.contains(term.as_str()))
++        .count()
+ }
+ 
+ fn lexical_ft_score(record: &Value) -> f64 {
+@@ -1001,7 +1125,13 @@ mod tests {
+ 
+         let signatures = (0..256)
+             .map(|_| {
+-                let metrics = lexical_record_metrics(&record, &query_terms, &anchor_profile);
++                let features = super::lexical_candidate_features(
++                    std::slice::from_ref(&record),
++                    &query_terms,
++                    #[cfg(feature = "eval-support")]
++                    None,
++                );
++                let metrics = lexical_record_metrics(&features[0], &query_terms, &anchor_profile);
+                 (
+                     metrics.weighted_overlap.to_bits(),
+                     metrics.hard_anchor_mass.to_bits(),
+@@ -1300,6 +1430,8 @@ mod tests {
+                 query_opt: Some("atlas launch checklist"),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1499,6 +1631,8 @@ mod tests {
+                 query_opt: Some("lgbtq support group"),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1577,6 +1711,8 @@ mod tests {
+                 query_opt: Some(query),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1643,6 +1779,8 @@ mod tests {
+                 query_opt: Some(query),
+                 limit: 10,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+@@ -1811,6 +1949,8 @@ mod tests {
+                 query_opt: Some("What degree did I graduate with?"),
+                 limit: 5,
+                 fact_types: &[],
++                #[cfg(feature = "eval-support")]
++                trace: None,
+             },
+         )
+         .await
+diff --git a/crates/memory-mcp/src/memory/retrieval/pipeline.rs b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+index 5361b380..cfe228f0 100644
+--- a/crates/memory-mcp/src/memory/retrieval/pipeline.rs
++++ b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+@@ -593,12 +593,22 @@ pub(super) async fn assemble_default_context(
+     // phase expects. The phase boundaries are documented
+     // here so future changes can target a single phase
+     // without disturbing the others.
+-    let channels = retrieve_fact_channels(service, &params).await?;
++    let channels = retrieve_fact_channels(
++        service,
++        &params,
++        #[cfg(feature = "eval-support")]
++        trace,
++    )
++    .await?;
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "channels.completed");
+     let (subject_ids, mentioned_names) = super::alias_expansion::resolve_entity_subject(
+         service,
+         params.raw_query_opt.unwrap_or_default(),
+     )
+     .await?;
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "subject.resolved");
+     let mut query_evidence = super::admission::build_query_evidence(
+         params.raw_query_opt,
+         subject_ids,
+@@ -625,8 +635,12 @@ pub(super) async fn assemble_default_context(
+         &query_evidence,
+         &channels.direct_facts,
+     );
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "topics.completed");
+     let ranked = rank_fact_channels(service, &params, channels).await?;
+     #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "fusion.completed");
++    #[cfg(feature = "eval-support")]
+     if trace.is_some() {
+         let items = ranked
+             .iter()
+@@ -668,6 +682,8 @@ pub(super) async fn assemble_default_context(
+         .into_iter()
+         .take(retrieval_candidate_limit(service, params.budget) as usize)
+         .collect();
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "admission.completed");
+     // A source episode can be a useful discourse anchor even when its
+     // standalone text is a weak answer to the query. Preserve anchors after
+     // evidence admission but before the cross-encoder prunes candidates; the
+@@ -689,6 +705,8 @@ pub(super) async fn assemble_default_context(
+         trace,
+     )
+     .await?;
++    #[cfg(feature = "eval-support")]
++    super::diagnostics::record_phase(trace, "selection.completed");
+     let mut source_question_candidates = source_question_candidates;
+     for episode_id in &selection.episode_fallback_source_anchors {
+         if !source_question_candidates.contains(episode_id) {
+@@ -1685,6 +1703,7 @@ struct SelectedContext {
+ async fn retrieve_fact_channels(
+     service: &RetrievalContext,
+     params: &DefaultContextParams<'_>,
++    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+ ) -> Result<RetrievedFactChannels, MemoryError> {
+     let candidate_limit = retrieval_candidate_limit(service, params.budget);
+     let lexical_result = select_fact_records_for_query(
+@@ -1694,6 +1713,8 @@ async fn retrieve_fact_channels(
+             query_opt: params.query_opt,
+             limit: candidate_limit,
+             fact_types: params.fact_types,
++            #[cfg(feature = "eval-support")]
++            trace,
+         },
+     )
+     .await?;
+@@ -1741,6 +1762,8 @@ async fn retrieve_fact_channels(
+                     query_opt: Some(expanded_query),
+                     limit: candidate_limit,
+                     fact_types: params.fact_types,
++                    #[cfg(feature = "eval-support")]
++                    trace,
+                 },
+             )
+             .await?;
+@@ -2045,7 +2068,14 @@ async fn select_context_facts(
+     let (episode_fallback_items, episode_fallback_source_anchors) = if current_query {
+         (Vec::new(), Vec::new())
+     } else if let Some(query) = params.query_opt {
+-        let items = collect_episode_fallback_items(service, params, query).await?;
++        let items = collect_episode_fallback_items(
++            service,
++            params,
++            query,
++            #[cfg(feature = "eval-support")]
++            trace,
++        )
++        .await?;
+         #[cfg(feature = "eval-support")]
+         super::diagnostics::record(trace, "episode_candidates", &items);
+         let mut seen_source_anchors = HashSet::new();
+diff --git a/crates/memory-mcp/src/memory/retrieval/ranking.rs b/crates/memory-mcp/src/memory/retrieval/ranking.rs
+index c273fd7a..341745eb 100644
+--- a/crates/memory-mcp/src/memory/retrieval/ranking.rs
++++ b/crates/memory-mcp/src/memory/retrieval/ranking.rs
+@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, hash_map::Entry};
+ use chrono::{DateTime, Utc};
+ 
+ use super::graph::GraphCandidate;
+-use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fact};
++use super::lexical::FactLexicalFeatures;
+ use super::temporal::TemporalWindow;
+ use crate::models::{AssembledContextItem, Fact, FactType};
+ use crate::shared::search::normalize_text;
+@@ -203,8 +203,7 @@ pub(crate) fn build_ranked_context_facts(
+     } = request;
+ 
+     let mut ranked_by_fact_id = BTreeMap::<String, RankedContextFact>::new();
+-    let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, fact);
+-    let grounding = |fact: &Fact| query_grounding_score(query_opt, fact);
++
+     let lexical_query_terms = query_opt.map(search_query_terms).unwrap_or_default();
+ 
+     for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
+@@ -212,10 +211,13 @@ pub(crate) fn build_ranked_context_facts(
+         let native_full_text_match = retrieval_tier == RetrievalTier::Direct
+             && query_opt.is_some_and(|query| !query.trim().is_empty());
+         let confidence = decayed_fn(&fact, cutoff);
+-        let lexical_score = lexical_fusion_score(rank, &fact, &lexical_query_terms);
+-        let query_alignment_factor = query_alignment(&fact);
+-        let grounding_score = grounding(&fact);
+-        let matched_terms = matched_terms_for_fact(query_opt, &fact);
++        let features = FactLexicalFeatures::new(&fact);
++        let lexical_score = reciprocal_rank(rank)
++            * (1.0 + fact.ft_score.max(0.0).ln_1p() + features.score(&lexical_query_terms) as f64);
++        let grounding_score = grounding_from_features(query_opt, &features);
++        let query_alignment_factor = (0.85 + (0.30 * grounding_score))
++            * first_person_memory_alignment_factor(query_opt, &fact.content);
++        let matched_terms = matched_terms_from_features(query_opt, &features);
+         ranked_by_fact_id
+             .entry(fact_id)
+             .and_modify(|candidate| {
+@@ -273,9 +275,11 @@ pub(crate) fn build_ranked_context_facts(
+     for (rank, candidate) in graph_facts.into_iter().enumerate() {
+         let fact_id = candidate.fact.fact_id.clone();
+         let confidence = decayed_fn(&candidate.fact, cutoff);
+-        let query_alignment_factor = query_alignment(&candidate.fact);
+-        let grounding_score = grounding(&candidate.fact);
+-        let matched_terms = matched_terms_for_fact(query_opt, &candidate.fact);
++        let features = FactLexicalFeatures::new(&candidate.fact);
++        let grounding_score = grounding_from_features(query_opt, &features);
++        let query_alignment_factor = (0.85 + (0.30 * grounding_score))
++            * first_person_memory_alignment_factor(query_opt, &candidate.fact.content);
++        let matched_terms = matched_terms_from_features(query_opt, &features);
+         let weighted_rank =
+             graph_rank_weight(rank, candidate.trace.hop_count, candidate.origin_factor);
+         if let Some(existing) = ranked_by_fact_id.get_mut(&fact_id) {
+@@ -333,9 +337,11 @@ pub(crate) fn build_ranked_context_facts(
+         } = community_candidate;
+         let fact_id = fact.fact_id.clone();
+         let confidence = decayed_fn(&fact, cutoff);
+-        let query_alignment_factor = query_alignment(&fact);
+-        let grounding_score = grounding(&fact);
+-        let matched_terms = matched_terms_for_fact(query_opt, &fact);
++        let features = FactLexicalFeatures::new(&fact);
++        let grounding_score = grounding_from_features(query_opt, &features);
++        let query_alignment_factor = (0.85 + (0.30 * grounding_score))
++            * first_person_memory_alignment_factor(query_opt, &fact.content);
++        let matched_terms = matched_terms_from_features(query_opt, &features);
+         let weighted_rank = reciprocal_rank(rank) * origin_factor.clamp(0.0, 1.0);
+         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
+             candidate.fusion_score += weighted_rank;
+@@ -389,9 +395,11 @@ pub(crate) fn build_ranked_context_facts(
+         } = semantic_candidate;
+         let fact_id = fact.fact_id.clone();
+         let confidence = decayed_fn(&fact, cutoff);
+-        let query_alignment_factor = query_alignment(&fact);
+-        let grounding_score = grounding(&fact);
+-        let matched_terms = matched_terms_for_fact(query_opt, &fact);
++        let features = FactLexicalFeatures::new(&fact);
++        let grounding_score = grounding_from_features(query_opt, &features);
++        let query_alignment_factor = (0.85 + (0.30 * grounding_score))
++            * first_person_memory_alignment_factor(query_opt, &fact.content);
++        let matched_terms = matched_terms_from_features(query_opt, &features);
+         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
+             candidate.fusion_score += reciprocal_rank(rank);
+             candidate.evidence.semantic_similarity = Some(
+@@ -460,12 +468,6 @@ pub(crate) fn build_ranked_context_facts(
+     ranked
+ }
+ 
+-fn lexical_fusion_score(rank: usize, fact: &Fact, query_terms: &[String]) -> f64 {
+-    let dampened_ft_score = fact.ft_score.max(0.0).ln_1p();
+-    let lexical_query_score = lexical_query_score_for_fact(fact, query_terms) as f64;
+-    reciprocal_rank(rank) * (1.0 + dampened_ft_score + lexical_query_score)
+-}
+-
+ fn reciprocal_rank(rank: usize) -> f64 {
+     1.0 / (RECIPROCAL_RANK_FUSION_K + rank as f64 + 1.0)
+ }
+@@ -537,16 +539,18 @@ fn build_rationale(
+     )
+ }
+ 
+-fn matched_terms_for_fact(query_opt: Option<&str>, fact: &Fact) -> Vec<String> {
++fn matched_terms_from_features(
++    query_opt: Option<&str>,
++    features: &FactLexicalFeatures<'_>,
++) -> Vec<String> {
+     let Some(query) = query_opt else {
+         return Vec::new();
+     };
+ 
+     let query_terms = unique_query_terms(&search_query_terms(query));
+-    let fact_terms = fact_term_set(fact);
+     query_terms
+         .into_iter()
+-        .filter(|term| fact_terms.contains(term.as_str()))
++        .filter(|term| features.contains(term.as_str()))
+         .collect()
+ }
+ 
+@@ -595,16 +599,7 @@ pub(crate) fn normalized_relevance_score(fact: &RankedContextFact) -> f64 {
+     (raw / (1.0 + raw)).clamp(0.0, 1.0)
+ }
+ 
+-fn query_alignment_factor(query_opt: Option<&str>, fact: &Fact) -> f64 {
+-    lexical_query_alignment_factor(query_opt, fact)
+-        * first_person_memory_alignment_factor(query_opt, &fact.content)
+-}
+-
+-fn lexical_query_alignment_factor(query_opt: Option<&str>, fact: &Fact) -> f64 {
+-    0.85 + (0.30 * query_grounding_score(query_opt, fact))
+-}
+-
+-pub(crate) fn query_grounding_score(query_opt: Option<&str>, fact: &Fact) -> f64 {
++fn grounding_from_features(query_opt: Option<&str>, features: &FactLexicalFeatures<'_>) -> f64 {
+     let Some(query) = query_opt else {
+         return 1.0;
+     };
+@@ -614,19 +609,21 @@ pub(crate) fn query_grounding_score(query_opt: Option<&str>, fact: &Fact) -> f64
+         return 1.0;
+     }
+ 
+-    let lexical_matches = lexical_query_overlap_for_fact(fact, &query_terms) as f64;
++    let lexical_matches = query_terms
++        .iter()
++        .filter(|term| features.contains(term.as_str()))
++        .count() as f64;
+     let coverage = (lexical_matches / query_terms.len() as f64).clamp(0.0, 1.0);
+-    let lexical_score = lexical_query_score_for_fact(fact, &query_terms) as f64;
++    let lexical_score = features.score(&query_terms) as f64;
+     let phrase_support =
+         ((lexical_score - lexical_matches).max(0.0) / query_terms.len() as f64).clamp(0.0, 1.0);
+     let anchor_terms = query_hard_anchor_terms(&query_terms);
+     let anchor_hits = if anchor_terms.is_empty() {
+         0.0
+     } else {
+-        let fact_terms = fact_term_set(fact);
+         (anchor_terms
+             .iter()
+-            .filter(|term| fact_terms.contains(term.as_str()))
++            .filter(|term| features.contains(term.as_str()))
+             .count() as f64
+             / anchor_terms.len() as f64)
+             .clamp(0.0, 1.0)
+@@ -798,28 +795,84 @@ fn temporal_similarity(left: DateTime<Utc>, right: DateTime<Utc>) -> f64 {
+     1.0 / (1.0 + diff_days / TEMPORAL_SIMILARITY_WINDOW_DAYS)
+ }
+ 
+-fn index_key_jaccard_similarity(left: &[String], right: &[String]) -> f64 {
+-    let left = left
+-        .iter()
+-        .map(|key| normalize_text(key))
+-        .filter(|key| !key.is_empty())
+-        .collect::<HashSet<_>>();
+-    let right = right
+-        .iter()
++fn normalized_index_keys(keys: &[String]) -> HashSet<String> {
++    keys.iter()
+         .map(|key| normalize_text(key))
+         .filter(|key| !key.is_empty())
+-        .collect::<HashSet<_>>();
++        .collect()
++}
+ 
+-    if left.is_empty() || right.is_empty() {
+-        return 0.0;
++/// One immutable dictionary for this selection. Fusion has already selected one
++/// candidate per fact identity; removal/reordering cannot change these features.
++struct SelectionScoring {
++    features: HashMap<String, (f64, std::sync::Arc<HashSet<String>>)>,
++}
++
++impl SelectionScoring {
++    fn new(
++        facts: &[RankedContextFact],
++        focus: Option<&TemporalWindow>,
++        anchors: &HashSet<String>,
++    ) -> Self {
++        let mut keys_cache = HashMap::new();
++        let mut vocabulary_cache = HashMap::new();
++        Self {
++            features: facts
++                .iter()
++                .map(|fact| {
++                    (
++                        fact.fact.fact_id.clone(),
++                        (
++                            {
++                                let focused = focused_ranked_relevance_score(fact, focus);
++                                if anchors.is_empty() {
++                                    focused
++                                } else {
++                                    let index_terms = vocabulary_cache
++                                        .entry(fact.fact.index_keys.as_slice())
++                                        .or_insert_with_key(|keys| {
++                                            crate::shared::search::search_query_term_set_many(
++                                                keys.iter().map(String::as_str),
++                                            )
++                                        });
++                                    let content_terms =
++                                        crate::shared::search::search_query_term_set(
++                                            &fact.fact.content,
++                                        );
++                                    let hits = anchors
++                                        .iter()
++                                        .filter(|term| {
++                                            content_terms.contains(term.as_str())
++                                                || index_terms.contains(term.as_str())
++                                        })
++                                        .count();
++                                    let support = if anchors.is_empty() {
++                                        1.0
++                                    } else if hits == 0 {
++                                        0.75
++                                    } else {
++                                        1.0 + (hits as f64 / anchors.len() as f64)
++                                    };
++                                    focused * support
++                                }
++                            },
++                            keys_cache
++                                .entry(fact.fact.index_keys.as_slice())
++                                .or_insert_with_key(|keys| {
++                                    std::sync::Arc::new(normalized_index_keys(keys))
++                                })
++                                .clone(),
++                        ),
++                    )
++                })
++                .collect(),
++        }
+     }
+ 
+-    let intersection = left.intersection(&right).count() as f64;
+-    let union = left.union(&right).count() as f64;
+-    if union <= 0.0 {
+-        0.0
+-    } else {
+-        intersection / union
++    fn relevance(&self, fact: &RankedContextFact) -> f64 {
++        self.features
++            .get(&fact.fact.fact_id)
++            .map_or(0.0, |features| features.0)
+     }
+ }
+ 
+@@ -867,27 +920,6 @@ fn anchor_term_hits_for_fact(fact: &RankedContextFact, anchor_terms: &HashSet<St
+         .count()
+ }
+ 
+-fn anchor_support_factor(fact: &RankedContextFact, anchor_terms: &HashSet<String>) -> f64 {
+-    if anchor_terms.is_empty() {
+-        return 1.0;
+-    }
+-
+-    let hits = anchor_term_hits_for_fact(fact, anchor_terms);
+-    if hits == 0 {
+-        0.75
+-    } else {
+-        1.0 + (hits as f64 / anchor_terms.len() as f64)
+-    }
+-}
+-
+-fn anchor_adjusted_relevance_score(
+-    fact: &RankedContextFact,
+-    temporal_focus: Option<&TemporalWindow>,
+-    anchor_terms: &HashSet<String>,
+-) -> f64 {
+-    focused_ranked_relevance_score(fact, temporal_focus) * anchor_support_factor(fact, anchor_terms)
+-}
+-
+ fn query_term_set_similarity(left: &HashSet<String>, right: &HashSet<String>) -> f64 {
+     if left.is_empty() || right.is_empty() {
+         return 0.0;
+@@ -993,9 +1025,18 @@ pub(crate) fn prune_redundant_selected_facts(
+     selected
+ }
+ 
+-fn candidate_redundancy(candidate: &RankedContextFact, selected: &RankedContextFact) -> f64 {
+-    let index_key_similarity =
+-        index_key_jaccard_similarity(&candidate.fact.index_keys, &selected.fact.index_keys);
++fn candidate_redundancy(
++    candidate: &RankedContextFact,
++    selected: &RankedContextFact,
++    scoring: &SelectionScoring,
++) -> f64 {
++    let index_key_similarity = scoring
++        .features
++        .get(&candidate.fact.fact_id)
++        .zip(scoring.features.get(&selected.fact.fact_id))
++        .map_or(0.0, |(left, right)| {
++            query_term_set_similarity(&left.1, &right.1)
++        });
+     let temporal_overlap = temporal_similarity(candidate.fact.t_valid, selected.fact.t_valid);
+     ((REDUNDANCY_INDEX_KEY_WEIGHT * index_key_similarity)
+         + (REDUNDANCY_TEMPORAL_WEIGHT * temporal_overlap))
+@@ -1006,19 +1047,17 @@ fn mmr_selection_score(
+     candidate: &RankedContextFact,
+     selected: &[RankedContextFact],
+     max_relevance: f64,
+-    temporal_focus: Option<&TemporalWindow>,
+-    anchor_terms: &HashSet<String>,
++    scoring: &SelectionScoring,
+ ) -> f64 {
+-    let relevance = (anchor_adjusted_relevance_score(candidate, temporal_focus, anchor_terms)
+-        / max_relevance.max(MIN_RANKED_CONFIDENCE))
+-    .clamp(0.0, 1.0);
++    let relevance =
++        (scoring.relevance(candidate) / max_relevance.max(MIN_RANKED_CONFIDENCE)).clamp(0.0, 1.0);
+     if selected.is_empty() {
+         return relevance;
+     }
+ 
+     let redundancy = selected
+         .iter()
+-        .map(|picked| candidate_redundancy(candidate, picked))
++        .map(|picked| candidate_redundancy(candidate, picked, scoring))
+         .fold(0.0, f64::max);
+ 
+     (MMR_RELEVANCE_WEIGHT * relevance) - ((1.0 - MMR_RELEVANCE_WEIGHT) * redundancy)
+@@ -1032,9 +1071,8 @@ fn seed_direct_recall_head(
+     budget: usize,
+     per_source_episode_cap: usize,
+     max_relevance: f64,
+-    temporal_focus: Option<&TemporalWindow>,
+     query_terms: &[String],
+-    anchor_terms: &HashSet<String>,
++    scoring: &SelectionScoring,
+ ) {
+     if query_terms.len() < 4 || budget <= 1 {
+         return;
+@@ -1057,7 +1095,7 @@ fn seed_direct_recall_head(
+             continue;
+         }
+ 
+-        let relevance = anchor_adjusted_relevance_score(candidate, temporal_focus, anchor_terms);
++        let relevance = scoring.relevance(candidate);
+         if relevance + 1e-9 < min_relevance {
+             continue;
+         }
+@@ -1120,19 +1158,16 @@ pub(crate) fn select_ranked_context_facts(
+         }
+     }
+ 
++    let scoring = SelectionScoring::new(&facts, temporal_focus_ref, &anchor_terms);
+     facts.sort_by(|left, right| {
+-        anchor_adjusted_relevance_score(right, temporal_focus_ref, &anchor_terms)
+-            .total_cmp(&anchor_adjusted_relevance_score(
+-                left,
+-                temporal_focus_ref,
+-                &anchor_terms,
+-            ))
++        scoring
++            .relevance(right)
++            .total_cmp(&scoring.relevance(left))
+             .then_with(|| compare_ranked_context_facts_with_focus(left, right, temporal_focus_ref))
+     });
+-
+     let max_relevance = facts
+         .first()
+-        .map(|fact| anchor_adjusted_relevance_score(fact, temporal_focus_ref, &anchor_terms))
++        .map(|fact| scoring.relevance(fact))
+         .unwrap_or(1.0)
+         .max(MIN_RANKED_CONFIDENCE);
+     let per_source_episode_cap = source_episode_selection_cap(budget);
+@@ -1146,9 +1181,8 @@ pub(crate) fn select_ranked_context_facts(
+         budget,
+         per_source_episode_cap,
+         max_relevance,
+-        temporal_focus_ref,
+         &query_terms,
+-        &anchor_terms,
++        &scoring,
+     );
+ 
+     while selected.len() < budget && !facts.is_empty() {
+@@ -1184,13 +1218,7 @@ pub(crate) fn select_ranked_context_facts(
+                 continue;
+             }
+ 
+-            let score = mmr_selection_score(
+-                candidate,
+-                &selected,
+-                max_relevance,
+-                temporal_focus_ref,
+-                &anchor_terms,
+-            );
++            let score = mmr_selection_score(candidate, &selected, max_relevance, &scoring);
+             let is_better = match best_idx {
+                 None => true,
+                 Some(_) if score > best_score + 1e-9 => true,
+diff --git a/crates/memory-mcp/src/shared/search.rs b/crates/memory-mcp/src/shared/search.rs
+index 2cb4ff45..3e93361b 100644
+--- a/crates/memory-mcp/src/shared/search.rs
++++ b/crates/memory-mcp/src/shared/search.rs
+@@ -47,12 +47,23 @@ pub(crate) fn has_search_query_terms(raw: &str) -> bool {
+ /// Deduplicate tokens only after the shared episode/quote preprocessing, before
+ /// their context-free normalization. Repeated source text needs no repeated work.
+ pub(crate) fn search_query_term_set(raw: &str) -> HashSet<String> {
+-    let prepared = prepare_lexical_text(raw);
+-    let mut seen_tokens = HashSet::new();
++    search_query_term_set_many(std::iter::once(raw))
++}
++
++/// Union vocabulary with per-input preprocessing. Quotes and episode references
++/// never cross an index-key boundary; identical prepared tokens normalize once.
++pub(crate) fn search_query_term_set_many<'a>(
++    inputs: impl IntoIterator<Item = &'a str>,
++) -> HashSet<String> {
++    let mut seen_tokens = HashSet::<String>::new();
+     let mut terms = Vec::new();
+-    for token in prepared.split_whitespace() {
+-        if seen_tokens.insert(token) {
+-            append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
++    for raw in inputs {
++        let prepared = prepare_lexical_text(raw);
++        for token in prepared.split_whitespace() {
++            if !seen_tokens.contains(token) {
++                seen_tokens.insert(token.to_owned());
++                append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
++            }
+         }
+     }
+     terms.into_iter().map(stem_search_term).collect()
+diff --git a/crates/memory-mcp/src/shared/search_lexical.rs b/crates/memory-mcp/src/shared/search_lexical.rs
+index 30f34c22..5c5d6708 100644
+--- a/crates/memory-mcp/src/shared/search_lexical.rs
++++ b/crates/memory-mcp/src/shared/search_lexical.rs
+@@ -8,7 +8,7 @@ use std::collections::HashSet;
+ 
+ use crate::models::Fact;
+ 
+-use super::search::search_query_term_set;
++use super::search::{search_query_term_set, search_query_term_set_many};
+ 
+ /// Subset of `query_terms` that appear in `text` (both normalized via
+ /// [`super::search::search_query_terms`]). Empty `query_terms` yields an empty set.
+@@ -42,11 +42,9 @@ pub fn fact_term_set(fact: &Fact) -> HashSet<String> {
+ /// things to read) but they are the same operation, so the operation lives
+ /// here once and each caller reads its own two fields.
+ fn term_set_of(content: &str, index_keys: &[String]) -> HashSet<String> {
+-    let mut terms = search_query_term_set(content);
+-    for index_key in index_keys {
+-        terms.extend(search_query_term_set(index_key));
+-    }
+-    terms
++    search_query_term_set_many(
++        std::iter::once(content).chain(index_keys.iter().map(String::as_str)),
++    )
+ }
+ 
+ /// Subset of `query_terms` matched by a fact's content and index keys.
+@@ -56,11 +54,19 @@ pub fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> Hash
+         return HashSet::new();
+     }
+ 
+-    let fact_terms = fact_term_set(fact);
+-
++    let content_terms = search_query_term_set(&fact.content);
++    // Index keys can only add membership. Do not normalize a large dictionary
++    // when the source text has already answered every requested membership.
++    if query_terms
++        .iter()
++        .all(|term| content_terms.contains(term.as_str()))
++    {
++        return query_terms.iter().cloned().collect();
++    }
++    let index_terms = search_query_term_set_many(fact.index_keys.iter().map(String::as_str));
+     query_terms
+         .iter()
+-        .filter(|term| fact_terms.contains(term.as_str()))
++        .filter(|term| content_terms.contains(term.as_str()) || index_terms.contains(term.as_str()))
+         .cloned()
+         .collect()
+ }
+diff --git a/crates/memory-mcp/tests/full_history_evidence.rs b/crates/memory-mcp/tests/full_history_evidence.rs
+index 801b8077..3a744366 100644
+--- a/crates/memory-mcp/tests/full_history_evidence.rs
++++ b/crates/memory-mcp/tests/full_history_evidence.rs
+@@ -7,6 +7,28 @@ use std::{
+     time::{Duration, Instant},
+ };
+ 
++struct CandidateProgress;
++impl memory_mcp::eval_support::retrieval::CandidateObserver for CandidateProgress {
++    fn observe_phase(&self, stage: &str, elapsed_ms: f64) {
++        println!(
++            "FULL_HISTORY_PHASE {}",
++            serde_json::json!({"stage":stage,"elapsed_ms":elapsed_ms})
++        );
++        std::io::stdout().flush().unwrap();
++    }
++    fn observe_work(&self, work: &memory_mcp::eval_support::retrieval::LexicalWork) {
++        println!("FULL_HISTORY_WORK {}", serde_json::to_string(work).unwrap());
++        std::io::stdout().flush().unwrap();
++    }
++    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
++        println!(
++            "FULL_HISTORY_CANDIDATES {}",
++            serde_json::to_string(inventory).unwrap()
++        );
++        std::io::stdout().flush().unwrap();
++    }
++}
++
+ struct QueryProgress(Instant);
+ 
+ impl memory_mcp::eval_support::QueryObserver for QueryProgress {
+@@ -72,7 +94,11 @@ async fn observe(case_id: &str) {
+         "FULL_HISTORY_START {}",
+         serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
+     );
+-    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(episode);
++    let capture =
++        memory_mcp::eval_support::retrieval::ContextEvidenceCapture::with_candidate_observer(
++            episode,
++            Arc::new(CandidateProgress),
++        );
+     let observed = tokio::time::timeout(
+         Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap()),
+         memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
+diff --git a/crates/memory-mcp/tests/lexical_term_set_resource.rs b/crates/memory-mcp/tests/lexical_term_set_resource.rs
+index b84f96b3..be65cda6 100644
+--- a/crates/memory-mcp/tests/lexical_term_set_resource.rs
++++ b/crates/memory-mcp/tests/lexical_term_set_resource.rs
+@@ -165,3 +165,241 @@ async fn episode_fallback_reuses_lexical_features_with_bounded_allocations() {
+         "fixed16-source read must not normalize long source text per sort comparison; observed {count}"
+     );
+ }
++
++#[test]
++fn index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys() {
++    record_term_set(&json!({"content":"Falcon M-42"}));
++    let keys = (0..2000)
++        .map(|n| format!("Falcon source M-42 carrier{n:04}"))
++        .collect::<Vec<_>>();
++    let record = json!({"content":"Falcon", "index_keys":keys});
++    let mut expected = ["falcon", "source", "42", "m42"]
++        .map(str::to_owned)
++        .into_iter()
++        .collect::<HashSet<_>>();
++    expected.extend((0..2000).map(|n| format!("carrier{n:04}")));
++    ALLOCATIONS.with(|counter| counter.set(Some(0)));
++    let actual = record_term_set(&record);
++    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
++    assert_eq!(actual, expected);
++    println!("INDEX_VOCABULARY_ALLOCATIONS {count}");
++    assert!(
++        count < 30_000,
++        "a2000-key dictionary with2004 terms must fit the30000-call allocation budget; observed {count}"
++    );
++}
++
++#[tokio::test]
++async fn public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order() {
++    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
++    use memory_mcp::storage::DbClient;
++    let (_, db) = common::make_service_with_client().await;
++    for n in 0..8 {
++        let id = format!("fact:keyresource{n:02}");
++        let content = format!("Falcon source deployment number {n}.");
++        let keys = (0..2000)
++            .map(|k| format!("Falcon source M-42 carrier{k:04}"))
++            .collect::<Vec<_>>();
++        db.create(&id, json!({"fact_id":id,"fact_type":"observation","content":content,"quote":content,
++            "source_episode":format!("episode:keyresource{n:02}"),"t_valid":"2026-01-01T00:00:00Z","t_ingested":"2026-01-01T00:00:00Z",
++            "confidence":0.9,"index_keys":keys,"scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
++            "org", &["t_valid","t_ingested"]).await.unwrap();
++    }
++    let service = memory_mcp::service::MemoryService::new(
++        std::sync::Arc::new(MeasuredApplicationDb(db)),
++        "org".into(),
++        "error".into(),
++        50,
++        100,
++    )
++    .unwrap();
++    let request = serde_json::from_value(json!({"query":"Falcon source Falcon","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"})).unwrap();
++    ALLOCATIONS.with(|counter| counter.set(Some(0)));
++    let actual = AssembleContextCapability::assemble_context_from_service(&service, request).await;
++    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
++    let actual = actual.unwrap();
++    assert_eq!(
++        actual
++            .iter()
++            .map(|item| item.fact_id.as_str())
++            .collect::<Vec<_>>(),
++        [
++            "fact:keyresource00",
++            "fact:keyresource01",
++            "fact:keyresource02",
++            "fact:keyresource03",
++            "fact:keyresource04"
++        ]
++    );
++    assert!(actual.iter().all(|item| item.content == item.quote));
++    println!("FACT_INDEX_APPLICATION_ALLOCATIONS {count}");
++    assert!(
++        count < 1_000_000,
++        "eight2000-key facts must fit the one-million-call application budget (storage excluded); observed {count}"
++    );
++}
++
++/// The public use-case resource budget measures application work. Database
++/// engine allocation/serialization is measured separately by full-history runs.
++/// This target uses a current-thread runtime, so the pause cannot cross threads.
++struct StorageAllocationPause(Option<usize>);
++impl StorageAllocationPause {
++    fn new() -> Self {
++        Self(ALLOCATIONS.with(|counter| counter.replace(None)))
++    }
++}
++impl Drop for StorageAllocationPause {
++    fn drop(&mut self) {
++        ALLOCATIONS.with(|counter| counter.set(self.0));
++    }
++}
++struct MeasuredApplicationDb(std::sync::Arc<dyn memory_mcp::storage::DbClient>);
++#[async_trait::async_trait]
++impl memory_mcp::storage::DbClient for MeasuredApplicationDb {
++    async fn query(
++        &self,
++        sql: &str,
++        vars: Option<serde_json::Value>,
++        namespace: &str,
++    ) -> Result<serde_json::Value, memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.query(sql, vars, namespace).await
++    }
++    async fn select_one(
++        &self,
++        id: &str,
++        namespace: &str,
++    ) -> Result<Option<serde_json::Value>, memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.select_one(id, namespace).await
++    }
++    async fn select_table(
++        &self,
++        table: memory_mcp::storage::table_scope::OwnedTable,
++        namespace: &str,
++    ) -> Result<Vec<serde_json::Value>, memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.select_table(table, namespace).await
++    }
++    async fn create(
++        &self,
++        id: &str,
++        value: serde_json::Value,
++        namespace: &str,
++        fields: &[&str],
++    ) -> Result<serde_json::Value, memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.create(id, value, namespace, fields).await
++    }
++    async fn update(
++        &self,
++        id: &str,
++        value: serde_json::Value,
++        namespace: &str,
++        fields: &[&str],
++    ) -> Result<serde_json::Value, memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.update(id, value, namespace, fields).await
++    }
++    async fn apply_migrations(&self, namespace: &str) -> Result<(), memory_mcp::MemoryError> {
++        let _pause = StorageAllocationPause::new();
++        self.0.apply_migrations(namespace).await
++    }
++}
++
++#[tokio::test]
++async fn lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations() {
++    use memory_mcp::storage::{ContextFactQuery, DbClient};
++    let (_, db) = common::make_service_with_client().await;
++    for n in 0..2 {
++        let id = format!("fact:hydration{n}");
++        let keys = (0..1000)
++            .map(|k| format!("Falcon source carrier{k:04}"))
++            .collect::<Vec<_>>();
++        db.create(&id,json!({"fact_id":id,"fact_type":"observation","content":"Falcon source","quote":"literal quote",
++            "source_episode":format!("episode:hydration{n}"),"t_valid":"2026-01-01T00:00:00Z","t_ingested":"2026-01-01T00:00:00Z",
++            "confidence":0.9,"index_keys":keys,"scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
++            "org",&["t_valid","t_ingested"]).await.unwrap();
++    }
++    let store = memory_mcp::knowledge::KnowledgeStoreClient::new(db, "org");
++    ALLOCATIONS.with(|counter| counter.set(Some(0)));
++    let rows = store
++        .select_facts_filtered(ContextFactQuery {
++            cutoff: "2026-05-01T00:00:00Z",
++            query_contains: Some("Falcon source"),
++            limit: 5,
++            fact_types: &[],
++        })
++        .await;
++    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
++    let rows = rows.unwrap();
++    assert_eq!(
++        rows.iter()
++            .map(|row| row["fact_id"].as_str().unwrap())
++            .collect::<Vec<_>>(),
++        ["fact:hydration0", "fact:hydration1"]
++    );
++    assert_eq!(rows[0]["quote"], "literal quote");
++    assert_eq!(rows[0]["index_keys"].as_array().unwrap().len(), 1000);
++    println!("FACT_HYDRATION_ALLOCATIONS {count}");
++    assert!(
++        count < 200_000,
++        "two1000-key winner projections must fit the200000-call engine budget; observed {count}"
++    );
++}
++
++#[tokio::test]
++async fn public_long_source_read_does_not_normalize_every_word_for_membership() {
++    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
++    use memory_mcp::storage::DbClient;
++    let (_, db) = common::make_service_with_client().await;
++    for n in 0..8 {
++        let id = format!("fact:longresource{n:02}");
++        let content = format!(
++            "{} Record {n}",
++            "Falcon archive source deployment details. ".repeat(2000)
++        );
++        db.create(&id, json!({"fact_id":id,"fact_type":"observation","content":content,"quote":content,
++            "source_episode":format!("episode:longresource{n:02}"),"t_valid":"2026-01-01T00:00:00Z","t_ingested":"2026-01-01T00:00:00Z",
++            "confidence":0.9,"index_keys":[],"scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
++            "org", &["t_valid","t_ingested"]).await.unwrap();
++    }
++    let service = memory_mcp::service::MemoryService::new(
++        std::sync::Arc::new(MeasuredApplicationDb(db)),
++        "org".into(),
++        "error".into(),
++        50,
++        100,
++    )
++    .unwrap();
++    let request = serde_json::from_value(json!({"query":"Falcon archive source","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"})).unwrap();
++    ALLOCATIONS.with(|counter| counter.set(Some(0)));
++    let actual = AssembleContextCapability::assemble_context_from_service(&service, request).await;
++    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
++    let actual = actual.unwrap();
++    assert_eq!(
++        actual
++            .iter()
++            .map(|item| item.fact_id.as_str())
++            .collect::<Vec<_>>(),
++        [
++            "fact:longresource00",
++            "fact:longresource01",
++            "fact:longresource02",
++            "fact:longresource03",
++            "fact:longresource04"
++        ]
++    );
++    let expected_text =
++        "Falcon archive source deployment details. ".repeat(2000)[..2048].to_owned();
++    assert!(
++        actual
++            .iter()
++            .all(|item| item.content == expected_text && item.quote == expected_text)
++    );
++    println!("LONG_SOURCE_APPLICATION_ALLOCATIONS {count}");
++    assert!(
++        count < 1_000_000,
++        "eight long repeated-vocabulary sources must fit the million-call application budget; observed {count}"
++    );
++}
+diff --git a/crates/memory-mcp/tests/retrieval_partial_evidence.rs b/crates/memory-mcp/tests/retrieval_partial_evidence.rs
+index 169fb2ab..cd3fc028 100644
+--- a/crates/memory-mcp/tests/retrieval_partial_evidence.rs
++++ b/crates/memory-mcp/tests/retrieval_partial_evidence.rs
+@@ -165,3 +165,111 @@ async fn one_capture_cannot_merge_stages_from_two_public_reads() {
+     );
+     assert_eq!(capture.stages().unwrap().len(), 1);
+ }
++
++mod common;
++
++struct Inventories {
++    phases: std::sync::Mutex<Vec<String>>,
++    rows: std::sync::Mutex<Vec<memory_mcp::eval_support::retrieval::CandidateInventory>>,
++    work: std::sync::Mutex<Vec<memory_mcp::eval_support::retrieval::LexicalWork>>,
++}
++impl memory_mcp::eval_support::retrieval::CandidateObserver for Inventories {
++    fn observe_phase(&self, stage: &str, _: f64) {
++        self.phases.lock().unwrap().push(stage.to_owned());
++    }
++    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
++        self.rows.lock().unwrap().push(inventory.clone());
++    }
++    fn observe_work(&self, work: &memory_mcp::eval_support::retrieval::LexicalWork) {
++        self.work.lock().unwrap().push(work.clone());
++    }
++}
++
++#[tokio::test]
++async fn public_read_observes_actual_time_visible_candidate_payload_without_source_text() {
++    use memory_mcp::eval_support::retrieval::{
++        ContextEvidenceCapture, assemble_context_recording_evidence,
++    };
++    let (service, db) = common::make_service_with_client().await;
++    for (id, content, source, keys, valid) in [
++        (
++            "fact:probea",
++            "archive source alpha",
++            "episode:probea",
++            vec!["M-42", "Été"],
++            "2026-01-01T00:00:00Z",
++        ),
++        (
++            "fact:probeb",
++            "archive source beta",
++            "episode:probeb",
++            vec!["M-42", "Été"],
++            "2026-01-01T00:00:00Z",
++        ),
++        (
++            "fact:future",
++            "archive source future",
++            "episode:future",
++            vec![],
++            "2027-01-01T00:00:00Z",
++        ),
++    ] {
++        db.create(id, json!({"fact_id":id,"fact_type":"observation","content":content,"quote":content,
++            "source_episode":source,"t_valid":valid,"t_ingested":valid,"confidence":0.9,"index_keys":keys,
++            "scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
++            "org", &["t_valid", "t_ingested"]).await.unwrap();
++    }
++    let sink = Arc::new(Inventories {
++        phases: std::sync::Mutex::new(Vec::new()),
++        rows: std::sync::Mutex::new(Vec::new()),
++        work: std::sync::Mutex::new(Vec::new()),
++    });
++    let capture = ContextEvidenceCapture::with_candidate_observer("episode:probea", sink.clone());
++    let request = serde_json::from_value(
++        json!({"query":"archive source","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"}),
++    )
++    .unwrap();
++    assemble_context_recording_evidence(&service, request, &capture)
++        .await
++        .unwrap();
++    assert_eq!(
++        *sink.phases.lock().unwrap(),
++        [
++            "channels.completed",
++            "subject.resolved",
++            "topics.completed",
++            "fusion.completed",
++            "admission.completed",
++            "selection.completed"
++        ]
++    );
++    let observed = sink.rows.lock().unwrap();
++    let initial = observed
++        .iter()
++        .find(|row| row.stage == "facts.initial_fetched")
++        .expect("actual candidate boundary must be emitted before ranking");
++    assert_eq!(initial.records, 2);
++    assert_eq!(initial.content_bytes, 39);
++    assert_eq!(initial.max_content_bytes, 20);
++    assert_eq!(initial.index_keys, 4);
++    assert_eq!(initial.index_key_bytes, 18);
++    assert_eq!(initial.max_index_key_bytes, 5);
++    assert_eq!(initial.unique_contents, 2);
++    assert_eq!(initial.unique_sources, 2);
++    assert_eq!(capture.candidates().unwrap().len(), observed.len());
++    let work = sink.work.lock().unwrap();
++    assert!(
++        !work.is_empty(),
++        "actual dictionary construction must be observed"
++    );
++    assert_eq!(work[0].records, 2);
++    assert_eq!(work[0].content_dictionaries, 2);
++    assert_eq!(
++        work[0].index_dictionaries, 1,
++        "different fact identities with equal key lists share one dictionary"
++    );
++    let serialized = serde_json::to_string(initial).unwrap();
++    assert!(!serialized.contains("archive source"));
++    assert!(!serialized.contains("index-only"));
++    assert!(!serialized.contains("episode:probe"));
++}

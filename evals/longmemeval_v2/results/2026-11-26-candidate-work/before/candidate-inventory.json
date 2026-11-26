@@ -1,0 +1,90 @@
+{
+  "0c6b0c60": [
+    {
+      "stage": "facts.initial_fetched",
+      "elapsed_ms": 11.049584,
+      "records": 0,
+      "content_bytes": 0,
+      "max_content_bytes": 0,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 0,
+      "unique_sources": 0
+    },
+    {
+      "stage": "facts.term_groups_fetched",
+      "elapsed_ms": 5384.248917,
+      "records": 874,
+      "content_bytes": 351551353,
+      "max_content_bytes": 1048542,
+      "index_keys": 5954171,
+      "index_key_bytes": 120856614,
+      "max_index_key_bytes": 266,
+      "unique_contents": 96,
+      "unique_sources": 96
+    },
+    {
+      "stage": "facts.term_groups_deduplicated",
+      "elapsed_ms": 5498.817209,
+      "records": 242,
+      "content_bytes": 119580400,
+      "max_content_bytes": 1048542,
+      "index_keys": 2148886,
+      "index_key_bytes": 47006223,
+      "max_index_key_bytes": 266,
+      "unique_contents": 96,
+      "unique_sources": 96
+    }
+  ],
+  "f61a096f": [
+    {
+      "stage": "facts.initial_fetched",
+      "elapsed_ms": 7.953959,
+      "records": 0,
+      "content_bytes": 0,
+      "max_content_bytes": 0,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 0,
+      "unique_sources": 0
+    },
+    {
+      "stage": "facts.term_groups_fetched",
+      "elapsed_ms": 14109.438750000001,
+      "records": 2859,
+      "content_bytes": 1072017514,
+      "max_content_bytes": 1048542,
+      "index_keys": 18202475,
+      "index_key_bytes": 368436183,
+      "max_index_key_bytes": 266,
+      "unique_contents": 126,
+      "unique_sources": 126
+    },
+    {
+      "stage": "facts.term_groups_deduplicated",
+      "elapsed_ms": 14389.134667,
+      "records": 343,
+      "content_bytes": 156007247,
+      "max_content_bytes": 1048542,
+      "index_keys": 2933673,
+      "index_key_bytes": 63673939,
+      "max_index_key_bytes": 266,
+      "unique_contents": 126,
+      "unique_sources": 126
+    },
+    {
+      "stage": "facts.initial_fetched",
+      "elapsed_ms": 24203.833042,
+      "records": 0,
+      "content_bytes": 0,
+      "max_content_bytes": 0,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 0,
+      "unique_sources": 0
+    }
+  ]
+}

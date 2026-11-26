@@ -1,0 +1,67 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.03s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 21 tests
+INDEX_VOCABULARY_ALLOCATIONS 6045
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 11
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+LEXICAL_SET_ALLOCATIONS 21
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10012248 single=8206239 additional=1806009
+EPISODE_BATCH_ALLOCATED_BYTES eight=10328928 single=8206160 additional=2122768
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+FACT_HYDRATION_ALLOCATIONS 47871
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_BATCH_ALLOCATED_BYTES eight=10276464 single=8206239 additional=2070225
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+EPISODE_FALLBACK_ALLOCATIONS 70224
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 128428
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+
+thread 'public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order' (7240152) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:281:66:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... FAILED
+LONG_SOURCE_APPLICATION_ALLOCATIONS 70659
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+
+thread 'public_mostly_unique_ordered_words_keep_the_same_resource_bound' (7240154) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:477:66:
+called `Option::unwrap()` on a `None` value
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... FAILED
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16032
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=327028
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+
+thread 'public_admission_reuses_exact_index_lists_across_distinct_fact_identities' (7240148) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:281:66:
+called `Option::unwrap()` on a `None` value
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... FAILED
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=531771
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16947
+test public_repeated_query_read_reuses_grounding_spans ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 999947
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... ok
+
+thread 'public_distinct_index_lists_reuse_shared_token_normalization' (7240150) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:281:66:
+called `Option::unwrap()` on a `None` value
+test public_distinct_index_lists_reuse_shared_token_normalization ... FAILED
+LONG_SOURCE_APPLICATION_ALLOCATIONS 16215
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+failures:
+
+failures:
+    public_admission_reuses_exact_index_lists_across_distinct_fact_identities
+    public_distinct_index_lists_reuse_shared_token_normalization
+    public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order
+    public_mostly_unique_ordered_words_keep_the_same_resource_bound
+
+test result: FAILED. 17 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.85s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

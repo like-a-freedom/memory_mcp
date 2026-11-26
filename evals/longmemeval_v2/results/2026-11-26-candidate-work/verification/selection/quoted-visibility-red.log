@@ -1,0 +1,25 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 20.55s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 2 tests
+
+thread 'quoted_visibility_word_inside_escaped_label_is_not_an_attribute' (7698591) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:770:5:
+escaped label text must not establish visibility
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'quoted_visibility_word_inside_popup_value_is_not_an_attribute' (7698592) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:758:5:
+quoted attribute content must not establish visibility
+test quoted_visibility_word_inside_popup_value_is_not_an_attribute ... FAILED
+test quoted_visibility_word_inside_escaped_label_is_not_an_attribute ... FAILED
+
+failures:
+
+failures:
+    quoted_visibility_word_inside_escaped_label_is_not_an_attribute
+    quoted_visibility_word_inside_popup_value_is_not_an_attribute
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.66s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

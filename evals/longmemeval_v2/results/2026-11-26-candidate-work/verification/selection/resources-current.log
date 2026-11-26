@@ -1,0 +1,30 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.85s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 22 tests
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+test unicode_lowercase_shrinking_to_one_byte_keeps_the_existing_search_vocabulary ... ok
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+test public_repeated_query_read_reuses_grounding_spans ... ok
+test public_composite_source_tokens_reuse_their_repeated_word_parts ... ok
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.21s
+

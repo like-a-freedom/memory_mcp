@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.67s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 1 test
+test button_request_with_tab_context_keeps_the_requested_buttons ... FAILED
+
+failures:
+
+---- button_request_with_tab_context_keeps_the_requested_buttons stdout ----
+
+thread 'button_request_with_tab_context_keeps_the_requested_buttons' (8077289) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:1010:5:
+context word tabs must not replace the explicitly requested toolbar buttons
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    button_request_with_tab_context_keeps_the_requested_buttons
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

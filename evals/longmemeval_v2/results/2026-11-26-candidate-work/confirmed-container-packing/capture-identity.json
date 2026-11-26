@@ -1,0 +1,20 @@
+{
+  "driver_sha256": "b0f364d7a01a6c65493afcf3a238c3dfbdf1bd0d04fb8b9b8309303a7403b4e1",
+  "product_binary_sha256": "d7000f784f8d1c2f46ea0915cfa8e9c91297e2c6555799b71ce9ac128989db39",
+  "product_binary_path": "/Users/solovey/Documents/dev/memory_mcp/target/candidate-work-accepted/memory_mcp",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--features",
+    "eval-support",
+    "--test",
+    "full_history_evidence",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "binary_sha256": "572fbf71e2d1e3cffe44c0c3768fc76c2de8585581e52551df399eb5a608874a",
+  "registration_sha256": "3a51d3e580c34486d2086fa206445c31a6e114e09537a9a0e9b1cee45e5977b6"
+}

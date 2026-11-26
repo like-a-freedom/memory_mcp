@@ -1,0 +1,29 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.64s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 3 tests
+
+thread 'excludes_label_has_no_positive_membership_priority' (7611096) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:588:5:
+an excluded label cannot acquire positive-membership priority
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'no_longer_included_label_has_no_positive_membership_priority' (7611097) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:588:5:
+an excluded label cannot acquire positive-membership priority
+test excludes_label_has_no_positive_membership_priority ... FAILED
+test no_longer_included_label_has_no_positive_membership_priority ... FAILED
+
+thread 'excepted_label_has_no_positive_membership_priority' (7611095) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:588:5:
+an excluded label cannot acquire positive-membership priority
+test excepted_label_has_no_positive_membership_priority ... FAILED
+
+failures:
+
+failures:
+    excepted_label_has_no_positive_membership_priority
+    excludes_label_has_no_positive_membership_priority
+    no_longer_included_label_has_no_positive_membership_priority
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.35s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

@@ -1,0 +1,113 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.53s
+     Running tests/episode_candidate_hydration.rs (target/debug/build/memory_mcp/1a57fd480da0303d/out/episode_candidate_hydration-1a57fd480da0303d)
+
+running 3 tests
+test episode_membership_preserves_unicode_literal_and_blank_term_semantics ... ok
+test episode_candidate_later_batch_keeps_new_winner_without_refilling_seen_caps ... ok
+test episode_term_candidates_return_each_payload_once_in_first_hit_order ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/equivalent_alias_reads.rs (target/debug/build/memory_mcp/887735e5649b3b21/out/equivalent_alias_reads-887735e5649b3b21)
+
+running 11 tests
+test equivalent_native_and_application_alias_runs_one_lexical_read ... ok
+test indexing_only_token_equivalence_cannot_remove_an_alias_read ... ok
+test native_stem_equivalence_alone_cannot_remove_different_application_query ... ok
+test different_key_index_analyzer_keeps_the_alias_read ... ok
+test genuine_alias_keeps_its_independent_read_and_evidence ... ok
+test different_native_tokens_keep_the_application_equivalent_alias ... ok
+test unavailable_analyzer_keeps_the_alias_read ... ok
+test incomplete_analyzer_keeps_the_alias_read ... ok
+test empty_native_tokens_cannot_establish_equivalence ... ok
+test different_content_index_analyzer_keeps_the_alias_read ... ok
+test additional_fulltext_index_cannot_change_alias_equivalence ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 20 tests
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+test episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test partial_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test mostly_matching_episode_term_batch_bounds_additional_source_allocation_bytes ... ok
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+test public_mostly_unique_ordered_words_keep_the_same_resource_bound ... ok
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+test public_selection_reuses_index_vocabulary_for_index_only_anchors ... ok
+test public_repeated_query_read_reuses_grounding_spans ... ok
+test public_distinct_index_lists_reuse_shared_token_normalization ... ok
+test public_repeated_ordered_words_share_normalized_scoring_tokens ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.64s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 12 tests
+2026-11-26T16:21:45.653990Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:21:45.667071Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:21:45.678515Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:21:45.690341Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+test diagnostic_source_observation_respects_request_policy ... ok
+2026-11-26T16:21:45.702071Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:21:45.714509Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+2026-11-26T16:21:45.727365Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=26104  args.truncated_chars=8000  result={}
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+2026-11-26T16:21:45.812233Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test explicitly_named_controls_survive_competing_generic_toolbar_histories ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running tests/retrieval_query_batching.rs (target/debug/build/memory_mcp/6011d5bf5e54d7fb/out/retrieval_query_batching-6011d5bf5e54d7fb)
+
+running 7 tests
+test episode_subqueries_preserve_unicode_casefolded_substring_groups ... ok
+test fact_fallback_batches_term_queries_within_the_rpc_budget ... ok
+test episode_fallback_batches_terms_without_changing_substring_queries ... ok
+test fact_term_batches_are_limited_to_eight_groups_per_rpc ... FAILED
+test episode_term_batches_are_limited_to_eight_groups_per_rpc ... FAILED
+test source_fact_reads_keep_independent_limits_in_batches_of_eight ... ok
+test surreal_subqueries_preserve_each_ordered_fact_score_group ... ok
+
+failures:
+
+---- fact_term_batches_are_limited_to_eight_groups_per_rpc stdout ----
+
+thread 'fact_term_batches_are_limited_to_eight_groups_per_rpc' (7062525) panicked at crates/memory-mcp/tests/retrieval_query_batching.rs:324:5:
+the query should exercise more than one batch
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- episode_term_batches_are_limited_to_eight_groups_per_rpc stdout ----
+
+thread 'episode_term_batches_are_limited_to_eight_groups_per_rpc' (7062523) panicked at crates/memory-mcp/tests/retrieval_query_batching.rs:354:5:
+the query should exercise more than one batch
+
+
+failures:
+    episode_term_batches_are_limited_to_eight_groups_per_rpc
+    fact_term_batches_are_limited_to_eight_groups_per_rpc
+
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_query_batching`

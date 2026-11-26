@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "evals/longmemeval_v2",
+    "-p",
+    "test_*.py"
+  ],
+  "exit_code": 0,
+  "seconds": 4.480138957995223
+}

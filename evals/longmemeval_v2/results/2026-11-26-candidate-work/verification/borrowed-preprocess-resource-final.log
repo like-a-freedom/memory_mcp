@@ -1,0 +1,33 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.21s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 13 tests
+LEXICAL_SET_ALLOCATIONS 17
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+INDEX_VOCABULARY_ALLOCATIONS 4032
+test index_key_vocabulary_normalizes_repeated_words_once_across_distinct_keys ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+UNCHANGED_INDEX_PREPROCESSING_ALLOCATIONS 7
+test index_preprocessing_does_not_clone_unchanged_inputs ... ok
+FACT_HYDRATION_ALLOCATIONS 47866
+test lexical_fact_projection_hydrates_each_winner_with_bounded_engine_allocations ... ok
+EPISODE_FALLBACK_ALLOCATIONS 67407
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+LEXICAL_UNION_ALLOCATIONS 117681
+test lexical_union_does_not_copy_the_growing_accumulator_per_hit ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=8 allocations=139160
+test public_fact_read_reuses_index_vocabulary_without_changing_tied_source_order ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 71368
+test public_long_source_read_does_not_normalize_every_word_for_membership ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 332214
+test public_unbroken_source_read_reuses_scoring_tokens ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=299555
+test public_experience_read_reuses_index_vocabulary_for_repeated_topic_evidence ... ok
+FACT_INDEX_APPLICATION_ALLOCATIONS facts=32 allocations=267335
+test public_admission_reuses_exact_index_lists_across_distinct_fact_identities ... ok
+LONG_SOURCE_APPLICATION_ALLOCATIONS 693072
+test public_repeated_query_read_reuses_grounding_spans ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.67s
+

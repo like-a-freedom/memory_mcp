@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--test",
+    "_access_probe",
+    "frozen_store_access_probe",
+    "--",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "seconds": 26.874598166992655,
+  "original_snapshot_unchanged": true
+}
