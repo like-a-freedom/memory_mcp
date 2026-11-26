@@ -1,0 +1,78 @@
+{
+  "case": "aster-current",
+  "revisions": [
+    {
+      "event": "aster-ledger",
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:31.776499Z",
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:2f49c21b45bcc6e1b34586e6",
+          "source_quote": "The Aster telemetry prism is kept in Cabinet-734.",
+          "statement": "The Aster telemetry prism is kept in Cabinet-734.",
+          "type": "note"
+        }
+      ]
+    }
+  ],
+  "episode_bindings": {
+    "episode:7a1d2efc3dee5e991bf1a391": "aster-ledger"
+  },
+  "request": {
+    "query": "Aster telemetry prism",
+    "budget": 8,
+    "compact": true
+  },
+  "response": {
+    "guidance": "Call explain if you need provenance-ready citations for selected items.",
+    "result": [
+      {
+        "confidence": 0.31,
+        "content": "The Aster telemetry prism is kept in Cabinet-734.",
+        "fact_id": "fact:2f49c21b45bcc6e1b34586e6",
+        "grounding": 0.75,
+        "provenance": {
+          "extraction_strategy": "structured_summary_line",
+          "ingestion_method": "extraction",
+          "matched_query_terms": [
+            "aster",
+            "telemetry",
+            "prism"
+          ],
+          "retrieval_admission": {
+            "basis": "lexical",
+            "community": null,
+            "explicit_date_admitted": false,
+            "graph_anchor_origin": null,
+            "hop_count": null,
+            "matched_content_terms": [
+              "aster",
+              "telemetry",
+              "prism"
+            ],
+            "matched_index_key_terms": [
+              "aster"
+            ],
+            "matched_references": [],
+            "policy_version": "retrieval-admission-v1",
+            "repeated_topic": null,
+            "resolved_entity_ids": [],
+            "semantic_similarity": null
+          },
+          "source_episode_id": "episode:7a1d2efc3dee5e991bf1a391",
+          "source_id": "source-aster-ledger",
+          "source_type": "document"
+        },
+        "rationale": "tier=direct",
+        "relevance": 0.07,
+        "retrieval_tier": "direct",
+        "semantic_available": false,
+        "source_episode": "episode:7a1d2efc3dee5e991bf1a391"
+      }
+    ],
+    "status": "success"
+  }
+}

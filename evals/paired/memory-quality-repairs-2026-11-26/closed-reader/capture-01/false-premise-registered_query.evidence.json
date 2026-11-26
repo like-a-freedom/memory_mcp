@@ -1,0 +1,63 @@
+{
+  "guidance": "Call explain if you need provenance-ready citations for selected items.",
+  "has_more": false,
+  "result": [
+    {
+      "confidence": 0.64,
+      "content": "The Onyx release key vault allocation is pending; no vault has been approved.",
+      "fact_id": "fact:5f053b0c77409534da41b11b",
+      "grounding": 0.66,
+      "provenance": {
+        "extraction_strategy": "structured_summary_line",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "approved",
+          "key",
+          "onyx",
+          "release",
+          "vault"
+        ],
+        "reranking": {
+          "admission_floor": 0.0,
+          "model_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+          "relevance_logit": 8.833173751831055
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "release",
+            "key",
+            "approved",
+            "vault"
+          ],
+          "matched_index_key_terms": [],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": null,
+          "resolved_entity_ids": [],
+          "semantic_similarity": 0.9102288894409123
+        },
+        "source_episode_id": "episode:da60db1c0e4c91e20a107eec",
+        "source_id": "false-premise-source",
+        "source_type": "document"
+      },
+      "quote": "The Onyx release key vault allocation is pending; no vault has been approved.",
+      "rationale": "tier=fallback fts=12.93 access_count=0 confidence=0.64 relevance=0.91 grounding=0.66 alignment=1.05 semantic=enabled matched lexical query=\"Onyx release key approved vault status\" and active at 2026-11-26",
+      "relevance": 0.91,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1",
+        "semantic_similarity": 0.9102288894409123
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": true,
+      "source_episode": "episode:da60db1c0e4c91e20a107eec"
+    }
+  ],
+  "status": "success",
+  "total_count": 1
+}

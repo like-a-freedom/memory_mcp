@@ -1,0 +1,91 @@
+{
+  "case": "beryl-valid-time",
+  "revisions": [
+    {
+      "event": "beryl-first",
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:45.042688Z",
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:64b96a6a0632c24ab5f216f4",
+          "source_quote": "The Beryl geodesic spindle is kept in Drawer-268.",
+          "statement": "The Beryl geodesic spindle is kept in Drawer-268.",
+          "type": "note"
+        }
+      ]
+    },
+    {
+      "event": "beryl-later",
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:45.235884Z",
+        "known_revision": 12,
+        "valid_at": "2026-06-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:4ee3044c96575a82db2de137",
+          "source_quote": "The Beryl geodesic spindle is kept in Drawer-951.",
+          "statement": "The Beryl geodesic spindle is kept in Drawer-951.",
+          "type": "note"
+        }
+      ]
+    }
+  ],
+  "episode_bindings": {
+    "episode:b15214da6230e72b9d70fd19": "beryl-first",
+    "episode:e72d2c177386aafdd985844d": "beryl-later"
+  },
+  "request": {
+    "query": "Beryl geodesic spindle",
+    "budget": 8,
+    "compact": true,
+    "valid_at": "2026-05-15T10:00:00Z"
+  },
+  "response": {
+    "context": {
+      "candidate_scan_truncated": false,
+      "completeness": "partial",
+      "omitted_channels": [
+        "alias expansion",
+        "experience, source episode siblings and source context neighborhoods",
+        "triples, graph edges and community summaries",
+        "semantic ANN and mutable embeddings",
+        "mutable fact access heat",
+        "legacy facts and episodes without committed revision provenance"
+      ],
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:45.259967Z",
+        "known_revision": 12,
+        "valid_at": "2026-05-15T10:00:00Z"
+      }
+    },
+    "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+    "result": [
+      {
+        "confidence": 0.66,
+        "content": "The Beryl geodesic spindle is kept in Drawer-268.",
+        "evidence_status": "current",
+        "fact_id": "fact:64b96a6a0632c24ab5f216f4",
+        "grounding": 1.0,
+        "provenance": {
+          "extraction_strategy": "structured_summary_line",
+          "ingestion_method": "extraction",
+          "known_revision": 12,
+          "source_episode_id": "episode:b15214da6230e72b9d70fd19",
+          "source_id": "source-beryl-first",
+          "source_type": "document",
+          "valid_at": "2026-05-15T10:00:00+00:00"
+        },
+        "rationale": "historical",
+        "relevance": 1.0,
+        "retrieval_tier": "historical_direct",
+        "semantic_available": false,
+        "source_episode": "episode:b15214da6230e72b9d70fd19"
+      }
+    ],
+    "status": "success"
+  }
+}

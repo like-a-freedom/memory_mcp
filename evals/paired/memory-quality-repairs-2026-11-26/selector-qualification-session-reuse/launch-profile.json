@@ -1,0 +1,8 @@
+{
+  "EMBEDDINGS_ENABLED": "false",
+  "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+  "NER_EXTRACTOR": "regex",
+  "SURREALDB_DB_NAME": "memory_decisions",
+  "SURREALDB_EMBEDDED": "true",
+  "SURREALDB_NAMESPACE": "main"
+}

@@ -1,0 +1,40 @@
+{
+  "schema": "memory-mcp-long-history-truth/v1",
+  "provenance": "Independent reviewed-source rules based on pinned source states and complete menus/toolbars; accepted answers are independent of archived reader/scorer outputs. Development diagnostic only. No exhaustive semantic paraphrase claim.",
+  "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+  "cases": {
+    "0c6b0c60": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "answer_kind": "closed_list",
+      "accepted_answers": [
+        "Past 24 hours, Past week, Past month, Past year, All time"
+      ],
+      "support_markers": [
+        "Past 24 hours",
+        "Past week",
+        "Past month",
+        "Past year",
+        "All time"
+      ]
+    },
+    "f61a096f": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "answer_kind": "count",
+      "accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "support_markers": [
+        "button '\\ue626 Back'",
+        "button 'Login as Customer'",
+        "button 'Delete Customer'",
+        "button 'Reset'",
+        "button 'Create Order'",
+        "button 'Reset Password'",
+        "button 'Force Sign-In'",
+        "button 'Save and Continue Edit'",
+        "button 'Save Customer'"
+      ]
+    }
+  }
+}

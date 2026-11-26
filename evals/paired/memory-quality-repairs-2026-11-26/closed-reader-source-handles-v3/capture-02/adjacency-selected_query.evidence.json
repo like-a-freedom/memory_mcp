@@ -1,0 +1,63 @@
+{
+  "guidance": "Call explain if you need provenance-ready citations for selected items.",
+  "has_more": false,
+  "result": [
+    {
+      "confidence": 0.64,
+      "content": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "fact_id": "fact:1ca8d99c076fd8a2cd934a62",
+      "grounding": 0.5,
+      "provenance": {
+        "extraction_strategy": "structured_summary_line",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "dashboard",
+          "orchard",
+          "order",
+          "tern"
+        ],
+        "reranking": {
+          "admission_floor": 0.0,
+          "model_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+          "relevance_logit": 9.035009384155273
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "dashboard",
+            "order",
+            "orchard"
+          ],
+          "matched_index_key_terms": [
+            "orchard"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": null,
+          "resolved_entity_ids": [],
+          "semantic_similarity": 0.924264916586743
+        },
+        "source_episode_id": "episode:07d53a60b78c291db37c8836",
+        "source_id": "adjacency-v2-source",
+        "source_type": "document"
+      },
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "rationale": "tier=fallback fts=8.52 access_count=1 confidence=0.64 relevance=0.91 grounding=0.50 alignment=1.00 semantic=enabled matched lexical query=\"Tern dashboard tab order after Orchard\" and active at 2026-11-26",
+      "relevance": 0.91,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1",
+        "semantic_similarity": 0.924264916586743
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": true,
+      "source_episode": "episode:07d53a60b78c291db37c8836"
+    }
+  ],
+  "status": "success",
+  "total_count": 1
+}

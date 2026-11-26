@@ -1,0 +1,16 @@
+{
+  "head": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+  "source_change": "anno.before.rs is HEAD source at the matched pre-fix run; anno.after.rs is the exact repaired source used by after-v2.json. Corpus labels and grader are matched across the pair.",
+  "files": {
+    "evals/results/extraction-entity-repair-2026-11-26/anno.before.rs": "46ffcc8fb29d3d0a38690670b3c6f0063fc73ee7a80f63b88e8e554a61505b4a",
+    "evals/results/extraction-entity-repair-2026-11-26/anno.after.rs": "4793866a84b58829414f420bef20e93b981cc276d88211ccf956f1163b8b94ae",
+    "evals/results/extraction-entity-repair-2026-11-26/before-v2.json": "b31a0455e215252ad2e59bd642d67c10d80366e1cc8fd024d5b3ab8d8551e51c",
+    "evals/results/extraction-entity-repair-2026-11-26/after-v2.json": "ef8c8afe8773192466b73770b13be9c7c710f8ef9ac37a16608b0b370dd046b7",
+    "crates/eval-harness/tests/fixtures/extraction_cases.json": "25ff45c548bc52d455b45505ccbd18951f80784d12b8cf1bb6f54d33beabc928",
+    "crates/eval-harness/tests/fixtures/extraction_cases_v2.json": "c6ade7802b00f17ca191667da5b85646b1d061e33e40063e1627c1284eb021b0",
+    "crates/eval-harness/src/suites/extraction.rs": "1f495adf8fd09c245b5f2e9766963805c25e7f2f138829afe67f5be0e640526c",
+    "docs/evals/EXTRACTION_ENTITY_LABEL_POLICY_V2.md": "e718e1b4ee5c79de07a7d6b0f46b75189c61055d5cff5ab45916b1ff2d7fc2fd",
+    "Cargo.lock": "689616e2f011d19c5437bf3051242cec221613fee5d66a187bf84350262a03fb",
+    "evals/profiles/pr.json": "774f2f4b836b060a645a77c04acdc0f5a405b7b6a643c3758162b74698618bd0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "session-reuse-development-execution/v1",
+  "whole_workflow_seconds": 600,
+  "scheduled_captures": 2,
+  "scheduled_arm_trials_per_capture": 8,
+  "source_exposure": "same previously exposed development tasks; no independent source confirmation",
+  "quality_criteria_changed": false,
+  "stop_after_any_complete_capture_gate_failure": true,
+  "actual_request_mode": "live",
+  "two_complete_captures_required": true,
+  "active_audit_script": "evals/paired/temporal_read_audit.py",
+  "active_audit_sha256": "a65011c57ecc01e2caaf168548625f8bc73baaeec1a1ed94d07067a9371d908e",
+  "active_audit_tests_sha256": "450091a4aef574008774fa51866592346295922de34a35d4dc6217d382db5c43",
+  "owned_temp_root": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/scratch",
+  "model_calls_started": false,
+  "per_agent_phase_acceptance_seconds": 25,
+  "maximum_accepted_cumulative_agent_phase_seconds": 400,
+  "agent_budget_interrupt_guarantee": false,
+  "blocking_mcp_transport_ceiling_seconds": 120
+}

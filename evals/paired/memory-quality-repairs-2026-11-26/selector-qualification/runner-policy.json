@@ -1,0 +1,9 @@
+{
+  "reads": 1,
+  "tools": [
+    "assemble_context"
+  ],
+  "retry": "none",
+  "tool_choice": "auto until budget consumed; tools omitted afterwards",
+  "runner_source": "crates/eval-harness/src/paired_agent/chat_completions.rs"
+}

@@ -1,0 +1,154 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Where is the Aster telemetry prism currently stored? Read current memory without historical time or knowledge selectors.",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "452d22d0290de2774f46351f259b235a699e42f28221fabf2ddb042ed6653f49",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "aster-ledger"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "At valid time 2026-05-15T10:00:00Z, where was the Beryl geodesic spindle stored? Use that exact valid_at and current knowledge (no known_at or known_revision).",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-15T10:00:00Z",
+      "known_revision": 6,
+      "context_budget": 8,
+      "history_sha256": "de351a1e4cd3b6e875a48d545824370829b17b4a636ddbc20b91ee72d1f97764",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "beryl-first"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "At knowledge revision {{KNOWN_REVISION}} and valid time 2026-05-01T10:00:00Z, where was the Cobalt calibration seal stored? Use exactly that known_revision and valid_at, not known_at.",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 3,
+      "context_budget": 8,
+      "history_sha256": "206a7a0432393c3ed53205fb2a4bedee84e394740094adad0555b17b21e2b662",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "cobalt-ledger"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Using knowledge as of 2020-01-01T00:00:00Z and valid time 2026-05-01T10:00:00Z, where was the Dahlia ballast key stored? Use that exact known_at and valid_at, not known_revision. Make one memory read with budget 8 and compact true, leaving unrelated filters and view settings at defaults. If that knowledge boundary contains no evidence, answer exactly unknown with citations [], and do not ask a clarification question.",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 0,
+      "context_budget": 8,
+      "history_sha256": "bab7c4a5c1ca150e8293070ed9b70cf92addab27c26cd60fbcedde7784494e6c",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [],
+      "forbidden_event_ids": [
+        "dahlia-ledger"
+      ],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]

@@ -1,0 +1,92 @@
+{
+  "case": "cobalt-revision-checkpoint",
+  "revisions": [
+    {
+      "event": "cobalt-ledger",
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:57.028267Z",
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:36ab8a7e689d6e1dd0138336",
+          "source_quote": "The Cobalt calibration seal is kept in Vault-462.",
+          "statement": "The Cobalt calibration seal is kept in Vault-462.",
+          "type": "note"
+        }
+      ]
+    },
+    {
+      "event": "cobalt-correction",
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:57.287641Z",
+        "known_revision": 12,
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:0d5fd4dbba0cf6b3fade1c3a",
+          "source_quote": "The Cobalt calibration seal is kept in Vault-817.",
+          "statement": "The Cobalt calibration seal is kept in Vault-817.",
+          "type": "note"
+        }
+      ]
+    }
+  ],
+  "episode_bindings": {
+    "episode:cc5b2f79bad783be1d7144cf": "cobalt-ledger",
+    "episode:d7860c957186402f996c0a11": "cobalt-correction"
+  },
+  "request": {
+    "query": "Cobalt calibration seal",
+    "budget": 8,
+    "compact": true,
+    "valid_at": "2026-05-01T10:00:00Z",
+    "known_revision": 6
+  },
+  "response": {
+    "context": {
+      "candidate_scan_truncated": false,
+      "completeness": "partial",
+      "omitted_channels": [
+        "alias expansion",
+        "experience, source episode siblings and source context neighborhoods",
+        "triples, graph edges and community summaries",
+        "semantic ANN and mutable embeddings",
+        "mutable fact access heat",
+        "legacy facts and episodes without committed revision provenance"
+      ],
+      "snapshot": {
+        "known_at": "2026-11-26T08:16:56.967983Z",
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    },
+    "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+    "result": [
+      {
+        "confidence": 0.7,
+        "content": "The Cobalt calibration seal is kept in Vault-462.",
+        "evidence_status": "current",
+        "fact_id": "fact:36ab8a7e689d6e1dd0138336",
+        "grounding": 1.0,
+        "provenance": {
+          "extraction_strategy": "structured_summary_line",
+          "ingestion_method": "extraction",
+          "known_revision": 6,
+          "source_episode_id": "episode:cc5b2f79bad783be1d7144cf",
+          "source_id": "source-cobalt-ledger",
+          "source_type": "document",
+          "valid_at": "2026-05-01T10:00:00+00:00"
+        },
+        "rationale": "historical",
+        "relevance": 1.0,
+        "retrieval_tier": "historical_direct",
+        "semantic_available": false,
+        "source_episode": "episode:cc5b2f79bad783be1d7144cf"
+      }
+    ],
+    "status": "success"
+  }
+}

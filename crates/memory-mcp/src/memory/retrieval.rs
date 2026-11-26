@@ -35,6 +35,8 @@ mod alias_expansion;
 mod budget;
 mod community;
 mod currency;
+#[cfg(feature = "eval-support")]
+pub(crate) mod diagnostics;
 mod experience;
 pub(crate) mod filtering;
 pub(crate) mod graph;
@@ -112,7 +114,12 @@ pub async fn assemble_context(
         caller_id: access.and_then(|payload| payload.caller_id),
     };
     crate::memory::api::recall_context(
-        &RetrievalPort { ctx, request },
+        &RetrievalPort {
+            ctx,
+            request,
+            #[cfg(feature = "eval-support")]
+            trace: None,
+        },
         &crate::memory::retrieval_deps::RateLimitDeps {
             rate_limiter: &ctx.rate_limiter,
         },
@@ -149,6 +156,8 @@ pub async fn assemble_context_temporal(
 struct RetrievalPort<'a> {
     ctx: &'a AssembleContextDeps,
     request: AssembleContextRequest,
+    #[cfg(feature = "eval-support")]
+    trace: diagnostics::EvidenceRecorder<'a>,
 }
 
 #[async_trait::async_trait]
@@ -157,10 +166,80 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
         &self,
         command: &crate::memory::api::RecallCommand,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-        let mut items = assemble_context_inner(self.ctx, self.request.clone()).await?;
+        let mut items = assemble_context_inner(
+            self.ctx,
+            self.request.clone(),
+            #[cfg(feature = "eval-support")]
+            self.trace,
+        )
+        .await?;
+        #[cfg(feature = "eval-support")]
+        diagnostics::record(self.trace, "selected_pre_packaging", &items);
         budget::bound_context_evidence(&mut items, &command.query);
+        #[cfg(feature = "eval-support")]
+        diagnostics::record(self.trace, "packed_context", &items);
         Ok(items)
     }
+}
+
+#[cfg(feature = "eval-support")]
+pub(crate) async fn assemble_context_with_evidence(
+    ctx: &AssembleContextDeps,
+    request: AssembleContextRequest,
+    source_episode: &str,
+) -> Result<diagnostics::ContextEvidence, MemoryError> {
+    let trace = std::sync::Mutex::new(diagnostics::Recorder {
+        started: Instant::now(),
+        source_episode: source_episode.to_owned(),
+        stages: Vec::new(),
+    });
+    let access = AccessPayload::from_payload(request.access.clone());
+    let source_rows = ctx
+        .episode_context_store()
+        .select_episode_by_id(source_episode)
+        .await?;
+    let formation = source_rows
+        .into_iter()
+        .filter(|row| {
+            access
+                .as_ref()
+                .is_none_or(|access| filtering::episode_record_allowed(row, access))
+        })
+        .filter_map(|row| {
+            let content = row.get("content")?.as_str()?;
+            serde_json::from_value::<AssembledContextItem>(json!({
+            "fact_id": "", "content": content, "quote": content,
+            "source_episode": source_episode, "confidence": 1.0,
+            "provenance": {"diagnostic_boundary":"persisted_source_episode"},
+            "rationale": "Persisted source carrier; atomic extraction completeness is unobserved"
+        })).ok()
+        })
+        .collect::<Vec<_>>();
+    diagnostics::record(Some(&trace), "formation", &formation);
+    let command = crate::memory::api::RecallCommand {
+        query: request.query.clone(),
+        budget: request.budget,
+        caller_id: access.and_then(|payload| payload.caller_id),
+    };
+    let items = crate::memory::api::recall_context(
+        &RetrievalPort {
+            ctx,
+            request,
+            trace: Some(&trace),
+        },
+        &crate::memory::retrieval_deps::RateLimitDeps {
+            rate_limiter: &ctx.rate_limiter,
+        },
+        &command,
+    )
+    .await?;
+    let recorder = trace
+        .into_inner()
+        .map_err(|_| MemoryError::Validation("evaluation evidence recorder poisoned".into()))?;
+    Ok(diagnostics::ContextEvidence {
+        stages: recorder.stages,
+        items,
+    })
 }
 
 struct TemporalRetrievalPort<'a> {
@@ -190,6 +269,7 @@ impl crate::memory::api::TemporalContextRetrievalPort for TemporalRetrievalPort<
 async fn assemble_context_inner(
     ctx: &RetrievalContext,
     request: AssembleContextRequest,
+    #[cfg(feature = "eval-support")] trace: diagnostics::EvidenceRecorder<'_>,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let started_at = Instant::now();
     let access = AccessPayload::from_payload(request.access.clone());
@@ -323,6 +403,8 @@ async fn assemble_context_inner(
                     query_flags: &params.query_flags,
                     access: &params.access,
                 },
+                #[cfg(feature = "eval-support")]
+                trace,
             )
             .await?
         }

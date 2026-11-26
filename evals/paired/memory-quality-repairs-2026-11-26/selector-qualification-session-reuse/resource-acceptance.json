@@ -1,0 +1,8 @@
+{
+  "schema": "temporal-resource-acceptance/v1",
+  "wall_time_ms": 25000,
+  "turns_used": 3,
+  "output_tokens": 384,
+  "enforcement": "reject late or excessive Completed receipts as well as resource-exit statuses; global workflow600s separately interrupts process group",
+  "transport_cancellation_gap": "blocking MCP call is not interrupted by agent25s eligibility budget"
+}

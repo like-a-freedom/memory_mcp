@@ -1,0 +1,22 @@
+{
+  "unchanged_quality_inputs": {
+    "tasks.json": {
+      "sha256": "ef67b52381c2757ddcfe8c6fe5ec6b62583cd688d987576d356687d24d87e9d8",
+      "matches_original_bytes": true
+    },
+    "probes.json": {
+      "sha256": "d180722e59f40f7efbb6d7f4799092a3ce0f72614acfa3d8c55660f7e896ec0f",
+      "matches_original_bytes": true
+    },
+    "criteria.json": {
+      "sha256": "b309d10059e51f7c61e44f38ad07f6a59cd1a31558379b9bd24ba1d6cb93429c",
+      "matches_original_bytes": true
+    },
+    "source-first-truth.json": {
+      "sha256": "4798216630db04d1102b08d8af0f85a65be732bfc643cc6b03988abd87935f82",
+      "matches_original_bytes": true
+    }
+  },
+  "old_execution": "../selector-qualification/execution-receipts.json",
+  "new_preregistration_sha256": "a67ed94f4ce364cb3f871c324bc91f6a604a62e37819bb9d708e158d7603e0df"
+}

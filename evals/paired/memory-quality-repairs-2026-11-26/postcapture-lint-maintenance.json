@@ -1,0 +1,9 @@
+{
+  "change": "Only transpose existing cfg(test) module after eval-support production items to satisfy clippy::items_after_test_module. No function body or public contract changed.",
+  "path": "crates/memory-mcp/src/eval_support/retrieval.rs",
+  "captured_source_sha256": "85cf7247ae00d72cfd1fc1d14659680cc4c2b7bee762396955252404a62a75cb",
+  "reconstructed_pre_lint_sha256": "85cf7247ae00d72cfd1fc1d14659680cc4c2b7bee762396955252404a62a75cb",
+  "final_source_sha256": "c03f63081e1b1d0d991ab4995a63e1768d4e923063abfd84acdfdfebd47c637b",
+  "exact_before_reconstruction_matches_capture": true,
+  "initial_lint_log": "/tmp/memory-repairs-clippy-final.log"
+}

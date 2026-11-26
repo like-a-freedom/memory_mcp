@@ -1,0 +1,96 @@
+{
+  "schema_version": "memory-mcp-agent-plan/v2",
+  "plan_id": "native-qwen-autonomous-temporal-selectors-repairs-2026-11-26",
+  "stage": "development_pilot",
+  "expected_trials": [
+    {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "planned_independent_families": 4,
+  "shared_identity": {
+    "agent_runner": "openai-compatible-chat-completions",
+    "agent_version": "public Rust Chat Completions recall runner; direct local MLX; temporal qualification",
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "model_identity_protocol": {
+      "method": "same_alias_within_invocation",
+      "max_duration_seconds": 600
+    },
+    "system_prompt_sha256": "426d44ec3051ff6e5f030ed15d1ed32016e77d5318835352c07f7d8ed47aa840",
+    "task_prompt_sha256": "39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab",
+    "host_policy_sha256": "33c63d3ce29af8eb5caadb6c4f3ea303a97b70278c2a05d2f66ece7279baeeb9",
+    "transport": "stdio",
+    "retry_policy_sha256": "85bb742bbcaca80fe39c0d8e58a171c84f6e8fe80c2ed545d251ee73b5bc7e4a",
+    "reader_config_sha256": "e182dd29e1cafa0b980121839f482104fabf10da7204c9c80d037afb3c7a095c",
+    "judge_config_sha256": null,
+    "corpus_sha256": "335734d08afb4eb82910bc0c29d6e7ab0bc2fc598ee9b067644791084acdcbed",
+    "oracle_sha256": "7005a1c628c6923d0e69e2930a5bafc9b80aca575c748e442fefbecb0e69ae9e",
+    "clock_id": "macos-utc-wall-clock-v1",
+    "simulator_sha256": "69f7a95619887163a61a04d400ea15ddda9e5fe13b4f04e6ca1bcff6465da129",
+    "provider_fingerprints": {
+      "memory_eval_cli": "d1dcc7f05ce7bb2d29aaf01ceb9fd44f9322bd3e3e3d9916f5d24a762e79a875",
+      "chat_completions_endpoint_config": "ab2602be035141d9c7a9dd13ff0ba780889dc8c8778424d8e5e0ac87f7e02c7e",
+      "chat_completions_request_parameters": "0977e1dbde5e2f49bbbd489efb25434cd9d10e116c2046ee465b772d5c6a895a"
+    },
+    "context_budget_tokens": 4096,
+    "tool_call_budget": 1,
+    "turn_budget": 3,
+    "output_token_budget": 384,
+    "wall_time_budget_ms": 25000,
+    "hardware_class": "macos-arm64"
+  },
+  "incumbent_product": {
+    "revision": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+    "binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+    "product_config_sha256": "bcfa6bf1fe0bb0e7b5227b33a0ab9b73f07244acc76859b1e49f39d50e630d0f",
+    "tool_schema_sha256": "PENDING_IMMUTABLE_SCHEMA",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "candidate_product": {
+    "revision": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+    "binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+    "product_config_sha256": "bcfa6bf1fe0bb0e7b5227b33a0ab9b73f07244acc76859b1e49f39d50e630d0f",
+    "tool_schema_sha256": "PENDING_IMMUTABLE_SCHEMA",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "declared_tool_schema_change": null,
+  "bootstrap": {
+    "seed": 2026112604,
+    "draws": 10000,
+    "confidence_level_basis_points": 9500
+  },
+  "pilot_report_sha256": null,
+  "power_analysis_sha256": null,
+  "promotion_criteria": null
+}

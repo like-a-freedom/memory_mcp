@@ -784,3 +784,39 @@ fn capture_preserves_the_binding_from_public_episode_ids_to_fixed_events() {
     assert_eq!(encoded["episode_id_to_event_id"]["episode:1"], "source-a");
     assert_eq!(encoded["episode_id_to_event_id"]["episode:2"], "source-b");
 }
+
+#[cfg(unix)]
+#[test]
+fn probe_formation_and_read_use_one_process_in_a_fresh_store() {
+    use sha2::{Digest, Sha256};
+    let (directory, binary, history, requested, _) = stdio_fixture();
+    let source = std::fs::read_to_string(&binary).unwrap();
+    std::fs::write(&binary, source.replace("n=0\n", "n=0\ntrap 'printf \"exit %s\\n\" \"$$\" >> \"$SURREALDB_DATA_DIR/process-events\"' 0\n").replace("while IFS= read -r line; do", "while IFS= read -r line; do\n printf '%s %s\\n' \"$$\" \"$line\" >> \"$SURREALDB_DATA_DIR/process-events\"" )).unwrap();
+    let product = hex::encode(Sha256::digest(std::fs::read(&binary).unwrap()));
+    let store = directory.path().join("one-session-probe");
+    let capture =
+        capture_stdio_probe(&requested, &history, &binary, &product, &store, "shadow").unwrap();
+    let events = std::fs::read_to_string(store.join("process-events")).unwrap();
+    let initialize_count = events
+        .lines()
+        .filter(|line| line.contains("\"method\":\"initialize\""))
+        .count();
+    assert_eq!(
+        initialize_count, 1,
+        "fresh probe formation must not reopen a second product process for its read"
+    );
+    assert_eq!(
+        capture.observation.source_event_ids,
+        ["source-a", "source-b"]
+    );
+    let pids = events
+        .lines()
+        .filter(|line| !line.starts_with("exit "))
+        .map(|line| line.split_once(' ').unwrap().0)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(pids.len(), 1);
+    assert!(
+        events.lines().any(|line| line.starts_with("exit ")),
+        "the owning session must be closed before capture returns"
+    );
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "closed-reader-workflow-summary/v1",
+  "captures": 2,
+  "scheduled": 24,
+  "completed": 24,
+  "passed": 24,
+  "dimensions": {
+    "value_correct": 24,
+    "sources_correct": 24,
+    "abstention_correct": 24,
+    "quote_correct": 24
+  },
+  "elapsed_seconds": 158.583,
+  "by_arm": {
+    "registered_query": {
+      "scheduled": 8,
+      "passed": 8
+    },
+    "selected_query": {
+      "scheduled": 8,
+      "passed": 8
+    },
+    "fixed_sufficient_reply": {
+      "scheduled": 8,
+      "passed": 8
+    }
+  },
+  "scope": "Exposed development cases; exact source selection via public handles, not raw long-ID transcription; same product, no treatment-effect or C2 claim."
+}

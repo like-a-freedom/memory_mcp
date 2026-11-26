@@ -1,0 +1,53 @@
+{
+  "case": "dahlia-before-ingestion",
+  "revisions": [
+    {
+      "event": "dahlia-ledger",
+      "snapshot": {
+        "known_at": "2026-11-26T08:17:08.397392Z",
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "facts": [
+        {
+          "fact_id": "fact:ca412de8928fd415e5ed3564",
+          "source_quote": "The Dahlia ballast key is kept in Locker-395.",
+          "statement": "The Dahlia ballast key is kept in Locker-395.",
+          "type": "note"
+        }
+      ]
+    }
+  ],
+  "episode_bindings": {
+    "episode:6827cd768f9314bcf4f929c6": "dahlia-ledger"
+  },
+  "request": {
+    "query": "Dahlia ballast key",
+    "budget": 8,
+    "compact": true,
+    "valid_at": "2026-05-01T10:00:00Z",
+    "known_at": "2020-01-01T00:00:00Z"
+  },
+  "response": {
+    "context": {
+      "candidate_scan_truncated": false,
+      "completeness": "partial",
+      "omitted_channels": [
+        "alias expansion",
+        "experience, source episode siblings and source context neighborhoods",
+        "triples, graph edges and community summaries",
+        "semantic ANN and mutable embeddings",
+        "mutable fact access heat",
+        "legacy facts and episodes without committed revision provenance"
+      ],
+      "snapshot": {
+        "known_at": "2020-01-01T00:00:00Z",
+        "known_revision": 0,
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    },
+    "guidance": "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.",
+    "result": [],
+    "status": "success"
+  }
+}

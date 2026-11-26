@@ -1,0 +1,41 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.44s
+     Running `target/debug/memory-eval run --profile evals/profiles/pr.json --suite extraction --baseline evals/results/extraction-closed-world-2026-11-26.json --artifact evals/results/extraction-entity-repair-2026-11-26/before-v2.json`
+suite 1/1: extraction started (9 expected cases)
+suite 1/1: extraction finished (9 cases, 2044 ms)
+# Evaluation Report — pr
+
+**Verdict:** QUALITY FAILED
+**Schema:** `memory-mcp-eval/v2`
+**Run ID:** `run-1795680120`
+**Duration:** 2106ms
+**Budget:** passed
+
+## Coverage
+
+**Expected cases:** 9
+**Outcomes:** 9 (failed: 4, invalid: 0)
+
+**Gates:** 1 (failed: 0, invalid: 0)
+
+| Status | Count |
+|--------|-------|
+| Passed | 5 |
+| Quality Failed | 4 |
+| Invalid | 0 |
+
+## Suite Metrics
+
+| Suite | Total | Passed | Failed | Invalid | Metrics |
+|-------|-------|--------|--------|---------|--------|
+| extraction | 9 | 5 | 4 | 0 | entity_f1=0.7879, entity_precision=0.6500, entity_recall=1.0000 |
+
+## Gates
+
+| Suite | Metric | Observed | Floor | Baseline | Budget | Status |
+|-------|--------|----------|-------|----------|--------|--------|
+| extraction | entity_f1 | 0.7879 | 0.7000 | 0.7500 | 0.1000 | passed |
+
+profile=pr total=9 passed=5 quality_failed=4 invalid=0 duration_ms=2106
+gate=extraction/entity_f1 observed=0.7879 status=passed
+RESULT: QUALITY FAILED

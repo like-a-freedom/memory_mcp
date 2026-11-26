@@ -230,6 +230,63 @@ pub fn qualify_agent_workflow(
         if probe_successes < criteria.minimum_probe_successes {
             failed_gates.push("ordinary_independent_probe_floor".into());
         }
+        // Answer and source coverage alone cannot establish that the agent used
+        // a registered temporal boundary. Legacy ordinary tasks have no read
+        // expectation and retain their original qualification semantics.
+        let registered_reads_pass = ordinary_receipts.iter().all(|receipt| {
+            let expectation = manifest
+                .tasks
+                .iter()
+                .find(|task| task.key == receipt.key)
+                .and_then(|task| task.oracle.read_expectation.as_ref());
+            let Some(expectation) = expectation else {
+                return true;
+            };
+            if expectation.snapshot_bound_retry.is_some()
+                && !receipt
+                    .snapshot_retry_diagnostic
+                    .as_ref()
+                    .is_some_and(|retry| {
+                        retry.expectation_registered
+                            && matches!(
+                                retry.assessment,
+                                SnapshotRetryAssessment::Compliant
+                                    | SnapshotRetryAssessment::NotEligible
+                            )
+                    })
+            {
+                return false;
+            }
+            receipt.read_diagnostics.as_ref().is_some_and(|reads| {
+                !reads.is_empty()
+                    && reads.iter().all(|read| {
+                        let selectors_match = expectation.selector_arguments.is_none()
+                            || read.selector_expectation_registered == Some(true)
+                                && read
+                                    .selector_argument_matches
+                                    .as_ref()
+                                    .is_some_and(|matches| {
+                                        !matches.is_empty()
+                                            && matches.values().all(|matches| *matches)
+                                    });
+                        let valid_time_matches = expectation.valid_at.is_none()
+                            || read.requested_valid_at_match == Some(true)
+                                && read.returned_valid_at_match == Some(true);
+                        let cutoff_matches = expectation.valid_at.is_none()
+                            || receipt.known_revision_checkpoint.is_none()
+                            || read.requested_cutoff_match == Some(true)
+                                && read.returned_cutoff_match == Some(true);
+                        let annotations_match = expectation
+                            .required_claim_annotation_alternatives
+                            .is_empty()
+                            || read.annotation_match == Some(true);
+                        selectors_match && valid_time_matches && cutoff_matches && annotations_match
+                    })
+            })
+        });
+        if !registered_reads_pass {
+            failed_gates.push("ordinary_registered_read_contract".into());
+        }
         if hard_violations != 0 {
             failed_gates.push("hard_violations".into());
         }
@@ -1100,6 +1157,201 @@ mod tests {
         plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
         plan.validate().unwrap();
         (manifest, plan, probes)
+    }
+
+    #[test]
+    fn registered_temporal_read_cannot_qualify_from_answer_and_probe_alone() {
+        let (mut manifest, mut plan, probes) = four_ordinary_case_fixture();
+        manifest.schema_version = "memory-mcp-agent-tasks/v2".into();
+        manifest.tasks[0].oracle.read_expectation = Some(ReadExpectation {
+            valid_at: Some(manifest.tasks[0].seed_episodes[0].valid_at),
+            required_claim_annotation_alternatives: vec![],
+            selector_arguments: None,
+            snapshot_bound_retry: None,
+        });
+        plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
+        let first_output = tempfile::tempdir().unwrap();
+        let second_output = tempfile::tempdir().unwrap();
+        let capture = |directory: &std::path::Path| {
+            run_with_independent_probes(
+                &plan,
+                &manifest,
+                &probes,
+                &mut Agent {
+                    retrieve: true,
+                    answer: "North City",
+                },
+                &mut ControlledProbe,
+                directory,
+            )
+            .expect("public runner captures correct answers and fixed probes")
+        };
+        let (first_incumbent, first_candidate) = capture(first_output.path());
+        let (second_incumbent, second_candidate) = capture(second_output.path());
+        let report = qualify_agent_workflow(
+            &plan,
+            &manifest,
+            &probes,
+            &AgentWorkflowQualificationCriteria {
+                ordinary_stratum_id: "ordinary".into(),
+                expected_trial_count: 4,
+                minimum_task_successes: 4,
+                minimum_direct_memory_successes: 4,
+                minimum_probe_successes: 4,
+            },
+            &[
+                AgentWorkflowCapture {
+                    incumbent: &first_incumbent,
+                    candidate: &first_candidate,
+                },
+                AgentWorkflowCapture {
+                    incumbent: &second_incumbent,
+                    candidate: &second_candidate,
+                },
+            ],
+        )
+        .expect("valid captures remain reviewable despite a failed read contract");
+
+        assert_eq!(report.captures[0].candidate_task_successes, 4);
+        assert_eq!(report.captures[0].candidate_independent_probe_successes, 4);
+        assert!(
+            !report.eligible,
+            "a correct answer cannot prove the requested temporal read happened"
+        );
+        assert!(
+            report.captures[0]
+                .failed_gates
+                .contains(&"ordinary_registered_read_contract".to_owned())
+        );
+    }
+
+    struct SelectedKnowledgeRead {
+        known_at: &'static str,
+    }
+    impl PairedTrialBackend for SelectedKnowledgeRead {
+        fn execute(
+            &mut self,
+            arm: RunArm,
+            task: &PreparedPairedTask,
+        ) -> Result<PairedTrialExecution, EvalError> {
+            let mut execution = Agent {
+                retrieve: true,
+                answer: "North City",
+            }
+            .execute(arm, task)?;
+            let selectors = BTreeMap::from([
+                ("fact_types".into(), serde_json::json!([])),
+                ("as_of".into(), Value::Null),
+                ("valid_at".into(), Value::Null),
+                ("known_at".into(), serde_json::json!(self.known_at)),
+                ("known_revision".into(), Value::Null),
+                ("budget".into(), serde_json::json!(5)),
+                ("view_mode".into(), Value::Null),
+                ("window_start".into(), Value::Null),
+                ("window_end".into(), Value::Null),
+                ("compact".into(), serde_json::json!(true)),
+            ]);
+            execution.observation.read_capture_status = Some(ReadCaptureStatus::Observed);
+            execution.observation.memory_reads = Some(vec![MemoryReadObservation {
+                request_sequence: 2,
+                response_sequence: Some(3),
+                elapsed_ms: Some(1),
+                outcome: MemoryReadOutcome::Nonempty,
+                item_count: Some(1),
+                request_query_sha256: Some("b".repeat(64)),
+                non_query_arguments_sha256: Some("c".repeat(64)),
+                selector_arguments_sha256: Some(
+                    selectors
+                        .into_iter()
+                        .map(|(field, value)| (field, sha256(&serde_json::to_vec(&value).unwrap())))
+                        .collect(),
+                ),
+                selector_arguments_present: None,
+                requested_valid_at_sha256: None,
+                requested_cutoff_sha256: None,
+                response_guidance_sha256: None,
+                evidence: Some(MemoryReadEvidence {
+                    source_episode_ids: execution.observation.memory_source_episode_ids.clone(),
+                    claim_annotations: vec![],
+                    completeness: Some(ReadCompleteness::Complete),
+                    requested_cutoff_sha256: None,
+                    returned_cutoff_sha256: None,
+                    returned_valid_at_sha256: None,
+                }),
+            }]);
+            Ok(execution)
+        }
+    }
+
+    fn qualify_selected_knowledge_read(known_at: &'static str) -> AgentWorkflowQualificationReport {
+        let (mut manifest, mut plan, probes) = four_ordinary_case_fixture();
+        manifest.schema_version = "memory-mcp-agent-tasks/v2".into();
+        manifest.tasks[0].oracle.read_expectation = Some(ReadExpectation {
+            valid_at: None,
+            required_claim_annotation_alternatives: vec![],
+            snapshot_bound_retry: None,
+            selector_arguments: Some(BTreeMap::from([(
+                "known_at".into(),
+                serde_json::json!("2020-01-01T00:00:00Z"),
+            )])),
+        });
+        plan.shared_identity.oracle_sha256 = manifest.oracle_sha256().unwrap();
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        let capture = |directory: &std::path::Path| {
+            run_with_independent_probes(
+                &plan,
+                &manifest,
+                &probes,
+                &mut SelectedKnowledgeRead { known_at },
+                &mut ControlledProbe,
+                directory,
+            )
+            .expect("public runner captures selected knowledge read")
+        };
+        let (first_incumbent, first_candidate) = capture(first.path());
+        let (second_incumbent, second_candidate) = capture(second.path());
+        qualify_agent_workflow(
+            &plan,
+            &manifest,
+            &probes,
+            &AgentWorkflowQualificationCriteria {
+                ordinary_stratum_id: "ordinary".into(),
+                expected_trial_count: 4,
+                minimum_task_successes: 4,
+                minimum_direct_memory_successes: 4,
+                minimum_probe_successes: 4,
+            },
+            &[
+                AgentWorkflowCapture {
+                    incumbent: &first_incumbent,
+                    candidate: &first_candidate,
+                },
+                AgentWorkflowCapture {
+                    incumbent: &second_incumbent,
+                    candidate: &second_candidate,
+                },
+            ],
+        )
+        .expect("qualification remains independent of correct answers")
+    }
+
+    #[test]
+    fn wrong_captured_knowledge_selector_blocks_otherwise_correct_qualification() {
+        let report = qualify_selected_knowledge_read("2021-01-01T00:00:00Z");
+        assert_eq!(report.captures[0].candidate_task_successes, 4);
+        assert_eq!(report.captures[0].candidate_independent_probe_successes, 4);
+        assert!(!report.eligible);
+        assert!(
+            report.captures[0]
+                .failed_gates
+                .contains(&"ordinary_registered_read_contract".to_owned())
+        );
+    }
+
+    #[test]
+    fn matching_captured_knowledge_selector_allows_correct_qualification() {
+        assert!(qualify_selected_knowledge_read("2020-01-01T00:00:00Z").eligible);
     }
 
     #[test]

@@ -1,0 +1,33 @@
+{
+  "experiment": "two isolated actual reviewed states; no full-history or reader replay on current product",
+  "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "git_head": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+  "binary_identity": "cargo integration executable is rebuilt between phases; pre executable hash not retained; source snapshots and exact captures retained; not a release/current CLI binary claim",
+  "sha256": {
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-prompts.jsonl": "dce235eb977dbaf5f0b324d06c4f7d84d6a3d7fe184a358168568f0bf340db6b",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-prompts.jsonl": "e4243294ef3b0acbe364c22d2a9725bb62da5153bcafb991ae19d3d933a2163c",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-budget-source.rs": "a6a2230b5ad9515088d0f7f73b94297e3aaf8b6491ec5267e79a1e14429e54b8",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-repair-test.log": "699ba3f9ccc6e322cb5305ba3e92460e03ddb3bd8560c18d1cc48558e0bc1899",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/cohort.json": "1bff7f140b84eb10b124fb0495edbfd4105d8c1f6c12a4a7ce6e0457fa118cf3",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/readers.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/README.md": "4eb5fd2b43350ba1de2aaeef0a62e744e17f025ed5b85911ba3e57fd0d5d8b1f",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-repair-test.log": "e680a151cfe72cc81de5c74ee8af70dc73200e7ae793004cdf2d730dd5828216",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-report.json": "57a699227c6b5f7d6837521540171c1d8951ace3f5ff0840ed10b2d678dc1b2a",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/validation.json": "3169b28eb0d21ff0ab19a0f361787773b7aa84236a67d4ee6037e1481822254d",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-stage-receipts.json": "018e9d812c48739068cab2b255c994d67343353175236b7d91c5ac74aa541d0f",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/truth.json": "675d713634125c2339a765c03e9aba85ec8f24d6ffd56cedbee745f14f03763a",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-budget-source.rs": "9f3ee39a88e820a50b5f0c2a2a126bd4eaaa69aec01556b26ce1469275f40c34",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/archive-recheck.json": "8aa1b7908e20c5c2d95a966e8a072a2191082fb8b09825d9646bcc8b79edc6e7",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-report.json": "c8dac6bd277138ec9298af2879c15e4e6ad6370a5f24d0d524d5a382af56a1e8",
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-stage-receipts.json": "b9e935b07f03a296138d019c2cea33935f1886353c6f8d7b068bb10952777377",
+    "evals/longmemeval_v2/fixtures/reviewed-state-cases-2026-11-26.json": "8ea70842460b78ce1071ac992abeade1afb0f6e300fca2c5bb60a09a9411b9a5",
+    "evals/longmemeval_v2/long_history_diagnosis.py": "ff572a122b3e737302f57addde41964f20e3ac42fdad7eeb3bb21a1df19d97af",
+    "evals/longmemeval_v2/test_long_history_diagnosis.py": "88f60e2b9685e1c4fd623a2803fc8bb5ab6f104cd118360085f3f1176d239d2b",
+    "crates/memory-mcp/tests/long_history_stage_evidence.rs": "5beca49f909642592a3e364ab8f65f537b2f5d22deec9a2a7bf460c934d8b912",
+    "crates/memory-mcp/src/memory/retrieval.rs": "4a97d7c90ed716782c8239ba8fe6d895d73f49efc122db2c78a68cc798ebff83",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "2910a74e19a5e396f6e2bfd6d9c765657c6833ea0346d757e73ae397b5ac3a22",
+    "crates/memory-mcp/src/memory/retrieval/diagnostics.rs": "57fafe232b9f19fde9cc7ccf58ca6a1cbb7c48cedf14f77844933f79760a60c7",
+    "crates/memory-mcp/src/eval_support/retrieval.rs": "85cf7247ae00d72cfd1fc1d14659680cc4c2b7bee762396955252404a62a75cb"
+  }
+}

@@ -19,6 +19,18 @@ pub(crate) fn seed_memory(
         database_path,
         claim_rollout_stage,
     )?;
+    let seeded = seed_memory_in_session(&mut session, episodes, checkpoint)?;
+    session.shutdown()?;
+    Ok(seeded)
+}
+
+/// Form history through the caller's isolated session, retaining it for its read.
+/// The caller owns shutdown; errors retain StdioSession's drop cleanup.
+pub(crate) fn seed_memory_in_session(
+    session: &mut StdioSession,
+    episodes: &[SeedEpisode],
+    checkpoint: Option<(usize, DateTime<Utc>)>,
+) -> Result<SeedMemoryOutput, EvalError> {
     let schemas = session.tool_schemas().clone();
     let mut bindings = BTreeMap::new();
     if checkpoint.is_some_and(|(index, _)| index > episodes.len()) {
@@ -31,7 +43,7 @@ pub(crate) fn seed_memory(
         if let Some((checkpoint_index, valid_at)) = checkpoint
             && index == checkpoint_index
         {
-            checkpoint_revision = Some(read_known_revision(&mut session, valid_at)?);
+            checkpoint_revision = Some(read_known_revision(session, valid_at)?);
         }
         let ingest = session.call_tool(
             "ingest",
@@ -63,9 +75,8 @@ pub(crate) fn seed_memory(
     if let Some((checkpoint_index, valid_at)) = checkpoint
         && checkpoint_index == episodes.len()
     {
-        checkpoint_revision = Some(read_known_revision(&mut session, valid_at)?);
+        checkpoint_revision = Some(read_known_revision(session, valid_at)?);
     }
-    session.shutdown()?;
     Ok(SeedMemoryOutput {
         episode_id_to_event_id: bindings,
         tool_schemas: schemas,

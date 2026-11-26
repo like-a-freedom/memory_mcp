@@ -1,0 +1,108 @@
+{
+  "schema": "temporal-both-arm-audit/v1",
+  "eligible": false,
+  "scheduled_arm_trials": 8,
+  "passing_arm_trials": 0,
+  "missing_arms": [
+    "incumbent",
+    "candidate"
+  ],
+  "rows": [
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": false,
+      "error": "missing arm artifact"
+    }
+  ]
+}

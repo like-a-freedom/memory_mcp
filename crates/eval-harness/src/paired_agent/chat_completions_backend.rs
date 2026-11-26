@@ -313,6 +313,16 @@ impl ChatCompletionsPairedBackend {
             &runtime.claim_rollout_stage,
             &state.source_root,
         )?;
+        self.validate_session(state, &session)?;
+        Ok(session)
+    }
+
+    fn validate_session(
+        &self,
+        state: &ChatCompletionsTrialState,
+        session: &StdioSession,
+    ) -> Result<(), EvalError> {
+        let runtime = self.arm(state.arm);
         let schema_sha256 = sha256(&serde_json::to_vec(session.tool_schemas())?);
         if schema_sha256 != state.tool_schema_sha256
             || schema_sha256 != runtime.expected_tool_schema_sha256
@@ -326,7 +336,7 @@ impl ChatCompletionsPairedBackend {
                 "memory product binary changed during the local paired trial".into(),
             ));
         }
-        Ok(session)
+        Ok(())
     }
 
     fn run_phase(
@@ -608,7 +618,7 @@ impl ChatCompletionsRecallBackend {
         &self,
         arm: RunArm,
         task: &super::PairedTaskInput,
-    ) -> Result<(ChatCompletionsTrialState, SeedMemoryOutput), EvalError> {
+    ) -> Result<(ChatCompletionsTrialState, SeedMemoryOutput, StdioSession), EvalError> {
         let runtime = self.runner.arm(arm);
         let directory = TrialDirectory::create(runtime.temp_root.as_deref())?;
         let database_path = directory.path.join("database");
@@ -626,10 +636,14 @@ impl ChatCompletionsRecallBackend {
                     })
             })
             .transpose()?;
-        let seeded = crate::memory_fixture::seed_memory(
+        let mut session = StdioSession::spawn_with_claim_stage_and_cwd(
             &runtime.memory_server_binary,
             &database_path,
             &runtime.claim_rollout_stage,
+            &directory.path,
+        )?;
+        let seeded = crate::memory_fixture::seed_memory_in_session(
+            &mut session,
             &task.seed_episodes,
             boundary,
         )?;
@@ -642,7 +656,7 @@ impl ChatCompletionsRecallBackend {
             tool_schema_sha256: sha256(&serde_json::to_vec(&seeded.tool_schemas)?),
             operator_imports: Vec::new(),
         };
-        Ok((state, seeded))
+        Ok((state, seeded, session))
     }
 }
 
@@ -653,7 +667,8 @@ impl super::PairedTrialBackend for ChatCompletionsRecallBackend {
     ) -> Result<super::PreparedPairedTask, EvalError> {
         let mut input = task.clone();
         let expected_known_revision = if task.knowledge_before_event_id.is_some() {
-            let (_, seeded) = self.seed(RunArm::Candidate, task)?;
+            let (_state, seeded, mut session) = self.seed(RunArm::Candidate, task)?;
+            session.shutdown()?;
             let revision = seeded
                 .known_revision
                 .ok_or_else(|| EvalError::InvalidInput("recall checkpoint unavailable".into()))?;
@@ -673,7 +688,7 @@ impl super::PairedTrialBackend for ChatCompletionsRecallBackend {
         arm: RunArm,
         task: &super::PreparedPairedTask,
     ) -> Result<super::PairedTrialExecution, EvalError> {
-        let (state, seeded) = self.seed(arm, &task.input)?;
+        let (state, seeded, mut session) = self.seed(arm, &task.input)?;
         if seeded.known_revision != task.expected_known_revision {
             return Err(EvalError::InvalidInput(
                 "recall checkpoint differs across seeded trials".into(),
@@ -711,7 +726,7 @@ impl super::PairedTrialBackend for ChatCompletionsRecallBackend {
             validation.set(result.is_err());
             result
         };
-        let mut session = self.runner.open_session(&state)?;
+        self.runner.validate_session(&state, &session)?;
         let observation = self.runner.run_phase(
             &state,
             &mut session,

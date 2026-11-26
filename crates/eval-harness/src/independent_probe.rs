@@ -129,13 +129,12 @@ pub fn capture_stdio_probe(
         store,
         claim_rollout_stage,
     )?;
-    let seeded =
-        crate::memory_fixture::seed_memory(binary, store, claim_rollout_stage, history, None)?;
     let mut session = crate::suites::memory_decisions::stdio::StdioSession::spawn_with_claim_stage(
         binary,
         store,
         claim_rollout_stage,
     )?;
+    let seeded = crate::memory_fixture::seed_memory_in_session(&mut session, history, None)?;
     let read = read_public_probe(
         &mut session,
         input.query.as_str(),

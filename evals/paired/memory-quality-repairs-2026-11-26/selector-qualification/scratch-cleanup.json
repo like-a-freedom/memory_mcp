@@ -1,0 +1,11 @@
+{
+  "removed": [
+    {
+      "path": "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-paired-trial-31953-0",
+      "creation_time": 1795681666.0927055,
+      "capture02_log_creation_time": 1795681658.763382,
+      "reason": "sole paired trial scratch created during this terminated capture; process group already terminated"
+    }
+  ],
+  "artifact_data_directories": []
+}

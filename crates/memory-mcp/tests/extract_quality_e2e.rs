@@ -667,3 +667,136 @@ async fn url_in_a_commitment_preserves_its_canonical_subject() {
             .all(|row| row["subject"]["subject_key"] == alice.entity_id)
     );
 }
+
+#[tokio::test]
+async fn automatic_currency_amount_does_not_create_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "approved amount is $7M.").await;
+    assert!(
+        result.entities.is_empty(),
+        "an amount is a value, not an identity: {:?}",
+        result.entities
+    );
+    assert!(result.links.is_empty());
+}
+
+#[tokio::test]
+async fn automatic_reported_metric_dimension_does_not_create_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "Alice Smith reports ARR is $7M.").await;
+    let names = result
+        .entities
+        .iter()
+        .map(|entity| entity.canonical_name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        vec!["Alice Smith"],
+        "the metric dimension and value describe the named reporter"
+    );
+}
+
+#[tokio::test]
+async fn automatic_growing_metric_dimension_does_not_create_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(
+        &tm.service,
+        "ARR grew to $3M. I will send the update by Friday.",
+    )
+    .await;
+    assert!(
+        result.entities.is_empty(),
+        "a growing measure is not a named actor: {:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn automatic_email_subject_retains_named_atlas_topic() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract_with_source_type(&tm.service, "email", "Subject: Atlas follow-up\n\nAction items:\n- Alice Smith: send revised deck by Friday\n- Bob Jones: review launch checklist by Monday").await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "Atlas"),
+        "{:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn automatic_company_name_can_contain_digits() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "Studio 54 reports revenue is $5M.").await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "Studio 54"),
+        "{:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn automatic_company_name_can_start_with_a_digit() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "3M reports revenue is $5M.").await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "3M"),
+        "{:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn automatic_acronym_actor_remains_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "NASA reports revenue is $5M.").await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "NASA"),
+        "{:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn explicit_resolution_remains_available_for_currency_names() {
+    let tm = common::TestMemory::new(false).await;
+    let id = common::resolve_entity(&tm.service, "concept", "$7M")
+        .await
+        .expect("manual currency-name resolution");
+    assert!(id.starts_with("entity:"));
+}
+
+#[tokio::test]
+async fn automatic_unregistered_metric_dimension_does_not_create_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "GTV is €42.50.").await;
+    assert!(
+        result.entities.is_empty(),
+        "the measure rule must not depend on a metric or currency whitelist: {:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn metric_spelling_in_a_named_actor_occurrence_remains_an_entity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "ARR is $3M. ARR announced a launch.").await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "ARR"),
+        "admission follows each occurrence's role, not a global name blacklist: {:?}",
+        result.entities
+    );
+}

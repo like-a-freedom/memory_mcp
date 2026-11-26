@@ -1,0 +1,25 @@
+    Checking memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Checking eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+error: items after a test module
+   --> crates/memory-mcp/src/eval_support/retrieval.rs:145:1
+    |
+145 |   mod tests {
+    |   ^^^^^^^^^
+...
+164 |   pub use crate::memory::retrieval::diagnostics::{ContextEvidence, RetrievalStage};
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+165 |
+166 | / pub async fn assemble_context_with_evidence(
+167 | |     service: &MemoryService,
+168 | |     request: crate::models::AssembleContextRequest,
+169 | |     source_episode: &str,
+170 | | ) -> Result<ContextEvidence, MemoryError> {
+    | |_________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#items_after_test_module
+    = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+    = help: move the items to before the test module was defined
+
+error: could not compile `memory_mcp` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

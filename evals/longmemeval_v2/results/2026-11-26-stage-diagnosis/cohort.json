@@ -1,0 +1,24 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-text-cohort/v1",
+  "domain": "web",
+  "selection": "Pre-score bounded web cohort. Include direct positive and closed-list false-premise questions supported by the same three audited complete menu or toolbar observations.",
+  "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+  "reviews": {
+    "0c6b0c60": {
+      "trajectory_id": "4ae82e48",
+      "state_index": 5,
+      "start_line": 45,
+      "end_line": 60,
+      "span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "text_sufficiency": "The expanded menu exposes all five options and the next element is outside the menu."
+    },
+    "f61a096f": {
+      "trajectory_id": "06c70de4",
+      "state_index": 38,
+      "start_line": 58,
+      "end_line": 77,
+      "span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "text_sufficiency": "The toolbar exposes nine buttons through the final save action, followed by the next section."
+    }
+  }
+}

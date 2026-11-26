@@ -1,0 +1,356 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1795680318",
+  "profile": "pr",
+  "started_at": "2026-11-26T08:05:18.752113Z",
+  "duration_ms": 3148,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-001"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-002"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-003"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-004"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-005"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-006"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-007"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-008"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-009"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 279,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 268,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-003"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 337,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-004"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 349,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-005"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 267,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-006"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 291,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-007"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 289,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-008"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 222,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-009"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 3,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 231,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "extraction",
+      "mode": "end_to_end",
+      "total": 9,
+      "passed": 9,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "extraction",
+      "metric": "entity_f1",
+      "observed": 1.0,
+      "hard_floor": 0.7,
+      "baseline": 0.787878787878788,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "f6c2000da2691bd15cd70e5134716bbfefc859c0ae4cfad1222fbdcdfcd6a07c",
+    "git_commit": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "extraction": {
+        "expectation_policy": "entities=closed;warnings=closed;fact_types=required",
+        "fixture_sha256": "c6ade7802b00f17ca191667da5b85646b1d061e33e40063e1627c1284eb021b0",
+        "grader_source_sha256": "1f495adf8fd09c245b5f2e9766963805c25e7f2f138829afe67f5be0e640526c",
+        "label_trust": "reviewed",
+        "metric_version": "extraction-v2-closed-expectations"
+      }
+    },
+    "profile_digest": "774f2f4b836b060a645a77c04acdc0f5a405b7b6a643c3758162b74698618bd0"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

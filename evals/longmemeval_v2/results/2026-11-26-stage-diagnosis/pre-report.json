@@ -1,0 +1,148 @@
+{
+  "schema": "memory-mcp-long-history-diagnosis/v1",
+  "answer_contract": "strict normalized phrase-set equality against independently reviewed accepted answers; unlisted valid paraphrases may be false negatives",
+  "stage_contract": "full-span absence is conservative; marker presence alone never establishes semantic sufficiency; missing intermediate receipts stay unknown",
+  "selected": 2,
+  "correct": 0,
+  "complete_reviewed_spans": 0,
+  "reader_failures_with_complete_evidence": 0,
+  "latency_seconds": {
+    "observed": 2,
+    "median": 0.145279708,
+    "max": 0.2270385
+  },
+  "cases": {
+    "0c6b0c60": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "source_input": "verified_reviewed_span",
+      "formation": "complete_reviewed_span_observed",
+      "evidence_selection": "complete_reviewed_span_observed",
+      "packaging": "complete_reviewed_span_absent_at_observed_boundary",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "Past 24 hours": true,
+        "Past week": false,
+        "Past month": false,
+        "Past year": false,
+        "All time": false
+      },
+      "context_nonempty": true,
+      "context_tokens": null,
+      "context_was_truncated": null,
+      "answer_kind": "closed_list",
+      "reader_context_link": "unknown_missing_context_digest",
+      "reader_answer": null,
+      "reader_verdict": "unknown_missing_reader",
+      "failure_localization": "unknown_missing_reader",
+      "query_seconds": 0.063520916,
+      "first_observed_loss": "packaging",
+      "stage_observations": {
+        "formation": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 0.221208,
+          "source_episode_id": "episode:04adaaf926f3f01afed575de"
+        },
+        "ranked_fact_candidates": {
+          "complete_reviewed_span": false,
+          "elapsed_ms": 36.09825,
+          "source_episode_id": "episode:04adaaf926f3f01afed575de"
+        },
+        "episode_candidates": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 55.813208,
+          "source_episode_id": "episode:04adaaf926f3f01afed575de"
+        },
+        "selected_pre_packaging": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 57.68525,
+          "source_episode_id": "episode:04adaaf926f3f01afed575de"
+        },
+        "packed_context": {
+          "complete_reviewed_span": false,
+          "elapsed_ms": 63.520916,
+          "source_episode_id": "episode:04adaaf926f3f01afed575de"
+        },
+        "candidates": {
+          "complete_reviewed_span": true,
+          "boundary": "union of ranked fact and admitted episode fallback pools"
+        }
+      }
+    },
+    "f61a096f": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "complete_reviewed_span_observed",
+      "evidence_selection": "complete_reviewed_span_observed",
+      "packaging": "complete_reviewed_span_absent_at_observed_boundary",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "button '\\ue626 Back'": false,
+        "button 'Login as Customer'": true,
+        "button 'Delete Customer'": true,
+        "button 'Reset'": true,
+        "button 'Create Order'": true,
+        "button 'Reset Password'": true,
+        "button 'Force Sign-In'": true,
+        "button 'Save and Continue Edit'": true,
+        "button 'Save Customer'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": null,
+      "context_was_truncated": null,
+      "answer_kind": "count",
+      "reader_context_link": "unknown_missing_context_digest",
+      "reader_answer": null,
+      "reader_verdict": "unknown_missing_reader",
+      "failure_localization": "unknown_missing_reader",
+      "query_seconds": 0.2270385,
+      "first_observed_loss": "packaging",
+      "stage_observations": {
+        "formation": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 0.19474999999999998,
+          "source_episode_id": "episode:489a9c62e736198a82194ae3"
+        },
+        "ranked_fact_candidates": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 153.40699999999998,
+          "source_episode_id": "episode:489a9c62e736198a82194ae3"
+        },
+        "episode_candidates": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 201.12470800000003,
+          "source_episode_id": "episode:489a9c62e736198a82194ae3"
+        },
+        "selected_pre_packaging": {
+          "complete_reviewed_span": true,
+          "elapsed_ms": 218.60475,
+          "source_episode_id": "episode:489a9c62e736198a82194ae3"
+        },
+        "packed_context": {
+          "complete_reviewed_span": false,
+          "elapsed_ms": 227.0385,
+          "source_episode_id": "episode:489a9c62e736198a82194ae3"
+        },
+        "candidates": {
+          "complete_reviewed_span": true,
+          "boundary": "union of ranked fact and admitted episode fallback pools"
+        }
+      }
+    }
+  },
+  "input_sha256": {
+    "cohort": "1bff7f140b84eb10b124fb0495edbfd4105d8c1f6c12a4a7ce6e0457fa118cf3",
+    "trajectories": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+    "truth": "675d713634125c2339a765c03e9aba85ec8f24d6ffd56cedbee745f14f03763a",
+    "prompts": "e4243294ef3b0acbe364c22d2a9725bb62da5153bcafb991ae19d3d933a2163c",
+    "readers": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stage_receipts": "018e9d812c48739068cab2b255c994d67343353175236b7d91c5ac74aa541d0f"
+  },
+  "input_paths": {
+    "cohort": "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/cohort.json",
+    "trajectories": "target/c4-native/cohort/trajectories.json",
+    "truth": "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/truth.json",
+    "prompts": "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-prompts.jsonl",
+    "readers": "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/readers.jsonl",
+    "stage_receipts": "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-stage-receipts.json"
+  }
+}

@@ -95,7 +95,141 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
             best_range = start..end;
         }
     }
-    Some(best_range)
+    Some(preserve_control_block(text, query_terms, best_range))
+}
+
+// Keep a short, contiguous accessibility control group intact when the lexical
+// window intersects it. Both plain trees and JSON-escaped trees occur in episodes.
+// The source remains a byte-exact, bounded excerpt with original offsets.
+fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) -> Range<usize> {
+    struct Line {
+        start: usize,
+        end: usize,
+        depth: usize,
+        control: bool,
+        button: bool,
+    }
+    let mut starts = vec![0];
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            starts.push(i + 1);
+        } else if bytes[i] == b'\\' && bytes.get(i + 1) == Some(&b'n') {
+            starts.push(i + 2);
+            i += 1;
+        }
+        i += 1;
+    }
+    let lines: Vec<_> = starts
+        .iter()
+        .enumerate()
+        .map(|(index, &start)| {
+            let end = starts.get(index + 1).copied().unwrap_or(text.len());
+            let mut body = &text[start..end];
+            let mut depth = 0;
+            loop {
+                if let Some(rest) = body.strip_prefix("\\t") {
+                    body = rest;
+                    depth += 1;
+                } else if let Some(rest) = body.strip_prefix('\t') {
+                    body = rest;
+                    depth += 1;
+                } else if let Some(rest) = body.strip_prefix(' ') {
+                    body = rest;
+                    depth += 1;
+                } else {
+                    break;
+                }
+            }
+            let role = body
+                .strip_prefix('[')
+                .and_then(|rest| rest.split_once("] "))
+                .filter(|(id, _)| id.chars().all(|c| c.is_ascii_digit()))
+                .map(|(_, role)| role)
+                .unwrap_or("");
+            let button = role.starts_with("button ");
+            let control = button || role.starts_with("list ") || role.starts_with("listitem ");
+            Line {
+                start,
+                end,
+                depth,
+                control,
+                button,
+            }
+        })
+        .collect();
+    let mut best = None;
+    let mut index = 0;
+    while index < lines.len() {
+        let first = &lines[index];
+        if !first.button {
+            index += 1;
+            continue;
+        }
+        let mut controls = 1;
+        let mut end_index = index + 1;
+        while let Some(line) = lines.get(end_index) {
+            if line.depth < first.depth {
+                break;
+            }
+            if line.depth == first.depth {
+                if !line.control {
+                    break;
+                }
+                controls += 1;
+            }
+            end_index += 1;
+        }
+        index = end_index.max(index + 1);
+        if controls < 2 {
+            continue;
+        }
+        // Include the closing sibling, which makes the group's end observable.
+        let end = lines.get(end_index).map_or(text.len(), |line| line.end);
+        let range = first.start..end;
+        if range.len() > MAX_EVIDENCE_EXCERPT_BYTES
+            || range.start >= original.end
+            || range.end <= original.start
+        {
+            continue;
+        }
+        let score = super::lexical::lexical_query_score_for_text(&text[range.clone()], terms);
+        if score == 0
+            || best
+                .as_ref()
+                .is_some_and(|(best_score, _)| score <= *best_score)
+        {
+            continue;
+        }
+        best = Some((score, range));
+    }
+    let Some((_, block)) = best else {
+        return original;
+    };
+    let start = text.ceil_char_boundary(
+        block
+            .start
+            .saturating_sub((MAX_EVIDENCE_EXCERPT_BYTES - block.len()) / 2),
+    );
+    let end = text.floor_char_boundary((start + MAX_EVIDENCE_EXCERPT_BYTES).min(text.len()));
+    let adjusted = start..end;
+    // An explicit UI enumeration may need the entire group even when some
+    // lexical context lies outside it; other reads retain the lexical winner.
+    let enumerates_controls = terms.iter().any(|term| {
+        matches!(
+            term.as_str(),
+            "dropdown" | "toolbar" | "option" | "options" | "button" | "buttons"
+        )
+    });
+    if !enumerates_controls
+        && super::lexical::lexical_query_score_for_text(&text[adjusted.clone()], terms)
+            < super::lexical::lexical_query_score_for_text(&text[original.clone()], terms)
+    {
+        original
+    } else {
+        adjusted
+    }
 }
 
 pub(super) fn should_prefer_episode_content(

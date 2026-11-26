@@ -1,0 +1,136 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "seed_episodes": [
+      {
+        "event_id": "aster-ledger",
+        "source_id": "source-aster-ledger",
+        "source_type": "document",
+        "content": "Fact: The Aster telemetry prism is kept in Cabinet-734.",
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    ],
+    "accepted_answers": [
+      "Cabinet-734"
+    ],
+    "required_sources": [
+      [
+        [
+          "aster-ledger"
+        ]
+      ]
+    ],
+    "forbidden_sources": [],
+    "temporal_intent": "aster-current"
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "seed_episodes": [
+      {
+        "event_id": "beryl-first",
+        "source_id": "source-beryl-first",
+        "source_type": "document",
+        "content": "Fact: The Beryl geodesic spindle is kept in Drawer-268.",
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      {
+        "event_id": "beryl-later",
+        "source_id": "source-beryl-later",
+        "source_type": "document",
+        "content": "Fact: The Beryl geodesic spindle is kept in Drawer-951.",
+        "valid_at": "2026-06-01T10:00:00Z"
+      }
+    ],
+    "accepted_answers": [
+      "Drawer-268"
+    ],
+    "required_sources": [
+      [
+        [
+          "beryl-first"
+        ]
+      ]
+    ],
+    "forbidden_sources": [
+      "beryl-later"
+    ],
+    "temporal_intent": "beryl-valid-time"
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "seed_episodes": [
+      {
+        "event_id": "cobalt-ledger",
+        "source_id": "source-cobalt-ledger",
+        "source_type": "document",
+        "content": "Fact: The Cobalt calibration seal is kept in Vault-462.",
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      {
+        "event_id": "cobalt-correction",
+        "source_id": "source-cobalt-correction",
+        "source_type": "document",
+        "content": "Fact: The Cobalt calibration seal is kept in Vault-817.",
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    ],
+    "accepted_answers": [
+      "Vault-462"
+    ],
+    "required_sources": [
+      [
+        [
+          "cobalt-ledger"
+        ]
+      ]
+    ],
+    "forbidden_sources": [
+      "cobalt-correction"
+    ],
+    "temporal_intent": "cobalt-revision-checkpoint"
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "seed_episodes": [
+      {
+        "event_id": "dahlia-ledger",
+        "source_id": "source-dahlia-ledger",
+        "source_type": "document",
+        "content": "Fact: The Dahlia ballast key is kept in Locker-395.",
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    ],
+    "accepted_answers": [
+      "unknown"
+    ],
+    "required_sources": [],
+    "forbidden_sources": [
+      "dahlia-ledger"
+    ],
+    "temporal_intent": "dahlia-before-ingestion"
+  }
+]

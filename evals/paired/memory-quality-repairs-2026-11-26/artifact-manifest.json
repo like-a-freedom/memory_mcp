@@ -1,0 +1,1370 @@
+{
+  "schema": "memory-quality-repairs-artifacts/v1",
+  "note": "Final evidence/doc identities; excludes this manifest and disposable stores/bytecode. Source identities are in verification.json.",
+  "files": {
+    "crates/eval-harness/tests/fixtures/extraction_cases_v2.json": {
+      "bytes": 6634,
+      "sha256": "c6ade7802b00f17ca191667da5b85646b1d061e33e40063e1627c1284eb021b0"
+    },
+    "docs/evals/EXTRACTION_ENTITY_LABEL_POLICY_V2.md": {
+      "bytes": 2736,
+      "sha256": "e718e1b4ee5c79de07a7d6b0f46b75189c61055d5cff5ab45916b1ff2d7fc2fd"
+    },
+    "docs/evals/MEMORY_QUALITY_REPAIRS_2026-11-26.md": {
+      "bytes": 30571,
+      "sha256": "b3563635beffde6105b5c6d7dcd710e2a0623e8e5964c8f8b2e265214b2832dc"
+    },
+    "docs/evals/README.md": {
+      "bytes": 33615,
+      "sha256": "f8402297e4fdadce0b455f01bc0dd6fb08f043846f9bdc13b8704896e3eb0476"
+    },
+    "docs/superpowers/plans/2026-11-26-memory-quality-repairs.md": {
+      "bytes": 8416,
+      "sha256": "b2628713188fe40ef94cccdd8d78ada96b2fc8f64e5b1dd9838414eeb5e1efbe"
+    },
+    "evals/longmemeval_v2/fixtures/reviewed-state-cases-2026-11-26.json": {
+      "bytes": 17531,
+      "sha256": "8ea70842460b78ce1071ac992abeade1afb0f6e300fca2c5bb60a09a9411b9a5"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/README.md": {
+      "bytes": 6337,
+      "sha256": "4eb5fd2b43350ba1de2aaeef0a62e744e17f025ed5b85911ba3e57fd0d5d8b1f"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/archive-recheck.json": {
+      "bytes": 8216,
+      "sha256": "8aa1b7908e20c5c2d95a966e8a072a2191082fb8b09825d9646bcc8b79edc6e7"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/cohort.json": {
+      "bytes": 1024,
+      "sha256": "1bff7f140b84eb10b124fb0495edbfd4105d8c1f6c12a4a7ce6e0457fa118cf3"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/manifest.json": {
+      "bytes": 3860,
+      "sha256": "a90eb9a6b2d1ee95a6d5c03a862d48a24340a5fca804215d66eb69d474d5b02e"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-budget-source.rs": {
+      "bytes": 42513,
+      "sha256": "a6a2230b5ad9515088d0f7f73b94297e3aaf8b6491ec5267e79a1e14429e54b8"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-prompts.jsonl": {
+      "bytes": 4832,
+      "sha256": "dce235eb977dbaf5f0b324d06c4f7d84d6a3d7fe184a358168568f0bf340db6b"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-repair-test.log": {
+      "bytes": 108485,
+      "sha256": "699ba3f9ccc6e322cb5305ba3e92460e03ddb3bd8560c18d1cc48558e0bc1899"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-report.json": {
+      "bytes": 6158,
+      "sha256": "57a699227c6b5f7d6837521540171c1d8951ace3f5ff0840ed10b2d678dc1b2a"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/post-stage-receipts.json": {
+      "bytes": 114672,
+      "sha256": "b9e935b07f03a296138d019c2cea33935f1886353c6f8d7b068bb10952777377"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-budget-source.rs": {
+      "bytes": 41628,
+      "sha256": "9f3ee39a88e820a50b5f0c2a2a126bd4eaaa69aec01556b26ce1469275f40c34"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-prompts.jsonl": {
+      "bytes": 4811,
+      "sha256": "e4243294ef3b0acbe364c22d2a9725bb62da5153bcafb991ae19d3d933a2163c"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-repair-test.log": {
+      "bytes": 109486,
+      "sha256": "e680a151cfe72cc81de5c74ee8af70dc73200e7ae793004cdf2d730dd5828216"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-report.json": {
+      "bytes": 6176,
+      "sha256": "c8dac6bd277138ec9298af2879c15e4e6ad6370a5f24d0d524d5a382af56a1e8"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/pre-stage-receipts.json": {
+      "bytes": 114626,
+      "sha256": "018e9d812c48739068cab2b255c994d67343353175236b7d91c5ac74aa541d0f"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/readers.jsonl": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/truth.json": {
+      "bytes": 1355,
+      "sha256": "675d713634125c2339a765c03e9aba85ec8f24d6ffd56cedbee745f14f03763a"
+    },
+    "evals/longmemeval_v2/results/2026-11-26-stage-diagnosis/validation.json": {
+      "bytes": 602,
+      "sha256": "3169b28eb0d21ff0ab19a0f361787773b7aa84236a67d4ee6037e1481822254d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/README.md": {
+      "bytes": 3153,
+      "sha256": "d9f87edcd2f8f52361d7d5d5528fc84311f7526b02d2c91952ba8e47c9b2658a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/README.md": {
+      "bytes": 1587,
+      "sha256": "5cc4a272e8d4747c568840518ceaf285c889c248ebe96521d8b6c45263da9f41"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-fixed_sufficient_reply.evidence.json": {
+      "bytes": 223,
+      "sha256": "b8752f764a720b9ddcd144480c924534701a4f53ff9cd40a15be271f06275b94"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-fixed_sufficient_reply.reader.json": {
+      "bytes": 2327,
+      "sha256": "30d0fcba007a0416943ece8e53132f32d3cc2133faf15426adb747610ca10dd7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-registered_query.evidence.json": {
+      "bytes": 2265,
+      "sha256": "870d6ad6c1a7281d0b7b35e374a0938cccfdb321364c80e1e5d13c98085131da"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-registered_query.reader.json": {
+      "bytes": 4072,
+      "sha256": "30302d28ceef53401d33f738c55722d9dc77bb895b33290309ffba3c1dffffe4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-selected_query.evidence.json": {
+      "bytes": 2275,
+      "sha256": "7fb087d2634f1dfa6b2ef22a149788b06416cdf15395e7d4cb528b8bba9f71ab"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-selected_query.reader.json": {
+      "bytes": 4082,
+      "sha256": "dde07c0f180847b9d0662d080ffdcdbcd13baa959a88f0010aadad629ff541ae"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/adjacency-selected_query.selection.json": {
+      "bytes": 1290,
+      "sha256": "79b6f4c44ca12391cd8bba03d86481a6aafb5d112c6ef6110987a997d5f4577f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-fixed_sufficient_reply.evidence.json": {
+      "bytes": 220,
+      "sha256": "1a934d7ad1bb05d0bc2e69fd950782b7172ea42859101fcaf1521832eb8ab81b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-fixed_sufficient_reply.reader.json": {
+      "bytes": 2400,
+      "sha256": "5d309f5375fa3a36ecbede30670ccb68768f2f84394619af8470f389962a35c2"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-registered_query.evidence.json": {
+      "bytes": 2195,
+      "sha256": "1ec5d1e9496986f236d2957137a19f49d397a3e3ca563316fc76a2810fb5245d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-registered_query.reader.json": {
+      "bytes": 4090,
+      "sha256": "e9982d87be824e349118106c8a09573de879f3b0e2e83007efeb9018c6439e7b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-selected_query.evidence.json": {
+      "bytes": 2187,
+      "sha256": "f81e07adf428448c5085b5ea84e740148da21cb8153bf6522f4c328cac20e91f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-selected_query.reader.json": {
+      "bytes": 4084,
+      "sha256": "d907c4f122d452b5ded8bc61f2b958aa897b260c610c21029623f368cf1103a0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/closed-list-selected_query.selection.json": {
+      "bytes": 1290,
+      "sha256": "40ecc929c210d5f6b2699c32cac39ef8992f45b32ff7390f4ef3538c3d7e2abd"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-fixed_sufficient_reply.evidence.json": {
+      "bytes": 254,
+      "sha256": "08982c44479d87ba9f84583a58f70a3921978353f40117cec79a3fdec5f8bbff"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-fixed_sufficient_reply.reader.json": {
+      "bytes": 2412,
+      "sha256": "7089d274e29106ffbd83050373e00ec429fe630c39a5abcbc23b1445a3d73b2b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-registered_query.evidence.json": {
+      "bytes": 2301,
+      "sha256": "752df133286d5d2011f0a79b887a61e00e74df809e259ea79e62a3cf5bf53025"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-registered_query.reader.json": {
+      "bytes": 4159,
+      "sha256": "e2683aeb2f1a0d707fc0c8e879cfb87af80a1aec5f2d0de32e72c6b01186d876"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-selected_query.evidence.json": {
+      "bytes": 2293,
+      "sha256": "24a0bc5c04cfdb88d1dfa31dc42eb7bc55c239d1c5f40de3a53b148934b18378"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-selected_query.reader.json": {
+      "bytes": 4151,
+      "sha256": "860a95fca37b12f99927f9ae9c112baff30060fe44fd0a45f66d0f16c6c5ed29"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/count-selected_query.selection.json": {
+      "bytes": 1286,
+      "sha256": "481623ae8a1fc1b6a0edcf4f5f575921f4c76c498c17507fe16c0ccdf452fc2f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-fixed_sufficient_reply.evidence.json": {
+      "bytes": 225,
+      "sha256": "10de9bb221722425a630f23877f48989be4613194a4ce99aa49b392786976bca"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-fixed_sufficient_reply.reader.json": {
+      "bytes": 2302,
+      "sha256": "173f05b2f6146fedd4dc49e1409212ea62861abe81e4928500c72f65f6605369"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-registered_query.evidence.json": {
+      "bytes": 2284,
+      "sha256": "5b0c8e7a81606b195c70204ace6d198db6870c0551da32e360ece2f9d1df6870"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-registered_query.reader.json": {
+      "bytes": 4074,
+      "sha256": "801afa2bcd310e4a727f8092f39e39fd0dbc5166c98b20fbf0938bc43d1e4479"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-selected_query.evidence.json": {
+      "bytes": 2274,
+      "sha256": "4e03305a92b04b3e34a103964d23b0eecadc4a6abb849ce7814aff5b688ae74a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-selected_query.reader.json": {
+      "bytes": 4064,
+      "sha256": "b2c234a1b56f0a06afacb01735c00ed449023f369daf1f81c8f81c7e65658245"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/false-premise-selected_query.selection.json": {
+      "bytes": 1259,
+      "sha256": "7952ef2b802d8e8b3417a0c20cad2cefa1f940477fe3070e472a013186595f47"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/mcp.jsonl": {
+      "bytes": 83893,
+      "sha256": "69457451845bf1a2cbe2597d489ee2837b4a6d95dfc56b379d0a1f0b74d3d76f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-01/rows.json": {
+      "bytes": 11492,
+      "sha256": "99ff1b926f180efca9b8235bbeb2515c0c6bbe8cd5c1b5ed6aed5fb6e0a2a479"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/capture-script.py": {
+      "bytes": 16890,
+      "sha256": "68d3770e8a5e5d6296eea347eb7de911a6c0d3f192b2874c6faf82ea369426d1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/frozen-plan.json": {
+      "bytes": 58020,
+      "sha256": "0a495be5333d06eb8750233942e7dd2154ee4040f740ffd73d9e7148111bbfdf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/local-config.json": {
+      "bytes": 4403,
+      "sha256": "2ae2c6d148ba25be574b630b06126aa8cb244c969fd666dba137422d8846f3ed"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/preregistration.md": {
+      "bytes": 1738,
+      "sha256": "edd97b007e07f5ddd99abb71fd819b0ee3965c77e61a7b88ae40fea168e2ecef"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader/result.json": {
+      "bytes": 14453,
+      "sha256": "29ca850ed2f258e592089b4a31bfb8231f741283c5bfecca9c1dcfe250d0f470"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/README.md": {
+      "bytes": 1419,
+      "sha256": "9492c309d415f5ac6b92eaedca2a07a4966e33ea5b27a86c330677ab353a4606"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-fixed_sufficient_reply.evidence.json": {
+      "bytes": 227,
+      "sha256": "64cd0172940338b3bdb081c8f195672b53a3a0d340a64bc2682dd69dd066103d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-fixed_sufficient_reply.reader.json": {
+      "bytes": 2617,
+      "sha256": "84da01fc2b722a98b47a99f7ab91d2eccba34d3e23259a1a1709bc27928f7311"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-registered_query.evidence.json": {
+      "bytes": 2275,
+      "sha256": "9100ca2f807fce136722a49f56fc95208b1d55f9acec70ed1c568e973a42021b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-registered_query.reader.json": {
+      "bytes": 4333,
+      "sha256": "52c0d08fd72c37b1b0b97e979478babfdbf40709b59b79ea2c6dc2cdd6b1355c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-selected_query.evidence.json": {
+      "bytes": 2282,
+      "sha256": "6304aef10ebbf6ad7842f27152bb8b2b8566a3b8b2ebcad88972b6a6bd1b78b6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-selected_query.reader.json": {
+      "bytes": 4340,
+      "sha256": "c20daff147a2990abbc77611cc19843a990f3fcd79124c8305f6a481ae307a0a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/adjacency-selected_query.selection.json": {
+      "bytes": 1286,
+      "sha256": "ffbaaa9d438b90dd0efab8266d28b76e20b1305d5b63bbc70d24000b4b14e14c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-fixed_sufficient_reply.evidence.json": {
+      "bytes": 234,
+      "sha256": "968a5d44a26412799f4afa645ee6f85643acf4132a4647f0af8eafe0ce096261"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-fixed_sufficient_reply.reader.json": {
+      "bytes": 2704,
+      "sha256": "9b420e2dd8f18b911612407a85a681ca93384382dc57ad02555d64ca1b2542e3"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-registered_query.evidence.json": {
+      "bytes": 2223,
+      "sha256": "37774521c1999226a97003f6d7ae1ec02132964a82e4f39a7d066abf7d789332"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-registered_query.reader.json": {
+      "bytes": 4409,
+      "sha256": "77badd32ff3c68c1af16f033d2db1327591064c9b8c9cbb925fd44132e0e6c3f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-selected_query.evidence.json": {
+      "bytes": 2214,
+      "sha256": "0f9cd3f44d66d2011d8fbcef83380803a8bc98f5bff7fb30ba20bfacf06c2098"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-selected_query.reader.json": {
+      "bytes": 4402,
+      "sha256": "f2f839527056171d29280dfdf9b6d78e2b8e23039c0661094550484a75469cd6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/closed-list-selected_query.selection.json": {
+      "bytes": 1285,
+      "sha256": "e2a40e770e1394d79c56d763d91d95bb76e313b931dd12515f570f981e7ab95c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-fixed_sufficient_reply.evidence.json": {
+      "bytes": 255,
+      "sha256": "d4f9fe2167c3d75c90e60b4fca851a61800026831644e988b3228ca18aeda4cf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-fixed_sufficient_reply.reader.json": {
+      "bytes": 2652,
+      "sha256": "83effd02590dab3d81b59c93d39c3cd7560e124425fce40f8884dae34190f6e1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-registered_query.evidence.json": {
+      "bytes": 2346,
+      "sha256": "13cdc69fd34668b477deb4277cbe1e847e62a4e7d314b6a7a9a451bc185a33d6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-registered_query.reader.json": {
+      "bytes": 4425,
+      "sha256": "ae0e6d98ff6d06d5d28231721083fc37891877ced70b70d85f5eb3a3545f0db4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-selected_query.evidence.json": {
+      "bytes": 2336,
+      "sha256": "a292e1e88eddfffb8ace2aa5d1e429576dba6fdf2ee9b83b70fdbe8e0165445d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-selected_query.reader.json": {
+      "bytes": 4415,
+      "sha256": "f6fc1c4a9a93b4af2ba8e697fced38aad17e4489bc5b74ab10a9ff380380c880"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/count-selected_query.selection.json": {
+      "bytes": 1294,
+      "sha256": "146083928c53e724e5efe482259c887f443692ef2f9a0e3f59176ca5c91aeab0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-fixed_sufficient_reply.evidence.json": {
+      "bytes": 237,
+      "sha256": "bbe0e088ed6d8076a993ed6986146f5f9301e70ada0949acc28c75b7c05a3037"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-fixed_sufficient_reply.reader.json": {
+      "bytes": 2616,
+      "sha256": "6e7f00bed8c2d87413280353cc9926313ab2a44993bf4dbd46b1935360f04956"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-registered_query.evidence.json": {
+      "bytes": 2357,
+      "sha256": "0c9ce8c2e84ed6ec54b0c19bfe9692145e94496c9083439e340c0428d959f7c4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-registered_query.reader.json": {
+      "bytes": 4400,
+      "sha256": "0ee237e54714a01a537f0fbcaf763b70273835c3530142ae6ba42ed59205a7ea"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-selected_query.evidence.json": {
+      "bytes": 2347,
+      "sha256": "23afcba3647e9ed97ebc55c0855c8ff584df6d6e2c856b58b9c782dc5b10749a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-selected_query.reader.json": {
+      "bytes": 4390,
+      "sha256": "ec9dbc68cbca110c1d0a50064b308c9f3f3eed595c570dd3017aa7a533e80f65"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/false-premise-selected_query.selection.json": {
+      "bytes": 1271,
+      "sha256": "4e9a283c0ce584da3736556310ac59768b4c9dd6d0dff53913dc609ca3cabe6d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/mcp.jsonl": {
+      "bytes": 84558,
+      "sha256": "3cb1259a4dcd8e8fd26acb2a22fa9050d42ae1afcaf089ceda1107bde44dd7ef"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-01/rows.json": {
+      "bytes": 18122,
+      "sha256": "4bde8998498be44a93dcc34431aec23463800e4635bb220adb69b5e61460f29a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-fixed_sufficient_reply.evidence.json": {
+      "bytes": 227,
+      "sha256": "64cd0172940338b3bdb081c8f195672b53a3a0d340a64bc2682dd69dd066103d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-fixed_sufficient_reply.reader.json": {
+      "bytes": 2617,
+      "sha256": "749637bae8981c1b33cd30a287a02431fe4e3430067ce15d4e7829a0c38f036f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-registered_query.evidence.json": {
+      "bytes": 2275,
+      "sha256": "9100ca2f807fce136722a49f56fc95208b1d55f9acec70ed1c568e973a42021b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-registered_query.reader.json": {
+      "bytes": 4333,
+      "sha256": "12ca7b62c06e7b876e55ed9ecf64fd2f074511fd3dde4e5ce9e0a32bc7873289"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-selected_query.evidence.json": {
+      "bytes": 2282,
+      "sha256": "6304aef10ebbf6ad7842f27152bb8b2b8566a3b8b2ebcad88972b6a6bd1b78b6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-selected_query.reader.json": {
+      "bytes": 4340,
+      "sha256": "bff7abc7875fe95562e3668a8852f302de0275b9a20a473769cf046a4d387a5e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/adjacency-selected_query.selection.json": {
+      "bytes": 1286,
+      "sha256": "c8d4e4e16cd0e4a6192c3549ff9ce9ea10a1957717aec42d8976eb07c4e4a530"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-fixed_sufficient_reply.evidence.json": {
+      "bytes": 234,
+      "sha256": "968a5d44a26412799f4afa645ee6f85643acf4132a4647f0af8eafe0ce096261"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-fixed_sufficient_reply.reader.json": {
+      "bytes": 2704,
+      "sha256": "828c8498ad6fcd82e9445a51538b891358df820ac62e05823c7df7ac93117846"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-registered_query.evidence.json": {
+      "bytes": 2223,
+      "sha256": "37774521c1999226a97003f6d7ae1ec02132964a82e4f39a7d066abf7d789332"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-registered_query.reader.json": {
+      "bytes": 4411,
+      "sha256": "0e7454c7a08dd63596acf1bd336b30ade571837a9b518279461f1a80345be30d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-selected_query.evidence.json": {
+      "bytes": 2214,
+      "sha256": "0f9cd3f44d66d2011d8fbcef83380803a8bc98f5bff7fb30ba20bfacf06c2098"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-selected_query.reader.json": {
+      "bytes": 4402,
+      "sha256": "39a061b603919c2e60addb8436559e597c226f8c1ff7695147a6ad3c05b016b4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/closed-list-selected_query.selection.json": {
+      "bytes": 1285,
+      "sha256": "7e626ba04e132052ae186f1bfc50b960ed0f542e0d67b64e4eb803ee9d4c9eca"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-fixed_sufficient_reply.evidence.json": {
+      "bytes": 255,
+      "sha256": "d4f9fe2167c3d75c90e60b4fca851a61800026831644e988b3228ca18aeda4cf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-fixed_sufficient_reply.reader.json": {
+      "bytes": 2652,
+      "sha256": "cc1bb03f05a0fbc7a91163941c634a364ff7a32e27197a9500e1f6a61296369e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-registered_query.evidence.json": {
+      "bytes": 2346,
+      "sha256": "13cdc69fd34668b477deb4277cbe1e847e62a4e7d314b6a7a9a451bc185a33d6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-registered_query.reader.json": {
+      "bytes": 4425,
+      "sha256": "952a3621b4ec0eb2773ef391f324bedd847dffb95be682f6dbc1a22036870c7d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-selected_query.evidence.json": {
+      "bytes": 2336,
+      "sha256": "a292e1e88eddfffb8ace2aa5d1e429576dba6fdf2ee9b83b70fdbe8e0165445d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-selected_query.reader.json": {
+      "bytes": 4415,
+      "sha256": "3f7bed7ab7c633d263c71a334f5426621af8d085428074e00bdc834514ae8a3b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/count-selected_query.selection.json": {
+      "bytes": 1294,
+      "sha256": "6cb59481893f949a3fcc935b3ea237171b0478441017d92633d9a010f9ce9b3a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-fixed_sufficient_reply.evidence.json": {
+      "bytes": 237,
+      "sha256": "bbe0e088ed6d8076a993ed6986146f5f9301e70ada0949acc28c75b7c05a3037"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-fixed_sufficient_reply.reader.json": {
+      "bytes": 2616,
+      "sha256": "30cdafd9ba9f3eca30994f8493effd7c962376b4bd3ca907be815d66417649a4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-registered_query.evidence.json": {
+      "bytes": 2357,
+      "sha256": "0c9ce8c2e84ed6ec54b0c19bfe9692145e94496c9083439e340c0428d959f7c4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-registered_query.reader.json": {
+      "bytes": 4400,
+      "sha256": "a29d969791018897df028ea6d96a6189d933170e4a43128c7493810875dbda11"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-selected_query.evidence.json": {
+      "bytes": 2347,
+      "sha256": "23afcba3647e9ed97ebc55c0855c8ff584df6d6e2c856b58b9c782dc5b10749a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-selected_query.reader.json": {
+      "bytes": 4390,
+      "sha256": "a36efeedae4dac7f74107d5043f89f71d8584c5ecf4d553b7ac0f82562fc0581"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/false-premise-selected_query.selection.json": {
+      "bytes": 1271,
+      "sha256": "3382b749e2baab1d4e5bcccd798e3bddcf09103cf2cd87c0327c08381bc23979"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/mcp.jsonl": {
+      "bytes": 84558,
+      "sha256": "22ec4443c11fcb93d3e1c3d056a37ead718d0a980bf33f730daf2282e9e1f0e4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-02/rows.json": {
+      "bytes": 18122,
+      "sha256": "4bde8998498be44a93dcc34431aec23463800e4635bb220adb69b5e61460f29a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/capture-script.py": {
+      "bytes": 19335,
+      "sha256": "b8881464f28a915c5fddacce3447cec9116921829bd3f4bead1e0801d8d3da6b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/frozen-plan.json": {
+      "bytes": 58651,
+      "sha256": "91d629c32ad93301fb177d5950aac87a6590696dcf61b706b1777e9819caea18"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/local-config.json": {
+      "bytes": 4996,
+      "sha256": "d2b624a956b9243289dd3cbf419ff4a41a23da8ffa60dd0616621e01bd02fa0d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/preregistration.md": {
+      "bytes": 2423,
+      "sha256": "a46c5fd5eba9d8edc48b024e8366282f51b97ef4230b43f422b17d24eec248ec"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/registration-sha256.json": {
+      "bytes": 367,
+      "sha256": "54a54ccfe803cb2b09beec7cdf1a0ff3541cf0beaf5a44c4fc9acfacd268a688"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/result.json": {
+      "bytes": 43507,
+      "sha256": "9109758cf6d85329992dec75e148cec4382f8c4bd9a3cf7dd9dc95cf69536404"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-handles-v3/summary.json": {
+      "bytes": 685,
+      "sha256": "38ff3eea66018ebeae4df5fb5e345f207930237fb358d56fcb2ec5926dfdd875"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/README.md": {
+      "bytes": 930,
+      "sha256": "147e6e07feb5d3333e44c2dcb507233ef355f02d7686ae2d9cecce5601ba0643"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-fixed_sufficient_reply.evidence.json": {
+      "bytes": 227,
+      "sha256": "64cd0172940338b3bdb081c8f195672b53a3a0d340a64bc2682dd69dd066103d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-fixed_sufficient_reply.reader.json": {
+      "bytes": 2393,
+      "sha256": "4c9117b1e3700c28b97e90fefdadf9fa1d06972706670e45d1cfbc466148c3f1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-registered_query.evidence.json": {
+      "bytes": 2275,
+      "sha256": "9100ca2f807fce136722a49f56fc95208b1d55f9acec70ed1c568e973a42021b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-registered_query.reader.json": {
+      "bytes": 4127,
+      "sha256": "7818fc42515b1cd9b59ba0665f0dca5d383d35b7368bbb851f4b0aa4c70b83b4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-selected_query.evidence.json": {
+      "bytes": 2282,
+      "sha256": "6304aef10ebbf6ad7842f27152bb8b2b8566a3b8b2ebcad88972b6a6bd1b78b6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-selected_query.reader.json": {
+      "bytes": 4134,
+      "sha256": "72f0c108277c59696d50d8631adb2cea24d99cb6685f2ad554050874f984a16c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/adjacency-selected_query.selection.json": {
+      "bytes": 1286,
+      "sha256": "e20c00d75e45eef8b50cfae995b2347493be9a2f7758163af9a5e2c93a1cad38"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-fixed_sufficient_reply.evidence.json": {
+      "bytes": 234,
+      "sha256": "968a5d44a26412799f4afa645ee6f85643acf4132a4647f0af8eafe0ce096261"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-fixed_sufficient_reply.reader.json": {
+      "bytes": 2489,
+      "sha256": "ca44f4efd604862bda7b3850f5ad6ddbb04f2e27e5214009205144f8a5968dee"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-registered_query.evidence.json": {
+      "bytes": 2223,
+      "sha256": "37774521c1999226a97003f6d7ae1ec02132964a82e4f39a7d066abf7d789332"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-registered_query.reader.json": {
+      "bytes": 4194,
+      "sha256": "67c83f06da2d9f3bfa44e8eb28a69748a6354eaa66a2f36045a1e0fb7f818bd7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-selected_query.evidence.json": {
+      "bytes": 2214,
+      "sha256": "0f9cd3f44d66d2011d8fbcef83380803a8bc98f5bff7fb30ba20bfacf06c2098"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-selected_query.reader.json": {
+      "bytes": 4187,
+      "sha256": "083fb517bf70aa76458d08b6e8087bd3646a2c014ed4e18a04497805b5d3d98d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/closed-list-selected_query.selection.json": {
+      "bytes": 1286,
+      "sha256": "065cb4e1e17f5317b149fc1b57b1d2a926e3e52587aff4f364c058db382ce241"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-fixed_sufficient_reply.evidence.json": {
+      "bytes": 255,
+      "sha256": "d4f9fe2167c3d75c90e60b4fca851a61800026831644e988b3228ca18aeda4cf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-fixed_sufficient_reply.reader.json": {
+      "bytes": 2436,
+      "sha256": "44f9d958bd1d742090831576b8de2d072deb22b5c687b41e6874ac9504db03e8"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-registered_query.evidence.json": {
+      "bytes": 2346,
+      "sha256": "13cdc69fd34668b477deb4277cbe1e847e62a4e7d314b6a7a9a451bc185a33d6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-registered_query.reader.json": {
+      "bytes": 4234,
+      "sha256": "f8f5384e418c306e0dd6e964bde7684e50928c260a20ff40fb45c45f7d07aa40"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-selected_query.evidence.json": {
+      "bytes": 2336,
+      "sha256": "a292e1e88eddfffb8ace2aa5d1e429576dba6fdf2ee9b83b70fdbe8e0165445d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-selected_query.reader.json": {
+      "bytes": 4224,
+      "sha256": "0c27162c0f5a1d5e2b28b718e2326707b78c9cbcd524b9508c166ff34d590831"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/count-selected_query.selection.json": {
+      "bytes": 1294,
+      "sha256": "7c3d1847afb0c9c7b1f4d33e3b0f2c78ce29f078ac48c9d2b2561876ed59f8d1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-fixed_sufficient_reply.evidence.json": {
+      "bytes": 237,
+      "sha256": "bbe0e088ed6d8076a993ed6986146f5f9301e70ada0949acc28c75b7c05a3037"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-fixed_sufficient_reply.reader.json": {
+      "bytes": 2400,
+      "sha256": "8ff10102e75807ac6b2965422730ab97b426b23f2f21e76f3cf8fec72f77a8c1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-registered_query.evidence.json": {
+      "bytes": 2357,
+      "sha256": "0c9ce8c2e84ed6ec54b0c19bfe9692145e94496c9083439e340c0428d959f7c4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-registered_query.reader.json": {
+      "bytes": 4184,
+      "sha256": "7875d2130b78e79bbc88a1c870f7a5ec928e58755a68f558cbecb19c92644158"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-selected_query.evidence.json": {
+      "bytes": 2347,
+      "sha256": "23afcba3647e9ed97ebc55c0855c8ff584df6d6e2c856b58b9c782dc5b10749a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-selected_query.reader.json": {
+      "bytes": 4174,
+      "sha256": "0b792830d6f33a62c1a8c2c4afcbb018d884089ad35bb950b02057e26357d349"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/false-premise-selected_query.selection.json": {
+      "bytes": 1271,
+      "sha256": "1c6868aa8a2ab1e1bf09566550f0c0064d44f0ec924a9d88f79b1456236a91b7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/mcp.jsonl": {
+      "bytes": 84556,
+      "sha256": "2d583fd06cf010ad2a3cf79a476411bc5699de8bfa7239fb3f48ab0ca2152ac2"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-01/rows.json": {
+      "bytes": 16076,
+      "sha256": "6a90b19af8253f34708af6ad54528a7d804b94b623881f92e9fbc985de167106"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/capture-script.py": {
+      "bytes": 18179,
+      "sha256": "f53cfc3a4a3dc416bdf0a3cdbee5b21ad23bd963c45d9ec5ecd749fe7a734804"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/frozen-plan.json": {
+      "bytes": 58336,
+      "sha256": "c03861dfa6c3f78e1dbe0d36d4f3ecbdb4c412eafbb2180eb682785ad7ebfd3d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/local-config.json": {
+      "bytes": 4681,
+      "sha256": "07b36b05ac0671c883a86eedc6dbede849f5d98bbf20defb8ee69b307916e813"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/preregistration.md": {
+      "bytes": 2076,
+      "sha256": "60e7ad7181ab1bbd8f1954d6407559365429a40e59e39d42cbdc285809e6e77c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/registration-sha256.json": {
+      "bytes": 367,
+      "sha256": "319aaa925bee5eaa4c3afc050a433b059f630ff7a2493d418cc43e65dfc35854"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/closed-reader-source-span-v2/result.json": {
+      "bytes": 19480,
+      "sha256": "f17757200c80360222cc56022c0afe6f3d7a775591481cf3a8440ef52197121c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/model-assets-after.json": {
+      "bytes": 2089,
+      "sha256": "075e5df6b517473b36cb2d61d6ad4d9af109a07aa3746cadac4d445ac6b5bc50"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/model-assets-before.json": {
+      "bytes": 2141,
+      "sha256": "75acc7e5e43e6e346f9c1ab6875a28e0ed35e245bdbdf8d708582228d49915d7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/README.md": {
+      "bytes": 787,
+      "sha256": "414936c455180dcd90a8491ad7f26276b74b7cb113e18415b79ceb4fb62645e7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/index.json": {
+      "bytes": 16780,
+      "sha256": "7c59b9141ddcc79fcddb7c1f7586a87095c5dd64bb39970bf816d238073815d0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-absent-target.json": {
+      "bytes": 81183,
+      "sha256": "d8a273fffb4785cc00897483f3e4fe488fcfb7064d99ce43840ad86a44eed29f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-current-snapshot.json": {
+      "bytes": 92131,
+      "sha256": "6feca42c7d562a5224078495e9a239c70d039408b447e919901d34b525ea0f94"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-ordinary-location.json": {
+      "bytes": 93768,
+      "sha256": "53a996e59b77ca8693cdb43bc8916b48008aeb25ad5d4d0285534744dff46d77"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-peer-conflict.json": {
+      "bytes": 113774,
+      "sha256": "c3c6b44779d0ee669b8e2bd3c93699266f541ad3737be5e0831c6284aba23592"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-prior-knowledge.json": {
+      "bytes": 112023,
+      "sha256": "c9a3fda43092c8d5fc7ec30a3b898afb7285d12fb2015d685a87b4fc167f2fb5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-similar-name.json": {
+      "bytes": 101407,
+      "sha256": "75f82d7fca21a4143be0e0e612590d2267f136c7bee6bc6d805d6e96abd06b75"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-unverified-correction.json": {
+      "bytes": 116010,
+      "sha256": "6e7c22dd6d8217b4617718f29d60bca03cb80e3b57c446803e363e00e752b135"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/receipt-v10-valid-boundary.json": {
+      "bytes": 94569,
+      "sha256": "30bffe2a4bed6d15e3b463379858dba38c32c69420a92b409cb4dbef66e31343"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/run.json": {
+      "bytes": 13972,
+      "sha256": "5d9000e9c3ddd4c931c99dff8c021c9bcf1083dd853a41ba636f430ec95ebac9"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/stderr.log": {
+      "bytes": 127,
+      "sha256": "3c07013291cc9b81bbd085302cc9a4ee4b955ebbfc0d512faf0f3d259d92fb17"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate/current/stdout.log": {
+      "bytes": 811,
+      "sha256": "9c41c5bb742eab5c1bc9cea46533c61165faba7a1baa752ca23b4a93093f72d0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/index.json": {
+      "bytes": 16780,
+      "sha256": "f9786356c17a043f89c93c80234ac7587b29082605bbb8883051744bbc5dd171"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-absent-target.json": {
+      "bytes": 81183,
+      "sha256": "9de3364a64708033b3c0191870e6140b1491e25d596ab1949a7ceffa698e24e5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-current-snapshot.json": {
+      "bytes": 92131,
+      "sha256": "9b30be7691b38f865c25e3e80996f86948c68daf0db405500ede4a4a9bd53b7f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-ordinary-location.json": {
+      "bytes": 93763,
+      "sha256": "6fdf6c8f774a78d723dbb027774a49252520f282266ea2b2582c95acb3f73a0a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-peer-conflict.json": {
+      "bytes": 113774,
+      "sha256": "aa8d182a9dc39654da59293c0c6c3945ddc4500c186e1509bfdf5ce2873c39d3"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-prior-knowledge.json": {
+      "bytes": 112021,
+      "sha256": "91dd9e9efd4b0c91bcc8e9d2f3e6ffaa1c306f828b8030442c6c7c20f111aee7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-similar-name.json": {
+      "bytes": 101407,
+      "sha256": "dfa9fb58939582e08dc8a0c14c716b85f6f9dd1b1eefe756ec37217410ef401c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-unverified-correction.json": {
+      "bytes": 116009,
+      "sha256": "b742c4f8ae59f25a7bc45826967e1237d72416ce57151a35ae3390dd7568d3dd"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/receipt-v10-valid-boundary.json": {
+      "bytes": 94566,
+      "sha256": "b438516735df0b86a8ab0cc05aa3e70d9247b9604585728155135da27a8a3974"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/run.json": {
+      "bytes": 14013,
+      "sha256": "6253298fdfecfbbd44a436855aa6292c687cc50260738617eb2bb848c73fc8a5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/stderr.log": {
+      "bytes": 127,
+      "sha256": "9b0c350a28f422102ad6c893ce8e61bbb7c3eaa158f003eb9ace2741658b595d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current/stdout.log": {
+      "bytes": 811,
+      "sha256": "2df7ba8d0a55bc74fc32490c64700337986cb00424cceec8cef67852d85fa17c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/current-regression.json": {
+      "bytes": 5526,
+      "sha256": "28fc749e68367b307a0527eebfa7900ac0615e93162ccf486d0d51e8090e259e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/native-gate-final/final-runner-regrade.json": {
+      "bytes": 5406,
+      "sha256": "834503093d32f50982df1882a95cc6d17abc7ff1a5a34745b5ad05ca068513e5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/postcapture-lint-maintenance.json": {
+      "bytes": 653,
+      "sha256": "01698d23eaae8357428a42d2d1a88b27cd7b21873bd9cfe25ec4b9d9d6b0b5ea"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/reader-offline-regrade.json": {
+      "bytes": 1294,
+      "sha256": "a9223fb9259877fbd2a666defe92cdbcafd54c4220f1974c773573930eedd6b3"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/scratch-cleanup.json": {
+      "bytes": 970,
+      "sha256": "90ccef63ad1a922d3a071eaa85e3c4e28f19f2f10f8e2d756a7ae8128a395ae5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/README.md": {
+      "bytes": 6189,
+      "sha256": "b2f37b4a6ea78c463092901e0b784038840816e981ff5d8936fa85b9da403708"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-01-v2.json": {
+      "bytes": 3885,
+      "sha256": "c49d7eb0ff107f8c9202cf29971982eaed99824d6335578826374cee5ffe5527"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-01-v3.json": {
+      "bytes": 3988,
+      "sha256": "6c4324e9447c84c3cf80225e00ccdc2a009aba72ebf5afe825e1db2eb5e0db6e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-01.json": {
+      "bytes": 3885,
+      "sha256": "30b9cc1b80a4e872baa713f0935b844bda597ae3a17e0d8a144b4571fd1e3524"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-01.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-02-v2.json": {
+      "bytes": 2616,
+      "sha256": "386da95d6500caadc99215b4061a50d8c83594100e88141c5449f41c88862991"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-02.json": {
+      "bytes": 2616,
+      "sha256": "35263dc16a7a1f2e471f62b53a29c02ec57c060fa8004f28639e07c874a485fe"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit-02.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit_capture.py": {
+      "bytes": 5849,
+      "sha256": "4fcbc0647c887e17aad86fd8ff78400d40201fc88b8e92b1f3a68098eddf663b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit_capture.v2.py": {
+      "bytes": 6146,
+      "sha256": "08b9b219ed758216811d022b4711f7f684461897e23a2419384b7c2adbac530f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/auditor-v2-correction.json": {
+      "bytes": 1159,
+      "sha256": "fff6d0935c90a10d3a98c673f96901c96a0d21b1fe27e9088b18fbdb06e38a63"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/auditor-v3-follow-up.json": {
+      "bytes": 572,
+      "sha256": "951d248cf3158aa31271c871bfd0249e6c21a44e229645183bed41772ebb9a77"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/candidate-receipts.jsonl": {
+      "bytes": 12034,
+      "sha256": "13acfeac14b2740b86ad81c56e0a51a4733f4b12e873ed92eebeeb7fb7841896"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/candidate.json": {
+      "bytes": 21696,
+      "sha256": "821e5101f051ee2ceb397ca4d119c0f3ebc7f9f85562fcb63f78c0f6149d7527"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/incumbent-receipts.jsonl": {
+      "bytes": 12036,
+      "sha256": "c6aba99de9fcc9a0434753acf43109274e5b91e76d43f9a383e26b8ca4a432ce"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/incumbent.json": {
+      "bytes": 21698,
+      "sha256": "f7392c3232829edd75a776db8caa06b884456bba34ed92eda6e792564f25454b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/independent-candidate.json": {
+      "bytes": 45801,
+      "sha256": "0f27d6f7c1d787d5f492a73f760c07862206bf7674e5fb100e50370481687321"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01/independent-incumbent.json": {
+      "bytes": 45803,
+      "sha256": "fd7b6a86a4837d47b1e5a47eaa40b7a9e76cd4fe6a83054ca35df2730eaaed3f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-01.log": {
+      "bytes": 212,
+      "sha256": "c8456822d3b13147336aa8ec30c9b32deb9be4e2ebf9ca48423f32e5d2e155da"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-02/candidate-receipts.jsonl": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-02/incumbent-receipts.jsonl": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/capture-02.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/criteria.json": {
+      "bytes": 172,
+      "sha256": "b309d10059e51f7c61e44f38ad07f6a59cd1a31558379b9bd24ba1d6cb93429c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/decision.json": {
+      "bytes": 2535,
+      "sha256": "3340cc88e84262c95b3f5cd5dfc3a257613a04139fff90b50a79cda64b33a33e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/execution-receipts.json": {
+      "bytes": 3507,
+      "sha256": "c454c8d815ac84332a36050c33e38b6c1470648f1c390edf5ecadd9268b25220"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/freeze-manifest.sha256": {
+      "bytes": 918,
+      "sha256": "25de7c6243e993c912674ccdca2995b4893b97e22476d78d32037605d642e8e6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/immutable-identity/identity.json": {
+      "bytes": 182,
+      "sha256": "f81ad79ea050e702c1cafadc22f3e351ecf5b2ad7b506607573af7524783442e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/immutable-identity/mcp.jsonl": {
+      "bytes": 38651,
+      "sha256": "050c301ee66b9027784548c7812d92d3cfbc7826fb5315b2f4be21c3ccc61538"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/immutable-identity/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/launch-profile.json": {
+      "bytes": 216,
+      "sha256": "bcfa6bf1fe0bb0e7b5227b33a0ab9b73f07244acc76859b1e49f39d50e630d0f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/aster-current/mcp.jsonl": {
+      "bytes": 47531,
+      "sha256": "ad28a6c137d0eb0d14949fab9577038fb8b7e0aed7a6e95ccd2f46ad1cfa849e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/aster-current/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/aster-current/summary.json": {
+      "bytes": 2298,
+      "sha256": "b45b6bc31693268242a379f409823e6b2d2665b2e24d739b27ddecb0df45bfdf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/beryl-valid-time/mcp.jsonl": {
+      "bytes": 54343,
+      "sha256": "86460d9415fc2baaa2ae172d6652039a6aac9d46b70055f6de7e46e3f7692abc"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/beryl-valid-time/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/beryl-valid-time/summary.json": {
+      "bytes": 2945,
+      "sha256": "edea8c448b02471eaea0823a21e792c33fa936168e68b4469931b8fe3120faf5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/cobalt-revision-checkpoint/mcp.jsonl": {
+      "bytes": 57442,
+      "sha256": "0391981eceaa9e7ae4d3fcf47549d91e0ea284f78c15a5adffe6149fd7884ded"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/cobalt-revision-checkpoint/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/cobalt-revision-checkpoint/summary.json": {
+      "bytes": 2996,
+      "sha256": "a815bc27bf4e112d91f1418b7ca1beeec9146cf74de2ff460ded53be9cf3a21b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/dahlia-before-ingestion/mcp.jsonl": {
+      "bytes": 47278,
+      "sha256": "dc872f6c5b08f90a1409a4df6948ba3f44e568b8c20abd4b574c2825324e401a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/dahlia-before-ingestion/mcp.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/dahlia-before-ingestion/summary.json": {
+      "bytes": 1895,
+      "sha256": "d4efaa97d901d74d421978f359671a390829bddc0eb334455a18aa3dbaa35933"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/native-preflight/summary.json": {
+      "bytes": 10773,
+      "sha256": "db7ebe8bbf55e30cb6235cb34dfd50fbdc13f4f75f6821f8efcdd2e0d586c903"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/plan.json": {
+      "bytes": 3912,
+      "sha256": "6f215c15835eee9f014d0a1989933dd30e67fe7750a3934ff5b0999eed383631"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/plan.preflight.json": {
+      "bytes": 3308,
+      "sha256": "2da81f3db2a01c4256d1adabd0f6317c02978d95202fbe700a21da43890d502d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/plan.ready.json": {
+      "bytes": 3825,
+      "sha256": "4743bfd5c95a4869831d7014418a3a98c9f61831685a24287a79915de05b7707"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/preregistration.md": {
+      "bytes": 5526,
+      "sha256": "33c63d3ce29af8eb5caadb6c4f3ea303a97b70278c2a05d2f66ece7279baeeb9"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/probes.json": {
+      "bytes": 4503,
+      "sha256": "d180722e59f40f7efbb6d7f4799092a3ce0f72614acfa3d8c55660f7e896ec0f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/probes.preflight.json": {
+      "bytes": 5236,
+      "sha256": "4dcdfc43d0254693fbff02287c8c6ff194ea8a1148cfd8c02bc65f2a2b3f466b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/0b9f1cf889c6b8cd6eb79e05070e57d4d254eb0fb3d0ca52f9052c7ad3d91fc1.json": {
+      "bytes": 4396,
+      "sha256": "561221a9703f3759e13111e4993281f42c0a03e8cb4544bb99dbad084383173f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/30dd2ae89fde35c7e45ed78bb00b773a5abec7a5542e168e6602864d3b1888ce.json": {
+      "bytes": 4396,
+      "sha256": "be697ca6cd6a636a4da8a858df08b9b4a23cfaf83518ce5a30801226374a466f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/5edead73115e1235a7022df5017f2c544549c60f7d9a45a8c53f685f8b69b251.json": {
+      "bytes": 3620,
+      "sha256": "1c652f5ddda56bf22f475abc0a662d69a42d86c69bb6ce8e89a439d32a527ec5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/7204a6e849f497d256ba3dbd34554dbf95d145bf81325239916920e48977bb42.json": {
+      "bytes": 4754,
+      "sha256": "a326d063c2377784ac31bed014a88f054332981251885ca74061423bc505f110"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/7b82e218be9fcf361361a8779fae5d35bfa277b8687d30f1cc31112051de35d5.json": {
+      "bytes": 4754,
+      "sha256": "664794d5304375ab9dcdac7c1616df4722425189d60f7050b9f223e1af9d6e2f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/88010a7045ff4519690ec30b624b8295c61d64f4357d64dcccb57f6bf1ba83e1.json": {
+      "bytes": 4707,
+      "sha256": "fbea0d9b4eef37f17a39c12090f916f12acc5ec625132227d447d11b113741be"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/a63c85e1022d9bcad5da2ce50814cf4ebb2113b42803b1e67eb97bd4468319fa.json": {
+      "bytes": 4707,
+      "sha256": "6e21f99c0c25541901e5bfc9ddebcab9797955d36081a5ac6aa5c67fa64769ba"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/public-traces-01/e405e2b77790bb974f63ef6e89453da92418e2320d60900e06ca91087c26377d.json": {
+      "bytes": 3620,
+      "sha256": "e0d36ae5b46613f10c2fd31092d797213ab4c6879f27dd34148f4c0601494b8f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/request-parameters.json": {
+      "bytes": 65,
+      "sha256": "d0884f217d7d3661f19a7596c4aafdaed3ee34e259fa57b93e386c714da740b0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/runner-policy.json": {
+      "bytes": 229,
+      "sha256": "85bb742bbcaca80fe39c0d8e58a171c84f6e8fe80c2ed545d251ee73b5bc7e4a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/scratch-cleanup.json": {
+      "bytes": 380,
+      "sha256": "a8252048c8e107867dd740e80ef7670b92b90f02243fb9709c195896393ea9a0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/source-first-truth.json": {
+      "bytes": 3329,
+      "sha256": "4798216630db04d1102b08d8af0f85a65be732bfc643cc6b03988abd87935f82"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/tasks.json": {
+      "bytes": 6669,
+      "sha256": "ef67b52381c2757ddcfe8c6fe5ec6b62583cd688d987576d356687d24d87e9d8"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/tasks.preflight.json": {
+      "bytes": 6669,
+      "sha256": "a6076f91f452f468ea51cb1346a37a5e6aadc0b667d79d3a487e1125631b3699"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/test_audit_capture.py": {
+      "bytes": 5030,
+      "sha256": "f18c4fe333201427a3be4f698214f2adabda7d129592b541456691bed90a5973"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/test_audit_capture.v2.py": {
+      "bytes": 5870,
+      "sha256": "57f7ae8b46e297568bf9251a916f68a4a32ba5219c9dad4f92cfb7dbe0c7f85d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/README.md": {
+      "bytes": 6984,
+      "sha256": "5e573552d58239608176c8ae4247931cbe118e007df693b74d4156f7512ddd5d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/audit-01.json": {
+      "bytes": 3988,
+      "sha256": "6c4324e9447c84c3cf80225e00ccdc2a009aba72ebf5afe825e1db2eb5e0db6e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/audit-01.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/audit-02.json": {
+      "bytes": 3988,
+      "sha256": "6c4324e9447c84c3cf80225e00ccdc2a009aba72ebf5afe825e1db2eb5e0db6e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/audit-02.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/auditor-v3-resource-enforcement.json": {
+      "bytes": 928,
+      "sha256": "cf62290dbbfe2e853bb88bef5a60e6d66a736ebb4d96973f129a559f0ea262a6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/candidate-receipts.jsonl": {
+      "bytes": 12034,
+      "sha256": "02bbbdb2f654df29c275ecddbac1e02b8b96c672eb7a83a74695711a147c81df"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/candidate.json": {
+      "bytes": 21724,
+      "sha256": "ac2fcc4a1e6dc7c5ac14c37e57e13dede03dc5299c79bc11a4c17eff61f8ede5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/incumbent-receipts.jsonl": {
+      "bytes": 12034,
+      "sha256": "4a9bdbeca4679abfd2ddeadbf1227feda8f8251e784d52dcd07d425f3ba6140c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/incumbent.json": {
+      "bytes": 21724,
+      "sha256": "46e036d2c13d72f7597fb92b1f1d353dac8ebf7f7ebb5f7b17673af8fdceeded"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/independent-candidate.json": {
+      "bytes": 45831,
+      "sha256": "43017013cf2df1860a1b5ad75cae3a1e7285383a0850a8d0a8bb6e58b5227067"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01/independent-incumbent.json": {
+      "bytes": 45831,
+      "sha256": "2a36b3955fb34fde8b978800d372295ab07205f681420f86ef7106f30b5842ef"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-01.log": {
+      "bytes": 226,
+      "sha256": "fc9b55cc486e3b110551aa203c260a24df9fff68511049334814db4fb46336e4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/candidate-receipts.jsonl": {
+      "bytes": 12035,
+      "sha256": "46efb12d96511397fe70508e7ae106c63a97f19b5dd80f1812ce049cbf1e2c89"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/candidate.json": {
+      "bytes": 21725,
+      "sha256": "eef5e9adb7b1e3d32d93b1b0306abb63e33d76df61d89a73f7d1a1bc58fe26b6"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/incumbent-receipts.jsonl": {
+      "bytes": 12034,
+      "sha256": "666335b5c136901237da4315853719475dabd6e09658df85ea6ded5df26df5e3"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/incumbent.json": {
+      "bytes": 21724,
+      "sha256": "58643b06ae4824ddd7096b11d907f4d3219dd53e090926d4ccabb4b6100eff7a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/independent-candidate.json": {
+      "bytes": 45832,
+      "sha256": "9c45368013c5bd510316dc8a16b80d7a6e5b76c545d5c8f37dc594a322a672c4"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02/independent-incumbent.json": {
+      "bytes": 45831,
+      "sha256": "a2acf46253ae0fce02baf70682865cc042ed0b29715241ccc0e0f8158651860f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/capture-02.log": {
+      "bytes": 226,
+      "sha256": "270b2050e855d315e517a8f4e4965378cd3ac2ecd061f0b01cf53bcab7fa8089"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/criteria.json": {
+      "bytes": 172,
+      "sha256": "b309d10059e51f7c61e44f38ad07f6a59cd1a31558379b9bd24ba1d6cb93429c"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/decision.json": {
+      "bytes": 4465,
+      "sha256": "0973a42263fb95763e0f93cb00cde025f0613a094022e4ef54ccbe8ed1eaec70"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/execution-contract.json": {
+      "bytes": 1068,
+      "sha256": "56096d18ebe14793f4b3eb95a6adfeb15530e419a48dc9a53f9a62c89adf000a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/execution-erratum.json": {
+      "bytes": 820,
+      "sha256": "09bf517046cc4eea4cb2c0ae90e05079b2e2d996d20facd021e6eb0a0a85c9c5"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/execution-receipts.json": {
+      "bytes": 5317,
+      "sha256": "8af2d49057b1bc2b19129cd693632a56ea17828adf30d834687f90d13b201f2d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/freeze-manifest.sha256": {
+      "bytes": 2013,
+      "sha256": "3115cdbb1091133f88020a95c1b6f5fded213e99c96d2beb2f66dc25aed00e87"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/launch-profile.json": {
+      "bytes": 216,
+      "sha256": "bcfa6bf1fe0bb0e7b5227b33a0ab9b73f07244acc76859b1e49f39d50e630d0f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/plan.json": {
+      "bytes": 3968,
+      "sha256": "1fd909130796ca84d2e78fbc81bcb5d50d128dabaa2ccbc4306fca2bf8be3723"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/plan.preflight.json": {
+      "bytes": 3830,
+      "sha256": "6c8577d496fe346e76522dca4c0dfb438e9ad19a80e854fc728ea52a09a6912a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/preregistration.md": {
+      "bytes": 4791,
+      "sha256": "a67ed94f4ce364cb3f871c324bc91f6a604a62e37819bb9d708e158d7603e0df"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/probes.json": {
+      "bytes": 4503,
+      "sha256": "d180722e59f40f7efbb6d7f4799092a3ce0f72614acfa3d8c55660f7e896ec0f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/024176c04987c8d7e80197b34c12ecc8335fa7ba735826b76f27dbe7cb6e62bf.json": {
+      "bytes": 3620,
+      "sha256": "dd96bdc3e88821386bd14e50f4d3d82487f816e4138368883e2c0149a857d777"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/42227392a50bd559891751dd446df25b9727ccea37839e4ad9963f55c56108d6.json": {
+      "bytes": 4396,
+      "sha256": "34193c706e62edcb955e4e9daa1852f274215977cb341b109eb338e74f92532b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/66bb08111789cb9ef18eed78e478bd754e38e702ab6412089183f4774ff7f3c9.json": {
+      "bytes": 3620,
+      "sha256": "e825a95ba2a60bb91407845ca263248bf9c17c56778ac7d1a96033d599730d03"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/68a2bed34fb2321b1c659b758eec189e7a3f2f3b0182aa1a46121cd16805b2a6.json": {
+      "bytes": 4754,
+      "sha256": "7c855cd977cc2915126a3667eb94ecfb345b2b8a8638e0ab10396d074cf9ad29"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/7fcd7aa9c34d53e444f8fb3718679baa0fb8d8f5fc9749030d1ba6e1904b801d.json": {
+      "bytes": 4396,
+      "sha256": "df3e1a8b4908ed0978d2e043b75a9ca42927c1068751a713d740821b88fbf241"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/8e1390de7a9320e325dd7a8fc9c5375cc1c70744d74262f076a5adffd329106c.json": {
+      "bytes": 4754,
+      "sha256": "49fc0f425144e1c0191450f6a6e869d491decf03ba8110d612dff171cf67c9a7"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/d4ae102a3ada48d55b5e6013cfadda9474699c8e4926668c37f855e3197b0a51.json": {
+      "bytes": 4707,
+      "sha256": "41563488f1f85eb2e199544f7b6d0a70061f79387d822557b7b31d26d552151b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-01/f8ea5938532add6e2c44d3e6a8f89c4711cc1347593af291de241208fd9d0aca.json": {
+      "bytes": 4707,
+      "sha256": "956c9c85fa78607478c62429e231c07aafcf1fedb6ece099e810150757ff075d"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/024176c04987c8d7e80197b34c12ecc8335fa7ba735826b76f27dbe7cb6e62bf.json": {
+      "bytes": 3620,
+      "sha256": "dd96bdc3e88821386bd14e50f4d3d82487f816e4138368883e2c0149a857d777"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/42227392a50bd559891751dd446df25b9727ccea37839e4ad9963f55c56108d6.json": {
+      "bytes": 4396,
+      "sha256": "34193c706e62edcb955e4e9daa1852f274215977cb341b109eb338e74f92532b"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/66bb08111789cb9ef18eed78e478bd754e38e702ab6412089183f4774ff7f3c9.json": {
+      "bytes": 3620,
+      "sha256": "e825a95ba2a60bb91407845ca263248bf9c17c56778ac7d1a96033d599730d03"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/68a2bed34fb2321b1c659b758eec189e7a3f2f3b0182aa1a46121cd16805b2a6.json": {
+      "bytes": 4754,
+      "sha256": "dd9067bcbf9d6ecce21f2514e3a94a4c4b9fa8487ec7b6abb865a0e20b6cce87"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/7fcd7aa9c34d53e444f8fb3718679baa0fb8d8f5fc9749030d1ba6e1904b801d.json": {
+      "bytes": 4396,
+      "sha256": "df3e1a8b4908ed0978d2e043b75a9ca42927c1068751a713d740821b88fbf241"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/8e1390de7a9320e325dd7a8fc9c5375cc1c70744d74262f076a5adffd329106c.json": {
+      "bytes": 4754,
+      "sha256": "539ee634aaf97ffc93cda7b7f3479d0fed0cea2bfaf0f26247d107c0bd51ba19"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/d4ae102a3ada48d55b5e6013cfadda9474699c8e4926668c37f855e3197b0a51.json": {
+      "bytes": 4707,
+      "sha256": "e9941a94597ee84a7b50e3a9170f4274f9c86775d33c9ba330c70c25694a07da"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/public-traces-02/f8ea5938532add6e2c44d3e6a8f89c4711cc1347593af291de241208fd9d0aca.json": {
+      "bytes": 4707,
+      "sha256": "70ac9b4fb313291b7c450aab88a42310a70256c84f78fbda61afa0545ee994ac"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/qualification.json": {
+      "bytes": 2267,
+      "sha256": "8b4ca3884f7bcd162f0ba1043453b67a9db860e7bf1c90e3280335a3190544e0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/request-parameters.json": {
+      "bytes": 65,
+      "sha256": "d0884f217d7d3661f19a7596c4aafdaed3ee34e259fa57b93e386c714da740b0"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/resource-acceptance.json": {
+      "bytes": 376,
+      "sha256": "279d28f29a9ac7d819c102dcea7ad81608f1a6e5da874a4949b07da733a0ab18"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/runner-policy.json": {
+      "bytes": 229,
+      "sha256": "85bb742bbcaca80fe39c0d8e58a171c84f6e8fe80c2ed545d251ee73b5bc7e4a"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/source-first-truth.json": {
+      "bytes": 3329,
+      "sha256": "4798216630db04d1102b08d8af0f85a65be732bfc643cc6b03988abd87935f82"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification-session-reuse/tasks.json": {
+      "bytes": 6669,
+      "sha256": "ef67b52381c2757ddcfe8c6fe5ec6b62583cd688d987576d356687d24d87e9d8"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/server-config.json": {
+      "bytes": 316,
+      "sha256": "6a97d521716271ebcbf7d9e352f344c238270774ab1355cd1d21f0851a0e0ed1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/clippy.log": {
+      "bytes": 260,
+      "sha256": "882ca6f15cd9612cf9ca1023c89915d9af8b28352ca88556131934e1ac7a6684"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/harness.log": {
+      "bytes": 89725,
+      "sha256": "6548f6721907049e65c820bbf431aefc257921102e83224c79af6f57c3448c4f"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/production.log": {
+      "bytes": 310679,
+      "sha256": "edab5e4c0fec65f05aafb97c4c5bcbdc8131de7b144c68b2d33657ee0110bbf3"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/python_longmem.log": {
+      "bytes": 165,
+      "sha256": "f41dd6499ffd72a5f4b6e26184b8aefd381c918f890474ca7c9953e230bf8f09"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/python_optimized_audit.log": {
+      "bytes": 109,
+      "sha256": "8fdd33d8b0ba27ea3e1a9c7ec6d0565c232b2eda5c052588bea0fda51341bef1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/python_targets.log": {
+      "bytes": 147,
+      "sha256": "a32bcc7fd98c70d94a7eef5daf71c8256587d0aa607cff9aecc04f2aa36b7d3e"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/retained-failed-old_fingerprint.log": {
+      "bytes": 291949,
+      "sha256": "bee9d9977161a274815d66fd6bf03e271fce65bf0b0c77acafb9e515b9da01b1"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/retained-failed-parallel_startup.log": {
+      "bytes": 72368,
+      "sha256": "177b5a70e82c075aee53cc87f0a2833e27dbc9c2be67c6278b5132589dee5dcf"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/retained-failed-sandbox_fsevents.log": {
+      "bytes": 244156,
+      "sha256": "d461f1aa5f5097567ce6f2f592f5dc1db30fc6fc5780299fed7f55c07740e9eb"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/retained-failed-test_module_order.log": {
+      "bytes": 1259,
+      "sha256": "b3e3efcd1721f551c6954462c3cf016a0a834bd11fe989cafd4ae9f992113853"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification-logs/stage_after_lint.log": {
+      "bytes": 985,
+      "sha256": "a9117c69303c6f905a3792049eca796f88bb3a96790f443dec1840be94556b94"
+    },
+    "evals/paired/memory-quality-repairs-2026-11-26/verification.json": {
+      "bytes": 68314,
+      "sha256": "6de1966cc0206fc6573f8cec5a0b8adb80676d792a60ac22fee559a2452c9fa6"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/README.md": {
+      "bytes": 6921,
+      "sha256": "61c2f803ee04ecd65be40840d781fb3241192aea028c5410fdfa186c32230ff2"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/after-v2.json": {
+      "bytes": 8620,
+      "sha256": "ef8c8afe8773192466b73770b13be9c7c710f8ef9ac37a16608b0b370dd046b7"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/after-v2.log": {
+      "bytes": 1550,
+      "sha256": "f714eef7df8e4945c50448715a3f282fa7ee95995f625a73da781d6fb5d1fe4d"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/anno.after.rs": {
+      "bytes": 11125,
+      "sha256": "4793866a84b58829414f420bef20e93b981cc276d88211ccf956f1163b8b94ae"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/anno.before.rs": {
+      "bytes": 9487,
+      "sha256": "46ffcc8fb29d3d0a38690670b3c6f0063fc73ee7a80f63b88e8e554a61505b4a"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/before-v2.json": {
+      "bytes": 9126,
+      "sha256": "b31a0455e215252ad2e59bd642d67c10d80366e1cc8fd024d5b3ab8d8551e51c"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/before-v2.log": {
+      "bytes": 1464,
+      "sha256": "2cf97281abcad9046194eeafa32152879202dda78442dd6719999fbfc4b7e62e"
+    },
+    "evals/results/extraction-entity-repair-2026-11-26/identity.json": {
+      "bytes": 1526,
+      "sha256": "a2552cf700a88b6c0d0ed417f6bfa3313c39c539e18b00301633811c7394192e"
+    }
+  }
+}

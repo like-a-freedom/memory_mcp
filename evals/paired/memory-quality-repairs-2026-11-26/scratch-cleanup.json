@@ -1,0 +1,25 @@
+{
+  "removed": [
+    {
+      "path": "closed-reader/capture-01/data",
+      "bytes": 33587277,
+      "reason": "disposable capture store; logical inputs and all raw MCP/model receipts retained for regrading"
+    },
+    {
+      "path": "closed-reader-source-span-v2/capture-01/data",
+      "bytes": 33587277,
+      "reason": "disposable capture store; logical inputs and all raw MCP/model receipts retained for regrading"
+    },
+    {
+      "path": "closed-reader-source-handles-v3/capture-01/data",
+      "bytes": 33587277,
+      "reason": "disposable capture store; logical inputs and all raw MCP/model receipts retained for regrading"
+    },
+    {
+      "path": "closed-reader-source-handles-v3/capture-02/data",
+      "bytes": 33587277,
+      "reason": "disposable capture store; logical inputs and all raw MCP/model receipts retained for regrading"
+    }
+  ],
+  "not_removed": "registered inputs, raw logical receipts, source truth, successful and failed attempts"
+}

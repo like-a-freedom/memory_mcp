@@ -1,0 +1,158 @@
+[
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Aster telemetry prism",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 6,
+      "context_budget": 8,
+      "history_sha256": "452d22d0290de2774f46351f259b235a699e42f28221fabf2ddb042ed6653f49",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "aster-ledger"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Beryl geodesic spindle",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-15T10:00:00Z",
+      "known_revision": 12,
+      "context_budget": 8,
+      "history_sha256": "de351a1e4cd3b6e875a48d545824370829b17b4a636ddbc20b91ee72d1f97764",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "beryl-first"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [
+        "beryl-later"
+      ],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Cobalt calibration seal",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 6,
+      "context_budget": 8,
+      "history_sha256": "206a7a0432393c3ed53205fb2a4bedee84e394740094adad0555b17b21e2b662",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [
+        [
+          [
+            "cobalt-ledger"
+          ]
+        ]
+      ],
+      "forbidden_event_ids": [
+        "cobalt-correction"
+      ],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  },
+  {
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "input": {
+      "schema_version": "memory-mcp-independent-probe/v1",
+      "query": "Dahlia ballast key",
+      "principal": "fixture-reader",
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 0,
+      "context_budget": 8,
+      "history_sha256": "bab7c4a5c1ca150e8293070ed9b70cf92addab27c26cd60fbcedde7784494e6c",
+      "claim_rollout_stage": "evidence"
+    },
+    "launch_profile": {
+      "NER_EXTRACTOR": "regex",
+      "EMBEDDINGS_ENABLED": "false",
+      "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+      "SURREALDB_EMBEDDED": "true",
+      "SURREALDB_DB_NAME": "memory_decisions",
+      "SURREALDB_NAMESPACE": "main"
+    },
+    "oracle": {
+      "sufficient_evidence_alternatives": [],
+      "forbidden_event_ids": [
+        "dahlia-ledger"
+      ],
+      "required_claim_annotations": [],
+      "required_claim_annotation_alternatives": []
+    }
+  }
+]

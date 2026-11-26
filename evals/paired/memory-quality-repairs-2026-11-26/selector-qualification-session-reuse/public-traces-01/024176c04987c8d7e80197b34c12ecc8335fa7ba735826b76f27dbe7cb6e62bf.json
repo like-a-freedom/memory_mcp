@@ -1,0 +1,67 @@
+{
+  "schema_version": "memory-mcp-public-synthetic-trace/v1",
+  "identity": {
+    "plan_sha256": "5344c7dd3bcb4338b92b55f4c71bcd11911af106089532c2df0698bb3335015c",
+    "product_binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+    "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "candidate",
+    "phase": "recall"
+  },
+  "calls": [
+    {
+      "tool": "assemble_context",
+      "arguments": {
+        "budget": 8,
+        "compact": true,
+        "known_at": "2020-01-01T00:00:00Z",
+        "query": "Dahlia ballast key storage location",
+        "valid_at": "2026-05-01T10:00:00Z"
+      },
+      "arguments_sha256": "644a23c68cdd887ad36b1a030228390b8310f1fa41579b0bf5bcfde2cf1d5f70",
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2020-01-01T00:00:00Z\",\"known_revision\":0,\"valid_at\":\"2026-05-01T10:00:00Z\"}},\"guidance\":\"No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.\",\"result\":[],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "context": {
+              "candidate_scan_truncated": false,
+              "completeness": "partial",
+              "omitted_channels": [
+                "alias expansion",
+                "experience, source episode siblings and source context neighborhoods",
+                "triples, graph edges and community summaries",
+                "semantic ANN and mutable embeddings",
+                "mutable fact access heat",
+                "legacy facts and episodes without committed revision provenance"
+              ],
+              "snapshot": {
+                "known_at": "2020-01-01T00:00:00Z",
+                "known_revision": 0,
+                "valid_at": "2026-05-01T10:00:00Z"
+              }
+            },
+            "guidance": "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.",
+            "result": [],
+            "status": "success"
+          }
+        }
+      },
+      "response_sha256": "7580c66c7ab2d78c910105a6655147d7ddc4b45e6139dd5ef5178fdce48f5901",
+      "call_failed": false
+    }
+  ]
+}

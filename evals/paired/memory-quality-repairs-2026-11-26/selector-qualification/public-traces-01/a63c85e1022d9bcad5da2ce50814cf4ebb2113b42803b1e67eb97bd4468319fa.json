@@ -1,0 +1,88 @@
+{
+  "schema_version": "memory-mcp-public-synthetic-trace/v1",
+  "identity": {
+    "plan_sha256": "5ceb6ff09c801fadfc48c78561333d678bba0f73809b454c7b53b14922fd0044",
+    "product_binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+    "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    "arm": "candidate",
+    "phase": "recall"
+  },
+  "calls": [
+    {
+      "tool": "assemble_context",
+      "arguments": {
+        "budget": 8,
+        "compact": true,
+        "query": "Where was the Beryl geodesic spindle stored?",
+        "valid_at": "2026-05-15T10:00:00Z"
+      },
+      "arguments_sha256": "ce21c6bb2226345b62c29146a45857af51c25ece131148556cf840de5f0c5942",
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"context\":{\"candidate_scan_truncated\":false,\"completeness\":\"partial\",\"omitted_channels\":[\"alias expansion\",\"experience, source episode siblings and source context neighborhoods\",\"triples, graph edges and community summaries\",\"semantic ANN and mutable embeddings\",\"mutable fact access heat\",\"legacy facts and episodes without committed revision provenance\"],\"snapshot\":{\"known_at\":\"2026-11-26T08:24:16.625058Z\",\"known_revision\":12,\"valid_at\":\"2026-05-15T10:00:00Z\"}},\"guidance\":\"Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.\",\"result\":[{\"confidence\":0.66,\"content\":\"The Beryl geodesic spindle is kept in Drawer-268.\",\"evidence_status\":\"current\",\"fact_id\":\"fact:64b96a6a0632c24ab5f216f4\",\"grounding\":0.75,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"known_revision\":12,\"source_episode_id\":\"episode:b15214da6230e72b9d70fd19\",\"source_id\":\"source-beryl-first\",\"source_type\":\"document\",\"valid_at\":\"2026-05-15T10:00:00+00:00\"},\"rationale\":\"historical\",\"relevance\":0.75,\"retrieval_tier\":\"historical_direct\",\"semantic_available\":false,\"source_episode\":\"episode:b15214da6230e72b9d70fd19\"}],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "context": {
+              "candidate_scan_truncated": false,
+              "completeness": "partial",
+              "omitted_channels": [
+                "alias expansion",
+                "experience, source episode siblings and source context neighborhoods",
+                "triples, graph edges and community summaries",
+                "semantic ANN and mutable embeddings",
+                "mutable fact access heat",
+                "legacy facts and episodes without committed revision provenance"
+              ],
+              "snapshot": {
+                "known_at": "2026-11-26T08:24:16.625058Z",
+                "known_revision": 12,
+                "valid_at": "2026-05-15T10:00:00Z"
+              }
+            },
+            "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+            "result": [
+              {
+                "confidence": 0.66,
+                "content": "The Beryl geodesic spindle is kept in Drawer-268.",
+                "evidence_status": "current",
+                "fact_id": "fact:64b96a6a0632c24ab5f216f4",
+                "grounding": 0.75,
+                "provenance": {
+                  "extraction_strategy": "structured_summary_line",
+                  "ingestion_method": "extraction",
+                  "known_revision": 12,
+                  "source_episode_id": "episode:b15214da6230e72b9d70fd19",
+                  "source_id": "source-beryl-first",
+                  "source_type": "document",
+                  "valid_at": "2026-05-15T10:00:00+00:00"
+                },
+                "rationale": "historical",
+                "relevance": 0.75,
+                "retrieval_tier": "historical_direct",
+                "semantic_available": false,
+                "source_episode": "episode:b15214da6230e72b9d70fd19"
+              }
+            ],
+            "status": "success"
+          }
+        }
+      },
+      "response_sha256": "bf9c671fd87b69fa4588b87a9e6b33362abc3f0501cc686f3ee59ffa75f1d915",
+      "call_failed": false
+    }
+  ]
+}

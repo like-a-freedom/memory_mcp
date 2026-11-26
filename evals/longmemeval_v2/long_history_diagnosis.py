@@ -17,7 +17,7 @@ from .reviewed_span_coverage import decode_saved_text, read_jsonl
 from .text_cohort import verified_span
 
 
-def diagnose(cohort, trajectories, truth, prompts, readers):
+def diagnose(cohort, trajectories, truth, prompts, readers, stage_receipts=None):
     if truth.get('schema') != 'memory-mcp-long-history-truth/v1':
         raise ValueError('unsupported independent truth schema')
     if cohort.get('schema') != 'memory-mcp-longmemeval-v2-text-cohort/v1':
@@ -38,6 +38,9 @@ def diagnose(cohort, trajectories, truth, prompts, readers):
     ids = set(cohort['reviews'])
     if set(truth['cases']) != ids or set(prompt_rows) != ids or not set(reader_rows) <= ids:
         raise ValueError('cohort, truth, prompt or reader identities do not match')
+    if stage_receipts is not None:
+        if stage_receipts.get('schema') != 'memory-mcp-source-stage-receipts/v1' or not set(stage_receipts.get('cases', {})) <= ids:
+            raise ValueError('stage receipt schema or case identities do not match')
     cases = {}
     latencies = []
     for case_id, review in cohort['reviews'].items():
@@ -96,6 +99,48 @@ def diagnose(cohort, trajectories, truth, prompts, readers):
             'failure_localization': localization,
             'query_seconds': latency,
         }
+    if stage_receipts is not None:
+        for case_id, receipt in stage_receipts['cases'].items():
+            review = cohort['reviews'][case_id]
+            span = verified_span(sources[review['trajectory_id']], review)
+            if receipt.get('reviewed_span_sha256') != review['span_sha256']:
+                raise ValueError('stage source digest does not match reviewed source')
+            source_episode = receipt.get('source_episode_id')
+            if not isinstance(source_episode, str) or not source_episode:
+                raise ValueError('stage source episode identity is required')
+            context_digest = hashlib.sha256(json.dumps(prompt_rows[case_id]['memory_context'], ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            if receipt.get('memory_context_sha256') != context_digest:
+                raise ValueError('stage context digest mismatch')
+            observations = {}
+            for observation in receipt['observations']:
+                stage = observation['stage']
+                if stage in observations:
+                    raise ValueError('duplicate stage observation')
+                items = observation['items']
+                if any(item.get('source_episode') != source_episode for item in items):
+                    raise ValueError('stage item is detached from reviewed source episode')
+                serialized_span = json.dumps(span, ensure_ascii=False)[1:-1]
+                present = any(span in decode_saved_text(item['content']) or serialized_span in item['content'] for item in items)
+                observations[stage] = {'complete_reviewed_span': present, 'elapsed_ms': observation.get('elapsed_ms'), 'source_episode_id': source_episode}
+            if 'candidates' not in observations and all(name in observations for name in ('ranked_fact_candidates', 'episode_candidates')):
+                observations['candidates'] = {'complete_reviewed_span': any(observations[name]['complete_reviewed_span'] for name in ('ranked_fact_candidates', 'episode_candidates')), 'boundary': 'union of ranked fact and admitted episode fallback pools'}
+            first_loss = 'none_observed'
+            previous_present = True
+            for stage, label_name in [('formation', 'formation'), ('candidates', 'candidates'), ('selected_pre_packaging', 'selection'), ('packed_context', 'packaging')]:
+                observation = observations.get(stage)
+                if observation is None:
+                    first_loss = 'unknown_missing_intermediate_observation'
+                    break
+                if previous_present and not observation['complete_reviewed_span']:
+                    first_loss = label_name
+                    break
+                previous_present = observation['complete_reviewed_span']
+            case = cases[case_id]
+            case['first_observed_loss'] = first_loss
+            case['stage_observations'] = observations
+            for stage, field in [('formation', 'formation'), ('candidates', 'evidence_selection'), ('packed_context', 'packaging')]:
+                if stage in observations:
+                    case[field] = ('complete_reviewed_span_observed' if observations[stage]['complete_reviewed_span'] else 'complete_reviewed_span_absent_at_observed_boundary')
     return {
         'schema': 'memory-mcp-long-history-diagnosis/v1',
         'answer_contract': 'strict normalized phrase-set equality against independently reviewed accepted answers; unlisted valid paraphrases may be false negatives',
@@ -114,9 +159,12 @@ def main():
     for name in ('cohort', 'trajectories', 'truth', 'prompts', 'readers'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--stage-receipts', type=Path)
     args = parser.parse_args()
     paths = {name: getattr(args, name) for name in ('cohort', 'trajectories', 'truth', 'prompts', 'readers')}
-    report = diagnose(*[read_jsonl(path) if name in ('prompts', 'readers') else json.loads(path.read_text()) for name, path in paths.items()])
+    report = diagnose(*[read_jsonl(path) if name in ('prompts', 'readers') else json.loads(path.read_text()) for name, path in paths.items()], stage_receipts=json.loads(args.stage_receipts.read_text()) if args.stage_receipts else None)
+    if args.stage_receipts:
+        paths['stage_receipts'] = args.stage_receipts
     report['input_sha256'] = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in paths.items()}
     report['input_paths'] = {name: str(path) for name, path in paths.items()}
     rendered = json.dumps(report, indent=2, ensure_ascii=False) + '\n'

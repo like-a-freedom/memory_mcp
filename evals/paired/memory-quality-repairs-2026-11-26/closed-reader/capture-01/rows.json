@@ -1,0 +1,409 @@
+[
+  {
+    "case": "closed-list",
+    "arm": "registered_query",
+    "expected": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "Fact: The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "status": "completed",
+    "query": "Juniper release complete package list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "quote": "The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "closed-list",
+    "arm": "selected_query",
+    "expected": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "Fact: The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "status": "completed",
+    "query": "Juniper release package names",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "quote": "The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "closed-list",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "Fact: The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "Birch",
+        "Cedar",
+        "Elm"
+      ],
+      "source_ids": [
+        "episode:f8c837fda8a7312b05d0df6a"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Juniper release has exactly these three packages: Birch, Cedar, Elm."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "status": "completed",
+    "query": "Marigold console tab order Lantern",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "status": "completed",
+    "query": "Marigold console tab order after Lantern",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Ledger",
+      "source_ids": [
+        "episode:a265c4d6b50f915649715368"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Marigold console tabs, in order, are: Search, Lantern, Ledger, Archive."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "count",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "status": "completed",
+    "query": "Helix editor toolbar actions complete list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "count",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "status": "completed",
+    "query": "Helix editor toolbar actions list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": false,
+      "passed": false
+    }
+  },
+  {
+    "case": "count",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "9",
+      "source_ids": [
+        "episode:55e4d4ff092e231a22b97600"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Helix editor toolbar contains these actions: New, Open, Save, Print, Undo, Redo, Search, Export, Help."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "registered_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "status": "completed",
+    "query": "Onyx release key approved vault status",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "selected_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "status": "completed",
+    "query": "Onyx release key approved vault",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": false,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:da60db1c0e4c91e20a107eec"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Onyx release key vault allocation is pending; no vault has been approved."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  }
+]

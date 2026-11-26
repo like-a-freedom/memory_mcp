@@ -141,7 +141,7 @@ async fn extractor_fingerprint_projection() {
     );
     assert_eq!(
         row["fingerprint"]["token"].as_str(),
-        Some("anno|candidate-policy=scalar-grammar-v1"),
+        Some("anno|identity-admission=v2|candidate-policy=scalar-grammar-v1"),
         "the projection must record the extractor token; the fingerprint          is an opaque token now (ADR-0068)"
     );
     let entity_ids = row["entity_ids"].as_array().expect("entity_ids array");

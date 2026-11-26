@@ -1,0 +1,26 @@
+{
+  "schema": "temporal-auditor-correction/v2",
+  "reason": "Python optimization removed assert-based acceptance checks; empty manifests also incorrectly qualified",
+  "frozen_v1": {
+    "path": "evals/paired/memory-quality-repairs-2026-11-26/selector-qualification/audit_capture.py",
+    "sha256": "4fcbc0647c887e17aad86fd8ff78400d40201fc88b8e92b1f3a68098eddf663b"
+  },
+  "active_v2": {
+    "path": "evals/paired/temporal_read_audit.py",
+    "sha256": "08b9b219ed758216811d022b4711f7f684461897e23a2419384b7c2adbac530f"
+  },
+  "tests": {
+    "path": "evals/paired/test_temporal_read_audit.py",
+    "sha256": "57f7ae8b46e297568bf9251a916f68a4a32ba5219c9dad4f92cfb7dbe0c7f85d",
+    "command": "python3 -m unittest discover -s evals/paired -p test_temporal_read_audit.py -v",
+    "green": 6
+  },
+  "red_observed": [
+    "optimized interpreter accepted corrupt incumbent selector",
+    "empty task manifest qualified zero of zero"
+  ],
+  "criteria_changed": false,
+  "model_rerun": false,
+  "original_freeze_preserved": true,
+  "interpretation": "Regrade identical raw artifacts with active v2; v1 remains historical and is not the final acceptance authority."
+}

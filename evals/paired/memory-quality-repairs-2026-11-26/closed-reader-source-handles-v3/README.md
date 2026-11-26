@@ -1,0 +1,7 @@
+# Reader citation-reference workflow:24/24
+
+Two planned fresh-process/store captures passed12/12 each, no invalid or omitted arms. Exact value/closed-set, resolved source identity, abstention and full source-span quote each passed24/24. Per arm: registered-query8/8, model-selected-query8/8, fixed-sufficient-reply8/8. The public map includes every returned source, while the raw model source_refs and resolved IDs remain separate. All mapping/grading controls passed25/25 without a model, including a controlled two-source public capture. Wrong/unknown/duplicate handles and borrowing another source's text fail.
+
+This is a reader workflow adaptation after retained failed v1/v2 registrations. It measures source selection using deterministic handle transport, not the model copying raw long source IDs. The same exposed development source bodies/labels as v2 were kept; it is not independent source confirmation. The MCP product response format is unchanged. The passes establish this finite configured workflow, not model-wide reliability or a memory-treatment effect.
+
+Total observed capture time158.583s; model/cache and fixed order are shared. Differences from earlier screens are not a controlled speed comparison. See preregistration.md, frozen-plan.json, raw MCP/evidence/reader receipts, result.json and summary.json. Standalone offline MLX ran locally on Apple Silicon; no LM Studio runtime or remote calls.

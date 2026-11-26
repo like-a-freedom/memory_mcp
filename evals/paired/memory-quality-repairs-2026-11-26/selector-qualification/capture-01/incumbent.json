@@ -1,0 +1,675 @@
+{
+  "schema_version": "memory-mcp-agent-paired/v12",
+  "arm": "incumbent",
+  "run_id": "28977-1795681377042776000-1",
+  "run_started_at": "2026-11-26T08:22:57.042781Z",
+  "run_completed_at": "2026-11-26T08:27:38.612771Z",
+  "identity": {
+    "shared": {
+      "agent_runner": "openai-compatible-chat-completions",
+      "agent_version": "public Rust Chat Completions recall runner; direct local MLX; temporal qualification",
+      "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+      "model_identity_protocol": {
+        "method": "same_alias_within_invocation",
+        "max_duration_seconds": 600
+      },
+      "system_prompt_sha256": "426d44ec3051ff6e5f030ed15d1ed32016e77d5318835352c07f7d8ed47aa840",
+      "task_prompt_sha256": "39bb773a96b335f107e455faebee4ca7e04551d864ee59062145cfaa220960ab",
+      "host_policy_sha256": "33c63d3ce29af8eb5caadb6c4f3ea303a97b70278c2a05d2f66ece7279baeeb9",
+      "transport": "stdio",
+      "retry_policy_sha256": "85bb742bbcaca80fe39c0d8e58a171c84f6e8fe80c2ed545d251ee73b5bc7e4a",
+      "reader_config_sha256": "e182dd29e1cafa0b980121839f482104fabf10da7204c9c80d037afb3c7a095c",
+      "judge_config_sha256": null,
+      "corpus_sha256": "335734d08afb4eb82910bc0c29d6e7ab0bc2fc598ee9b067644791084acdcbed",
+      "oracle_sha256": "7005a1c628c6923d0e69e2930a5bafc9b80aca575c748e442fefbecb0e69ae9e",
+      "clock_id": "macos-utc-wall-clock-v1",
+      "simulator_sha256": "69f7a95619887163a61a04d400ea15ddda9e5fe13b4f04e6ca1bcff6465da129",
+      "provider_fingerprints": {
+        "chat_completions_endpoint_config": "ab2602be035141d9c7a9dd13ff0ba780889dc8c8778424d8e5e0ac87f7e02c7e",
+        "chat_completions_request_parameters_config": "0977e1dbde5e2f49bbbd489efb25434cd9d10e116c2046ee465b772d5c6a895a",
+        "memory_eval_cli": "d1dcc7f05ce7bb2d29aaf01ceb9fd44f9322bd3e3e3d9916f5d24a762e79a875"
+      },
+      "context_budget_tokens": 4096,
+      "tool_call_budget": 1,
+      "turn_budget": 3,
+      "output_token_budget": 384,
+      "wall_time_budget_ms": 25000,
+      "hardware_class": "macos-arm64"
+    },
+    "product": {
+      "revision": "6b1035a79ec8ffd5c3b52d10c509a8d7d27817d0",
+      "binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+      "product_config_sha256": "bcfa6bf1fe0bb0e7b5227b33a0ab9b73f07244acc76859b1e49f39d50e630d0f",
+      "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+      "enabled_features": [
+        "fs-watch"
+      ],
+      "claim_rollout_stage": "evidence"
+    }
+  },
+  "expected_trials": [
+    {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "receipts": [
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "elapsed_ms": 27,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "request_query_sha256": "16660b08825b54691f1cc55c32a76d566697aea8ed470e53d9085ca0d2d0e7e6",
+          "non_query_arguments_sha256": "b585490efb172ec6cdf40cae25437d8cdb180f197e4aacfad6cdaa22a1b2e1ca",
+          "selector_expectation_registered": true,
+          "selector_argument_matches": {
+            "as_of": true,
+            "budget": true,
+            "compact": true,
+            "fact_types": true,
+            "known_at": true,
+            "known_revision": true,
+            "valid_at": true,
+            "view_mode": true,
+            "window_end": true,
+            "window_start": true
+          },
+          "response_guidance_sha256": "1da46c4f8ceaed398c4ddd81980172abb214e01c213813f1ce518d350d519f24",
+          "source_coverage": true,
+          "completeness": "unknown",
+          "cited_returned_source_count": 1
+        }
+      ],
+      "snapshot_retry_diagnostic": {
+        "expectation_registered": false,
+        "assessment": "not_registered",
+        "retry_required_when_eligible": false,
+        "initial_read_eligible": null,
+        "retry_observed": null,
+        "retry_count": null,
+        "retry_limit_respected": null
+      },
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": true,
+        "accepted_answer_match": "exact",
+        "required_evidence_cited": true,
+        "clarification_matches": true
+      },
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2196,
+      "output_tokens": 102,
+      "wall_time_ms": 12982,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1189,
+          "output_tokens": 58
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "afea97953dc7f6e5cd4bae1f9f941019333a002f6e223a96623f09e40e21af4f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "d92e89bcc55c59ebd5705b549d2187d87355205d2b23120bdb2e11d6361d9f9f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1007,
+          "output_tokens": 44
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "8f0aa2a17306212ba3e84e8a84b8b55ddc7010644ff4fd3e8aaa4cac05087136",
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "elapsed_ms": 11,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "request_query_sha256": "f0588eecbdf5d2820061faee6abb6c024010f774a354ec79e66a8b21c8cc84e1",
+          "non_query_arguments_sha256": "d0618534f422a42772eeb6082228dc4211087cec477826a03c12276e6eb1c577",
+          "selector_expectation_registered": true,
+          "selector_argument_matches": {
+            "as_of": true,
+            "budget": true,
+            "compact": true,
+            "fact_types": true,
+            "known_at": true,
+            "known_revision": true,
+            "valid_at": true,
+            "view_mode": true,
+            "window_end": true,
+            "window_start": true
+          },
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "source_coverage": true,
+          "completeness": "partial",
+          "cited_returned_source_count": 1
+        }
+      ],
+      "snapshot_retry_diagnostic": {
+        "expectation_registered": false,
+        "assessment": "not_registered",
+        "retry_required_when_eligible": false,
+        "initial_read_eligible": null,
+        "retry_observed": null,
+        "retry_count": null,
+        "retry_limit_respected": null
+      },
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": true,
+        "accepted_answer_match": "exact",
+        "required_evidence_cited": true,
+        "clarification_matches": true
+      },
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2476,
+      "output_tokens": 136,
+      "wall_time_ms": 18164,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1222,
+          "output_tokens": 92
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "ce21c6bb2226345b62c29146a45857af51c25ece131148556cf840de5f0c5942",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "cb255dc90a1a7cadca8c9dd477a00d90acad6fd3b7206237d6aeb97b95c8433c",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1254,
+          "output_tokens": 44
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "a9df1023c104a516f6d4bd010a47570ca61f8b9e42006b19fc790923bd586c4f",
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "elapsed_ms": 7,
+          "outcome": "nonempty",
+          "item_count": 1,
+          "request_query_sha256": "81d50698cd1860b0e17b69b96412062116f065a1d782bfa8ff5a085824596f62",
+          "non_query_arguments_sha256": "778ac259a2d0ff7ad6254f163e7d56ca1b8660e66181c182c2ba00ddf2901cae",
+          "selector_expectation_registered": true,
+          "selector_argument_matches": {
+            "as_of": true,
+            "budget": true,
+            "compact": true,
+            "fact_types": true,
+            "known_at": true,
+            "known_revision": true,
+            "valid_at": true,
+            "view_mode": true,
+            "window_end": true,
+            "window_start": true
+          },
+          "response_guidance_sha256": "b6bed3a81db7965ca526f3b800ef132358b2a6a7b6b78698ef003a9e9301b24f",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "requested_cutoff_match": true,
+          "returned_cutoff_match": true,
+          "source_coverage": true,
+          "completeness": "partial",
+          "cited_returned_source_count": 1
+        }
+      ],
+      "snapshot_retry_diagnostic": {
+        "expectation_registered": false,
+        "assessment": "not_registered",
+        "retry_required_when_eligible": false,
+        "initial_read_eligible": null,
+        "retry_observed": null,
+        "retry_count": null,
+        "retry_limit_respected": null
+      },
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "arm_order": 1,
+      "known_revision_checkpoint": 6,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": true,
+        "accepted_answer_match": "exact",
+        "required_evidence_cited": true,
+        "clarification_matches": true
+      },
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2469,
+      "output_tokens": 145,
+      "wall_time_ms": 12378,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1222,
+          "output_tokens": 103
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "3fee56c9a14d83b7bb1d65d92dd8e98243ae7ceb22fd52aa67aebe3eebb2ceb7",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "4aa6cdbd9b2e13a27214b36dcba684bc76b1930d38cdd581ff4dfe4b7eab552f",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1247,
+          "output_tokens": 42
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "8eb6f62b3e03bc63c7fb8af161127a90e52d232dcde082ef283567dd8054004c",
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    },
+    {
+      "read_capture_status": "observed",
+      "read_diagnostics": [
+        {
+          "request_sequence": 3,
+          "response_sequence": 4,
+          "elapsed_ms": 4,
+          "outcome": "empty",
+          "item_count": 0,
+          "request_query_sha256": "a12204ee479b510eca30a47acbf56deac45c71aeb584162052ed00046de3616e",
+          "non_query_arguments_sha256": "bba6c10729c5d338221a41d5df77baa600969bfcc184ca0d9d3d131035552920",
+          "selector_expectation_registered": true,
+          "selector_argument_matches": {
+            "as_of": true,
+            "budget": true,
+            "compact": true,
+            "fact_types": true,
+            "known_at": true,
+            "known_revision": true,
+            "valid_at": true,
+            "view_mode": true,
+            "window_end": true,
+            "window_start": true
+          },
+          "response_guidance_sha256": "3537c8cc8e2ecbfccaa168828967ec48ef56fbe13aeba910cffc72ac57b3735b",
+          "requested_valid_at_match": true,
+          "returned_valid_at_match": true,
+          "source_coverage": true,
+          "completeness": "partial",
+          "cited_returned_source_count": 0
+        }
+      ],
+      "snapshot_retry_diagnostic": {
+        "expectation_registered": false,
+        "assessment": "not_registered",
+        "retry_required_when_eligible": false,
+        "initial_read_eligible": null,
+        "retry_observed": null,
+        "retry_count": null,
+        "retry_limit_respected": null
+      },
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "arm_order": 2,
+      "status": "completed",
+      "direct_memory_success": true,
+      "task_oracle_passed": true,
+      "task_oracle_diagnostics": {
+        "final_answer_present": true,
+        "final_answer_schema_valid": true,
+        "accepted_answer": true,
+        "accepted_answer_match": "exact",
+        "required_evidence_cited": true,
+        "clarification_matches": true
+      },
+      "turns_used": 2,
+      "tool_calls": 1,
+      "repair_turns": 0,
+      "user_clarifications": 0,
+      "input_tokens": 2200,
+      "output_tokens": 138,
+      "wall_time_ms": 10688,
+      "hard_violations": [],
+      "trace": [
+        {
+          "sequence": 1,
+          "turn": 1,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 2,
+          "turn": 1,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 1248,
+          "output_tokens": 121
+        },
+        {
+          "sequence": 3,
+          "turn": 1,
+          "kind": "memory_read",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "644a23c68cdd887ad36b1a030228390b8310f1fa41579b0bf5bcfde2cf1d5f70",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 4,
+          "turn": 1,
+          "kind": "tool_response",
+          "call_id": "call-1",
+          "tool_name": "assemble_context",
+          "error_class": null,
+          "payload_sha256": "1ecd055224da02094638bd34c0efce241c1a6a31077951e6510029e8458ac6af",
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 5,
+          "turn": 2,
+          "kind": "agent_turn_started",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "sequence": 6,
+          "turn": 2,
+          "kind": "agent_turn",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": null,
+          "input_tokens": 952,
+          "output_tokens": 17
+        },
+        {
+          "sequence": 7,
+          "turn": 2,
+          "kind": "final_answer",
+          "call_id": null,
+          "tool_name": null,
+          "error_class": null,
+          "payload_sha256": "adcfdbf3b21bb6ee62f42029ffcb263e5339346be898493ff35b9a4dc560790f",
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
+    }
+  ]
+}

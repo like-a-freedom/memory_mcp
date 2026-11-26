@@ -1,0 +1,60 @@
+{
+  "schema": "autonomous-temporal-qualification-decision/v1",
+  "eligible": false,
+  "status": "incomplete_required_second_capture",
+  "first_capture": {
+    "incumbent": {
+      "scheduled_trials": 4,
+      "completed_trials": 4,
+      "exact_task_successes": 4,
+      "direct_evidence_successes": 4,
+      "independent_probe_successes": 4,
+      "hard_violations": 0,
+      "resource_exits": 0,
+      "actual_read_selector_successes": 4,
+      "agent_phase_total_ms": 54212,
+      "agent_phase_max_ms": 18164
+    },
+    "candidate": {
+      "scheduled_trials": 4,
+      "completed_trials": 4,
+      "exact_task_successes": 4,
+      "direct_evidence_successes": 4,
+      "independent_probe_successes": 4,
+      "hard_violations": 0,
+      "resource_exits": 0,
+      "actual_read_selector_successes": 4,
+      "agent_phase_total_ms": 43602,
+      "agent_phase_max_ms": 11741
+    }
+  },
+  "second_capture": {
+    "scheduled_arm_trials": 8,
+    "completed_agent_trials": 0,
+    "completed_independent_probe_receipts": 0,
+    "reason": "strict whole-workflow wall deadline during preparation",
+    "cli_exit_code": -15
+  },
+  "total_scheduled_arm_trials": 16,
+  "completed_agent_trials": 8,
+  "hard_whole_workflow_deadline_seconds": 300,
+  "first_capture_wall_seconds": 281.99695704097394,
+  "whole_workflow_seconds": 299.8977204989642,
+  "rust_two_capture_qualifier": "not run: second independent artifacts absent; no fabricated repeat",
+  "c2_eligible": false,
+  "treatment_effect_estimated": false,
+  "performance_claim": false,
+  "grading_code": "evals/paired/temporal_read_audit.py",
+  "grading_code_sha256": "08b9b219ed758216811d022b4711f7f684461897e23a2419384b7c2adbac530f",
+  "input_sha256": {
+    "plan.json": "6f215c15835eee9f014d0a1989933dd30e67fe7750a3934ff5b0999eed383631",
+    "tasks.json": "ef67b52381c2757ddcfe8c6fe5ec6b62583cd688d987576d356687d24d87e9d8",
+    "probes.json": "d180722e59f40f7efbb6d7f4799092a3ce0f72614acfa3d8c55660f7e896ec0f",
+    "criteria.json": "b309d10059e51f7c61e44f38ad07f6a59cd1a31558379b9bd24ba1d6cb93429c",
+    "freeze-manifest.sha256": "25de7c6243e993c912674ccdca2995b4893b97e22476d78d32037605d642e8e6",
+    "audit-01-v2.json": "c49d7eb0ff107f8c9202cf29971982eaed99824d6335578826374cee5ffe5527",
+    "audit-02-v2.json": "386da95d6500caadc99215b4061a50d8c83594100e88141c5449f41c88862991",
+    "execution-receipts.json": "c454c8d815ac84332a36050c33e38b6c1470648f1c390edf5ecadd9268b25220",
+    "auditor-v2-correction.json": "fff6d0935c90a10d3a98c673f96901c96a0d21b1fe27e9088b18fbdb06e38a63"
+  }
+}

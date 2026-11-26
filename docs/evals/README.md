@@ -85,15 +85,23 @@ empirical question requires it.
 
 ## Current memory-quality evidence
 
-The [November 26 quality audit closure](MEMORY_QUALITY_CLOSURE_2026-11-26.md)
-is the current consolidated interpretation. Stronger public CLI controls reject
-wrong numeric assertions and changed repeated reads; the eight-case native gate
-still passes. Closed extraction expectations now honestly report 4/9 cases
-passed (entity precision .60, recall 1.00, F1 .75), rather than accepting extras.
-The seven frozen long-history answers are 2/7 under strict reviewed truth;
-earlier 3/7 replay scoring accepted an unsupported extra list member. This is a
-diagnostic slice, not an official aggregate score. See the report for stage
-unknowns, the fresh bounded query/reader diagnostic and prioritized repair criteria.
+The [November 26 repair report](MEMORY_QUALITY_REPAIRS_2026-11-26.md)
+is the current consolidated interpretation. Matched extraction on the same v2
+labels improved from 5/9 to 9/9 cases (precision .65 to 1.00, recall 1.00 in
+both). The source-linked packing reproductions improved from 0/2 to 2/2 complete
+blocks. These are finite development repairs, not benchmark-wide gains. Stronger
+public CLI controls reject wrong numeric assertions, changed repeated reads,
+incomplete/extra sets and ungrounded quotes. The eight-case native memory gate
+passes. Reader and autonomous selector workflow outcomes, retained failed
+registrations, resource limits and next actions are recorded in that report.
+
+The [preceding audit](MEMORY_QUALITY_CLOSURE_2026-11-26.md) retains the historical
+v1 extraction score of 4/9 (precision .60, recall 1.00, F1 .75). Its v1 and the
+new v2 denominator are not interchangeable. The seven frozen long-history
+answers remain 2/7 under strict reviewed truth; earlier 3/7 replay scoring
+accepted an unsupported extra list member. No new full-history reader capture
+was performed by the packing repair. This is a diagnostic slice, not an
+official aggregate score.
 
 The registered [deterministic candidate gate](DETERMINISTIC_MEMORY_QUALITY.md)
 passed the development and separate confirmation histories. The
@@ -208,10 +216,31 @@ plan expects that historical configuration. Current product-default profiles
 use `claim_rollout_stage: "default"`; do not let an old profile inherit the
 new default implicitly.
 
-Every committed evaluation is run through a profile. The profile fixes the
+Rust suite evaluations run through a profile. The profile fixes the
 selected suites, expected coverage, time budget, gates, and (where applicable)
 the corpus root. Schema-v2 artifacts reject missing, duplicate, or unexpected
 suite-scoped cases.
+
+Bounded reader and temporal-workflow diagnostics instead freeze their own
+plan, task/source truth, prompts, product/model identities and stop rule before
+capture. `python3 evals/paired/memory_quality_diagnostic.py --help` exposes
+provider-neutral `freeze`, `capture` and `score` commands; the optional model
+endpoint must be numeric loopback. It requires neither Codex nor LM Studio.
+Its source-handle mode maps **all** delivered sources, never hidden correct
+labels. `source_span` checks a full registered proposition within an exact
+quote from both its cited raw source and delivered evidence. Model-call
+eligibility, per-socket I/O timeout and MCP call timeout are distinct; none
+should be described as a whole-capture hard deadline.
+
+`python3 evals/paired/temporal_read_audit.py --tasks <tasks.json> --capture
+<capture-directory> --traces <trace-directory>` supplements the authoritative
+Rust scorer for the fixed temporal-development protocol. It checks both arms,
+actual queries/selectors linked to scored reads, exact observed coverage,
+sources and observed resource eligibility. It does not cancel executing MCP
+calls and is not a general configurable replacement for paired scoring.
+The current workflow registration separately bounds whole execution. Regrade
+archived evidence with its archived script and registered inputs; use fresh
+destinations for new attempts.
 
 | Profile | Command | Scope | Status |
 |---|---|---|---|

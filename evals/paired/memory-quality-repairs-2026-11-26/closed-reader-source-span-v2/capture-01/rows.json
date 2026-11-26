@@ -1,0 +1,483 @@
+[
+  {
+    "case": "closed-list",
+    "arm": "registered_query",
+    "expected": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_evidence": [
+        "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+        "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+      ]
+    },
+    "status": "completed",
+    "query": "Sable delivery complete module list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "quote": "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "closed-list",
+    "arm": "selected_query",
+    "expected": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_evidence": [
+        "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+        "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+      ]
+    },
+    "status": "completed",
+    "query": "Sable delivery module names",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "quote": "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "closed-list",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera.",
+      "quote_evidence": [
+        "Fact: The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+      ]
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "Lumen",
+        "Rivet",
+        "Nimbus",
+        "Tessera"
+      ],
+      "source_ids": [
+        "episode:c6a6f83ced2d638c6ca11477"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Sable delivery contains exactly these four modules: Lumen, Rivet, Nimbus, Tessera."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c291db37c8836"
+      ],
+      "abstain": false,
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_evidence": [
+        "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+        "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+      ]
+    },
+    "status": "completed",
+    "query": "Tern dashboard tab order Orchard",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c291db37c8836"
+      ],
+      "abstain": false,
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c291db37c8836"
+      ],
+      "abstain": false,
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_evidence": [
+        "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+        "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+      ]
+    },
+    "status": "completed",
+    "query": "Tern dashboard tab order after Orchard",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c291db37c8836"
+      ],
+      "abstain": false,
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "adjacency",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c291db37c8836"
+      ],
+      "abstain": false,
+      "quote": "The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes.",
+      "quote_evidence": [
+        "Fact: The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+      ]
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Mosaic",
+      "source_ids": [
+        "episode:07d53a60b78c8836"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Tern dashboard tabs, in order, are: Signal, Orchard, Mosaic, Harbor, Notes."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": false,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": false
+    }
+  },
+  {
+    "case": "count",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_evidence": [
+        "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+        "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+      ]
+    },
+    "status": "completed",
+    "query": "Umber editor command bar actions complete list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "count",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_evidence": [
+        "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+        "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+      ]
+    },
+    "status": "completed",
+    "query": "Umber editor command bar actions list",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "count",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close.",
+      "quote_evidence": [
+        "Fact: The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+      ]
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "7",
+      "source_ids": [
+        "episode:689798e4dc783471d20596d1"
+      ],
+      "abstain": false,
+      "quote": "Fact: The Umber editor command bar contains these actions: Draft, Load, Store, Duplicate, Search, Publish, Close."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "registered_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_evidence": [
+        "The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+        "The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+      ]
+    },
+    "status": "completed",
+    "query": "Wren signing key approved storage bay status",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "selected_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_evidence": [
+        "The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+        "The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+      ]
+    },
+    "status": "completed",
+    "query": "Wren signing key approved storage bay",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_mode": "source_span",
+      "quote_source": "Fact: The Wren signing key has no approved storage bay; the bay assignment remains provisional.",
+      "quote_evidence": [
+        "Fact: The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+      ]
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:e3f2ad2f00a062eef85dbe15"
+      ],
+      "abstain": true,
+      "quote": "Fact: The Wren signing key has no approved storage bay; the bay assignment remains provisional."
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  }
+]

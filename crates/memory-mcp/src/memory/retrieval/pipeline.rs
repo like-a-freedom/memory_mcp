@@ -591,6 +591,7 @@ impl EpisodeFallbackStrategy {
 pub(super) async fn assemble_default_context(
     service: &RetrievalContext,
     params: DefaultContextParams<'_>,
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     // Task 14 decomposition: the assembly pipeline is split
     // into three private phase functions. Each phase takes
@@ -631,6 +632,16 @@ pub(super) async fn assemble_default_context(
         &channels.direct_facts,
     );
     let ranked = rank_fact_channels(service, &params, channels).await?;
+    #[cfg(feature = "eval-support")]
+    if trace.is_some() {
+        let items = ranked
+            .iter()
+            .map(|fact| {
+                ranked_fact_to_item(fact.clone(), params.cutoff, super::fact_decayed_confidence)
+            })
+            .collect::<Vec<_>>();
+        super::diagnostics::record(trace, "ranked_fact_candidates", &items);
+    }
     let explicit_subject_scoped_query = !query_evidence.subject_terms.is_empty()
         && query_evidence
             .content_terms
@@ -675,7 +686,15 @@ pub(super) async fn assemble_default_context(
     let ranked = super::reranking::filter_candidates(service, &params, ranked).await?;
     let current_query = query_evidence.intent == super::admission::AdmissionIntent::Current;
     let ranked = project_current_candidates(service, &params, &query_evidence, ranked).await?;
-    let selection = select_context_facts(service, &params, ranked, current_query).await?;
+    let selection = select_context_facts(
+        service,
+        &params,
+        ranked,
+        current_query,
+        #[cfg(feature = "eval-support")]
+        trace,
+    )
+    .await?;
     let mut source_question_candidates = source_question_candidates;
     for episode_id in &selection.episode_fallback_source_anchors {
         if !source_question_candidates.contains(episode_id) {
@@ -2022,6 +2041,7 @@ async fn select_context_facts(
     params: &DefaultContextParams<'_>,
     mut ranked_facts: Vec<RankedContextFact>,
     current_query: bool,
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
 ) -> Result<SelectedContext, MemoryError> {
     let timeline_mode = params.resolved_view_mode == Some("timeline")
         || (params.resolved_view_mode.is_none() && params.query_flags.wants_timeline);
@@ -2032,6 +2052,8 @@ async fn select_context_facts(
         (Vec::new(), Vec::new())
     } else if let Some(query) = params.query_opt {
         let items = collect_episode_fallback_items(service, params, query).await?;
+        #[cfg(feature = "eval-support")]
+        super::diagnostics::record(trace, "episode_candidates", &items);
         let mut seen_source_anchors = HashSet::new();
         let source_anchors = items
             .iter()

@@ -1,0 +1,189 @@
+{
+  "schema_version": "memory-mcp-agent-tasks/v2",
+  "tasks": [
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "Where is the Aster telemetry prism currently stored? Read current memory without historical time or knowledge selectors. Use one memory read. Return the exact stored location as answer and cite its returned source episode ID. Use budget 8 and compact true; leave unrelated filters and view settings at their defaults.",
+      "seed_episodes": [
+        {
+          "event_id": "aster-ledger",
+          "source_id": "source-aster-ledger",
+          "source_type": "document",
+          "content": "Fact: The Aster telemetry prism is kept in Cabinet-734.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "aster-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Cabinet-734"
+        ],
+        "forbidden_event_ids": [],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": null,
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "budget": 8,
+            "compact": true
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "At valid time 2026-05-15T10:00:00Z, where was the Beryl geodesic spindle stored? Use that exact valid_at and current knowledge (no known_at or known_revision). Use one memory read. Return the exact stored location as answer and cite its returned source episode ID. Use budget 8 and compact true; leave unrelated filters and view settings at their defaults.",
+      "seed_episodes": [
+        {
+          "event_id": "beryl-first",
+          "source_id": "source-beryl-first",
+          "source_type": "document",
+          "content": "Fact: The Beryl geodesic spindle is kept in Drawer-268.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        {
+          "event_id": "beryl-later",
+          "source_id": "source-beryl-later",
+          "source_type": "document",
+          "content": "Fact: The Beryl geodesic spindle is kept in Drawer-951.",
+          "valid_at": "2026-06-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "beryl-first"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Drawer-268"
+        ],
+        "forbidden_event_ids": [
+          "beryl-later"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-05-15T10:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "budget": 8,
+            "compact": true,
+            "valid_at": "2026-05-15T10:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "prompt": "At knowledge revision {{KNOWN_REVISION}} and valid time 2026-05-01T10:00:00Z, where was the Cobalt calibration seal stored? Use exactly that known_revision and valid_at, not known_at. Use one memory read. Return the exact stored location as answer and cite its returned source episode ID. Use budget 8 and compact true; leave unrelated filters and view settings at their defaults.",
+      "seed_episodes": [
+        {
+          "event_id": "cobalt-ledger",
+          "source_id": "source-cobalt-ledger",
+          "source_type": "document",
+          "content": "Fact: The Cobalt calibration seal is kept in Vault-462.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        {
+          "event_id": "cobalt-correction",
+          "source_id": "source-cobalt-correction",
+          "source_type": "document",
+          "content": "Fact: The Cobalt calibration seal is kept in Vault-817.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [
+          [
+            [
+              "cobalt-ledger"
+            ]
+          ]
+        ],
+        "accepted_answers": [
+          "Vault-462"
+        ],
+        "forbidden_event_ids": [
+          "cobalt-correction"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-05-01T10:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "budget": 8,
+            "compact": true,
+            "known_revision": 6,
+            "valid_at": "2026-05-01T10:00:00Z"
+          }
+        }
+      },
+      "knowledge_before_event_id": "cobalt-correction"
+    },
+    {
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "prompt": "Using knowledge as of 2020-01-01T00:00:00Z and valid time 2026-05-01T10:00:00Z, where was the Dahlia ballast key stored? Use that exact known_at and valid_at, not known_revision. Make one memory read with budget 8 and compact true, leaving unrelated filters and view settings at defaults. If that knowledge boundary contains no evidence, answer exactly unknown with citations [], and do not ask a clarification question.",
+      "seed_episodes": [
+        {
+          "event_id": "dahlia-ledger",
+          "source_id": "source-dahlia-ledger",
+          "source_type": "document",
+          "content": "Fact: The Dahlia ballast key is kept in Locker-395.",
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      ],
+      "oracle": {
+        "sufficient_evidence_alternatives": [],
+        "accepted_answers": [
+          "unknown"
+        ],
+        "forbidden_event_ids": [
+          "dahlia-ledger"
+        ],
+        "needs_clarification": false,
+        "read_expectation": {
+          "valid_at": "2026-05-01T10:00:00Z",
+          "required_claim_annotation_alternatives": [],
+          "selector_arguments": {
+            "budget": 8,
+            "compact": true,
+            "known_at": "2020-01-01T00:00:00Z",
+            "valid_at": "2026-05-01T10:00:00Z"
+          }
+        }
+      }
+    }
+  ]
+}

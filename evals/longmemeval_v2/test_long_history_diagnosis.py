@@ -23,6 +23,9 @@ class LongHistoryDiagnosisCliTests(unittest.TestCase):
             }
             inputs['readers'][0]['memory_context_sha256'] = hashlib.sha256(json.dumps(inputs['prompts'][0]['memory_context'], ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
             mutate(inputs)
+            if 'stage-receipts' in inputs:
+                for case in inputs['stage-receipts']['cases'].values():
+                    case.setdefault('memory_context_sha256', hashlib.sha256(json.dumps(inputs['prompts'][0]['memory_context'], ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest())
             for name, value in inputs.items():
                 (root / name).write_text(json.dumps(value) if name not in ('prompts', 'readers') else '\n'.join(json.dumps(x) for x in value))
             result = subprocess.run([sys.executable, '-m', 'evals.longmemeval_v2.long_history_diagnosis', *[arg for name in inputs for arg in ('--' + name, str(root / name))]], capture_output=True, text=True)
@@ -87,6 +90,50 @@ class LongHistoryDiagnosisCliTests(unittest.TestCase):
         result = self.run_diagnostic(lambda inputs: inputs['readers'][0].pop('memory_context_sha256'))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['cases']['case']['failure_localization'], 'end_to_end_failure_stage_unknown')
+
+    def test_first_loss_is_packing_only_with_linked_intermediate_evidence(self):
+        def stages(inputs):
+            digest = inputs['cohort']['reviews']['case']['span_sha256']
+            def observation(stage, content):
+                return {'stage': stage, 'elapsed_ms': 1, 'items': [{'source_episode': 'episode:reviewed', 'content': content}]}
+            inputs['stage-receipts'] = {'schema': 'memory-mcp-source-stage-receipts/v1', 'cases': {'case': {
+                'reviewed_span_sha256': digest, 'source_episode_id': 'episode:reviewed',
+                'observations': [observation('formation', 'Tabs: Forums, Tags, Alphabetical'), observation('candidates', 'Tabs: Forums, Tags, Alphabetical'), observation('selected_pre_packaging', 'Tabs: Forums, Tags, Alphabetical'), observation('packed_context', 'Tabs: Forums')]}}}
+        result = self.run_diagnostic(stages)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        case = json.loads(result.stdout)['cases']['case']
+        self.assertEqual(case['first_observed_loss'], 'packaging')
+        self.assertEqual(case['evidence_selection'], 'complete_reviewed_span_observed')
+
+    def test_missing_candidate_observation_cannot_name_packaging_as_first_loss(self):
+        def stages(inputs):
+            inputs['stage-receipts'] = {'schema': 'memory-mcp-source-stage-receipts/v1', 'cases': {'case': {
+                'reviewed_span_sha256': inputs['cohort']['reviews']['case']['span_sha256'],
+                'source_episode_id': 'episode:reviewed',
+                'observations': [{'stage': name, 'elapsed_ms': 1, 'items': [{'source_episode': 'episode:reviewed', 'content': text}]} for name, text in (
+                    ('formation', 'Tabs: Forums, Tags, Alphabetical'), ('selected_pre_packaging', 'Tabs: Forums, Tags, Alphabetical'), ('packed_context', 'Tabs: Forums'))]}}}
+        result = self.run_diagnostic(stages)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['cases']['case']['first_observed_loss'], 'unknown_missing_intermediate_observation')
+
+    def test_stage_from_another_source_is_rejected(self):
+        def stages(inputs):
+            inputs['stage-receipts'] = {'schema': 'memory-mcp-source-stage-receipts/v1', 'cases': {'case': {
+                'reviewed_span_sha256': inputs['cohort']['reviews']['case']['span_sha256'],
+                'source_episode_id': 'episode:reviewed', 'observations': [
+                    {'stage': 'formation', 'elapsed_ms': 1, 'items': [{'source_episode': 'episode:other', 'content': 'Tabs: Forums, Tags, Alphabetical'}]}]}}}
+        result = self.run_diagnostic(stages)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('stage item is detached from reviewed source episode', result.stderr)
+
+    def test_stage_context_receipt_cannot_attach_to_a_different_read(self):
+        def stages(inputs):
+            inputs['stage-receipts'] = {'schema': 'memory-mcp-source-stage-receipts/v1', 'cases': {'case': {
+                'reviewed_span_sha256': inputs['cohort']['reviews']['case']['span_sha256'],
+                'source_episode_id': 'episode:reviewed', 'memory_context_sha256': '0' * 64, 'observations': []}}}
+        result = self.run_diagnostic(stages)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('stage context digest mismatch', result.stderr)
 
 
 if __name__ == '__main__':

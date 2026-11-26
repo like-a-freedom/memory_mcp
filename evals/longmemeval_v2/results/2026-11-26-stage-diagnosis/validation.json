@@ -1,0 +1,26 @@
+{
+  "rust_scoped": {
+    "command": "rtk cargo test -p memory_mcp --features eval-support --test long_history_stage_evidence",
+    "passed": 6,
+    "failed": 0,
+    "seconds": 1.36
+  },
+  "python_longmemeval": {
+    "discovered": 54,
+    "passed": 49,
+    "skipped": 5
+  },
+  "additional_observed_reds": [
+    "formation must be actual persisted source read",
+    "diagnostic source must respect request tag policy",
+    "stage context digest mismatch must reject"
+  ],
+  "original_pre_capture": {
+    "passed": 2,
+    "failed": 2
+  },
+  "paired_post_capture": {
+    "passed": 5,
+    "failed": 0
+  }
+}

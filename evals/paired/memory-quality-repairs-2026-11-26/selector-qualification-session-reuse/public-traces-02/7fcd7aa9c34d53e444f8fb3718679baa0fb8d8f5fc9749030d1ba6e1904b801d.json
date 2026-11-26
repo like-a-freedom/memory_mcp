@@ -1,0 +1,92 @@
+{
+  "schema_version": "memory-mcp-public-synthetic-trace/v1",
+  "identity": {
+    "plan_sha256": "5344c7dd3bcb4338b92b55f4c71bcd11911af106089532c2df0698bb3335015c",
+    "product_binary_sha256": "c91d2d2eb7682e448292ffaa33ef0b52553cb1e36eb011500c4e494ed628acb7",
+    "tool_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "key": {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    "arm": "incumbent",
+    "phase": "recall"
+  },
+  "calls": [
+    {
+      "tool": "assemble_context",
+      "arguments": {
+        "budget": 8,
+        "compact": true,
+        "query": "Where is the Aster telemetry prism currently stored?"
+      },
+      "arguments_sha256": "afea97953dc7f6e5cd4bae1f9f941019333a002f6e223a96623f09e40e21af4f",
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"guidance\":\"Call explain if you need provenance-ready citations for selected items.\",\"result\":[{\"confidence\":0.31,\"content\":\"The Aster telemetry prism is kept in Cabinet-734.\",\"fact_id\":\"fact:2f49c21b45bcc6e1b34586e6\",\"grounding\":0.53,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"aster\",\"telemetry\",\"prism\"],\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"aster\",\"telemetry\",\"prism\"],\"matched_index_key_terms\":[\"aster\"],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":null},\"source_episode_id\":\"episode:7a1d2efc3dee5e991bf1a391\",\"source_id\":\"source-aster-ledger\",\"source_type\":\"document\"},\"rationale\":\"tier=fallback\",\"relevance\":0.07,\"retrieval_tier\":\"fallback\",\"semantic_available\":false,\"source_episode\":\"episode:7a1d2efc3dee5e991bf1a391\"}],\"status\":\"success\"}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "guidance": "Call explain if you need provenance-ready citations for selected items.",
+            "result": [
+              {
+                "confidence": 0.31,
+                "content": "The Aster telemetry prism is kept in Cabinet-734.",
+                "fact_id": "fact:2f49c21b45bcc6e1b34586e6",
+                "grounding": 0.53,
+                "provenance": {
+                  "extraction_strategy": "structured_summary_line",
+                  "ingestion_method": "extraction",
+                  "matched_query_terms": [
+                    "aster",
+                    "telemetry",
+                    "prism"
+                  ],
+                  "retrieval_admission": {
+                    "basis": "lexical",
+                    "community": null,
+                    "explicit_date_admitted": false,
+                    "graph_anchor_origin": null,
+                    "hop_count": null,
+                    "matched_content_terms": [
+                      "aster",
+                      "telemetry",
+                      "prism"
+                    ],
+                    "matched_index_key_terms": [
+                      "aster"
+                    ],
+                    "matched_references": [],
+                    "policy_version": "retrieval-admission-v1",
+                    "repeated_topic": null,
+                    "resolved_entity_ids": [],
+                    "semantic_similarity": null
+                  },
+                  "source_episode_id": "episode:7a1d2efc3dee5e991bf1a391",
+                  "source_id": "source-aster-ledger",
+                  "source_type": "document"
+                },
+                "rationale": "tier=fallback",
+                "relevance": 0.07,
+                "retrieval_tier": "fallback",
+                "semantic_available": false,
+                "source_episode": "episode:7a1d2efc3dee5e991bf1a391"
+              }
+            ],
+            "status": "success"
+          }
+        }
+      },
+      "response_sha256": "0f0c0fc7cb947af55a6906c487459033f77fcd0ef8890b017e36ae48c94e3c6a",
+      "call_failed": false
+    }
+  ]
+}

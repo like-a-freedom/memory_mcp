@@ -2,14 +2,9 @@ use eval_harness::{CaseStatus, EvalProfile, EvalSuite, ExtractionSuite, RunConte
 
 #[tokio::test]
 async fn complete_entity_expectation_rejects_false_positives() {
-    let outcomes = ExtractionSuite::new()
-        .unwrap()
-        .run(&RunContext::new(EvalProfile::Pr))
-        .await;
-    let outcome = outcomes
-        .iter()
-        .find(|o| o.case_id().as_str() == "ext-001")
-        .unwrap();
+    let outcome = run_fixture(serde_json::json!({
+        "id":"deliberately-incomplete-entities", "description":"adversarial closed expectation omits a clearly named person", "source_type":"chat", "source_id":"person", "content":"Alice Smith prefers weekly updates.", "expected":{}
+    })).await;
     assert_eq!(outcome.metrics["entity_precision"], 0.0);
     assert_eq!(outcome.status, CaseStatus::QualityFailed);
     assert!(

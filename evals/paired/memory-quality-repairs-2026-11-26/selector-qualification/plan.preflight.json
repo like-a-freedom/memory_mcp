@@ -1,0 +1,95 @@
+{
+  "schema_version": "memory-mcp-agent-plan/v2",
+  "plan_id": "native-qwen-autonomous-temporal-selectors-repairs-2026-11-26",
+  "stage": "development_pilot",
+  "expected_trials": [
+    {
+      "stratum_id": "ordinary",
+      "family_id": "aster-current",
+      "case_id": "aster-current",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "beryl-valid-time",
+      "case_id": "beryl-valid-time",
+      "repetition": 1,
+      "incumbent_first": false
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "cobalt-revision-checkpoint",
+      "case_id": "cobalt-revision-checkpoint",
+      "repetition": 1,
+      "incumbent_first": true
+    },
+    {
+      "stratum_id": "ordinary",
+      "family_id": "dahlia-before-ingestion",
+      "case_id": "dahlia-before-ingestion",
+      "repetition": 1,
+      "incumbent_first": false
+    }
+  ],
+  "planned_independent_families": 4,
+  "shared_identity": {
+    "agent_runner": "openai-compatible-chat-completions",
+    "agent_version": "public Rust Chat Completions recall runner; direct local MLX; temporal qualification",
+    "model": "PENDING_ROOT_RUNTIME_ALIAS",
+    "model_identity_protocol": {
+      "method": "same_alias_within_invocation",
+      "max_duration_seconds": 600
+    },
+    "system_prompt_sha256": "f4381cdb818df28748c22a9df6d54f3dcbac6a877993ae0a8b60cd1ae7c895ec",
+    "task_prompt_sha256": "83f49d8d547dac601159bafdc79648572836252b55bef5ba320cbf32d6fb3c75",
+    "host_policy_sha256": "9b4e3d2291d42d5d1f488c3879dc389a474c6085f65652f6768ba80d44aa4cd6",
+    "transport": "stdio",
+    "retry_policy_sha256": "7001ba39a70c4567bfa8640f34c2f76f0d12c4494ec2f3d30e3576187d221642",
+    "reader_config_sha256": "e182dd29e1cafa0b980121839f482104fabf10da7204c9c80d037afb3c7a095c",
+    "judge_config_sha256": null,
+    "corpus_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "oracle_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "clock_id": "macos-utc-wall-clock-v1",
+    "simulator_sha256": "8f7aec6089e1c83b9b44df8b90f0f8565257d255f2a72db75998f5dd99b45708",
+    "provider_fingerprints": {
+      "memory_eval_cli": "PENDING_PUBLIC_PREFLIGHT",
+      "chat_completions_endpoint_config": "PENDING_PUBLIC_PREFLIGHT"
+    },
+    "context_budget_tokens": 4096,
+    "tool_call_budget": 1,
+    "turn_budget": 3,
+    "output_token_budget": 384,
+    "wall_time_budget_ms": 25000,
+    "hardware_class": "macos-arm64"
+  },
+  "incumbent_product": {
+    "revision": "PENDING_PUBLIC_PREFLIGHT",
+    "binary_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "product_config_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "tool_schema_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "candidate_product": {
+    "revision": "PENDING_PUBLIC_PREFLIGHT",
+    "binary_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "product_config_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "tool_schema_sha256": "PENDING_PUBLIC_PREFLIGHT",
+    "enabled_features": [
+      "fs-watch"
+    ],
+    "claim_rollout_stage": "evidence"
+  },
+  "declared_tool_schema_change": null,
+  "bootstrap": {
+    "seed": 2026112604,
+    "draws": 10000,
+    "confidence_level_basis_points": 9500
+  },
+  "pilot_report_sha256": null,
+  "power_analysis_sha256": null,
+  "promotion_criteria": null
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "name": "closed-reader",
+    "result_sha256": "29ca850ed2f258e592089b4a31bfb8231f741283c5bfecca9c1dcfe250d0f470",
+    "archived_script_sha256": "68d3770e8a5e5d6296eea347eb7de911a6c0d3f192b2874c6faf82ea369426d1",
+    "captures": [
+      {
+        "repetition": 1,
+        "scheduled": 12,
+        "strict_passes": 6,
+        "scores_unchanged": true
+      }
+    ]
+  },
+  {
+    "name": "closed-reader-source-span-v2",
+    "result_sha256": "f17757200c80360222cc56022c0afe6f3d7a775591481cf3a8440ef52197121c",
+    "archived_script_sha256": "f53cfc3a4a3dc416bdf0a3cdbee5b21ad23bd963c45d9ec5ecd749fe7a734804",
+    "captures": [
+      {
+        "repetition": 1,
+        "scheduled": 12,
+        "strict_passes": 11,
+        "scores_unchanged": true
+      }
+    ]
+  },
+  {
+    "name": "closed-reader-source-handles-v3",
+    "result_sha256": "9109758cf6d85329992dec75e148cec4382f8c4bd9a3cf7dd9dc95cf69536404",
+    "archived_script_sha256": "b8881464f28a915c5fddacce3447cec9116921829bd3f4bead1e0801d8d3da6b",
+    "captures": [
+      {
+        "repetition": 1,
+        "scheduled": 12,
+        "strict_passes": 12,
+        "scores_unchanged": true
+      },
+      {
+        "repetition": 2,
+        "scheduled": 12,
+        "strict_passes": 12,
+        "scores_unchanged": true
+      }
+    ]
+  }
+]

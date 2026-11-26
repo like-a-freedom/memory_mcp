@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use anno::{HeuristicNER, Model, RegexNER, StackedNER};
+use anno::{EntityCategory, HeuristicNER, Model, RegexNER, StackedNER};
 use async_trait::async_trait;
 
 use crate::models::EntityCandidate;
@@ -79,6 +79,10 @@ impl EntityExtractor for AnnoEntityExtractor {
         "anno"
     }
 
+    fn fingerprint(&self) -> super::ExtractorFingerprint {
+        super::ExtractorFingerprint::new("anno|identity-admission=v2")
+    }
+
     fn max_input_bytes(&self) -> Option<usize> {
         Some(self.max_input_bytes)
     }
@@ -100,7 +104,16 @@ impl EntityExtractor for AnnoEntityExtractor {
 
         let mut candidates = BTreeMap::new();
 
-        for entity in entities {
+        for entity in &entities {
+            // Pattern-recognized values do not establish durable identity.
+            // Retain the backend's semantic category before label mapping loses it.
+            if matches!(
+                entity.entity_type.category(),
+                EntityCategory::Numeric | EntityCategory::Temporal
+            ) || is_metric_dimension(entity, &entities, content)
+            {
+                continue;
+            }
             let canonical_name = entity.text.trim();
             if canonical_name.is_empty() {
                 continue;
@@ -119,6 +132,32 @@ impl EntityExtractor for AnnoEntityExtractor {
 
         Ok(candidates.into_values().collect())
     }
+}
+
+/// An isolated uppercase label immediately predicated on a typed numeric value
+/// is an attribute dimension, rather than evidence of an organization identity.
+/// Keep the span grammar local to the original occurrence; a genuine named
+/// occurrence elsewhere in the same text can still establish the entity.
+fn is_metric_dimension(entity: &anno::Entity, entities: &[anno::Entity], content: &str) -> bool {
+    let name = entity.text.trim();
+    if name.chars().count() < 2 || !name.chars().all(char::is_uppercase) {
+        return false;
+    }
+    let Some(value) = entities
+        .iter()
+        .filter(|value| {
+            value.entity_type.category() == EntityCategory::Numeric && value.start() >= entity.end()
+        })
+        .min_by_key(|value| value.start())
+    else {
+        return false;
+    };
+    let predicate = content
+        .chars()
+        .skip(entity.end())
+        .take(value.start() - entity.end())
+        .collect::<String>();
+    predicate.trim().eq_ignore_ascii_case("is") || predicate.trim().eq_ignore_ascii_case("grew to")
 }
 
 fn map_label(label: &str) -> &'static str {

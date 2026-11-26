@@ -1,0 +1,316 @@
+[
+  {
+    "case": "aster-current",
+    "revisions": [
+      {
+        "event": "aster-ledger",
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:31.776499Z",
+          "known_revision": 6,
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:2f49c21b45bcc6e1b34586e6",
+            "source_quote": "The Aster telemetry prism is kept in Cabinet-734.",
+            "statement": "The Aster telemetry prism is kept in Cabinet-734.",
+            "type": "note"
+          }
+        ]
+      }
+    ],
+    "episode_bindings": {
+      "episode:7a1d2efc3dee5e991bf1a391": "aster-ledger"
+    },
+    "request": {
+      "query": "Aster telemetry prism",
+      "budget": 8,
+      "compact": true
+    },
+    "response": {
+      "guidance": "Call explain if you need provenance-ready citations for selected items.",
+      "result": [
+        {
+          "confidence": 0.31,
+          "content": "The Aster telemetry prism is kept in Cabinet-734.",
+          "fact_id": "fact:2f49c21b45bcc6e1b34586e6",
+          "grounding": 0.75,
+          "provenance": {
+            "extraction_strategy": "structured_summary_line",
+            "ingestion_method": "extraction",
+            "matched_query_terms": [
+              "aster",
+              "telemetry",
+              "prism"
+            ],
+            "retrieval_admission": {
+              "basis": "lexical",
+              "community": null,
+              "explicit_date_admitted": false,
+              "graph_anchor_origin": null,
+              "hop_count": null,
+              "matched_content_terms": [
+                "aster",
+                "telemetry",
+                "prism"
+              ],
+              "matched_index_key_terms": [
+                "aster"
+              ],
+              "matched_references": [],
+              "policy_version": "retrieval-admission-v1",
+              "repeated_topic": null,
+              "resolved_entity_ids": [],
+              "semantic_similarity": null
+            },
+            "source_episode_id": "episode:7a1d2efc3dee5e991bf1a391",
+            "source_id": "source-aster-ledger",
+            "source_type": "document"
+          },
+          "rationale": "tier=direct",
+          "relevance": 0.07,
+          "retrieval_tier": "direct",
+          "semantic_available": false,
+          "source_episode": "episode:7a1d2efc3dee5e991bf1a391"
+        }
+      ],
+      "status": "success"
+    }
+  },
+  {
+    "case": "beryl-valid-time",
+    "revisions": [
+      {
+        "event": "beryl-first",
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:45.042688Z",
+          "known_revision": 6,
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:64b96a6a0632c24ab5f216f4",
+            "source_quote": "The Beryl geodesic spindle is kept in Drawer-268.",
+            "statement": "The Beryl geodesic spindle is kept in Drawer-268.",
+            "type": "note"
+          }
+        ]
+      },
+      {
+        "event": "beryl-later",
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:45.235884Z",
+          "known_revision": 12,
+          "valid_at": "2026-06-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:4ee3044c96575a82db2de137",
+            "source_quote": "The Beryl geodesic spindle is kept in Drawer-951.",
+            "statement": "The Beryl geodesic spindle is kept in Drawer-951.",
+            "type": "note"
+          }
+        ]
+      }
+    ],
+    "episode_bindings": {
+      "episode:b15214da6230e72b9d70fd19": "beryl-first",
+      "episode:e72d2c177386aafdd985844d": "beryl-later"
+    },
+    "request": {
+      "query": "Beryl geodesic spindle",
+      "budget": 8,
+      "compact": true,
+      "valid_at": "2026-05-15T10:00:00Z"
+    },
+    "response": {
+      "context": {
+        "candidate_scan_truncated": false,
+        "completeness": "partial",
+        "omitted_channels": [
+          "alias expansion",
+          "experience, source episode siblings and source context neighborhoods",
+          "triples, graph edges and community summaries",
+          "semantic ANN and mutable embeddings",
+          "mutable fact access heat",
+          "legacy facts and episodes without committed revision provenance"
+        ],
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:45.259967Z",
+          "known_revision": 12,
+          "valid_at": "2026-05-15T10:00:00Z"
+        }
+      },
+      "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+      "result": [
+        {
+          "confidence": 0.66,
+          "content": "The Beryl geodesic spindle is kept in Drawer-268.",
+          "evidence_status": "current",
+          "fact_id": "fact:64b96a6a0632c24ab5f216f4",
+          "grounding": 1.0,
+          "provenance": {
+            "extraction_strategy": "structured_summary_line",
+            "ingestion_method": "extraction",
+            "known_revision": 12,
+            "source_episode_id": "episode:b15214da6230e72b9d70fd19",
+            "source_id": "source-beryl-first",
+            "source_type": "document",
+            "valid_at": "2026-05-15T10:00:00+00:00"
+          },
+          "rationale": "historical",
+          "relevance": 1.0,
+          "retrieval_tier": "historical_direct",
+          "semantic_available": false,
+          "source_episode": "episode:b15214da6230e72b9d70fd19"
+        }
+      ],
+      "status": "success"
+    }
+  },
+  {
+    "case": "cobalt-revision-checkpoint",
+    "revisions": [
+      {
+        "event": "cobalt-ledger",
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:57.028267Z",
+          "known_revision": 6,
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:36ab8a7e689d6e1dd0138336",
+            "source_quote": "The Cobalt calibration seal is kept in Vault-462.",
+            "statement": "The Cobalt calibration seal is kept in Vault-462.",
+            "type": "note"
+          }
+        ]
+      },
+      {
+        "event": "cobalt-correction",
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:57.287641Z",
+          "known_revision": 12,
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:0d5fd4dbba0cf6b3fade1c3a",
+            "source_quote": "The Cobalt calibration seal is kept in Vault-817.",
+            "statement": "The Cobalt calibration seal is kept in Vault-817.",
+            "type": "note"
+          }
+        ]
+      }
+    ],
+    "episode_bindings": {
+      "episode:cc5b2f79bad783be1d7144cf": "cobalt-ledger",
+      "episode:d7860c957186402f996c0a11": "cobalt-correction"
+    },
+    "request": {
+      "query": "Cobalt calibration seal",
+      "budget": 8,
+      "compact": true,
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_revision": 6
+    },
+    "response": {
+      "context": {
+        "candidate_scan_truncated": false,
+        "completeness": "partial",
+        "omitted_channels": [
+          "alias expansion",
+          "experience, source episode siblings and source context neighborhoods",
+          "triples, graph edges and community summaries",
+          "semantic ANN and mutable embeddings",
+          "mutable fact access heat",
+          "legacy facts and episodes without committed revision provenance"
+        ],
+        "snapshot": {
+          "known_at": "2026-11-26T08:16:56.967983Z",
+          "known_revision": 6,
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      },
+      "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+      "result": [
+        {
+          "confidence": 0.7,
+          "content": "The Cobalt calibration seal is kept in Vault-462.",
+          "evidence_status": "current",
+          "fact_id": "fact:36ab8a7e689d6e1dd0138336",
+          "grounding": 1.0,
+          "provenance": {
+            "extraction_strategy": "structured_summary_line",
+            "ingestion_method": "extraction",
+            "known_revision": 6,
+            "source_episode_id": "episode:cc5b2f79bad783be1d7144cf",
+            "source_id": "source-cobalt-ledger",
+            "source_type": "document",
+            "valid_at": "2026-05-01T10:00:00+00:00"
+          },
+          "rationale": "historical",
+          "relevance": 1.0,
+          "retrieval_tier": "historical_direct",
+          "semantic_available": false,
+          "source_episode": "episode:cc5b2f79bad783be1d7144cf"
+        }
+      ],
+      "status": "success"
+    }
+  },
+  {
+    "case": "dahlia-before-ingestion",
+    "revisions": [
+      {
+        "event": "dahlia-ledger",
+        "snapshot": {
+          "known_at": "2026-11-26T08:17:08.397392Z",
+          "known_revision": 6,
+          "valid_at": "2026-05-01T10:00:00Z"
+        },
+        "facts": [
+          {
+            "fact_id": "fact:ca412de8928fd415e5ed3564",
+            "source_quote": "The Dahlia ballast key is kept in Locker-395.",
+            "statement": "The Dahlia ballast key is kept in Locker-395.",
+            "type": "note"
+          }
+        ]
+      }
+    ],
+    "episode_bindings": {
+      "episode:6827cd768f9314bcf4f929c6": "dahlia-ledger"
+    },
+    "request": {
+      "query": "Dahlia ballast key",
+      "budget": 8,
+      "compact": true,
+      "valid_at": "2026-05-01T10:00:00Z",
+      "known_at": "2020-01-01T00:00:00Z"
+    },
+    "response": {
+      "context": {
+        "candidate_scan_truncated": false,
+        "completeness": "partial",
+        "omitted_channels": [
+          "alias expansion",
+          "experience, source episode siblings and source context neighborhoods",
+          "triples, graph edges and community summaries",
+          "semantic ANN and mutable embeddings",
+          "mutable fact access heat",
+          "legacy facts and episodes without committed revision provenance"
+        ],
+        "snapshot": {
+          "known_at": "2020-01-01T00:00:00Z",
+          "known_revision": 0,
+          "valid_at": "2026-05-01T10:00:00Z"
+        }
+      },
+      "guidance": "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.",
+      "result": [],
+      "status": "success"
+    }
+  }
+]

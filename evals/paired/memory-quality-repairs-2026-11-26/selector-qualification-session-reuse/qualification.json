@@ -1,0 +1,54 @@
+{
+  "schema_version": "memory-mcp-agent-workflow-qualification/v1",
+  "plan_id": "native-qwen-autonomous-temporal-session-reuse-development-2026-11-26",
+  "plan_sha256": "5344c7dd3bcb4338b92b55f4c71bcd11911af106089532c2df0698bb3335015c",
+  "manifest_sha256": "33e6f9b29f218b247a52a02d958057f40b947b460619ad0dbe70eb111582aab5",
+  "probes_sha256": "8bda7ca342d8e970524d86dd804cf420cb3d3d62768cbff0df4f167fc0d1543f",
+  "criteria_sha256": "9c3aec3080c6274633d36f8fa4c30cf7277170ecc4201a9125e8f73b4527bab8",
+  "criteria": {
+    "ordinary_stratum_id": "ordinary",
+    "expected_trial_count": 4,
+    "minimum_task_successes": 4,
+    "minimum_direct_memory_successes": 4,
+    "minimum_probe_successes": 4
+  },
+  "captures": [
+    {
+      "run_id": "38320-1795682373271527000-1",
+      "incumbent_artifact_sha256": "64b89f4c5a685cb329c48b5c686da47bc9cfbfb06f9df6c79675ba61f2570fdb",
+      "candidate_artifact_sha256": "ed8a4e966799922c7256879233bbdbe617aca3f05c4dfe17becba1217e4d8225",
+      "candidate_task_successes": 4,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 4,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 0,
+      "candidate_max_turns": 2,
+      "candidate_max_tool_calls": 1,
+      "candidate_max_output_tokens": 145,
+      "candidate_max_wall_time_ms": 12242,
+      "failed_gates": [],
+      "eligible": true
+    },
+    {
+      "run_id": "38766-1795682576217812000-1",
+      "incumbent_artifact_sha256": "b1a6295cd125b643775e8a809216e7249646f3a145ab7f088303bd02f24b7a29",
+      "candidate_artifact_sha256": "32c242a124637a444fad10b1a7cec59411d331fa1cd58728da75ce051630c74a",
+      "candidate_task_successes": 4,
+      "candidate_task_trials": 4,
+      "candidate_direct_memory_successes": 4,
+      "candidate_independent_probe_successes": 4,
+      "candidate_independent_probe_trials": 4,
+      "candidate_hard_violations": 0,
+      "candidate_budget_exit_trials": 0,
+      "candidate_max_turns": 2,
+      "candidate_max_tool_calls": 1,
+      "candidate_max_output_tokens": 145,
+      "candidate_max_wall_time_ms": 19295,
+      "failed_gates": [],
+      "eligible": true
+    }
+  ],
+  "eligible": true
+}

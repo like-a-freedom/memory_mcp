@@ -1,0 +1,147 @@
+{
+  "schema": "temporal-both-arm-audit/v2",
+  "eligible": true,
+  "scheduled_arm_trials": 8,
+  "passing_arm_trials": 8,
+  "missing_arms": [],
+  "rows": [
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": true,
+      "actual_query": "Where is the Aster telemetry prism currently stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true
+      }
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": true,
+      "actual_query": "Where was the Beryl geodesic spindle stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "valid_at": "2026-05-15T10:00:00Z"
+      }
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": true,
+      "actual_query": "Where was the Cobalt calibration seal stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    },
+    {
+      "arm": "incumbent",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": true,
+      "actual_query": "Dahlia ballast key storage location",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "known_at": "2020-01-01T00:00:00Z",
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "aster-current",
+        "case_id": "aster-current",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": true,
+      "actual_query": "Where is the Aster telemetry prism currently stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true
+      }
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "beryl-valid-time",
+        "case_id": "beryl-valid-time",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": true,
+      "actual_query": "Where was the Beryl geodesic spindle stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "valid_at": "2026-05-15T10:00:00Z"
+      }
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "cobalt-revision-checkpoint",
+        "case_id": "cobalt-revision-checkpoint",
+        "repetition": 1,
+        "incumbent_first": true
+      },
+      "passed": true,
+      "actual_query": "Where was the Cobalt calibration seal stored?",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "known_revision": 6,
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    },
+    {
+      "arm": "candidate",
+      "key": {
+        "stratum_id": "ordinary",
+        "family_id": "dahlia-before-ingestion",
+        "case_id": "dahlia-before-ingestion",
+        "repetition": 1,
+        "incumbent_first": false
+      },
+      "passed": true,
+      "actual_query": "Dahlia ballast key storage location",
+      "actual_selectors": {
+        "budget": 8,
+        "compact": true,
+        "known_at": "2020-01-01T00:00:00Z",
+        "valid_at": "2026-05-01T10:00:00Z"
+      }
+    }
+  ]
+}
