@@ -1,0 +1,214 @@
+{
+  "candidate": {
+    "evidence_verified_before_invalidation": 4,
+    "exact_cited_answers": 4,
+    "exact_stale_fact_invalidation_verified": 4,
+    "first_read_exact_registered_question_matches": 0,
+    "gates": {
+      "bounded_retry_contract": true,
+      "evidence_before_invalidation_floor": true,
+      "exact_extract_floor": true,
+      "exact_stale_fact_invalidation_floor": true,
+      "independent_probe_floor": true,
+      "successful_invalidation_floor": true,
+      "task_success_floor": true,
+      "zero_hard_violations": true,
+      "zero_resource_exits": true,
+      "zero_untrusted_probe_sources": true
+    },
+    "guidance_authorized_retry_trials": 0,
+    "hard_violations": 0,
+    "independent_probe_successes": 4,
+    "nonempty_reads_with_source_coverage": 4,
+    "passed": true,
+    "read_count": 4,
+    "read_outcomes": {
+      "nonempty": 4
+    },
+    "recall_wall_time_ms": {
+      "max": 16648,
+      "mean": 15340.75,
+      "median": 15210.5
+    },
+    "resource_or_timeout_exits": 0,
+    "retry_contract_violations": [],
+    "selector_argument_match_counts": {
+      "as_of": {
+        "match": 3,
+        "mismatch": 1,
+        "unknown": 0
+      },
+      "budget": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "compact": {
+        "match": 1,
+        "mismatch": 3,
+        "unknown": 0
+      },
+      "fact_types": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "known_at": {
+        "match": 1,
+        "mismatch": 3,
+        "unknown": 0
+      },
+      "known_revision": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "valid_at": {
+        "match": 3,
+        "mismatch": 1,
+        "unknown": 0
+      },
+      "view_mode": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "window_end": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "window_start": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      }
+    },
+    "successful_exact_once_extracts": 4,
+    "successful_exact_once_invalidations": 4,
+    "task_successes": 4,
+    "trials": 4,
+    "unsupported_or_prohibited_probe_sources": 0,
+    "valid_time_match_counts": {
+      "requested": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "returned": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "eligible_for_capture_02": true,
+  "exact_invalidation_evidence": "private successful-read fact_id/source match precedes invalidation; IDs and sequence values are not persisted",
+  "incumbent": {
+    "evidence_verified_before_invalidation": 4,
+    "exact_cited_answers": 4,
+    "exact_stale_fact_invalidation_verified": 4,
+    "first_read_exact_registered_question_matches": 0,
+    "gates": {
+      "bounded_retry_contract": true,
+      "evidence_before_invalidation_floor": true,
+      "exact_extract_floor": true,
+      "exact_stale_fact_invalidation_floor": true,
+      "independent_probe_floor": true,
+      "successful_invalidation_floor": true,
+      "task_success_floor": true,
+      "zero_hard_violations": true,
+      "zero_resource_exits": true,
+      "zero_untrusted_probe_sources": true
+    },
+    "guidance_authorized_retry_trials": 0,
+    "hard_violations": 0,
+    "independent_probe_successes": 4,
+    "nonempty_reads_with_source_coverage": 4,
+    "passed": true,
+    "read_count": 4,
+    "read_outcomes": {
+      "nonempty": 4
+    },
+    "recall_wall_time_ms": {
+      "max": 16206,
+      "mean": 14186,
+      "median": 14283.0
+    },
+    "resource_or_timeout_exits": 0,
+    "retry_contract_violations": [],
+    "selector_argument_match_counts": {
+      "as_of": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "budget": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "compact": {
+        "match": 1,
+        "mismatch": 3,
+        "unknown": 0
+      },
+      "fact_types": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "known_at": {
+        "match": 0,
+        "mismatch": 4,
+        "unknown": 0
+      },
+      "known_revision": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "valid_at": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "view_mode": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "window_end": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "window_start": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      }
+    },
+    "successful_exact_once_extracts": 4,
+    "successful_exact_once_invalidations": 4,
+    "task_successes": 4,
+    "trials": 4,
+    "unsupported_or_prohibited_probe_sources": 0,
+    "valid_time_match_counts": {
+      "requested": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      },
+      "returned": {
+        "match": 4,
+        "mismatch": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "interpretation": "same-product workflow qualification; not a treatment-effect estimate",
+  "plan_id": "c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25",
+  "schema_version": "c1-agent-managed-correction-recovery-evaluation/v1",
+  "status": "pass"
+}

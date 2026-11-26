@@ -105,7 +105,8 @@ The final release build kept all five context items on both restores of
 `f43926d9`. The same 4,096-token cap kept 3,598 tokens per restore.
 The baseline retained zero. Both restores returned the same ordered context hash.
 This was a context-only replay, so the official seven-case answer
-accuracy remains measured only for the baseline.
+answer accuracy was still measured only for the baseline at that point; the
+later current-master recheck is recorded below.
 [Context replay receipt](../../evals/longmemeval_v2/results/2026-11-24-small-web-text-baseline/b5-context-replay-f43926d9.json)
 
 To reproduce this replay, use the existing adapter with the saved C4
@@ -145,3 +146,59 @@ measurement per case does not establish a stable speedup. The C3 context
 contains the complete reviewed span in 2/7 cases, versus 1/7 for B5. The
 `f43926d9` case demonstrates that retrieving a complete reviewed span still
 does not guarantee the reader will answer correctly.
+
+## Post-B5 current-master recheck — 2026-11-26
+
+The current master was evaluated on native Apple Silicon against the same
+frozen seven questions, 100 ordered web trajectories and saved snapshot. The
+standalone local MLX-LM runtime served both models over loopback; no LM Studio
+application, server, or CLI was used. All seven reads returned nonempty
+contexts (1,473–3,598 tokens) without truncation. The full-run scorer stopped
+at the third case after the judge returned empty content. Its coverage receipt
+therefore reports only 2/7 scored rows and **no complete official aggregate**;
+the partial 2/7 is not an accuracy result.
+
+Every reader and judge weight file matched the SHA-256 in the pinned native
+profile. The files live under a cache path named `lm-studio`; inference still
+ran in standalone MLX-LM servers, not LM Studio.
+
+To compare the memory results without repeating the expensive reads, a paired
+reader/judge replay used the saved B5 and current-master contexts, the same
+local model aliases, temperature 0, the same concise output suffix and pinned
+upstream scoring predicates. This is a diagnostic replay, not an official
+LongMemEval full run. It scored all seven rows:
+
+| Measure | B5 context | Current master | Observed change |
+| --- | ---: | ---: | ---: |
+| Pinned exact-match predicate | 1/7 | 3/7 | +2 cases |
+| Strict phrase-set equality, list answers | 0/4 | 2/4 | +2 cases |
+| Complete reviewed source span present | 1/7 | 2/7 | +1 case |
+| Mean memory-query latency | 630.4 s | 588.0 s | −6.7% |
+| Median memory-query latency | 437.7 s | 423.7 s | −3.2% |
+| Maximum memory-query latency | 1,011.5 s | 991.3 s | −2.0% |
+
+The answer gains are concentrated in `6d975a08` (the browse tabs) and
+`d6da3938` (Reset Password). The first has the complete reviewed span in its
+context. The second does not match the complete-span oracle, but the answer
+text itself is present in the returned context; this confirms that the
+complete-span check is conservative. The scorer's pass for `0c6b0c60` is
+unsupported: the answer adds “Past hour,” which is absent from the context, and
+the strict phrase-set metric rejects it. The three false-premise cases still
+fail (`89a20f48`, `922a0c56`, `f43926d9`); notably, `f43926d9` contains the
+complete reviewed span but the reader still answers incorrectly.
+
+These seven cases show a useful signal, not a guarantee: one current capture
+is too small to establish a population-level accuracy or latency improvement,
+and the pinned judge metric includes model-backed abstention judgments. The
+strict phrase-set and reviewed-span measures are deterministic. The original
+scorer failure exposed an artifact-loss defect: completed reader answers were
+not saved before scoring, so one judge exception discarded the unscored
+suffix. `scored_coverage.py` now persists reader outputs incrementally with
+prompt/context hashes but without copying those inputs. Its regression test
+reproduces a later judge abort and proves earlier responses survive.
+
+Artifacts: [execution manifest](../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/execution-manifest.json),
+[run receipt](../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/score-coverage.json),
+[paired comparison](../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1/paired-b5-comparison.json),
+[current replay](../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1/replay.json),
+and [deterministic phrase-set score](../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1/strict-phrase-set-accuracy.json).

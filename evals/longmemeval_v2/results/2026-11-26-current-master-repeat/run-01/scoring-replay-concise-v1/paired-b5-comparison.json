@@ -1,0 +1,192 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-current-master-vs-b5-paired-diagnostic/v1",
+  "claim_scope": "descriptive comparison on the same frozen seven-case Small-Web cohort and saved snapshot; not a statistical or generalization claim",
+  "official_full_run_status": "unavailable: original scorer stopped at case 3 after an empty judge response; reader answers for remaining cases were not captured by the old harness",
+  "paired_scoring_protocol": "same local reader/judge aliases, endpoints, temperature 0, concise output suffix and pinned upstream predicates for both arms; no memory re-query; local MLX-LM, no LM Studio runtime",
+  "baseline_replay": "evals/longmemeval_v2/results/2026-11-25-b5-recheck/run-02/scoring-replay-concise-v1",
+  "candidate_replay": "evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1",
+  "same_seven_case_ids": [
+    "0c6b0c60",
+    "6d975a08",
+    "89a20f48",
+    "922a0c56",
+    "d6da3938",
+    "f43926d9",
+    "f61a096f"
+  ],
+  "metrics": {
+    "pinned_exact_match": {
+      "b5": "1/7",
+      "current_master": "3/7",
+      "delta_correct_cases": 2
+    },
+    "strict_phrase_set": {
+      "b5": {
+        "selected": 4,
+        "correct": 0,
+        "failure_inclusive_accuracy": 0.0
+      },
+      "current_master": {
+        "selected": 4,
+        "correct": 2,
+        "failure_inclusive_accuracy": 0.5
+      }
+    },
+    "complete_reviewed_span_coverage": {
+      "b5": {
+        "present": 1,
+        "selected": 7
+      },
+      "current_master": {
+        "present": 2,
+        "selected": 7
+      }
+    },
+    "memory_query_latency_seconds": {
+      "mean": {
+        "b5_seconds": 630.4063079402861,
+        "current_master_seconds": 588.0236138332839,
+        "delta_seconds": -42.38269410700218,
+        "relative_change_pct": -6.723075827949487
+      },
+      "median": {
+        "b5_seconds": 437.6712041669962,
+        "current_master_seconds": 423.7366930839926,
+        "delta_seconds": -13.9345110830036,
+        "relative_change_pct": -3.1837852137255984
+      },
+      "max": {
+        "b5_seconds": 1011.490362291006,
+        "current_master_seconds": 991.3283737919992,
+        "delta_seconds": -20.16198849900684,
+        "relative_change_pct": -1.9932951662871334
+      }
+    },
+    "reader_generation_seconds": {
+      "b5": {
+        "mean": 13.16757142857143,
+        "median": 10.765,
+        "sum": 92.173
+      },
+      "current_master": {
+        "mean": 9.975142857142856,
+        "median": 8.994,
+        "sum": 69.826
+      }
+    }
+  },
+  "cases": [
+    {
+      "question_id": "0c6b0c60",
+      "b5": {
+        "score": true,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "Past hour, Past 24 hours, Past week, Past month, Past year, All time"
+      },
+      "current_master": {
+        "score": true,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "Past hour, Past 24 hours, Past week, Past month, Past year, All time"
+      }
+    },
+    {
+      "question_id": "6d975a08",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "Hot, New, Top"
+      },
+      "current_master": {
+        "score": true,
+        "strict_phrase_set_score": true,
+        "reviewed_span_present": true,
+        "answer": "Forums, Tags, Alphabetical"
+      }
+    },
+    {
+      "question_id": "89a20f48",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": false,
+        "answer": "Past year"
+      },
+      "current_master": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": false,
+        "answer": "Past year"
+      }
+    },
+    {
+      "question_id": "922a0c56",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": false,
+        "answer": "Send Email"
+      },
+      "current_master": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": false,
+        "answer": "Send Email"
+      }
+    },
+    {
+      "question_id": "d6da3938",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "Create Invoice"
+      },
+      "current_master": {
+        "score": true,
+        "strict_phrase_set_score": true,
+        "reviewed_span_present": false,
+        "answer": "Reset Password"
+      }
+    },
+    {
+      "question_id": "f43926d9",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": true,
+        "answer": "Forums"
+      },
+      "current_master": {
+        "score": false,
+        "strict_phrase_set_score": null,
+        "reviewed_span_present": true,
+        "answer": "Forums"
+      }
+    },
+    {
+      "question_id": "f61a096f",
+      "b5": {
+        "score": false,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "four"
+      },
+      "current_master": {
+        "score": false,
+        "strict_phrase_set_score": false,
+        "reviewed_span_present": false,
+        "answer": "two"
+      }
+    }
+  ],
+  "limitations": [
+    "n=7, one candidate capture; observed differences do not establish a population effect or stable latency gain",
+    "the pinned LongMemEval score includes a local LLM judge for abstention cases; generation and judging are model-backed and are not deterministic in the strict sense",
+    "the strict phrase-set and reviewed-span metrics are deterministic, but the reviewed-span check is conservative and requires the complete frozen source span",
+    "case 0c6b0c60 is an official predicate pass but is unsupported by the supplied context and fails strict exact-set scoring",
+    "case d6da3938 is correct despite the full reviewed span not matching; the relevant answer text is present in the context, so full-span coverage undercounts usable evidence"
+  ]
+}

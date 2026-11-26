@@ -93,6 +93,64 @@ class ScoredCoverageTests(unittest.TestCase):
             self.assertEqual(report["cases"], {"a": "scored", "b": "judge_error", "c": "unscored"})
             self.assertEqual(report["official_metrics_status"], "unavailable")
 
+    def test_reader_outputs_survive_a_later_judge_abort(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            rows = [
+                {
+                    "question_id": case,
+                    "messages": [{"role": "user", "content": f"prompt {case}"}],
+                    "memory_context": [{"type": "text", "value": f"evidence {case}"}],
+                }
+                for case in ("a", "b")
+            ]
+
+            async def reader(_client, _args, messages):
+                case = messages[0]["content"].removeprefix("prompt ")
+                return f"answer {case}", {"total_tokens": 3}
+
+            async def generate(_args, prompt_rows):
+                observed = {}
+                for row in prompt_rows:
+                    response, usage = await harness.call_reader_model_async(
+                        None, None, row["messages"]
+                    )
+                    observed[row["question_id"]] = {
+                        "response_raw": response,
+                        "response_parsed_boxed": response,
+                        "is_unknown": False,
+                        "usage": usage,
+                    }
+                return observed
+
+            def score(_row, _config):
+                raise ValueError("malformed judge response")
+
+            def main():
+                asyncio.run(harness.generate_all_reader_outputs(None, rows))
+                harness.score_prediction({"question_id": "a", "eval_name": "llm"}, {})
+
+            harness = SimpleNamespace(
+                main=main,
+                call_reader_model_async=reader,
+                generate_all_reader_outputs=generate,
+                score_prediction=score,
+                LLM_EVAL_FUNCTIONS={"llm"},
+            )
+            with self.assertRaises(ValueError):
+                run_observed(harness, [], ["a", "b"], output)
+
+            captured = [
+                json.loads(line)
+                for line in (output / "reader_outputs.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual([row["question_id"] for row in captured], ["a", "b"])
+            self.assertEqual([row["status"] for row in captured], ["captured", "captured"])
+            self.assertEqual([row["response_raw"] for row in captured], ["answer a", "answer b"])
+            self.assertTrue(all(row["prompt_sha256"] for row in captured))
+            self.assertTrue(all(row["memory_context_sha256"] for row in captured))
+            self.assertNotIn("evidence a", (output / "reader_outputs.jsonl").read_text())
+
     def test_judge_failure_after_reader_fallback_records_both_stages(self):
         with TemporaryDirectory() as directory:
             output = Path(directory)
@@ -122,6 +180,11 @@ class ScoredCoverageTests(unittest.TestCase):
             report = json.loads((output / "score-coverage.json").read_text())
             self.assertEqual(report["cases"], {"a": "reader_error"})
             self.assertEqual(report["failures"], {"a": ["reader_error", "judge_timeout"]})
+            captured = json.loads((output / "reader_outputs.jsonl").read_text())
+            self.assertEqual(captured["question_id"], "a")
+            self.assertEqual(captured["status"], "reader_error")
+            self.assertEqual(captured["error_type"], "ConnectionError")
+            self.assertNotIn("response_raw", captured)
 
     def test_remote_reader_or_judge_endpoint_is_refused(self):
         with self.assertRaisesRegex(argparse.ArgumentTypeError, "loopback"):

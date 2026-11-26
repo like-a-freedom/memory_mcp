@@ -371,6 +371,19 @@ source-span scorer is reproducible without a model/provider. See the
 [execution manifest](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/execution-manifest.json),
 and [repeated reviewed-span coverage receipt](../../../evals/longmemeval_v2/results/2026-11-25-c3-final-query-fix/run-02/reviewed-span-coverage.json).
 
+The post-B5 current-master recheck repeated all seven frozen cases on native
+Apple Silicon without LM Studio. The original scorer stopped at the third case
+after an empty judge response, so that run has no complete official aggregate.
+The paired replay on saved B5/current contexts scored 3/7 versus 1/7, strict
+phrase-set equality 2/4 versus 0/4, full reviewed-span coverage 2/7 versus 1/7,
+and mean query latency 588.0 s versus 630.4 s. These are finite-cohort
+diagnostics, not guarantees: one current capture is too small for population
+claims, the judge metric is model-backed, and one exact-match pass is
+unsupported. A RED → GREEN harness regression now captures reader outputs
+incrementally so a later judge failure cannot discard completed answers. The
+[current-master recheck](../../../evals/longmemeval_v2/results/2026-11-26-current-master-repeat/RECHECK.md)
+records the paired cases and all limits.
+
 The ordinary agent-control gate was replayed offline and remained eligible for
 its exact configuration: two captures each passed task, direct-read, and
 independent-probe criteria 4/4 with no violations or resource exits. The
@@ -380,6 +393,17 @@ repeat at 0/4 exact cited tasks in both arms. Its cross-capture report records
 the per-field selectors, valid-time results, evidence coverage, failures and
 latency. Neither screen qualifies C2 or demonstrates a memory treatment
 effect.
+
+The 2026-11-26 offline replay independently recomputed the ordinary v3
+qualification and both C1 v7 captures without a model, Codex process, provider
+or memory server. The ordinary qualification output, both `compare-agent-managed`
+outputs and both `evaluate_c1.py` outputs were byte-identical to their archived
+reports. The bounded-recovery validator passed on both captures with zero
+contract violations; capture 02 recorded three authorized retries per arm.
+Capture 01 remains PASS and capture 02 remains NO-GO at 0/4 exact cited tasks
+per arm, with one candidate prohibited-evidence violation. The frozen stop
+rule is exhausted; no third capture was run. Replay artifacts are in the
+[offline qualification replay](../../../evals/paired/offline-qualification-replay-2026-11-26/REPLAY.md).
 
 ## Task D1. Bound and reconstruct public explain citations
 

@@ -294,4 +294,9 @@ If upstream scores a fallback, its row remains in the native count and the
 coverage calculation excludes it. If scoring aborts, the incomplete
 suffix remains unscored. When the aggregate exists the observer verifies
 its overall denominator and score from the native case rows. Treat
-`prompt_rows.jsonl` and `per_question.jsonl` as private benchmark artifacts.
+`prompt_rows.jsonl`, `per_question.jsonl`, and `reader_outputs.jsonl` as
+private benchmark artifacts. The observer incrementally writes
+`reader_outputs.jsonl` after each reader response so a later judge/scorer
+abort does not discard completed answers. It stores question IDs, prompt and
+memory-context digests, response status, raw reader answers and usage without
+copying prompts or memory contexts.

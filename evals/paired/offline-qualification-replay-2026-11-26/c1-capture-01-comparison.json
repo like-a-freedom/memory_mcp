@@ -1,0 +1,563 @@
+{
+  "schema_version": "memory-mcp-agent-managed-comparison/v1",
+  "plan_id": "c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25",
+  "plan_sha256": "42713a5425c3ddf531ad116b4d02660501f710925926e75b7b486648c370d769",
+  "run_id": "61199-1795621888841489000-0",
+  "incumbent_artifact_sha256": "ac750fccb5acdbfdfa51abdf9e9e28b94e5f31dc7f2bca19a13e8b941f918ec2",
+  "candidate_artifact_sha256": "51c78423990bfe3aa5fc3d8c7d23479dde2ab6bfeea8609782e1076f10a99898",
+  "incumbent_stage_sha256": "0b848abf12fb11481ec6ae5ae5e96da163ff5c50f3cf2a874d6c95303d2285de",
+  "candidate_stage_sha256": "7f0fc8bb72a24a06b77158a2a7fb5cbb68bce007f814c3ef0d4de67a27783336",
+  "paired_agent_comparison": {
+    "schema_version": "memory-mcp-agent-comparison/v2",
+    "run_id": "61199-1795621888841489000-0",
+    "run_started_at": "2026-11-25T15:51:28.841509Z",
+    "run_completed_at": "2026-11-25T15:58:02.604748Z",
+    "plan": {
+      "schema_version": "memory-mcp-agent-plan/v2",
+      "plan_id": "c1-agent-managed-correction-recovery-v7-selector-diagnostics-2026-11-25",
+      "stage": "development_pilot",
+      "expected_trials": [
+        {
+          "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+          "family_id": "highmere-dome-shutter-service-code-history",
+          "case_id": "highmere-current-dome-shutter-service-code",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+          "family_id": "rillbank-cold-room-monitor-channel-history",
+          "case_id": "rillbank-current-cold-room-monitor-channel",
+          "repetition": 1,
+          "incumbent_first": false
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+          "family_id": "caldera-migration-radar-sync-key-history",
+          "case_id": "caldera-current-migration-radar-sync-key",
+          "repetition": 1,
+          "incumbent_first": true
+        },
+        {
+          "stratum_id": "agent_managed_correction_recovery_selector_diagnostics",
+          "family_id": "fernwick-salinity-probe-calibration-profile-history",
+          "case_id": "fernwick-current-salinity-probe-calibration-profile",
+          "repetition": 1,
+          "incumbent_first": false
+        }
+      ],
+      "planned_independent_families": 4,
+      "shared_identity": {
+        "agent_runner": "codex-cli",
+        "agent_version": "0.171.0-alpha.13",
+        "model": "gpt-6.1-sol",
+        "model_identity_protocol": {
+          "method": "same_alias_within_invocation",
+          "max_duration_seconds": 7200
+        },
+        "system_prompt_sha256": "abd2a2e1fc473ed6a37419bb00f4fa101f7711670a78ef20f569ab15b85583ee",
+        "task_prompt_sha256": "1b9dc6977e1cad79e0195400b5bb60d24f0f97d9a9884ae3a0292565978324a8",
+        "host_policy_sha256": "2df1be214f58e0edbb8514121f93d427cc8a8d3709d0dff16b26d5a61088e239",
+        "transport": "stdio",
+        "retry_policy_sha256": "1eaadf373ec122bbefd99e88422be49d889a7a4ea3f294a5870152ca3a2070fb",
+        "reader_config_sha256": "bcb55359b5b4cb2af7fcf05ad9c6e0bfeaaf2d1bf007a009558dd5ec52a4658d",
+        "judge_config_sha256": null,
+        "corpus_sha256": "91b382f830858083410338cbc8f6e06378c158f52f4ce53d2aaab7d43fc78e1d",
+        "oracle_sha256": "fed558aa2606429746757049a0d44726258ceee91c3916a388ce4707fe14592a",
+        "clock_id": "macos-utc-wall-clock-v1",
+        "simulator_sha256": "d448b6b3a3285fa00c97339327bce0a829b0928f85c9f5f7398fb33d5d6b78b9",
+        "provider_fingerprints": {
+          "codex_cli": "3b6d00deea5fabc50ad34be1872b8e4ead1638d23c68fabb7837edc07f0cf1e0",
+          "memory_eval_cli": "91209c8eb0faadec774e4c01432827dd9eb52360c4e42e3eec55e521f286d9e3"
+        },
+        "context_budget_tokens": 65536,
+        "tool_call_budget": 8,
+        "turn_budget": 8,
+        "output_token_budget": 1024,
+        "wall_time_budget_ms": 120000,
+        "hardware_class": "macos-arm64"
+      },
+      "incumbent_product": {
+        "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+        "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "candidate_product": {
+        "revision": "457044031d612cf6c8ecb1477802c6ddaa5f6346+dirty",
+        "binary_sha256": "5aee43e9a7d4eadae35be71431e85b091e65da3d2da39d692c0132ef6ac6dedd",
+        "product_config_sha256": "dd189d6af56cb77dbb6c33c0f9e1a4331b15a7b260f96a53c79b698650508a12",
+        "tool_schema_sha256": "d7335948e07a612b296933c31e2542bf1a3e42fc0b0f29aca19c2d6c157b72f4",
+        "enabled_features": [
+          "fs-watch"
+        ],
+        "claim_rollout_stage": "evidence"
+      },
+      "declared_tool_schema_change": null,
+      "bootstrap": {
+        "seed": 2026112528,
+        "draws": 10000,
+        "confidence_level_basis_points": 9500
+      }
+    },
+    "plan_sha256": "42713a5425c3ddf531ad116b4d02660501f710925926e75b7b486648c370d769",
+    "manifest_sha256": "ea6e8c90a52a508166b35dd52f69b013074a2892d098c19dbc58fe03db61ea4d",
+    "incumbent_artifact_sha256": "ac750fccb5acdbfdfa51abdf9e9e28b94e5f31dc7f2bca19a13e8b941f918ec2",
+    "candidate_artifact_sha256": "51c78423990bfe3aa5fc3d8c7d23479dde2ab6bfeea8609782e1076f10a99898",
+    "overall": {
+      "direct_memory_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "task_success": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "repair_turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "turn_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "tool_call_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "clarification_gain": {
+        "estimate": 0.0,
+        "interval": {
+          "estimate": 0.0,
+          "lower": 0.0,
+          "upper": 0.0,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 0.0,
+          "fernwick-salinity-probe-calibration-profile-history": 0.0,
+          "highmere-dome-shutter-service-code-history": 0.0,
+          "rillbank-cold-room-monitor-channel-history": 0.0
+        }
+      },
+      "input_token_gain": {
+        "estimate": 8.0,
+        "interval": {
+          "estimate": 8.0,
+          "lower": -112.5,
+          "upper": 122.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 21.0,
+          "fernwick-salinity-probe-calibration-profile-history": 161.0,
+          "highmere-dome-shutter-service-code-history": -157.0,
+          "rillbank-cold-room-monitor-channel-history": 7.0
+        }
+      },
+      "output_token_gain": {
+        "estimate": 1.25,
+        "interval": {
+          "estimate": 1.25,
+          "lower": -11.25,
+          "upper": 12.5,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 13.0,
+          "fernwick-salinity-probe-calibration-profile-history": -1.0,
+          "highmere-dome-shutter-service-code-history": -19.0,
+          "rillbank-cold-room-monitor-channel-history": 12.0
+        }
+      },
+      "wall_time_gain_ms": {
+        "estimate": -1154.75,
+        "interval": {
+          "estimate": -1154.75,
+          "lower": -2424.0,
+          "upper": 147.75,
+          "independent_clusters": 4,
+          "draws": 10000,
+          "seed": 2026112528,
+          "confidence_level_basis_points": 9500,
+          "algorithm": "splitmix64-v1"
+        },
+        "family_deltas": {
+          "caldera-migration-radar-sync-key-history": 616.0,
+          "fernwick-salinity-probe-calibration-profile-history": -2859.0,
+          "highmere-dome-shutter-service-code-history": -1257.0,
+          "rillbank-cold-room-monitor-channel-history": -1119.0
+        }
+      }
+    },
+    "by_stratum": {
+      "agent_managed_correction_recovery_selector_diagnostics": {
+        "direct_memory_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "task_success": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "repair_turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "turn_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "tool_call_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "clarification_gain": {
+          "estimate": 0.0,
+          "interval": {
+            "estimate": 0.0,
+            "lower": 0.0,
+            "upper": 0.0,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 0.0,
+            "fernwick-salinity-probe-calibration-profile-history": 0.0,
+            "highmere-dome-shutter-service-code-history": 0.0,
+            "rillbank-cold-room-monitor-channel-history": 0.0
+          }
+        },
+        "input_token_gain": {
+          "estimate": 8.0,
+          "interval": {
+            "estimate": 8.0,
+            "lower": -112.5,
+            "upper": 122.5,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 21.0,
+            "fernwick-salinity-probe-calibration-profile-history": 161.0,
+            "highmere-dome-shutter-service-code-history": -157.0,
+            "rillbank-cold-room-monitor-channel-history": 7.0
+          }
+        },
+        "output_token_gain": {
+          "estimate": 1.25,
+          "interval": {
+            "estimate": 1.25,
+            "lower": -11.25,
+            "upper": 12.5,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 13.0,
+            "fernwick-salinity-probe-calibration-profile-history": -1.0,
+            "highmere-dome-shutter-service-code-history": -19.0,
+            "rillbank-cold-room-monitor-channel-history": 12.0
+          }
+        },
+        "wall_time_gain_ms": {
+          "estimate": -1154.75,
+          "interval": {
+            "estimate": -1154.75,
+            "lower": -2424.0,
+            "upper": 147.75,
+            "independent_clusters": 4,
+            "draws": 10000,
+            "seed": 2026112528,
+            "confidence_level_basis_points": 9500,
+            "algorithm": "splitmix64-v1"
+          },
+          "family_deltas": {
+            "caldera-migration-radar-sync-key-history": 616.0,
+            "fernwick-salinity-probe-calibration-profile-history": -2859.0,
+            "highmere-dome-shutter-service-code-history": -1257.0,
+            "rillbank-cold-room-monitor-channel-history": -1119.0
+          }
+        }
+      }
+    },
+    "paired_trial_count": 4,
+    "independent_family_count": 4,
+    "hard_violation_count": 0,
+    "budget_exceeded_trial_count": 0,
+    "arm_order_counts": {
+      "agent_managed_correction_recovery_selector_diagnostics": {
+        "incumbent_first": 2,
+        "candidate_first": 2
+      }
+    }
+  },
+  "incumbent": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 4
+    },
+    "formation_turns_total": 4,
+    "formation_tool_calls_total": 12,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 202896,
+    "formation_output_tokens_total": 1345,
+    "formation_wall_time_ms_total": 106980,
+    "retained_store_bytes_total": 137232692,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 4,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 4,
+      "extract_calls": 4,
+      "evidence_requests": 4,
+      "evidence_responses": 4,
+      "evidence_before_invalidation": 4,
+      "response_sizes": {
+        "measured_responses": 4,
+        "total_wire_bytes": 12358,
+        "maximum_wire_bytes": 3107
+      }
+    }
+  },
+  "candidate": {
+    "expected_trials": 4,
+    "formation_status_counts": {
+      "completed": 4
+    },
+    "formation_turns_total": 4,
+    "formation_tool_calls_total": 12,
+    "formation_user_clarifications_total": 0,
+    "formation_input_tokens_total": 202138,
+    "formation_output_tokens_total": 1344,
+    "formation_wall_time_ms_total": 107286,
+    "retained_store_bytes_total": 137232692,
+    "write_operations": {
+      "memory_decisions/extract": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      },
+      "memory_decisions/invalidate": {
+        "attempts": 4,
+        "succeeded": 4,
+        "failed": 0,
+        "unresolved": 0
+      }
+    },
+    "independent_probe_successes": 4,
+    "independent_probe_trials": 4,
+    "unsupported_source_total": 0,
+    "prohibited_source_total": 0,
+    "fact_evidence_audit": {
+      "telemetry_trials": 4,
+      "extract_calls": 4,
+      "evidence_requests": 4,
+      "evidence_responses": 4,
+      "evidence_before_invalidation": 4,
+      "response_sizes": {
+        "measured_responses": 4,
+        "total_wire_bytes": 12358,
+        "maximum_wire_bytes": 3107
+      }
+    }
+  },
+  "independent_probe_pairs": {
+    "paired_trials": 4,
+    "both_succeeded": 4,
+    "incumbent_only_succeeded": 0,
+    "candidate_only_succeeded": 0,
+    "neither_succeeded": 0
+  }
+}

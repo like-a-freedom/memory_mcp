@@ -1,0 +1,22 @@
+{
+  "authorized_partial_guidance_sha256s": [
+    "0b455cac9f2656d0653c73909e35aa6bd3bf53b169114f24fd05c66fce1056ba",
+    "94fe3a40bd3d726332de427cf20d011cd35efc2d556e13869ef6ccff25a58168"
+  ],
+  "bounded_retry_contract_passed": true,
+  "candidate": {
+    "arm": "candidate",
+    "guidance_authorized_retry_trials": 0,
+    "reads": 4,
+    "retry_contract_violations": [],
+    "trials": 4
+  },
+  "incumbent": {
+    "arm": "incumbent",
+    "guidance_authorized_retry_trials": 0,
+    "reads": 4,
+    "retry_contract_violations": [],
+    "trials": 4
+  },
+  "schema_version": "c1-bounded-read-recovery-validation/v1"
+}

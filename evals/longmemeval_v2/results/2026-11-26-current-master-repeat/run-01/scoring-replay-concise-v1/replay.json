@@ -1,0 +1,93 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-concise-paired-reader/v1",
+  "version": "current-master",
+  "protocol": "paired local diagnostic replay on frozen saved memory contexts; no memory re-query",
+  "prompt_suffix": "\n\nOutput constraint: Do not include analysis. Return only a concise final answer in the exact format requested. If the premise is wrong, state the flaw briefly inside the requested boxed format.",
+  "prompt_suffix_sha256": "d945ee385942c96ed9532c4981f005825361e591c8d12aac64b00ec70ef6399c",
+  "reader_model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "judge_model": "/Users/solovey/.cache/lm-studio/models/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+  "reader_endpoint": "http://127.0.0.1:18767/v1/chat/completions",
+  "judge_endpoint": "http://127.0.0.1:18766/v1/chat/completions",
+  "runtime": "standalone MLX-LM loopback; LM Studio application/server/CLI not used",
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "reader_initial_max_tokens": 512,
+  "judge_initial_max_tokens": 512,
+  "retry_caps": [
+    512,
+    1024
+  ],
+  "pinned_upstream_commit": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "official_scoring": "pinned upstream qa_eval_metrics predicates and judge prompt; replay wrapper retries empty/invalid judge once",
+  "memory_requery": false,
+  "reader_replay_wall_seconds": 69.848,
+  "cases": {
+    "selected_case_count": 7,
+    "scored_case_count": 7,
+    "official_exact_match": "3/7",
+    "official_failure_inclusive_successes_over_selected": 3,
+    "official_metrics_status": "complete",
+    "strict_phrase_set": {
+      "selected": 4,
+      "correct": 2,
+      "failure_inclusive_accuracy": 0.5
+    },
+    "memory_query_latency_seconds": {
+      "mean": 588.0236138332839,
+      "median": 423.7366930839926,
+      "max": 991.3283737919992
+    },
+    "reader_generation_seconds": {
+      "mean": 9.975142857142856,
+      "median": 8.994,
+      "sum": 69.826
+    },
+    "case_official_scores": {
+      "0c6b0c60": true,
+      "6d975a08": true,
+      "89a20f48": false,
+      "922a0c56": false,
+      "d6da3938": true,
+      "f43926d9": false,
+      "f61a096f": false
+    },
+    "case_strict_scores": {
+      "0c6b0c60": false,
+      "6d975a08": true,
+      "89a20f48": null,
+      "922a0c56": null,
+      "d6da3938": true,
+      "f43926d9": null,
+      "f61a096f": false
+    },
+    "case_status": {
+      "0c6b0c60": "scored",
+      "6d975a08": "scored",
+      "89a20f48": "scored",
+      "922a0c56": "scored",
+      "d6da3938": "scored",
+      "f43926d9": "scored",
+      "f61a096f": "scored"
+    },
+    "memory_context_sha256": {
+      "0c6b0c60": "c5bed2f069d10deef212aa99da073583f4a3f40b51f315443f81e63ad7cfe3f6",
+      "6d975a08": "88011e0db2165bcb90d67fe016c47b0936f69dcc56f00c124447b0b461eb75c0",
+      "89a20f48": "628cf45605c9d5ba7c5434527e1e11c30b39f2fd526b14b7d155deb31a4673d4",
+      "922a0c56": "1e571a39a125dc296e2fc1e62babddbb64e67f3602dfdb8df3c3ab6644b976db",
+      "d6da3938": "1a6a8ac0d60cf1eefde52497bc2717fc5f64f59b70f37369b7bc3838a3c1b62e",
+      "f43926d9": "2a8f19548582919c180655c52b933652a772f838473059af4e46a22900e5a100",
+      "f61a096f": "f390c6abc508f47e3a97ab013ad954c146323ff872a49b1d46e819789cba2528"
+    },
+    "case_reviewed_span_present": {
+      "0c6b0c60": false,
+      "6d975a08": true,
+      "89a20f48": false,
+      "922a0c56": false,
+      "d6da3938": false,
+      "f43926d9": true,
+      "f61a096f": false
+    }
+  }
+}

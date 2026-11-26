@@ -1,0 +1,62 @@
+{
+  "schema": "memory-mcp-longmemeval-v2-current-master-run-manifest/v1",
+  "host": {
+    "os": "macOS",
+    "version": "27.2.1",
+    "architecture": "arm64",
+    "native_apple_silicon": true
+  },
+  "product": {
+    "git_head": "7c17c47ecbb608fe4e8efb89c642c28ada940e46",
+    "release_binary_sha256": "6a912216015e9ece30d1b53ccc21c00165dedfa635e85b9a298ef80fc5983d41"
+  },
+  "cohort": {
+    "selected_cases": 7,
+    "trajectories": 100,
+    "input_sha256": {
+      "questions.json": "7f5beb79700ad9670b81b423777f60c643bbdcba4eeb65fb6fbb0586a938afec",
+      "haystack.json": "9b751199062ea7db2edc472a4f362aca7af5eb113f7ddf2f39c0b6d3d5eba1ac",
+      "trajectories.json": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+      "selection.json": "3749af6c58ec5886a71ba5eaf72ea2d86dca344675bbc4ab09d21fc1e7d0aca8"
+    },
+    "snapshot": "target/c4-native/build/memory_state",
+    "snapshot_build_status": "saved"
+  },
+  "runtime": {
+    "inference": "standalone MLX-LM loopback endpoints",
+    "lm_studio_runtime_used": false,
+    "reader_model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "reader_endpoint": "http://127.0.0.1:18767/v1/chat/completions",
+    "judge_model": "/Users/solovey/.cache/lm-studio/models/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit",
+    "judge_endpoint": "http://127.0.0.1:18766/v1/chat/completions",
+    "temperature": 0,
+    "local_runtime": {
+      "mlx_lm": "0.32.2",
+      "mlx": "0.32.4"
+    },
+    "model_profile": "evals/longmemeval_v2/small-web-native-profile.json",
+    "model_profile_sha256": "495cec02ff18302331ae6ca5d123a0ed494814a548a1f7b7cce1b68ba2e18582",
+    "model_profile_files_verified": true,
+    "weight_cache_note": "Model files reside in a directory named lm-studio; they were served by standalone mlx_lm servers, not the LM Studio application/server/CLI."
+  },
+  "official_run": {
+    "started_at_utc": "2026-11-26T01:16:47.148004+00:00",
+    "completed_prompt_build_utc": "2026-11-26T01:43:42.900966+00:00",
+    "selected": 7,
+    "official_metrics_status": "unavailable",
+    "native_scored": 2,
+    "judge_error_case": "89a20f48",
+    "elapsed_seconds": 1875.603
+  },
+  "paired_scoring_replay": {
+    "reader_replay_wall_seconds": 69.848,
+    "scored_cases": 7,
+    "exact_match": "3/7",
+    "strict_phrase_set": {
+      "selected": 4,
+      "correct": 2,
+      "failure_inclusive_accuracy": 0.5
+    },
+    "memory_requery": false
+  }
+}

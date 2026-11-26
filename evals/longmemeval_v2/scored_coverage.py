@@ -1,7 +1,8 @@
-"""Run the pinned upstream scorer with separate, failure-inclusive coverage."""
+"""Run the pinned scorer with failure-inclusive coverage and durable reader capture."""
 
 import argparse
 from collections import defaultdict
+import hashlib
 import json
 import math
 import os
@@ -19,21 +20,70 @@ def failure_status(role, error):
 def run_observed(harness, argv, case_ids, output, preflight=None):
     failures = defaultdict(list)
     reader_cases = {}
+    reader_inputs = {}
+    reader_outputs = {}
     duration = {"reader": 0.0, "judge_scoring": 0.0}
     generate = harness.generate_all_reader_outputs
     reader = harness.call_reader_model_async
     score = harness.score_prediction
 
+    def persist_reader_outputs():
+        if not reader_inputs:
+            return
+        records = []
+        for case_id, inputs in reader_inputs.items():
+            identity = {
+                "schema": "memory-mcp-longmemeval-v2-reader-output/v1",
+                "question_id": case_id,
+                "prompt_sha256": hashlib.sha256(json.dumps(
+                    inputs["messages"], ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")).hexdigest(),
+                "memory_context_sha256": hashlib.sha256(json.dumps(
+                    inputs["memory_context"], ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")).hexdigest(),
+            }
+            identity.update(reader_outputs.get(case_id, {"status": "not_observed"}))
+            records.append(json.dumps(identity, ensure_ascii=True, sort_keys=True))
+        temporary = output / ".reader_outputs.jsonl.tmp"
+        temporary.write_text("\n".join(records) + "\n", encoding="utf-8")
+        temporary.replace(output / "reader_outputs.jsonl")
+
     async def observe_generation(args, rows):
         reader_cases.update((id(row["messages"]), row["question_id"]) for row in rows)
+        reader_inputs.update((row["question_id"], {
+            "messages": row["messages"],
+            "memory_context": row.get("memory_context"),
+        }) for row in rows)
         return await generate(args, rows)
 
     async def observe_reader(client, args, messages):
         start = time.monotonic()
+        case_id = reader_cases.get(id(messages))
         try:
-            return await reader(client, args, messages)
+            response = await reader(client, args, messages)
+            if case_id is not None:
+                if (isinstance(response, tuple) and len(response) == 2
+                        and isinstance(response[0], str) and isinstance(response[1], dict)):
+                    reader_outputs[case_id] = {
+                        "status": "captured",
+                        "response_raw": response[0],
+                        "usage": response[1],
+                    }
+                else:
+                    reader_outputs[case_id] = {
+                        "status": "captured_unrecognized_response",
+                        "response_type": type(response).__name__,
+                    }
+                persist_reader_outputs()
+            return response
         except Exception as error:
-            failures[reader_cases[id(messages)]].append(failure_status("reader", error))
+            if case_id is not None:
+                status = failure_status("reader", error)
+                failures[case_id].append(status)
+                reader_outputs[case_id] = {"status": status, "error_type": type(error).__name__}
+                persist_reader_outputs()
             raise
         finally:
             duration["reader"] += time.monotonic() - start
@@ -73,6 +123,7 @@ def run_observed(harness, argv, case_ids, output, preflight=None):
         ):
             harness.main()
     finally:
+        persist_reader_outputs()
         cases = write_coverage(case_ids, failures, output, time.monotonic() - start, duration)
     return int(any(status != "scored" for status in cases.values()))
 
