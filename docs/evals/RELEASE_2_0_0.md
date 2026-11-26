@@ -33,8 +33,12 @@ counted as production scenario coverage.
 The workspace suite precedes the final one-line facet-proof repair; the feature
 suite, scoped semantic/reranking controls and native release profile cover that
 repair. The version bump changes package metadata only. The post-bump public
-binary gate has a separate receipt attached after publication; it uses an immutable
-executable copy to prevent concurrent Cargo builds from replacing its input.
+binary gate passed **8/8**, with zero failed, invalid or unobserved cases,
+`no_regressions=true` and `all_cases_pass=true`. Its
+[receipt](../../evals/results/release-2.0.0/public-gate-receipt.json) and
+[raw comparison](../../evals/results/release-2.0.0/public-gate/current-regression.json)
+were archived after publication. An immutable executable copy prevented concurrent
+Cargo builds from replacing the input; its SHA was unchanged after capture.
 
 All local evaluation runs use native Apple Silicon. Local checks do not establish
 remote SurrealDB, Docker or other-target compatibility. Hosted release CI is a
@@ -52,5 +56,5 @@ new preregistered independent study succeed.
 
 Remaining work includes inference-attempt accounting, reader refusal/escaping,
 the unresolved long-history case, durable access-update cost, independent entity
-quality, citation usability and behavioural skill evaluation. A detailed acceptance
-plan is added after publication, separately from the immutable release tag.
+quality, citation usability and behavioural skill evaluation. The detailed [post-release implementation plan](../superpowers/plans/2026-11-26-post-release-memory-quality.md)
+was added after publication, separately from the immutable release tag.

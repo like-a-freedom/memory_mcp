@@ -1,0 +1,14 @@
+{
+  "binary_sha256": "9bb336e3d10522a57f335cc9d2612b6d676322d626672159bb8e31e719db1348",
+  "version": "memory_mcp 2.0.0",
+  "architecture": "target/release-preflight-frozen/memory_mcp: Mach-O 64-bit executable arm64",
+  "schema_version": "memory-mcp-release-public-gate/v1",
+  "release_commit": "766a8d11ff90af48abe8694922a9fd877bf23d98",
+  "command": "MEMORY_DECISIONS_SERVER_BIN=<immutable binary copy> MEMORY_QUALITY_GATE_OUTPUT=<fresh directory> cargo test -p eval-harness --test deterministic_quality_gate --locked -- --ignored",
+  "exit_code": 0,
+  "binary_sha256_unchanged_after_capture": true,
+  "result": "public-gate/current-regression.json",
+  "source_receipts": "public-gate/current/index.json",
+  "output_sha256": "a06dd53c6c39d5c4ba1c47f69bf1d4294ac5319bd788dfc2ced68e1b18ef5c57",
+  "identity_note": "The runner labels product_revision ci-current. The executable SHA, verified 2.0.0 version, metadata-only diff and release_commit provide the exact build binding. Captured absolute paths are retained unchanged to preserve receipt hashes; the public-gate subtree is a byte-identical archive of the original output directory."
+}
