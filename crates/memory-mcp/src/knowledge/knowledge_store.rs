@@ -6,8 +6,7 @@
 //! retrieval pipeline holds both, which makes the ownership visible
 //! in the types rather than only in a comment.
 //!
-//! The method bodies are unchanged from the single store this split
-//! came from, so this is a move rather than a rewrite.
+//! Query normalization uses the same native analyzer as the owned fact indexes.
 
 use std::sync::Arc;
 
@@ -26,6 +25,73 @@ pub struct KnowledgeStoreClient {
 }
 
 impl KnowledgeStoreClient {
+    /// Native token streams for an equivalence check, never an application-side
+    /// approximation of the database's English/Russian stemming rules.
+    pub(crate) async fn analyze_fact_queries(
+        &self,
+        queries: &[&str],
+    ) -> Result<Vec<Vec<String>>, MemoryError> {
+        let value = self
+            .db
+            .query(
+                "RETURN { analyzer: (INFO FOR DB).analyzers.memory_fts, indexes: (INFO FOR TABLE fact).indexes, streams: array::map($queries, |$query| search::analyze('memory_fts', $query)) };",
+                Some(json!({"queries": queries})),
+            )
+            .await?;
+        // search::analyze uses the indexing stage, whereas MATCHES uses the
+        // querying stage. Only this known, stage-independent chain establishes
+        // equivalence. An unknown/custom chain is an optimization miss.
+        let row = value
+            .get(0)
+            .ok_or_else(|| MemoryError::Storage("missing fact analyzer description".into()))?;
+        const STAGE_INDEPENDENT_ANALYZER: &str = "DEFINE ANALYZER memory_fts TOKENIZERS CLASS FILTERS LOWERCASE, ASCII, SNOWBALL(ENGLISH), SNOWBALL(RUSSIAN)";
+        if row.get("analyzer").and_then(Value::as_str) != Some(STAGE_INDEPENDENT_ANALYZER) {
+            return Err(MemoryError::Storage(
+                "unsupported fact analyzer equivalence".into(),
+            ));
+        }
+        // Both fields participate in MATCHES. Inspect their actual bindings in
+        // the same statement; a known analyzer name alone is insufficient.
+        let indexes = &row["indexes"];
+        let additional_fulltext = indexes.as_object().is_none_or(|indexes| {
+            indexes
+                .values()
+                .filter(|definition| {
+                    definition
+                        .as_str()
+                        .is_some_and(|definition| definition.contains(" FULLTEXT "))
+                })
+                .count()
+                != 2
+        });
+        if additional_fulltext
+            || indexes.get("fact_content_search").and_then(Value::as_str)
+                != Some(
+                    "DEFINE INDEX fact_content_search ON fact FIELDS content FULLTEXT ANALYZER memory_fts BM25(1.2,0.75)",
+                )
+            || indexes
+                .get("fact_index_keys_search")
+                .and_then(Value::as_str)
+                != Some(
+                    "DEFINE INDEX fact_index_keys_search ON fact FIELDS index_keys FULLTEXT ANALYZER memory_fts BM25(1.2,0.75)",
+                )
+        {
+            return Err(MemoryError::Storage(
+                "unsupported fact index equivalence".into(),
+            ));
+        }
+        let streams: Vec<Vec<String>> =
+            serde_json::from_value(row["streams"].clone()).map_err(|error| {
+                MemoryError::Storage(format!("invalid fact analyzer token streams: {error}"))
+            })?;
+        if streams.len() != queries.len() {
+            return Err(MemoryError::Storage(
+                "incomplete fact analyzer token streams".into(),
+            ));
+        }
+        Ok(streams)
+    }
+
     pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
         Self {
             db: BoundDbClient::new(db, namespace),
@@ -167,47 +233,35 @@ impl KnowledgeStoreClient {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
-    /// Selects one independently limited FTS result group for each lexical
-    /// fallback term. Groups stay in input order so retrieval deduplication
-    /// keeps the same winning occurrence as the sequential reads.
-    pub async fn select_facts_for_lexical_terms(
+    /// First-hit union of independently limited lexical term results. Full
+    /// source fields are hydrated once per identity, after each term's limit.
+    pub async fn select_lexical_fact_candidates(
         &self,
         cutoff: &str,
         terms: &[String],
         limit_per_term: i32,
         fact_types: &[String],
-    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+    ) -> Result<Vec<Value>, MemoryError> {
         const MAX_TERMS_PER_RPC: usize = 8;
-
-        let mut result_groups = Vec::with_capacity(terms.len());
-        for term_batch in terms.chunks(MAX_TERMS_PER_RPC) {
-            let first_term = term_batch.first().ok_or_else(|| {
-                MemoryError::Storage("empty lexical fact query batch".to_string())
-            })?;
-            let (_, vars) = crate::knowledge::queries::build_select_facts_filtered_query(
+        let mut candidates = Vec::new();
+        let mut seen = Vec::new();
+        for batch in terms.chunks(MAX_TERMS_PER_RPC) {
+            let (sql, vars) = crate::knowledge::queries::build_select_lexical_candidate_batch_query(
                 cutoff,
-                Some(first_term),
+                batch,
                 limit_per_term,
                 fact_types,
+                &seen,
             );
-            let mut subqueries = Vec::with_capacity(term_batch.len());
-            for term in term_batch {
-                let (sql, _) = crate::knowledge::queries::build_select_facts_filtered_query(
-                    cutoff,
-                    Some(term),
-                    limit_per_term,
-                    fact_types,
-                );
-                subqueries.push(format!("({sql})"));
-            }
-            let sql = format!("RETURN [{}]", subqueries.join(", "));
-            let groups = self
-                .db
-                .query_row_groups(&sql, Some(vars), term_batch.len())
-                .await?;
-            result_groups.extend(groups);
+            let rows = self.db.query_rows(&sql, Some(vars)).await?;
+            seen.extend(
+                rows.iter()
+                    .filter_map(|row| row.get("fact_id").and_then(Value::as_str))
+                    .map(str::to_owned),
+            );
+            candidates.extend(rows);
         }
-        Ok(result_groups)
+        Ok(candidates)
     }
 
     /// Facts linked to a set of normalized entity ids.

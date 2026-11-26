@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 
 use crate::error::MemoryError;
 use crate::models::{AccessPayload, AssembledContextItem, Fact, FactType};
-use crate::shared::search::search_query_terms;
 use crate::shared::temporal::normalize_dt;
 
 use super::filtering::{compare_facts_by_recency, fact_is_active_at, filter_facts_by_constraints};
@@ -37,12 +36,7 @@ pub(crate) fn expand_experience_query_terms(
 
     let mut term_frequency = HashMap::<String, usize>::new();
     for fact in direct_facts.iter().take(5) {
-        let mut fact_terms = search_query_terms(&fact.content)
-            .into_iter()
-            .collect::<HashSet<_>>();
-        for index_key in &fact.index_keys {
-            fact_terms.extend(search_query_terms(index_key));
-        }
+        let fact_terms = crate::shared::search_lexical::fact_term_set(fact);
         for term in fact_terms {
             *term_frequency.entry(term).or_default() += 1;
         }
@@ -82,17 +76,12 @@ pub(crate) fn repeated_topic_evidence_for_query(
         .filter(|fact| fact.fact_type != FactType::Experience.as_str())
         .take(5)
     {
-        let content_terms = search_query_terms(&fact.content)
-            .into_iter()
-            .collect::<HashSet<_>>();
+        let content_terms = crate::shared::search::search_query_term_set(&fact.content);
         if !content_terms.iter().any(|term| query_terms.contains(term)) {
             continue;
         }
 
-        let mut fact_terms = content_terms;
-        for index_key in &fact.index_keys {
-            fact_terms.extend(search_query_terms(index_key));
-        }
+        let fact_terms = crate::shared::search_lexical::fact_term_set(fact);
         for term in fact_terms {
             if !query_terms.contains(&term) {
                 supporting_facts

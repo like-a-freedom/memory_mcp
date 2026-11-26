@@ -1,5 +1,5 @@
-use crate::models::AssembledContextItem;
-use std::collections::HashSet;
+use crate::models::{AssembleContextRequest, AssembledContextItem};
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use super::admission::{build_query_evidence, episode_candidate_is_admitted_at_reference_time};
@@ -15,8 +15,56 @@ use crate::shared::search_lexical::matched_query_terms_for_text;
 // Leave space for the source metadata and delimiters in downstream context windows.
 const MAX_EVIDENCE_EXCERPT_BYTES: usize = 2048;
 
-pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query: &str) {
+pub(super) fn bound_context_evidence(
+    items: &mut [AssembledContextItem],
+    request: &AssembleContextRequest,
+) {
+    let query = request.query.as_str();
     let query_terms = crate::shared::search::search_query_terms(query);
+    let control_labels = if query_terms
+        .iter()
+        .any(|term| matches!(term.as_str(), "hidden" | "invisible"))
+    {
+        Vec::new()
+    } else {
+        super::query_mode::control_query_labels(query)
+    };
+    // Annotation completeness is no evidence of recency. Explicit state/time
+    // questions retain their existing narrative/distance ordering instead.
+    let prefer_visible_container = request.as_of.is_none()
+        && request.window_start.is_none()
+        && request.window_end.is_none()
+        && request.view_mode.is_none()
+        && super::temporal::infer_temporal_window(query, crate::shared::temporal::now()).is_none()
+        && !query
+            .split('"')
+            .step_by(2)
+            .flat_map(|part| part.split(|ch: char| !ch.is_alphanumeric()))
+            .any(|word| {
+                matches!(
+                    word.to_lowercase().as_str(),
+                    "after"
+                        | "before"
+                        | "later"
+                        | "earlier"
+                        | "latest"
+                        | "previous"
+                        | "first"
+                        | "last"
+                        | "then"
+                        | "when"
+                        | "since"
+                        | "until"
+                        | "during"
+                        | "while"
+                        | "current"
+                        | "new"
+                        | "old"
+                        | "updated"
+                        | "changed"
+                        | "now"
+                )
+            });
     for item in items {
         if item.content.len().max(item.quote.len()) <= MAX_EVIDENCE_EXCERPT_BYTES {
             continue;
@@ -27,7 +75,12 @@ pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query: 
 
         let same_text = item.content == item.quote;
         let episode_fallback = item.provenance["episode_fallback"] == true && same_text;
-        if let Some(range) = evidence_excerpt_range(&item.content, &query_terms) {
+        if let Some(range) = evidence_excerpt_range(
+            &item.content,
+            &query_terms,
+            &control_labels,
+            prefer_visible_container,
+        ) {
             if episode_fallback {
                 item.provenance["episode_excerpt"] = serde_json::json!({
                     "start_byte": range.start,
@@ -44,7 +97,12 @@ pub(super) fn bound_context_evidence(items: &mut [AssembledContextItem], query: 
             }
             item.content = item.content[range].to_owned();
         }
-        if let Some(range) = evidence_excerpt_range(&item.quote, &query_terms) {
+        if let Some(range) = evidence_excerpt_range(
+            &item.quote,
+            &query_terms,
+            &control_labels,
+            prefer_visible_container,
+        ) {
             item.provenance["quote_excerpt"] = excerpt_metadata(&range, item.quote.len());
             item.quote = item.quote[range].to_owned();
         }
@@ -59,7 +117,12 @@ fn excerpt_metadata(range: &Range<usize>, bytes: usize) -> serde_json::Value {
     })
 }
 
-fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<usize>> {
+fn evidence_excerpt_range<'a>(
+    text: &'a str,
+    query_terms: &[String],
+    control_labels: &[String],
+    prefer_visible_container: bool,
+) -> Option<Range<usize>> {
     if text.len() <= MAX_EVIDENCE_EXCERPT_BYTES {
         return None;
     }
@@ -69,6 +132,12 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
 
     let last_start = text.len() - MAX_EVIDENCE_EXCERPT_BYTES;
     let margin = MAX_EVIDENCE_EXCERPT_BYTES / 4;
+    // Repeated source windows have the same score for this immutable query.
+    // Borrow only for this excerpt search; no cache outlives or owns the source.
+    let mut scores = HashMap::new();
+    let mut scorer = super::lexical::TextLexicalScorer::new(query_terms);
+    let mut score_text =
+        |window: &'a str| *scores.entry(window).or_insert_with(|| scorer.score(window));
     let mut best_score = None;
     let mut best_range = 0..0;
     // Overlap adjacent windows so short evidence can survive a window boundary.
@@ -78,36 +147,70 @@ fn evidence_excerpt_range(text: &str, query_terms: &[String]) -> Option<Range<us
     {
         let start = text.ceil_char_boundary(offset);
         let end = text.floor_char_boundary(offset + MAX_EVIDENCE_EXCERPT_BYTES);
-        let overlap = super::lexical::lexical_query_score_for_text(&text[start..end], query_terms);
+        let overlap = score_text(&text[start..end]);
         if best_score.is_some_and(|(best_overlap, _)| overlap < best_overlap) {
             continue;
         }
         // Prefer room around a match for the words carrying its answer.
         let inner_start = text.ceil_char_boundary(offset + margin);
         let inner_end = text.floor_char_boundary(offset + 3 * margin);
-        let interior_overlap = super::lexical::lexical_query_score_for_text(
-            &text[inner_start..inner_end],
-            query_terms,
-        );
+        let interior_overlap = score_text(&text[inner_start..inner_end]);
         let score = (overlap, interior_overlap);
         if best_score.is_none_or(|best| score > best) {
             best_score = Some(score);
             best_range = start..end;
         }
     }
-    Some(preserve_control_block(text, query_terms, best_range))
+    Some(preserve_control_block(
+        text,
+        query_terms,
+        control_labels,
+        prefer_visible_container,
+        best_range,
+    ))
 }
 
-// Keep a short, contiguous accessibility control group intact when the lexical
-// window intersects it. Both plain trees and JSON-escaped trees occur in episodes.
+// Keep a short, contiguous accessibility control group intact. Explicit UI
+// enumerations rank complete query-bearing groups; other reads keep overlap with
+// the lexical window. Both plain trees and JSON-escaped trees occur in episodes.
 // The source remains a byte-exact, bounded excerpt with original offsets.
-fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) -> Range<usize> {
-    struct Line {
+fn preserve_control_block(
+    text: &str,
+    terms: &[String],
+    control_labels: &[String],
+    prefer_visible_container: bool,
+    original: Range<usize>,
+) -> Range<usize> {
+    let is_control_term = |term: &str| {
+        matches!(
+            term,
+            "dropdown" | "toolbar" | "option" | "options" | "button" | "buttons" | "tab" | "tabs"
+        )
+    };
+    let enumerates_controls = terms.iter().any(|term| is_control_term(term));
+    let enumerates_tabs = terms
+        .iter()
+        .any(|term| matches!(term.as_str(), "tab" | "tabs"))
+        && !terms
+            .iter()
+            .any(|term| matches!(term.as_str(), "button" | "buttons" | "toolbar" | "dropdown"));
+    let topical_terms: Vec<_> = terms
+        .iter()
+        // Every navigation list contains the structural role `list`. That
+        // alone cannot establish a topical match for a requested tab group.
+        .filter(|term| !is_control_term(term) && !(enumerates_tabs && term.as_str() == "list"))
+        .cloned()
+        .collect();
+    struct Line<'text> {
         start: usize,
         end: usize,
         depth: usize,
         control: bool,
         button: bool,
+        list: bool,
+        link: bool,
+        visible_label: Option<&'text str>,
+        visible_container: bool,
     }
     let mut starts = vec![0];
     let bytes = text.as_bytes();
@@ -121,6 +224,7 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
         }
         i += 1;
     }
+    let mut containers: Vec<(usize, bool)> = Vec::new();
     let lines: Vec<_> = starts
         .iter()
         .enumerate()
@@ -150,28 +254,63 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
                 .unwrap_or("");
             let button = role.starts_with("button ");
             let control = button || role.starts_with("list ") || role.starts_with("listitem ");
+            while containers
+                .last()
+                .is_some_and(|(parent_depth, _)| *parent_depth >= depth)
+            {
+                containers.pop();
+            }
+            let visible_container = containers.last().is_some_and(|(_, visible)| *visible);
+            if role.split_whitespace().next().is_some_and(|name| {
+                matches!(
+                    name,
+                    "main"
+                        | "toolbar"
+                        | "group"
+                        | "region"
+                        | "dialog"
+                        | "tabpanel"
+                        | "section"
+                        | "Section"
+                        | "navigation"
+                )
+            }) {
+                containers.push((depth, visible_role_label(role).is_some()));
+            }
             Line {
                 start,
                 end,
                 depth,
                 control,
                 button,
+                list: role.starts_with("list "),
+                link: role.starts_with("link "),
+                visible_label: button.then(|| visible_role_label(role)).flatten(),
+                visible_container,
             }
         })
         .collect();
     let mut best = None;
+    let mut overlapping_tabs: Option<Range<usize>> = None;
     let mut index = 0;
     while index < lines.len() {
         let first = &lines[index];
-        if !first.button {
+        let link_list = enumerates_tabs && first.list;
+        if !(link_list || first.button && !enumerates_tabs) {
             index += 1;
             continue;
         }
-        let mut controls = 1;
+        let mut controls = usize::from(first.button);
         let mut end_index = index + 1;
         while let Some(line) = lines.get(end_index) {
-            if line.depth < first.depth {
+            if line.depth < first.depth || (link_list && line.depth == first.depth) {
                 break;
+            }
+            if link_list && line.end - first.start > MAX_EVIDENCE_EXCERPT_BYTES {
+                break;
+            }
+            if link_list && line.link {
+                controls += 1;
             }
             if line.depth == first.depth {
                 if !line.control {
@@ -181,7 +320,14 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
             }
             end_index += 1;
         }
-        index = end_index.max(index + 1);
+        let start_index = index;
+        // A long enclosing list may contain a short eligible tab list. Keep
+        // scanning its descendants; each list scan itself is byte bounded.
+        index = if link_list {
+            index + 1
+        } else {
+            end_index.max(index + 1)
+        };
         if controls < 2 {
             continue;
         }
@@ -189,24 +335,106 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
         let end = lines.get(end_index).map_or(text.len(), |line| line.end);
         let range = first.start..end;
         if range.len() > MAX_EVIDENCE_EXCERPT_BYTES
-            || range.start >= original.end
-            || range.end <= original.start
+            || (!enumerates_controls
+                && (range.start >= original.end || range.end <= original.start))
         {
             continue;
         }
-        let score = super::lexical::lexical_query_score_for_text(&text[range.clone()], terms);
-        if score == 0
-            || best
-                .as_ref()
-                .is_some_and(|(best_score, _)| score <= *best_score)
+        let block_score = super::lexical::lexical_query_score_for_text(&text[range.clone()], terms);
+        if block_score == 0
+            || (enumerates_controls
+                && super::lexical::lexical_query_score_for_text(
+                    &text[range.clone()],
+                    &topical_terms,
+                ) == 0)
+        {
+            continue;
+        }
+        if link_list && range.start < original.end && range.end > original.start {
+            overlapping_tabs = Some(overlapping_tabs.map_or_else(
+                || range.clone(),
+                |seen| seen.start.min(range.start)..seen.end.max(range.end),
+            ));
+        }
+        // For an enumeration the complete group is the evidence unit, not a
+        // narrative about opening it. Rank eligible groups by their own query
+        // support near the winning narrative; distance precedes lexical tie-breaks
+        // so a different historical UI state cannot win on generic sort words.
+        // No answer labels, source IDs or fixed distance-to-gold enter selection.
+        let start = text.ceil_char_boundary(
+            range
+                .start
+                .saturating_sub((MAX_EVIDENCE_EXCERPT_BYTES - range.len()) / 2),
+        );
+        let end = text.floor_char_boundary((start + MAX_EVIDENCE_EXCERPT_BYTES).min(text.len()));
+        let context_score = if enumerates_controls {
+            super::lexical::lexical_query_score_for_text(&text[start..end], terms)
+        } else {
+            0
+        };
+        let distance =
+            range.start.saturating_sub(original.end) + original.start.saturating_sub(range.end);
+        // A nearby hidden historical copy cannot establish the named controls
+        // currently exposed by a UI. Count only explicit visibility of the
+        // requested labels, not unrelated visible filters. Unknown visibility
+        // remains eligible and preserves the previous distance ordering on ties.
+        let visible_label_count = control_labels
+            .iter()
+            .filter(|label| {
+                lines[start_index..end_index].iter().any(|line| {
+                    line.visible_label.is_some_and(|name| {
+                        super::query_mode::control_label_coverage(
+                            name,
+                            std::slice::from_ref(*label),
+                        ) > 0.0
+                    })
+                })
+            })
+            .count();
+        let container_confirmed_labels = if prefer_visible_container {
+            control_labels
+                .iter()
+                .filter(|label| {
+                    lines[start_index..end_index].iter().any(|line| {
+                        line.visible_container
+                            && line.visible_label.is_some_and(|name| {
+                                super::query_mode::control_label_coverage(
+                                    name,
+                                    std::slice::from_ref(*label),
+                                ) > 0.0
+                            })
+                    })
+                })
+                .count()
+        } else {
+            0
+        };
+        let score = (
+            visible_label_count,
+            container_confirmed_labels,
+            std::cmp::Reverse(distance),
+            block_score,
+            context_score,
+        );
+        if best
+            .as_ref()
+            .is_some_and(|(best_score, _)| score <= *best_score)
         {
             continue;
         }
         best = Some((score, range));
     }
-    let Some((_, block)) = best else {
+    let Some((_, mut block)) = best else {
         return original;
     };
+    // A lexical window can intersect two neighboring navigation groups. Keep
+    // both complete when their contiguous union fits; centering only the first
+    // would cut the second even though it was already part of this window.
+    if let Some(overlap) = overlapping_tabs
+        && overlap.len() <= MAX_EVIDENCE_EXCERPT_BYTES
+    {
+        block = overlap;
+    }
     let start = text.ceil_char_boundary(
         block
             .start
@@ -216,12 +444,6 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
     let adjusted = start..end;
     // An explicit UI enumeration may need the entire group even when some
     // lexical context lies outside it; other reads retain the lexical winner.
-    let enumerates_controls = terms.iter().any(|term| {
-        matches!(
-            term.as_str(),
-            "dropdown" | "toolbar" | "option" | "options" | "button" | "buttons"
-        )
-    });
     if !enumerates_controls
         && super::lexical::lexical_query_score_for_text(&text[adjusted.clone()], terms)
             < super::lexical::lexical_query_score_for_text(&text[original.clone()], terms)
@@ -232,12 +454,81 @@ fn preserve_control_block(text: &str, terms: &[String], original: Range<usize>) 
     }
 }
 
+// Accessibility roles quote names and may quote attribute values. A visibility
+// word inside either value is data, not the standalone visibility attribute.
+// Malformed/unclosed quoted values provide no positive visibility evidence.
+fn visible_role_label(role: &str) -> Option<&str> {
+    let (_, named) = role.split_once(" '")?;
+    let mut escaped = false;
+    let end = named.char_indices().find_map(|(index, ch)| {
+        if escaped {
+            escaped = false;
+            None
+        } else if ch == '\\' {
+            escaped = true;
+            None
+        } else {
+            (ch == '\'').then_some(index)
+        }
+    })?;
+    let label = &named[..end];
+    let attributes = named[end + 1..]
+        .strip_prefix(',')?
+        .trim_end()
+        .trim_end_matches("\\n");
+    let mut quote = None;
+    let mut escaped = false;
+    let mut start = 0;
+    let mut visible = false;
+    for (index, ch) in attributes.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            if ch == '\\' {
+                escaped = true;
+            } else if ch == delimiter {
+                quote = None;
+            }
+        } else if matches!(ch, '\'' | '"') {
+            quote = Some(ch);
+        } else if ch == ',' {
+            visible |= attributes[start..index].trim() == "visible";
+            start = index + 1;
+        }
+    }
+    if quote.is_some() || escaped {
+        return None;
+    }
+    visible |= attributes[start..].trim() == "visible";
+    visible.then_some(label)
+}
+
 pub(super) fn should_prefer_episode_content(
     selected_facts: &[RankedContextFact],
     episode_items: &[AssembledContextItem],
     query_terms: &[String],
 ) -> bool {
     if episode_items.is_empty() || query_terms.is_empty() {
+        return false;
+    }
+
+    // A rescue cannot discard the named controls supported by the fact pack
+    // merely because unrelated words are spread across a long episode.
+    let fact_labels = selected_facts
+        .iter()
+        .map(|f| f.evidence.control_label_coverage)
+        .fold(0.0, f64::max);
+    let episode_labels = episode_items
+        .iter()
+        .filter_map(|i| {
+            i.provenance
+                .get("control_label_coverage")
+                .and_then(serde_json::Value::as_f64)
+        })
+        .fold(0.0, f64::max);
+    if fact_labels > episode_labels {
         return false;
     }
 
@@ -361,6 +652,7 @@ pub(super) async fn collect_episode_fallback_items(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
     query: &str,
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let response_budget = params.budget.max(1) as usize;
     let candidate_budget = super::reranking::candidate_pool_limit(
@@ -376,25 +668,41 @@ pub(super) async fn collect_episode_fallback_items(
     )
     .await?;
 
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_candidates(trace, "episodes.fetched", &episode_records);
     let query_terms = crate::shared::search::search_query_terms(query);
     let raw_query = params.raw_query_opt.unwrap_or(query);
-    let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
+    // A producer-declared conversation turn can locate an answer in its
+    // neighborhood without independently asserting it. Use normalized terms
+    // for that candidate pool, retaining every substantive follow-up clause.
+    // Standalone episodes must satisfy the complete raw answer admission policy.
+    let semantic_query = crate::shared::search::preprocess_search_query(
+        &super::query_mode::evidence_query_surface(raw_query),
+    );
+    let context_evidence =
+        build_query_evidence(Some(&semantic_query), Vec::new(), &[], params.query_flags);
+    let query_evidence = build_query_evidence(Some(raw_query), Vec::new(), &[], params.query_flags);
     let reranker_available = service.embedding_provider.reranking_signature().is_some();
     let mut episodes = filtering::filter_episodes_by_constraints(episode_records, params.access);
     episodes.retain(|episode| {
+        let query_evidence = if episode.source_context.is_some() {
+            &context_evidence
+        } else {
+            &query_evidence
+        };
         // Episode fallback bypasses fact reconciliation, so preserve the
         // declared-subject boundary for structured records. Free-form
         // conversation turns keep the discourse-neighborhood policy below.
         super::admission::candidate_matches_declared_query_subject(raw_query, &episode.content)
             && if reranker_available {
                 super::admission::episode_candidate_is_rerankable_at_reference_time(
-                    &query_evidence,
+                    query_evidence,
                     &episode.content,
                     Some(episode.t_ref),
                 )
             } else {
                 episode_candidate_is_admitted_at_reference_time(
-                    &query_evidence,
+                    query_evidence,
                     &episode.content,
                     Some(episode.t_ref),
                 )
@@ -405,7 +713,7 @@ pub(super) async fn collect_episode_fallback_items(
 
     use super::views::{EpisodeFallbackParams, build_episode_fallback_items};
 
-    Ok(build_episode_fallback_items(EpisodeFallbackParams {
+    let mut items = build_episode_fallback_items(EpisodeFallbackParams {
         episodes,
         query_opt: Some(query),
         semantic_available: service.embedding_provider.is_enabled(),
@@ -415,7 +723,18 @@ pub(super) async fn collect_episode_fallback_items(
         timeline_mode: params.resolved_view_mode == Some("timeline"),
         budget: candidate_limit,
         fallback_rationale_fn: default_episode_fallback_rationale,
-    }))
+    });
+    let labels = super::query_mode::control_query_labels(
+        &super::query_mode::lexical_search_surface(raw_query),
+    );
+    if !reranker_available && !labels.is_empty() {
+        for item in &mut items {
+            item.provenance["control_label_coverage"] = serde_json::json!(
+                super::query_mode::control_label_coverage(&item.content, &labels)
+            );
+        }
+    }
+    Ok(items)
 }
 
 #[cfg(test)]

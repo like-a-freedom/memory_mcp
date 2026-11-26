@@ -82,11 +82,11 @@ async fn track_fact_accesses(
     items: &[AssembledContextItem],
     access: &AccessPayload,
 ) {
-    for item in items {
-        if !is_fact_access_trackable(&item.fact_id) {
-            continue;
-        }
-        if let Err(err) = ctx.record_fact_access(&item.fact_id, 1).await {
+    let record = async |item: Option<&AssembledContextItem>| {
+        if let Some(item) = item
+            && is_fact_access_trackable(&item.fact_id)
+            && let Err(err) = ctx.record_fact_access(&item.fact_id, 1).await
+        {
             ctx.logger.log(
                 log_event(
                     "assemble_context.access_track_error",
@@ -97,6 +97,27 @@ async fn track_fact_accesses(
                     None,
                 ),
                 err.log_level(),
+            );
+        }
+    };
+    // Each wave is owned and awaited by this read: no detached telemetry or
+    // unbounded fan-out. Repeated identities retain their sequential ordering.
+    for wave in items.chunks(4) {
+        let repeated = wave.iter().enumerate().any(|(index, item)| {
+            wave[..index]
+                .iter()
+                .any(|previous| previous.fact_id == item.fact_id)
+        });
+        if repeated {
+            for item in wave {
+                record(Some(item)).await;
+            }
+        } else {
+            tokio::join!(
+                record(wave.first()),
+                record(wave.get(1)),
+                record(wave.get(2)),
+                record(wave.get(3))
             );
         }
     }
@@ -164,7 +185,7 @@ struct RetrievalPort<'a> {
 impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
     async fn retrieve(
         &self,
-        command: &crate::memory::api::RecallCommand,
+        _command: &crate::memory::api::RecallCommand,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
         let mut items = assemble_context_inner(
             self.ctx,
@@ -175,7 +196,7 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
         .await?;
         #[cfg(feature = "eval-support")]
         diagnostics::record(self.trace, "selected_pre_packaging", &items);
-        budget::bound_context_evidence(&mut items, &command.query);
+        budget::bound_context_evidence(&mut items, &self.request);
         #[cfg(feature = "eval-support")]
         diagnostics::record(self.trace, "packed_context", &items);
         Ok(items)
@@ -249,7 +270,7 @@ impl crate::memory::api::TemporalContextRetrievalPort for TemporalRetrievalPort<
     ) -> Result<crate::models::ContextAssemblyResult, crate::error::MemoryError> {
         let mut result =
             pipeline::assemble_revision_bounded_context(self.ctx, request, temporal).await?;
-        budget::bound_context_evidence(&mut result.items, &request.query);
+        budget::bound_context_evidence(&mut result.items, request);
         Ok(result)
     }
 }
@@ -608,6 +629,13 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     fn grouped_rows(sql: &str, mut rows_for_index: impl FnMut(usize) -> Vec<Value>) -> Value {
+        if sql.contains("array::min([term_rank") {
+            return Value::Array(
+                (0..sql.matches("content @1@ ").count())
+                    .flat_map(&mut rows_for_index)
+                    .collect(),
+            );
+        }
         let group_count = crate::service::mock_db::grouped_select_queries(sql).len();
         Value::Array(
             (0..group_count)
@@ -617,25 +645,27 @@ mod tests {
     }
 
     fn grouped_fts_rows(sql: &str, mut rows_for_term: impl FnMut(&str) -> Vec<Value>) -> Value {
-        let groups = crate::service::mock_db::grouped_select_queries(sql);
-        let terms = groups
-            .into_iter()
-            .map(|subquery| {
-                subquery
-                    .split("@1@ ")
-                    .nth(1)
-                    .and_then(|literal| literal.strip_prefix('"'))
+        let terms = sql
+            .split("content @1@ ")
+            .skip(1)
+            .map(|literal| {
+                literal
+                    .strip_prefix('"')
                     .and_then(|literal| literal.split('"').next())
-                    .expect("FTS subquery has its escaped term literal")
+                    .expect("FTS term literal")
             })
             .collect::<Vec<_>>();
-        assert!(!terms.is_empty(), "grouped FTS query contains subqueries");
-        Value::Array(
-            terms
-                .into_iter()
-                .map(|term| Value::Array(rows_for_term(term)))
-                .collect(),
-        )
+        assert!(!terms.is_empty(), "FTS query contains subqueries");
+        if sql.contains("array::min([term_rank") {
+            Value::Array(terms.into_iter().flat_map(&mut rows_for_term).collect())
+        } else {
+            Value::Array(
+                terms
+                    .into_iter()
+                    .map(|term| Value::Array(rows_for_term(term)))
+                    .collect(),
+            )
+        }
     }
 
     #[test]
@@ -790,7 +820,7 @@ mod tests {
                     // would match.
                     |sql| sql.contains("search::score"),
                     |sql, vars| {
-                        if sql.starts_with("RETURN [") {
+                        if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
                             return Ok(grouped_fts_rows(sql, |term| match term {
                                 "atlas" | "launch" | "checklist" => vec![json!({
                                     "fact_id": "fact:fallback",
@@ -972,7 +1002,7 @@ mod tests {
                 vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
-                if sql.starts_with("RETURN [") {
+                if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
                     return Ok(grouped_rows(sql, |_| Vec::new()));
                 }
                 // The context store now runs the indexed community lookup and the
@@ -1146,7 +1176,8 @@ mod tests {
                     .expect_query_with(
                         |sql| sql.contains("search::score"),
                         |sql, vars| {
-                            if sql.starts_with("RETURN [") {
+                            if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank")
+                            {
                                 return Ok(grouped_rows(sql, |_| Vec::new()));
                             }
                             let query = vars
@@ -1578,7 +1609,7 @@ mod tests {
                 .as_array()
                 .expect("timeline fact rows")
                 .clone();
-                if sql.starts_with("RETURN [") {
+                if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
                     Ok(grouped_rows(sql, |_| rows.clone()))
                 } else {
                     Ok(Value::Array(rows))

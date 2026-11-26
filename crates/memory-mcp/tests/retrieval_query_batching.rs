@@ -97,7 +97,8 @@ async fn episode_fallback_batches_terms_without_changing_substring_queries() {
         .iter()
         .filter(|sql| {
             let sql = sql.to_ascii_lowercase();
-            sql.contains("from episode") && sql.contains("string::contains")
+            sql.contains("from episode")
+                && (sql.contains("string::contains") || sql.contains("as matched_terms"))
         })
         .count();
     assert!(
@@ -316,7 +317,7 @@ async fn fact_term_batches_are_limited_to_eight_groups_per_rpc() {
         .lock()
         .expect("query recorder lock")
         .iter()
-        .filter(|sql| sql.starts_with("RETURN [") && sql.contains("search::score(1)"))
+        .filter(|sql| sql.contains("GROUP BY fact_id") && sql.contains("array::flatten("))
         .map(|sql| sql.matches("search::score(1)").count())
         .collect::<Vec<_>>();
     assert!(grouped_queries.iter().all(|count| *count <= 8));
@@ -346,8 +347,8 @@ async fn episode_term_batches_are_limited_to_eight_groups_per_rpc() {
         .lock()
         .expect("query recorder lock")
         .iter()
-        .filter(|sql| sql.starts_with("RETURN [") && sql.contains("string::contains"))
-        .map(|sql| sql.matches("string::contains").count())
+        .filter(|sql| sql.contains("LET $pool = "))
+        .map(|sql| sql.matches("$normalized CONTAINS $queries[").count())
         .collect::<Vec<_>>();
     assert!(grouped_queries.iter().all(|count| *count <= 8));
     let total_groups = grouped_queries.iter().sum::<usize>();

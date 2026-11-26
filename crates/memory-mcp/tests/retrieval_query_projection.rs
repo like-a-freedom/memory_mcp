@@ -781,3 +781,150 @@ async fn lexical_projection_preserves_multiword_matching_on_both_indexes() {
             .all(|row| row["source_episode"] != "episode:projection-index")
     );
 }
+
+#[tokio::test]
+async fn batched_lexical_sort_discards_full_sources_before_each_term_limit() {
+    let (_, db) = common::make_service_with_client().await;
+    let recorder = Arc::new(SqlRecorder::default());
+    db.set_eval_query_observer(recorder.clone());
+    memory_mcp::knowledge::KnowledgeStoreClient::new(db.clone(), "org")
+        .select_lexical_fact_candidates("2026-05-04T00:00:00Z", &["falcon".into()], 2, &[])
+        .await
+        .unwrap();
+    let sql = recorder
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|sql| sql.contains("array::flatten(["))
+        .expect("actual public batched read")
+        .clone();
+    // This fixed one-term fixture extracts the actual bounded term statement,
+    // including nested projections, rather than constructing a second builder.
+    let term_sql = sql
+        .split_once("array::flatten([(")
+        .unwrap()
+        .1
+        .split_once(")]) GROUP BY fact_id")
+        .unwrap()
+        .0;
+    let plan = db
+        .query(
+            &format!("{term_sql} EXPLAIN"),
+            Some(json!({"cutoff":"2026-05-04T00:00:00Z","limit":2})),
+            "org",
+        )
+        .await
+        .unwrap();
+    fn find_sort(node: &Value) -> Option<&Value> {
+        if node["operator"] == "Sort" {
+            return Some(node);
+        }
+        node.get("children")
+            .and_then(Value::as_array)?
+            .iter()
+            .find_map(find_sort)
+    }
+    let sort = plan
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(find_sort)
+        .expect("actual per-term sort");
+    let mut input = &sort["children"][0];
+    while input["operator"] == "Subquery" {
+        input = &input["children"][0];
+    }
+    assert_eq!(
+        input["operator"], "SelectProject",
+        "each term must discard full source payload before sorting, not merely before union hydration"
+    );
+    assert_eq!(
+        input["attributes"]["projections"],
+        "record, fact_id, t_valid, ft_score, term_rank"
+    );
+}
+
+#[tokio::test]
+async fn batched_episode_sort_discards_full_sources_before_each_term_limit() {
+    let (_, db) = common::make_service_with_client().await;
+    db.create("episode:thin_source", json!({"episode_id":"episode:thin_source","source_type":"document","source_id":"thin-source","content":"Falcon literal source payload","t_ref":"2026-01-01T00:00:00Z","t_ingested":"2026-01-01T00:00:00Z","scope":"org","policy_tags":[]}), "org", &["t_ref","t_ingested"]).await.unwrap();
+    let recorder = Arc::new(SqlRecorder::default());
+    db.set_eval_query_observer(recorder.clone());
+    EpisodeContextStore::new(db.clone(), "org")
+        .select_episode_candidates("2026-05-04T00:00:00Z", &["falcon".into()], 2, &[])
+        .await
+        .unwrap();
+    let sql = recorder
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|sql| sql.contains("LET $pool = "))
+        .expect("actual public batched read")
+        .clone();
+    // Execute the actual pre-sort pool separately: it must discard raw and
+    // normalized source text, retaining only identity, ordering and membership.
+    let pool_sql = sql
+        .split_once("LET $pool = ")
+        .unwrap()
+        .1
+        .split_once("; RETURN (")
+        .unwrap()
+        .0;
+    let pool = db
+        .query(
+            &format!("RETURN {pool_sql}"),
+            Some(json!({"cutoff":"2026-05-04T00:00:00Z","queries":["falcon"]})),
+            "org",
+        )
+        .await
+        .unwrap();
+    let rows = pool.as_array().unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["episode_id", "matched_terms", "record", "t_ref"]
+    );
+    assert_eq!(rows[0]["episode_id"], "episode:thin_source");
+    assert_eq!(rows[0]["matched_terms"], json!([true]));
+    let term_sql = sql
+        .split_once("|$term_rank| (")
+        .unwrap()
+        .1
+        .split_once("))) GROUP BY episode_id")
+        .unwrap()
+        .0;
+    let plan = db
+        .query(
+            &format!("{term_sql} EXPLAIN"),
+            Some(json!({"pool":pool,"limit":2,"term_rank":0})),
+            "org",
+        )
+        .await
+        .unwrap();
+    fn find_sort(node: &Value) -> Option<&Value> {
+        if node["operator"] == "Sort" {
+            return Some(node);
+        }
+        node.get("children")
+            .and_then(Value::as_array)?
+            .iter()
+            .find_map(find_sort)
+    }
+    let sort = plan
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(find_sort)
+        .expect("actual per-term sort");
+    assert_eq!(
+        sort["operator"], "Sort",
+        "actual bounded term statement sorts the verified thin pool"
+    );
+}

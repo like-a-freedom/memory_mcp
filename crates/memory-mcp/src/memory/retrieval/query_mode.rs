@@ -156,6 +156,121 @@ pub(super) fn query_clauses(query: &str) -> Vec<&str> {
         .collect()
 }
 
+/// Remove only recognized presentation directives. Ordinary context and unknown
+/// qualifiers remain evidence requirements, even after a question mark.
+pub(super) fn evidence_query_surface(query: &str) -> std::borrow::Cow<'_, str> {
+    let clauses = split_query_clauses(query);
+    let presentation = clauses
+        .iter()
+        .map(|(text, _)| is_presentation_directive(text))
+        .collect::<Vec<_>>();
+    if !presentation.contains(&true) || !presentation.contains(&false) {
+        return std::borrow::Cow::Borrowed(query);
+    }
+    let mut result = String::with_capacity(query.len());
+    for ((clause, terminator), presentation) in clauses.into_iter().zip(presentation) {
+        if presentation {
+            continue;
+        }
+        if !result.is_empty() {
+            result.push(' ');
+        }
+        result.push_str(clause);
+        if let Some(terminator) = terminator {
+            result.push(terminator);
+        }
+    }
+    std::borrow::Cow::Owned(result)
+}
+
+fn is_presentation_directive(clause: &str) -> bool {
+    let mut normalized = crate::shared::search::normalize_text(clause);
+    if ![
+        "your final answer should ",
+        "the final answer should ",
+        "return the result as ",
+        "mark your final answer ",
+        "format the answer ",
+        "format your answer ",
+        "answer in ",
+        "respond in ",
+        "reply in ",
+    ]
+    .iter()
+    .any(|prefix| normalized.starts_with(prefix))
+    {
+        return false;
+    }
+    // Examples describe the requested rendering. An unclosed/nested example
+    // remains unknown and therefore cannot make a clause disappear.
+    for marker in ["(e.g.", "(for example"] {
+        while let Some(start) = normalized.find(marker) {
+            let Some(end) = normalized[start..].find(')') else {
+                return false;
+            };
+            if normalized[start + marker.len()..start + end].contains('(') {
+                return false;
+            }
+            normalized.replace_range(start..=start + end, " ");
+        }
+    }
+    let tokens = normalized
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
+    let rendering = [
+        "english", "russian", "french", "german", "spanish", "italian", "json", "xml", "yaml",
+        "markdown", "csv", "boxed",
+    ];
+    tokens.iter().any(|token| rendering.contains(token))
+        && tokens.iter().all(|token| {
+            rendering.contains(token)
+                || matches!(
+                    *token,
+                    "your"
+                        | "the"
+                        | "final"
+                        | "answer"
+                        | "should"
+                        | "be"
+                        | "return"
+                        | "result"
+                        | "as"
+                        | "mark"
+                        | "of"
+                        | "phrases"
+                        | "format"
+                        | "in"
+                        | "respond"
+                        | "reply"
+                        | "a"
+                        | "an"
+                        | "and"
+                        | "or"
+                        | "with"
+                        | "without"
+                        | "only"
+                        | "no"
+                        | "wrapped"
+                        | "wrap"
+                        | "comma"
+                        | "separated"
+                        | "list"
+                        | "string"
+                        | "object"
+                        | "array"
+                        | "plain"
+                        | "text"
+                        | "short"
+                        | "brief"
+                        | "concise"
+                        | "explanation"
+                        | "code"
+                        | "block"
+                )
+        })
+}
+
 /// Keeps interrogative/request clauses for lexical candidate search while the
 /// original full query remains available for admission and temporal rules.
 pub(super) fn lexical_search_surface(query: &str) -> String {
@@ -189,15 +304,25 @@ pub(super) fn lexical_search_surface(query: &str) -> String {
             let first = clause
                 .split(|character: char| !character.is_alphabetic())
                 .find(|token| !token.is_empty());
-            first.is_some_and(|first| {
-                QUERY_FRAME_STARTERS
-                    .iter()
-                    .any(|starter| first.eq_ignore_ascii_case(starter))
-                    || (*terminator == Some('?')
-                        && AUXILIARY_QUESTION_STARTERS
+            let framed_question = *terminator == Some('?')
+                && clause.split([',', ':']).skip(1).any(|part| {
+                    part.split_whitespace().next().is_some_and(|first| {
+                        QUERY_FRAME_STARTERS
                             .iter()
-                            .any(|starter| first.eq_ignore_ascii_case(starter)))
-            })
+                            .chain(AUXILIARY_QUESTION_STARTERS)
+                            .any(|starter| first.eq_ignore_ascii_case(starter))
+                    })
+                });
+            framed_question
+                || first.is_some_and(|first| {
+                    QUERY_FRAME_STARTERS
+                        .iter()
+                        .any(|starter| first.eq_ignore_ascii_case(starter))
+                        || (*terminator == Some('?')
+                            && AUXILIARY_QUESTION_STARTERS
+                                .iter()
+                                .any(|starter| first.eq_ignore_ascii_case(starter)))
+                })
         })
         .map(|(clause, _)| clause)
         .collect::<Vec<_>>();
@@ -256,6 +381,93 @@ pub(super) fn resolve_view_mode(
     };
 
     (resolved, flags)
+}
+
+// UI labels are identities, rather than interchangeable topical words. This
+// preference is only for quoted labels in a control question; other questions
+// retain their existing relevance ordering. It never grants admission or changes
+// temporal/access rules, and independent reranker evidence keeps precedence.
+pub(super) fn control_query_labels(query: &str) -> Vec<String> {
+    // Require an explicit control-membership question, not an arbitrary quoted
+    // contextual phrase that happens to mention a toolbar elsewhere.
+    let outside_quotes = query.split('"').step_by(2).collect::<Vec<_>>().join(" ");
+    // A quoted excluded label is not positive membership evidence. Keep
+    // ambiguous or negated questions on the ordinary relevance path.
+    let outside_words = outside_quotes.to_lowercase();
+    if outside_words
+        .split(|ch: char| !ch.is_alphanumeric() && ch != '\'' && ch != '’')
+        .any(|word| {
+            matches!(
+                word,
+                "no" | "not"
+                    | "never"
+                    | "without"
+                    | "except"
+                    | "excluding"
+                    | "exclude"
+                    | "excludes"
+                    | "excluded"
+            ) || word.ends_with("n't")
+                || word.ends_with("n’t")
+        })
+    {
+        return Vec::new();
+    }
+    let terms = crate::shared::search::search_query_terms(&outside_quotes);
+    if !terms
+        .iter()
+        .any(|term| matches!(term.as_str(), "toolbar" | "dropdown" | "button"))
+        || !terms.iter().any(|term| {
+            matches!(
+                term.as_str(),
+                "include"
+                    | "including"
+                    | "contains"
+                    | "contain"
+                    | "named"
+                    | "labelled"
+                    | "labeled"
+                    | "called"
+            )
+        })
+    {
+        return Vec::new();
+    }
+    let mut labels = Vec::new();
+    let mut rest = query;
+    while let Some(start) = rest.find('"') {
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('"') else {
+            return Vec::new();
+        };
+        let label = crate::shared::search::normalize_text(&rest[..end]);
+        if !label.is_empty() && !labels.contains(&label) {
+            labels.push(label);
+        }
+        rest = &rest[end + 1..];
+    }
+    labels
+}
+
+pub(super) fn control_label_coverage(content: &str, labels: &[String]) -> f64 {
+    let content = crate::shared::search::normalize_text(content);
+    let hits = labels
+        .iter()
+        .filter(|label| {
+            content.match_indices(label.as_str()).any(|(start, found)| {
+                let end = start + found.len();
+                !content[..start]
+                    .chars()
+                    .next_back()
+                    .is_some_and(char::is_alphanumeric)
+                    && !content[end..]
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_alphanumeric)
+            })
+        })
+        .count();
+    hits as f64 / labels.len() as f64
 }
 
 #[cfg(test)]

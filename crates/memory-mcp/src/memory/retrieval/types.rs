@@ -46,6 +46,9 @@ pub(crate) struct CandidateEvidence {
     pub(crate) matched_references: Vec<String>,
     pub(crate) resolved_entity_ids: Vec<String>,
     pub(crate) native_full_text_match: bool,
+    /// Exact source-text support for labels explicitly quoted in a UI-control
+    /// question. Index keys alone cannot identify an observed control.
+    pub(crate) control_label_coverage: f64,
     pub(crate) semantic_similarity: Option<f64>,
     pub(crate) graph_anchor_origin: Option<GraphAnchorOrigin>,
     pub(crate) hop_count: Option<usize>,

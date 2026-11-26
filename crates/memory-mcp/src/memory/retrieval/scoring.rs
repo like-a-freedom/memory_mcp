@@ -52,6 +52,12 @@ pub(super) fn ranked_fact_to_item(
         provenance = json!({});
     }
     if let Some(map) = provenance.as_object_mut() {
+        if evidence.control_label_coverage > 0.0 {
+            map.insert(
+                "control_label_coverage".to_owned(),
+                json!(evidence.control_label_coverage),
+            );
+        }
         if let Some(reranking) = &evidence.reranking {
             map.insert("reranking".to_string(), reranking.clone());
         }

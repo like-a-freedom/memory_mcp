@@ -593,12 +593,22 @@ pub(super) async fn assemble_default_context(
     // phase expects. The phase boundaries are documented
     // here so future changes can target a single phase
     // without disturbing the others.
-    let channels = retrieve_fact_channels(service, &params).await?;
+    let channels = retrieve_fact_channels(
+        service,
+        &params,
+        #[cfg(feature = "eval-support")]
+        trace,
+    )
+    .await?;
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_phase(trace, "channels.completed");
     let (subject_ids, mentioned_names) = super::alias_expansion::resolve_entity_subject(
         service,
         params.raw_query_opt.unwrap_or_default(),
     )
     .await?;
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_phase(trace, "subject.resolved");
     let mut query_evidence = super::admission::build_query_evidence(
         params.raw_query_opt,
         subject_ids,
@@ -625,17 +635,13 @@ pub(super) async fn assemble_default_context(
         &query_evidence,
         &channels.direct_facts,
     );
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_phase(trace, "topics.completed");
     let ranked = rank_fact_channels(service, &params, channels).await?;
     #[cfg(feature = "eval-support")]
-    if trace.is_some() {
-        let items = ranked
-            .iter()
-            .map(|fact| {
-                ranked_fact_to_item(fact.clone(), params.cutoff, super::fact_decayed_confidence)
-            })
-            .collect::<Vec<_>>();
-        super::diagnostics::record(trace, "ranked_fact_candidates", &items);
-    }
+    super::diagnostics::record_phase(trace, "fusion.completed");
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_ranked(trace, "ranked_fact_candidates", &ranked, params.cutoff);
     let explicit_subject_scoped_query = !query_evidence.subject_terms.is_empty()
         && query_evidence
             .content_terms
@@ -662,12 +668,30 @@ pub(super) async fn assemble_default_context(
         params.cutoff,
         params.access,
     );
-    let ranked =
-        super::admission::admit_ranked_candidates(&query_evidence, ranked, &admission_policy);
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_ranked(
+        trace,
+        "subject_scoped_fact_candidates",
+        &ranked,
+        params.cutoff,
+    );
+    let ranked = super::admission::admit_ranked_candidates(
+        &query_evidence,
+        ranked,
+        &admission_policy,
+        #[cfg(feature = "eval-support")]
+        trace,
+    );
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_ranked(trace, "admitted_fact_candidates", &ranked, params.cutoff);
     let ranked: Vec<RankedContextFact> = ranked
         .into_iter()
         .take(retrieval_candidate_limit(service, params.budget) as usize)
         .collect();
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_phase(trace, "admission.completed");
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_ranked(trace, "bounded_fact_candidates", &ranked, params.cutoff);
     // A source episode can be a useful discourse anchor even when its
     // standalone text is a weak answer to the query. Preserve anchors after
     // evidence admission but before the cross-encoder prunes candidates; the
@@ -689,6 +713,8 @@ pub(super) async fn assemble_default_context(
         trace,
     )
     .await?;
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_phase(trace, "selection.completed");
     let mut source_question_candidates = source_question_candidates;
     for episode_id in &selection.episode_fallback_source_anchors {
         if !source_question_candidates.contains(episode_id) {
@@ -1646,9 +1672,8 @@ async fn project_current_candidates(
 /// The four fact channels produced by `retrieve_fact_channels`
 /// (Task 14, step 1). The fields mirror the inputs
 /// `build_ranked_context_facts` consumes; the
-/// `direct_retrieval_tier` records which tier produced the
-/// initial lexical hit so `rank_fact_channels` can attach
-/// the right tier label to the merged stream.
+/// `direct_native_fact_ids` retains the actual native FTS identities so the
+/// lexical/fallback union cannot manufacture native evidence.
 struct RetrievedFactChannels {
     direct_facts: Vec<crate::models::Fact>,
     temporal_facts: Vec<crate::models::Fact>,
@@ -1657,7 +1682,7 @@ struct RetrievedFactChannels {
     graph_facts: Vec<crate::memory::retrieval::graph::GraphCandidate>,
     community_facts: Vec<super::types::CommunityFactCandidate>,
     semantic_facts: Vec<super::types::SemanticCandidate>,
-    direct_retrieval_tier: RetrievalTier,
+    direct_native_fact_ids: HashSet<String>,
 }
 
 /// The ranked + selected output of the selection phase
@@ -1685,6 +1710,7 @@ struct SelectedContext {
 async fn retrieve_fact_channels(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
 ) -> Result<RetrievedFactChannels, MemoryError> {
     let candidate_limit = retrieval_candidate_limit(service, params.budget);
     let lexical_result = select_fact_records_for_query(
@@ -1694,11 +1720,13 @@ async fn retrieve_fact_channels(
             query_opt: params.query_opt,
             limit: candidate_limit,
             fact_types: params.fact_types,
+            #[cfg(feature = "eval-support")]
+            trace,
         },
     )
     .await?;
 
-    let direct_retrieval_tier = lexical_result.retrieval_tier;
+    let direct_native_fact_ids = lexical_result.native_fact_ids;
     let mut direct_facts =
         filter_facts_by_constraints(lexical_result.records, params.access, params.fact_types);
 
@@ -1741,6 +1769,8 @@ async fn retrieve_fact_channels(
                     query_opt: Some(expanded_query),
                     limit: candidate_limit,
                     fact_types: params.fact_types,
+                    #[cfg(feature = "eval-support")]
+                    trace,
                 },
             )
             .await?;
@@ -1946,7 +1976,7 @@ async fn retrieve_fact_channels(
         graph_facts,
         community_facts,
         semantic_facts,
-        direct_retrieval_tier,
+        direct_native_fact_ids,
     })
 }
 
@@ -1971,13 +2001,20 @@ async fn rank_fact_channels(
         graph_facts,
         community_facts,
         semantic_facts,
-        direct_retrieval_tier,
+        direct_native_fact_ids,
     } = channels;
 
     if params.query_opt.is_some() {
         let mut lexical_facts = direct_facts
             .into_iter()
-            .map(|fact| (fact, direct_retrieval_tier))
+            .map(|fact| {
+                let tier = if direct_native_fact_ids.contains(&fact.fact_id) {
+                    RetrievalTier::Direct
+                } else {
+                    RetrievalTier::EpisodeFallback
+                };
+                (fact, tier)
+            })
             .collect::<Vec<_>>();
         lexical_facts.extend(
             temporal_facts
@@ -2003,6 +2040,7 @@ async fn rank_fact_channels(
                 semantic_facts,
                 query_opt: params.raw_query_opt,
                 semantic_available: service.embedding_provider.is_enabled(),
+                reranking_available: service.embedding_provider.reranking_signature().is_some(),
                 cutoff: params.cutoff,
             },
             super::fact_decayed_confidence,
@@ -2019,6 +2057,7 @@ async fn rank_fact_channels(
                 semantic_facts: Vec::new(),
                 query_opt: params.raw_query_opt,
                 semantic_available: service.embedding_provider.is_enabled(),
+                reranking_available: service.embedding_provider.reranking_signature().is_some(),
                 cutoff: params.cutoff,
             },
             super::fact_decayed_confidence,
@@ -2045,7 +2084,14 @@ async fn select_context_facts(
     let (episode_fallback_items, episode_fallback_source_anchors) = if current_query {
         (Vec::new(), Vec::new())
     } else if let Some(query) = params.query_opt {
-        let items = collect_episode_fallback_items(service, params, query).await?;
+        let items = collect_episode_fallback_items(
+            service,
+            params,
+            query,
+            #[cfg(feature = "eval-support")]
+            trace,
+        )
+        .await?;
         #[cfg(feature = "eval-support")]
         super::diagnostics::record(trace, "episode_candidates", &items);
         let mut seen_source_anchors = HashSet::new();

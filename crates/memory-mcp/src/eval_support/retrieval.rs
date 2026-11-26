@@ -145,7 +145,8 @@ pub async fn new_eval_reembed_service(
 /// Immutable source-filtered receipts from the actual context pipeline.
 /// Raw evidence is returned only to this explicit eval caller, never logged.
 pub use crate::memory::retrieval::diagnostics::{
-    ContextEvidence, ContextEvidenceCapture, RetrievalStage,
+    CandidateInventory, CandidateObserver, ContextEvidence, ContextEvidenceCapture, LexicalWork,
+    RetrievalStage,
 };
 
 pub async fn assemble_context_with_evidence(

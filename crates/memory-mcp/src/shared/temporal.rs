@@ -57,10 +57,20 @@ pub const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
 /// The same clause against a named variable, for a query that binds its cutoff
 /// under something other than `$cutoff`.
 pub fn visibility_clause(cutoff_var: &str) -> String {
+    qualified_visibility_clause("", cutoff_var)
+}
+
+/// The same visibility rule for a materialized record in an array closure.
+/// Only fixed owner-supplied field names are qualified; the cutoff stays bound.
+pub(crate) fn visibility_clause_on_record(record: &str, cutoff_var: &str) -> String {
+    qualified_visibility_clause(&format!("{record}."), cutoff_var)
+}
+
+fn qualified_visibility_clause(prefix: &str, cutoff_var: &str) -> String {
     format!(
-        "t_valid <= type::datetime({cutoff_var}) \
-         AND (t_ingested IS NONE OR t_ingested <= type::datetime({cutoff_var})) \
-         AND (t_invalid IS NONE OR t_invalid > type::datetime({cutoff_var}) OR t_invalid_ingested > type::datetime({cutoff_var}))",
+        "{prefix}t_valid <= type::datetime({cutoff_var}) \
+         AND ({prefix}t_ingested IS NONE OR {prefix}t_ingested <= type::datetime({cutoff_var})) \
+         AND ({prefix}t_invalid IS NONE OR {prefix}t_invalid > type::datetime({cutoff_var}) OR {prefix}t_invalid_ingested > type::datetime({cutoff_var}))",
     )
 }
 

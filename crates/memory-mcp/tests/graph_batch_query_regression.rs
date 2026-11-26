@@ -391,8 +391,15 @@ async fn batch_graph_lookup_uses_endpoint_indexes_with_many_unrelated_edges() {
     let cutoff = (Utc::now() + Duration::days(1)).to_rfc3339();
     let (sql, vars) = build_select_edge_neighbors_for_entities_query(&seed_ids, &cutoff);
 
+    let inner = sql
+        .split_once("array::filter((")
+        .unwrap()
+        .1
+        .split_once("), |$edge|")
+        .unwrap()
+        .0;
     let plan = db
-        .query(&format!("EXPLAIN {sql}"), Some(vars), "org")
+        .query(&format!("EXPLAIN {inner}"), Some(vars), "org")
         .await
         .expect("EXPLAIN batched graph query")
         .to_string();
@@ -413,4 +420,81 @@ async fn batch_graph_lookup_uses_endpoint_indexes_with_many_unrelated_edges() {
         !plan.contains("TableScan"),
         "unexpected endpoint table scan: {plan}"
     );
+}
+
+#[tokio::test]
+async fn graph_batches_do_not_rescan_the_global_valid_time_bitmap() {
+    let (_, db) = common::make_service_with_client().await;
+    let ids = (0..32)
+        .map(|n| format!("entity:sparse{n:03}"))
+        .collect::<Vec<_>>();
+    let (sql, vars) = build_select_edge_neighbors_for_entities_query(&ids, "2026-05-01T00:00:00Z");
+    let outer = db
+        .query(&format!("EXPLAIN {sql}"), Some(vars.clone()), "org")
+        .await
+        .unwrap()
+        .to_string();
+    assert!(
+        !outer.contains("edge_t_valid"),
+        "each sparse endpoint batch must not build a whole-history time bitmap: {outer}"
+    );
+    // Inspect the actual candidate statement inside the materialization barrier,
+    // because outer EXPLAIN represents array evaluation as one FunctionCall.
+    let inner = sql
+        .split_once("array::filter((")
+        .unwrap()
+        .1
+        .split_once("), |$edge|")
+        .unwrap()
+        .0;
+    let plan = db
+        .query(&format!("EXPLAIN {inner}"), Some(vars), "org")
+        .await
+        .unwrap()
+        .to_string();
+    assert!(plan.contains("edge_in"), "incoming endpoint index: {plan}");
+    assert!(plan.contains("edge_out"), "outgoing endpoint index: {plan}");
+    assert!(
+        !plan.contains("edge_t_valid"),
+        "time filtering must follow indexed candidates: {plan}"
+    );
+    assert!(
+        !plan.contains("TableScan"),
+        "indexed candidates must not become a table scan: {plan}"
+    );
+}
+
+#[tokio::test]
+async fn staged_graph_read_excludes_future_validity_and_ingestion() {
+    let (_, db) = common::make_service_with_client().await;
+    common::seed_entity(&db, "org", "entity:future_anchor", "person", "Anchor", &[]).await;
+    common::seed_entity(&db, "org", "entity:future_target", "person", "Target", &[]).await;
+    let store = KnowledgeGraphStore::new(db.clone(), "org");
+    let at = |day| Utc.with_ymd_and_hms(2026, 10, day, 0, 0, 0).unwrap();
+    for (name, valid, ingested) in [
+        ("visible", 1, 1),
+        ("future_valid", 8, 1),
+        ("future_ingested", 1, 8),
+    ] {
+        seed_edge_at(
+            &store,
+            EdgeFixture {
+                edge_id: &format!("edge:{name}"),
+                from_id: "entity:future_anchor",
+                to_id: "entity:future_target",
+                relation: name,
+                t_valid: at(valid),
+                t_ingested: at(ingested),
+                t_invalid: None,
+                t_invalid_ingested: None,
+            },
+        )
+        .await;
+    }
+    let rows = memory_mcp::knowledge::KnowledgeStoreClient::new(db, "org")
+        .select_edge_neighbors_for_entities(&["entity:future_anchor".into()], &at(5).to_rfc3339())
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["relation"], "visible");
 }

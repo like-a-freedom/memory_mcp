@@ -176,6 +176,21 @@ fn record_graph_neighbor(
     }
 }
 
+async fn read_neighbor_batch(
+    store: &crate::knowledge::KnowledgeStoreClient,
+    entities: Option<&[String]>,
+    cutoff: &str,
+) -> Result<Vec<Value>, MemoryError> {
+    match entities {
+        Some(entities) => {
+            store
+                .select_edge_neighbors_for_entities(entities, cutoff)
+                .await
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
 async fn walk_anchor_entities(
     service: &crate::memory::retrieval::RetrievalContext,
     cutoff_iso: &str,
@@ -204,13 +219,22 @@ async fn walk_anchor_entities(
     {
         let frontier_ids = frontier.keys().cloned().collect::<Vec<_>>();
         let mut edges = Vec::new();
-        for entity_batch in frontier_ids.chunks(GRAPH_NEIGHBOR_BATCH_SIZE) {
-            edges.extend(
-                service
-                    .knowledge_store()
-                    .select_edge_neighbors_for_entities(entity_batch, cutoff_iso)
-                    .await?,
-            );
+        // Overlap at most four independent read-only batches. try_join! owns
+        // the futures (no detached tasks), cancels siblings on the first observed
+        // error, and keeps successful edges in the original batch order.
+        for wave in frontier_ids.chunks(GRAPH_NEIGHBOR_BATCH_SIZE * 4) {
+            let mut batches = wave.chunks(GRAPH_NEIGHBOR_BATCH_SIZE);
+            let store = service.knowledge_store();
+            let (first, second, third, fourth) = tokio::try_join!(
+                read_neighbor_batch(store, batches.next(), cutoff_iso),
+                read_neighbor_batch(store, batches.next(), cutoff_iso),
+                read_neighbor_batch(store, batches.next(), cutoff_iso),
+                read_neighbor_batch(store, batches.next(), cutoff_iso),
+            )?;
+            edges.extend(first);
+            edges.extend(second);
+            edges.extend(third);
+            edges.extend(fourth);
         }
 
         let mut next_frontier = BTreeMap::new();

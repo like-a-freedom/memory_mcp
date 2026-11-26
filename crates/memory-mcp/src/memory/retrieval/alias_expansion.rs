@@ -12,6 +12,8 @@ pub(super) async fn resolve_entity_subject(
     service: &crate::memory::retrieval::RetrievalContext,
     query: &str,
 ) -> Result<(Vec<String>, Vec<String>), crate::MemoryError> {
+    let query_surface = super::query_mode::evidence_query_surface(query);
+    let query = query_surface.as_ref();
     let lowered = query.trim().to_lowercase();
     let subject = [
         "what do you know about ",
@@ -190,7 +192,38 @@ pub(crate) async fn expand_query_with_aliases(
         }
     }
 
-    expanded.into_iter().collect()
+    let expanded = expanded.into_iter().collect::<Vec<_>>();
+    let query_terms = crate::shared::search::search_query_terms(query);
+    let equivalent = expanded
+        .iter()
+        .filter(|expanded| crate::shared::search::search_query_terms(expanded) == query_terms)
+        .collect::<Vec<_>>();
+    if equivalent.is_empty() {
+        return expanded;
+    }
+    let inputs = std::iter::once(query)
+        .chain(equivalent.iter().map(|query| query.as_str()))
+        .collect::<Vec<_>>();
+    // A missing/unsupported analyzer is an optimization miss. Keep all aliases
+    // rather than guessing equivalence or discarding independent evidence.
+    let Ok(streams) = service
+        .knowledge_store()
+        .analyze_fact_queries(&inputs)
+        .await
+    else {
+        return expanded;
+    };
+    let redundant = equivalent
+        .iter()
+        .zip(streams.iter().skip(1))
+        .filter(|(_, tokens)| !tokens.is_empty() && **tokens == streams[0])
+        .map(|(query, _)| query.as_str())
+        .collect::<HashSet<_>>();
+    expanded
+        .iter()
+        .filter(|query| !redundant.contains(query.as_str()))
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]

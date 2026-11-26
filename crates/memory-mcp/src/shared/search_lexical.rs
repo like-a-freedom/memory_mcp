@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use crate::models::Fact;
 
-use super::search::search_query_term_set;
+use super::search::{search_query_term_set, search_query_term_set_many};
 
 /// Subset of `query_terms` that appear in `text` (both normalized via
 /// [`super::search::search_query_terms`]). Empty `query_terms` yields an empty set.
@@ -28,7 +28,7 @@ pub fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashS
 
 /// Normalized term set of a fact: its content plus all index keys.
 pub fn fact_term_set(fact: &Fact) -> HashSet<String> {
-    term_set_of(&fact.content, &fact.index_keys)
+    term_set_of(&fact.content, fact.index_keys.iter().map(String::as_str))
 }
 
 /// The one term-set implementation, over the two fields every searchable row
@@ -41,12 +41,8 @@ pub fn fact_term_set(fact: &Fact) -> HashSet<String> {
 /// interchangeable in *shape* (a `Fact` and a raw `Value` are different
 /// things to read) but they are the same operation, so the operation lives
 /// here once and each caller reads its own two fields.
-fn term_set_of(content: &str, index_keys: &[String]) -> HashSet<String> {
-    let mut terms = search_query_term_set(content);
-    for index_key in index_keys {
-        terms.extend(search_query_term_set(index_key));
-    }
-    terms
+fn term_set_of<'a>(content: &'a str, index_keys: impl Iterator<Item = &'a str>) -> HashSet<String> {
+    search_query_term_set_many(std::iter::once(content).chain(index_keys))
 }
 
 /// Subset of `query_terms` matched by a fact's content and index keys.
@@ -56,11 +52,19 @@ pub fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> Hash
         return HashSet::new();
     }
 
-    let fact_terms = fact_term_set(fact);
-
+    let content_terms = search_query_term_set(&fact.content);
+    // Index keys can only add membership. Do not normalize a large dictionary
+    // when the source text has already answered every requested membership.
+    if query_terms
+        .iter()
+        .all(|term| content_terms.contains(term.as_str()))
+    {
+        return query_terms.iter().cloned().collect();
+    }
+    let index_terms = search_query_term_set_many(fact.index_keys.iter().map(String::as_str));
     query_terms
         .iter()
-        .filter(|term| fact_terms.contains(term.as_str()))
+        .filter(|term| content_terms.contains(term.as_str()) || index_terms.contains(term.as_str()))
         .cloned()
         .collect()
 }
@@ -77,8 +81,8 @@ pub fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> Hash
 /// else.
 pub fn record_term_set(record: &serde_json::Value) -> HashSet<String> {
     term_set_of(
-        &string_field(record, "content").unwrap_or_default(),
-        &string_array_field(record, "index_keys"),
+        string_field(record, "content").unwrap_or_default(),
+        string_array_field(record, "index_keys"),
     )
 }
 
@@ -97,10 +101,10 @@ pub fn record_query_overlap(record: &serde_json::Value, query_terms: &[String]) 
         .count()
 }
 
-fn string_field(record: &serde_json::Value, field: &str) -> Option<String> {
+fn string_field<'a>(record: &'a serde_json::Value, field: &str) -> Option<&'a str> {
     let value = record.get(field)?;
     if value.is_string() {
-        return value.as_str().map(str::to_string);
+        return value.as_str();
     }
     // SurrealDB serialises a `Strand` as `{"Strand": {"String": "…"}}`, and a
     // lexical scan reads rows straight out of the driver.
@@ -108,20 +112,21 @@ fn string_field(record: &serde_json::Value, field: &str) -> Option<String> {
         .get("String")
         .or_else(|| value.get("Strand").and_then(|s| s.get("String")))
         .and_then(serde_json::Value::as_str)
-        .map(str::to_string)
 }
 
-fn string_array_field(record: &serde_json::Value, field: &str) -> Vec<String> {
-    let Some(values) = record.get(field).and_then(serde_json::Value::as_array) else {
-        return Vec::new();
-    };
-    values
-        .iter()
+fn string_array_field<'a>(
+    record: &'a serde_json::Value,
+    field: &str,
+) -> impl Iterator<Item = &'a str> {
+    record
+        .get(field)
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
         .filter_map(|value| match value {
-            serde_json::Value::String(text) => Some(text.clone()),
+            serde_json::Value::String(text) => Some(text.as_str()),
             other => string_field(other, "String"),
         })
-        .collect()
 }
 
 /// True if `term` is exactly four ASCII digits (a year token like `2026`).

@@ -1889,3 +1889,37 @@ async fn original_dog_adoption_query_excludes_a_later_puppy_session() {
         "a later puppy and its follow-up discussion do not answer when Audrey adopted the first three dogs: {items:#?}"
     );
 }
+
+#[tokio::test]
+async fn a_source_question_cannot_drop_substantive_post_question_constraints() {
+    let tm = common::TestMemory::new(false).await;
+    ingest_turn(
+        &tm.service,
+        "chat:qualified-team:1",
+        "chat:qualified-team",
+        1,
+        "Owen: Which team did Mira sign with?",
+    )
+    .await;
+    ingest_turn(
+        &tm.service,
+        "chat:qualified-team:2",
+        "chat:qualified-team",
+        2,
+        "Mira: The Minnesota Wolves!",
+    )
+    .await;
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &tm.service,
+        query_text(
+            "Which team did Mira sign with? Only consider teams based in canada with professional registration confirmed by the national sporting federation.",
+            None,
+        ),
+    ).await.expect("qualified conversation query should assemble");
+
+    assert!(
+        items.is_empty(),
+        "neither the source question nor its answer establishes the requested qualification: {items:#?}"
+    );
+}

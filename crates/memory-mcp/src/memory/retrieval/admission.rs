@@ -1,9 +1,9 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Datelike, Utc};
 
 use crate::models::AccessPayload;
-use crate::shared::search::search_query_terms;
+use crate::shared::search::{search_query_term_set, search_query_terms};
 
 use super::filtering::{fact_allowed_by_access, fact_is_active_at};
 use super::query_mode::{QueryFlags, query_clauses};
@@ -161,7 +161,8 @@ pub(super) fn build_query_evidence(
     mentioned_names: &[String],
     flags: &QueryFlags,
 ) -> QueryEvidence {
-    let raw = raw_query.unwrap_or_default();
+    let semantic_query = super::query_mode::evidence_query_surface(raw_query.unwrap_or_default());
+    let raw = semantic_query.as_ref();
     let without_urls = strip_url_tokens(raw);
     let (cleaned_query, scope_reference) = strip_project_scope(&without_urls);
     let mut qualified_references = extract_qualified_references(&cleaned_query);
@@ -266,8 +267,9 @@ fn is_subject_word(token: &str, allow_uppercase: bool) -> bool {
 }
 
 fn inferred_subject_terms_with_case(query: &str, allow_uppercase: bool) -> Vec<String> {
+    let query = super::query_mode::evidence_query_surface(query);
     unique_terms(
-        query_clauses(query)
+        query_clauses(&query)
             .into_iter()
             .flat_map(|clause| inferred_subject_terms_in_clause(clause, allow_uppercase))
             .collect(),
@@ -360,10 +362,11 @@ fn inferred_subject_terms_in_clause(query: &str, allow_uppercase: bool) -> Vec<S
 
 /// A single explicit subject, using the same admission rule as historical reads.
 pub(super) fn explicit_query_subject(query: &str) -> Option<String> {
+    let query = super::query_mode::evidence_query_surface(query);
     let mut subjects = Vec::new();
     let mut ambiguous_clause = false;
 
-    for clause in query_clauses(query) {
+    for clause in query_clauses(&query) {
         let tokens = clause
             .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
             .filter(|s| !s.is_empty())
@@ -603,10 +606,11 @@ fn is_personal_planning_cue(term: &str) -> bool {
         .any(|cue| cue == term)
 }
 
-pub(super) fn evaluate_candidate(
+fn evaluate_candidate_with_topics(
     query: &QueryEvidence,
     candidate: &RankedContextFact,
     policy: &AdmissionPolicy<'_>,
+    topics: &CandidateTopicMatches,
 ) -> AdmissionDecision {
     debug_assert_eq!(policy.version, "retrieval-admission-v1");
 
@@ -660,7 +664,7 @@ pub(super) fn evaluate_candidate(
     }
 
     if !query.mandatory_reference_alternatives.is_empty() {
-        let candidate_references = candidate_references(&candidate.fact);
+        let candidate_references = &topics.references;
         if query
             .mandatory_reference_alternatives
             .iter()
@@ -672,7 +676,7 @@ pub(super) fn evaluate_candidate(
                 .any(|reference| reference.starts_with("url:"));
             if (query.content_terms.is_empty() && !has_url_reference)
                 || is_literal_reference_recall_request(query)
-                || has_minimum_candidate_topic_hits(query, candidate)
+                || has_minimum_candidate_topic_hits(query, topics)
                 || has_native_single_term_support(query, candidate)
             {
                 return AdmissionDecision::Admit(AdmissionBasis::Reference);
@@ -704,7 +708,7 @@ pub(super) fn evaluate_candidate(
         // inherit that episode-level qualification, but still need independent
         // topical support and may not contradict the requested reference.
         if candidate.retrieval_tier == super::types::RetrievalTier::SourceExpanded
-            && has_minimum_candidate_topic_hits(query, candidate)
+            && has_minimum_candidate_topic_hits(query, topics)
         {
             return AdmissionDecision::Admit(AdmissionBasis::QualifiedSourceEpisode);
         }
@@ -784,7 +788,7 @@ pub(super) fn evaluate_candidate(
                 }
             }
         }
-        if has_sufficient_candidate_support(query, candidate)
+        if has_sufficient_candidate_support(query, topics)
             || has_native_single_term_support(query, candidate)
         {
             return AdmissionDecision::Admit(AdmissionBasis::Lexical);
@@ -816,44 +820,128 @@ pub(super) fn evaluate_candidate(
         return AdmissionDecision::Admit(AdmissionBasis::CommunitySummary);
     }
 
-    if query.intent == AdmissionIntent::Content
-        && repeated_topic_admission_evidence(query, &candidate.fact).is_some()
-    {
+    if query.intent == AdmissionIntent::Content && topics.repeated_topic.is_some() {
         return AdmissionDecision::Admit(AdmissionBasis::RepeatedTopic);
     }
 
     AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
 }
 
-fn has_sufficient_candidate_support(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
-    has_sufficient_term_support(query, &matched_candidate_topic_terms(query, candidate))
+#[derive(Clone, Default)]
+struct CandidateTopicMatches {
+    references: Vec<String>,
+    content: Vec<String>,
+    index: Vec<String>,
+    repeated_topic: Option<super::types::RepeatedTopicAdmissionEvidence>,
 }
 
-fn has_minimum_candidate_topic_hits(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
+impl CandidateTopicMatches {
+    fn combined(&self, query: &QueryEvidence) -> Vec<String> {
+        query
+            .content_terms
+            .iter()
+            .filter(|term| self.content.contains(term) || self.index.contains(term))
+            .cloned()
+            .collect()
+    }
+}
+
+fn content_topic_matches(query: &QueryEvidence, content: &str) -> Vec<String> {
+    if query.content_terms.is_empty() {
+        return Vec::new();
+    }
+    let terms = search_query_term_set(&strip_url_tokens(content));
+    query
+        .content_terms
+        .iter()
+        .filter(|term| terms.contains(*term))
+        .cloned()
+        .collect()
+}
+
+#[derive(Clone, Default)]
+struct IndexTopicFeatures {
+    references: Vec<String>,
+    matches: Vec<String>,
+    repeated_topic: Option<super::types::RepeatedTopicAdmissionEvidence>,
+    #[cfg(feature = "eval-support")]
+    dictionary_builds: usize,
+}
+
+fn index_topic_features(
+    query: &QueryEvidence,
+    keys: &[String],
+    tokens: &mut crate::shared::search::IndexTokenVocabulary,
+) -> IndexTopicFeatures {
+    let references = if query.qualified_references.is_empty()
+        && query.mandatory_reference_alternatives.is_empty()
+    {
+        Vec::new()
+    } else {
+        unique_terms(
+            keys.iter()
+                .flat_map(|key| extract_qualified_references(key))
+                .collect(),
+        )
+    };
+    if query.content_terms.is_empty() {
+        return IndexTopicFeatures {
+            references,
+            ..IndexTopicFeatures::default()
+        };
+    }
+    let raw_terms = tokens.vocabulary(keys.iter().map(String::as_str));
+    let contains_urls = keys.iter().any(|key| key.contains("://"));
+    // Topic admission excludes URLs; repeated-topic evidence historically uses
+    // the complete key vocabulary. Share the dictionary only when they agree.
+    let without_urls = contains_urls.then(|| index_vocabulary_without_urls(keys, tokens));
+    let topic_terms = without_urls.as_ref().unwrap_or(&raw_terms);
+    IndexTopicFeatures {
+        references,
+        matches: query
+            .content_terms
+            .iter()
+            .filter(|term| topic_terms.contains(*term))
+            .cloned()
+            .collect(),
+        repeated_topic: repeated_topic_admission_evidence(query, &raw_terms),
+        #[cfg(feature = "eval-support")]
+        dictionary_builds: 1 + usize::from(contains_urls),
+    }
+}
+
+#[cfg(test)]
+fn evaluate_candidate(
+    query: &QueryEvidence,
+    candidate: &RankedContextFact,
+    policy: &AdmissionPolicy<'_>,
+) -> AdmissionDecision {
+    let index = index_topic_features(
+        query,
+        &candidate.fact.index_keys,
+        &mut crate::shared::search::IndexTokenVocabulary::default(),
+    );
+    let topics = CandidateTopicMatches {
+        references: candidate_references(&candidate.fact),
+        content: content_topic_matches(query, &candidate.fact.content),
+        index: index.matches,
+        repeated_topic: (candidate.fact.fact_type == crate::models::FactType::Experience.as_str())
+            .then_some(index.repeated_topic)
+            .flatten(),
+    };
+    evaluate_candidate_with_topics(query, candidate, policy, &topics)
+}
+
+fn has_sufficient_candidate_support(query: &QueryEvidence, topics: &CandidateTopicMatches) -> bool {
+    has_sufficient_term_support(query, &topics.combined(query))
+}
+
+fn has_minimum_candidate_topic_hits(query: &QueryEvidence, topics: &CandidateTopicMatches) -> bool {
     if query.content_terms.is_empty() {
         return false;
     }
     let minimum_hits = if query.content_terms.len() == 1 { 1 } else { 2 };
-    matched_candidate_topic_terms(query, candidate).len() >= minimum_hits
-}
-
-fn matched_candidate_topic_terms(
-    query: &QueryEvidence,
-    candidate: &RankedContextFact,
-) -> Vec<String> {
-    let content_terms = search_query_terms(&strip_url_tokens(&candidate.fact.content));
-    let index_key_terms = candidate
-        .fact
-        .index_keys
-        .iter()
-        .flat_map(|key| search_query_terms(&strip_url_tokens(key)))
-        .collect::<Vec<_>>();
-    query
-        .content_terms
-        .iter()
-        .filter(|term| content_terms.contains(term) || index_key_terms.contains(term))
-        .cloned()
-        .collect()
+    topics.combined(query).len() >= minimum_hits
 }
 
 fn speaker_conflicts_with_requested_subject(query: &QueryEvidence, content: &str) -> bool {
@@ -936,9 +1024,7 @@ fn has_timeline_topic_support(query: &QueryEvidence, candidate: &RankedContextFa
 }
 
 fn has_timeline_topic_support_for_text(query: &QueryEvidence, content: &str) -> bool {
-    let content_terms = search_query_terms(&strip_url_tokens(content))
-        .into_iter()
-        .collect::<HashSet<_>>();
+    let content_terms = search_query_term_set(&strip_url_tokens(content));
 
     query.content_terms.iter().any(|term| {
         !is_timeline_narration_term(term)
@@ -1407,6 +1493,7 @@ fn has_native_single_term_support(query: &QueryEvidence, candidate: &RankedConte
     query.content_terms.len() == 1 && candidate.evidence.native_full_text_match
 }
 
+#[cfg(test)]
 fn candidate_references(fact: &crate::models::Fact) -> Vec<String> {
     let mut references = extract_qualified_references(&fact.content);
     references.extend(extract_qualified_references(&fact.source_episode));
@@ -1492,9 +1579,7 @@ fn is_literal_reference_recall_request(query: &QueryEvidence) -> bool {
 }
 
 fn has_sufficient_content_support_for_text(query: &QueryEvidence, content: &str) -> bool {
-    let candidate_terms = search_query_terms(&strip_url_tokens(content))
-        .into_iter()
-        .collect::<HashSet<_>>();
+    let candidate_terms = search_query_term_set(&strip_url_tokens(content));
     let matched_terms = query
         .content_terms
         .iter()
@@ -1522,17 +1607,8 @@ fn has_sufficient_term_support(query: &QueryEvidence, matched_terms: &[String]) 
 
 fn repeated_topic_admission_evidence(
     query: &QueryEvidence,
-    fact: &crate::models::Fact,
+    index_terms: &HashSet<String>,
 ) -> Option<super::types::RepeatedTopicAdmissionEvidence> {
-    if fact.fact_type != crate::models::FactType::Experience.as_str() {
-        return None;
-    }
-
-    let index_terms = fact
-        .index_keys
-        .iter()
-        .flat_map(|index_key| search_query_terms(index_key))
-        .collect::<HashSet<_>>();
     let matched_query_index_terms = query
         .content_terms
         .iter()
@@ -1639,9 +1715,7 @@ pub(super) fn episode_candidate_is_rerankable_at_reference_time(
         return episode_candidate_is_admitted_at_reference_time(query, content, reference_time);
     }
 
-    let candidate_terms = search_query_terms(&strip_url_tokens(content))
-        .into_iter()
-        .collect::<HashSet<_>>();
+    let candidate_terms = search_query_term_set(&strip_url_tokens(content));
     query
         .content_terms
         .iter()
@@ -1673,12 +1747,87 @@ pub(super) fn admit_ranked_candidates(
     query: &QueryEvidence,
     candidates: Vec<RankedContextFact>,
     policy: &AdmissionPolicy<'_>,
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
 ) -> Vec<RankedContextFact> {
+    // Borrow exact raw inputs only while candidates are immutable. Keep the
+    // short query matches, not cloned source text/keys or a cross-read cache.
+    let mut contents = HashMap::new();
+    let mut content_references = HashMap::new();
+    let mut indexes = HashMap::new();
+    let mut index_tokens = crate::shared::search::IndexTokenVocabulary::default();
+    let topics = candidates
+        .iter()
+        .map(|candidate| {
+            if !fact_is_active_at(&candidate.fact, policy.cutoff)
+                || !fact_allowed_by_access(&candidate.fact, policy.access)
+            {
+                return CandidateTopicMatches::default();
+            }
+            let index = indexes
+                .entry(candidate.fact.index_keys.as_slice())
+                .or_insert_with_key(|keys| index_topic_features(query, keys, &mut index_tokens));
+            CandidateTopicMatches {
+                references: if query.qualified_references.is_empty()
+                    && query.mandatory_reference_alternatives.is_empty()
+                {
+                    Vec::new()
+                } else {
+                    let mut references = content_references
+                        .entry(candidate.fact.content.as_str())
+                        .or_insert_with_key(|text| extract_qualified_references(text))
+                        .clone();
+                    references.extend(extract_qualified_references(&candidate.fact.source_episode));
+                    references.extend(index.references.iter().cloned());
+                    unique_terms(references)
+                },
+                content: contents
+                    .entry(candidate.fact.content.as_str())
+                    .or_insert_with_key(|content| content_topic_matches(query, content))
+                    .clone(),
+                index: index.matches.clone(),
+                repeated_topic: if candidate.fact.fact_type
+                    == crate::models::FactType::Experience.as_str()
+                {
+                    index.repeated_topic.clone()
+                } else {
+                    None
+                },
+            }
+        })
+        .collect::<Vec<_>>();
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_work(
+        trace,
+        super::diagnostics::LexicalWork {
+            stage: "admission.topics",
+            elapsed_ms: 0.0,
+            records: candidates.len(),
+            content_dictionaries: if query.content_terms.is_empty() {
+                0
+            } else {
+                contents.len()
+            },
+            index_dictionaries: if query.content_terms.is_empty() {
+                0
+            } else {
+                indexes
+                    .values()
+                    .map(|features| features.dictionary_builds)
+                    .sum()
+            },
+        },
+    );
+    drop(contents);
+    drop(content_references);
+    drop(indexes);
     candidates
         .into_iter()
-        .filter_map(|mut candidate| {
-            if let AdmissionDecision::Admit(basis) = evaluate_candidate(query, &candidate, policy) {
-                populate_candidate_evidence(query, &mut candidate);
+        .zip(topics)
+        .filter_map(|(mut candidate, topics)| {
+            if let AdmissionDecision::Admit(basis) =
+                evaluate_candidate_with_topics(query, &candidate, policy, &topics)
+            {
+                populate_candidate_evidence(query, &mut candidate, topics);
                 candidate.evidence.admission_basis = Some(basis);
                 candidate.evidence.explicit_date_admitted = query.intent != AdmissionIntent::Browse
                     && query.explicit_calendar_date.is_some();
@@ -1690,18 +1839,31 @@ pub(super) fn admit_ranked_candidates(
         .collect()
 }
 
-fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedContextFact) {
-    let fact_terms = search_query_terms(&strip_url_tokens(&candidate.fact.content))
-        .into_iter()
-        .collect::<HashSet<_>>();
-    candidate.evidence.matched_content_terms = query
-        .content_terms
+fn index_vocabulary_without_urls(
+    keys: &[String],
+    tokens: &mut crate::shared::search::IndexTokenVocabulary,
+) -> HashSet<String> {
+    use std::borrow::Cow;
+    let prepared = keys
         .iter()
-        .filter(|term| fact_terms.contains(*term))
-        .cloned()
-        .collect();
+        .map(|key| {
+            if key.contains("://") {
+                Cow::Owned(strip_url_tokens(key))
+            } else {
+                Cow::Borrowed(key.as_str())
+            }
+        })
+        .collect::<Vec<_>>();
+    tokens.vocabulary(prepared.iter().map(|key| key.as_ref()))
+}
 
-    let fact_references = candidate_references(&candidate.fact);
+fn populate_candidate_evidence(
+    query: &QueryEvidence,
+    candidate: &mut RankedContextFact,
+    topics: CandidateTopicMatches,
+) {
+    candidate.evidence.matched_content_terms = topics.content;
+    let fact_references = topics.references;
     candidate.evidence.matched_references = query
         .qualified_references
         .iter()
@@ -1709,18 +1871,7 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
         .cloned()
         .collect();
 
-    let index_key_terms = candidate
-        .fact
-        .index_keys
-        .iter()
-        .flat_map(|key| search_query_terms(&strip_url_tokens(key)))
-        .collect::<HashSet<_>>();
-    candidate.evidence.matched_index_key_terms = query
-        .content_terms
-        .iter()
-        .filter(|term| index_key_terms.contains(*term))
-        .cloned()
-        .collect();
+    candidate.evidence.matched_index_key_terms = topics.index;
 
     let fact_entities = candidate.fact.entity_links.iter().collect::<HashSet<_>>();
     candidate.evidence.resolved_entity_ids = query
@@ -1740,53 +1891,56 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
             .collect();
     }
 
-    candidate.evidence.repeated_topic = repeated_topic_admission_evidence(query, &candidate.fact);
+    candidate.evidence.repeated_topic = topics.repeated_topic;
 }
 
 fn candidate_conflicts_with_query_reference(query: &QueryEvidence, content: &str) -> bool {
-    let denied_references = content
-        .split(['.', '!', '?', '\n', ';', ','])
-        .map(str::trim)
-        .filter_map(|clause| {
-            let lower = clause.to_ascii_lowercase();
-            let denied = ["not ", "never ", "except ", "excluding "]
-                .iter()
-                .any(|prefix| lower.starts_with(prefix));
-            (denied && !lower.starts_with("not only "))
-                .then(|| extract_qualified_references(clause))
-        })
-        .flatten()
-        .collect::<HashSet<_>>();
-    let candidate_references = extract_qualified_references(content);
-    let has_supported_requested_reference =
-        query
-            .mandatory_reference_alternatives
-            .iter()
-            .any(|reference| {
-                candidate_references.contains(reference) && !denied_references.contains(reference)
-            });
-    let denies_requested_reference = query
-        .mandatory_reference_alternatives
-        .iter()
-        .any(|reference| denied_references.contains(reference));
-    if denies_requested_reference && !has_supported_requested_reference {
-        return true;
-    }
-
-    let has_exact_reference = candidate_references
-        .iter()
-        .any(|reference| query.mandatory_reference_alternatives.contains(reference));
-    if !has_exact_reference
-        && query
-            .mandatory_reference_alternatives
-            .iter()
-            .any(|expected| {
-                candidate_references
+    if !query.mandatory_reference_alternatives.is_empty() {
+        let denied_references = content
+            .split(['.', '!', '?', '\n', ';', ','])
+            .map(str::trim)
+            .filter_map(|clause| {
+                let lower = clause.to_ascii_lowercase();
+                let denied = ["not ", "never ", "except ", "excluding "]
                     .iter()
-                    .any(|actual| reference_family(expected) == reference_family(actual))
+                    .any(|prefix| lower.starts_with(prefix));
+                (denied && !lower.starts_with("not only "))
+                    .then(|| extract_qualified_references(clause))
             })
-    {
-        return true;
+            .flatten()
+            .collect::<HashSet<_>>();
+        let candidate_references = extract_qualified_references(content);
+        let has_supported_requested_reference =
+            query
+                .mandatory_reference_alternatives
+                .iter()
+                .any(|reference| {
+                    candidate_references.contains(reference)
+                        && !denied_references.contains(reference)
+                });
+        let denies_requested_reference = query
+            .mandatory_reference_alternatives
+            .iter()
+            .any(|reference| denied_references.contains(reference));
+        if denies_requested_reference && !has_supported_requested_reference {
+            return true;
+        }
+
+        let has_exact_reference = candidate_references
+            .iter()
+            .any(|reference| query.mandatory_reference_alternatives.contains(reference));
+        if !has_exact_reference
+            && query
+                .mandatory_reference_alternatives
+                .iter()
+                .any(|expected| {
+                    candidate_references
+                        .iter()
+                        .any(|actual| reference_family(expected) == reference_family(actual))
+                })
+        {
+            return true;
+        }
     }
 
     content
@@ -1862,6 +2016,40 @@ fn classify_intent(raw_query: &str, flags: &QueryFlags, has_entities: bool) -> A
 fn asks_for_event_time(normalized_query: &str) -> bool {
     let normalized_query =
         normalized_query.trim_start_matches(|character: char| !character.is_alphanumeric());
+    // "When X, which options ...?" describes a condition, not a request
+    // for the date of X. Keep genuine date questions in the main clause.
+    let when_auxiliary = normalized_query
+        .strip_prefix("when ")
+        .and_then(|clause| clause.split_whitespace().next())
+        .is_some_and(|word| {
+            matches!(
+                word,
+                "did"
+                    | "does"
+                    | "do"
+                    | "was"
+                    | "were"
+                    | "is"
+                    | "are"
+                    | "has"
+                    | "have"
+                    | "had"
+                    | "will"
+                    | "would"
+                    | "can"
+                    | "could"
+                    | "should"
+            )
+        });
+    if normalized_query.starts_with("when ")
+        && !when_auxiliary
+        && let Some((_, question)) = normalized_query.split_once(',')
+        && ["what ", "which ", "where ", "who ", "how "]
+            .iter()
+            .any(|starter| question.trim_start().starts_with(starter))
+    {
+        return asks_for_event_time(question.trim_start());
+    }
     normalized_query.starts_with("when ")
         || normalized_query.starts_with("what year ")
         || normalized_query.starts_with("what date ")
@@ -2356,8 +2544,12 @@ fn strip_url_tokens(raw: &str) -> String {
                     '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>'
                 )
             });
-            let lowered = trimmed.to_ascii_lowercase();
-            !lowered.starts_with("https://") && !lowered.starts_with("http://")
+            !trimmed
+                .get(..8)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("https://"))
+                && !trimmed
+                    .get(..7)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("http://"))
         })
         .collect::<Vec<_>>()
         .join(" ")
@@ -3957,7 +4149,13 @@ mod tests {
             AdmissionDecision::Admit(AdmissionBasis::Entity)
         );
 
-        let admitted = admit_ranked_candidates(&query, vec![linked], &policy);
+        let admitted = admit_ranked_candidates(
+            &query,
+            vec![linked],
+            &policy,
+            #[cfg(feature = "eval-support")]
+            None,
+        );
         assert_eq!(admitted.len(), 1);
         assert_eq!(admitted[0].evidence.resolved_entity_ids, vec!["entity:ana"]);
         assert_eq!(

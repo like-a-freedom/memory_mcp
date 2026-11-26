@@ -141,12 +141,11 @@ pub const ENTITY_TEMPORAL_FIELDS: &[&str] = &[];
 /// The temporal columns a community carries.
 pub const COMMUNITY_TEMPORAL_FIELDS: &[&str] = &["updated_at"];
 
-pub fn build_select_facts_filtered_query(
+fn fact_query_filters(
     cutoff: &str,
-    query_contains: Option<&str>,
     limit: i32,
     fact_types: &[String],
-) -> (String, Value) {
+) -> (String, serde_json::Map<String, Value>) {
     let mut where_clauses = vec![BI_TEMPORAL_WHERE.to_string()];
 
     let mut vars = serde_json::Map::from_iter([
@@ -160,6 +159,28 @@ pub fn build_select_facts_filtered_query(
     }
 
     let base_where = where_clauses.join(" AND ");
+    (base_where, vars)
+}
+
+fn hydrated_fact_projection() -> String {
+    NONSEMANTIC_FACT_PROJECTION
+        .split(',')
+        .map(str::trim)
+        .map(|field| match field {
+            "fact_id" | "t_valid" => field.to_owned(),
+            _ => format!("record.{field} AS {field}"),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn build_select_facts_filtered_query(
+    cutoff: &str,
+    query_contains: Option<&str>,
+    limit: i32,
+    fact_types: &[String],
+) -> (String, Value) {
+    let (base_where, mut vars) = fact_query_filters(cutoff, limit, fact_types);
 
     let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
         let query_literal = surreal_string_literal(query);
@@ -169,15 +190,7 @@ pub fn build_select_facts_filtered_query(
         // SurrealDB sorts before projecting a SELECT's fields. A separate
         // projection boundary keeps full text/quotes/vectors out of sort runs;
         // only the limited winners are hydrated in this statement's read view.
-        let projection = NONSEMANTIC_FACT_PROJECTION
-            .split(',')
-            .map(str::trim)
-            .map(|field| match field {
-                "fact_id" | "t_valid" => field.to_owned(),
-                _ => format!("record.{field} AS {field}"),
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
+        let projection = hydrated_fact_projection();
         format!(
             "SELECT {projection}, ft_score FROM (SELECT id AS record, fact_id, t_valid, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal})) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
@@ -188,6 +201,33 @@ pub fn build_select_facts_filtered_query(
     };
 
     (sql, Value::Object(vars))
+}
+
+/// Limit each lexical term before the first-hit union, then hydrate only
+/// new identities in the same statement's read view. Never refill a term's
+/// limit after deduplication. `seen` carries only earlier batches' identities.
+pub(crate) fn build_select_lexical_candidate_batch_query(
+    cutoff: &str,
+    terms: &[String],
+    limit: i32,
+    fact_types: &[String],
+    seen: &[String],
+) -> (String, Value) {
+    let (base_where, mut vars) = fact_query_filters(cutoff, limit, fact_types);
+    vars.insert("seen".into(), json!(seen));
+    // Every term needs its own narrow sort input. Deduplicating afterwards
+    // cannot undo a wide pre-projection sort inside an individual term read.
+    let groups = terms.iter().enumerate().map(|(term_rank, term)| {
+        let query = surreal_string_literal(term);
+        format!("(SELECT record, fact_id, t_valid, ft_score, term_rank FROM (SELECT id AS record, fact_id, t_valid, search::score(1) AS ft_score, {term_rank} AS term_rank FROM fact WHERE {base_where} AND (content @1@ {query} OR index_keys @1@ {query})) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit)")
+    }).collect::<Vec<_>>().join(", ");
+    let projection = hydrated_fact_projection();
+    (
+        format!(
+            "SELECT {projection}, ft_score FROM (SELECT hit[2] AS record, hit[4] AS fact_id, hit[3] AS t_valid, hit[1] AS ft_score, hit[0] AS term_rank FROM (SELECT fact_id, array::min([term_rank, ft_score, record, t_valid, fact_id]) AS hit FROM array::flatten([{groups}]) GROUP BY fact_id) ORDER BY term_rank ASC, ft_score DESC, t_valid DESC, fact_id ASC) WHERE fact_id NOT IN $seen"
+        ),
+        Value::Object(vars),
+    )
 }
 
 /// Escapes a user-provided value as a SurrealQL double-quoted string literal.
@@ -478,9 +518,14 @@ pub fn build_select_edge_neighbors_for_entities_query(
         .collect::<Vec<_>>()
         .join(" OR ");
 
+    // Materialize only indexed neighbors before applying time visibility. A
+    // normal nested SELECT is pushed down by the engine and rebuilds a global
+    // t_valid bitmap for every small endpoint batch. The closure is an explicit
+    // barrier within this statement's read view; no endpoint or temporal cap.
+    let visibility = crate::shared::temporal::visibility_clause_on_record("$edge", "$cutoff");
     (
         format!(
-            "SELECT in, out, relation FROM edge WHERE ({predicates}) AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+            "SELECT in, out, relation FROM array::filter((SELECT in, out, relation, t_valid, t_ingested, t_invalid, t_invalid_ingested FROM edge WHERE ({predicates})), |$edge| {visibility}) ORDER BY in ASC, out ASC, t_valid DESC"
         ),
         Value::Object(vars),
     )

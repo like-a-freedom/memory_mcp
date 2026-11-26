@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
@@ -47,15 +48,146 @@ pub(crate) fn has_search_query_terms(raw: &str) -> bool {
 /// Deduplicate tokens only after the shared episode/quote preprocessing, before
 /// their context-free normalization. Repeated source text needs no repeated work.
 pub(crate) fn search_query_term_set(raw: &str) -> HashSet<String> {
-    let prepared = prepare_lexical_text(raw);
-    let mut seen_tokens = HashSet::new();
-    let mut terms = Vec::new();
-    for token in prepared.split_whitespace() {
-        if seen_tokens.insert(token) {
-            append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
+    search_query_term_set_many(std::iter::once(raw))
+}
+
+/// Union vocabulary with per-input preprocessing. Quotes and episode references
+/// never cross an index-key boundary; identical prepared tokens normalize once.
+pub(crate) fn search_query_term_set_many<'a>(
+    inputs: impl IntoIterator<Item = &'a str>,
+) -> HashSet<String> {
+    let mut seen_tokens = HashSet::<String>::new();
+    let mut seen_words = HashSet::<String>::new();
+    let mut terms = HashSet::new();
+    for raw in inputs {
+        let prepared = prepare_lexical_text(raw);
+        for token in prepared.split_whitespace() {
+            if seen_tokens.contains(token) {
+                continue;
+            }
+            seen_tokens.insert(token.to_owned());
+            for word in token.split(|character: char| !character.is_alphanumeric()) {
+                if !seen_words.contains(word) {
+                    seen_words.insert(word.to_owned());
+                    if let Some(term) = normalize_search_term(word, RussianFunctionWords::Drop) {
+                        terms.insert(stem_search_term(term));
+                    }
+                }
+            }
+            terms.extend(normalize_reference_like_term(token).map(stem_search_term));
         }
     }
-    terms.into_iter().map(stem_search_term).collect()
+    terms
+}
+
+/// Operation-local normalization for overlapping, non-identical index lists.
+/// Cache keys are exact prepared raw tokens; no source IDs, hashes or state from
+/// another read can substitute for input equality. Each output owns its vocabulary.
+#[derive(Default)]
+pub(crate) struct IndexTokenVocabulary {
+    cached_bytes: usize,
+    tokens: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl IndexTokenVocabulary {
+    pub(crate) fn vocabulary<'a>(
+        &mut self,
+        inputs: impl IntoIterator<Item = &'a str>,
+    ) -> HashSet<String> {
+        let mut vocabulary = HashSet::new();
+        for raw in inputs {
+            let prepared = prepare_lexical_text(raw);
+            for token in prepared.split_whitespace() {
+                if let Some(terms) = self.tokens.get(token) {
+                    insert_vocabulary_terms(&mut vocabulary, terms);
+                    continue;
+                }
+                let mut terms = Vec::new();
+                append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
+                let terms = terms.into_iter().map(stem_search_term).collect::<Vec<_>>();
+                insert_vocabulary_terms(&mut vocabulary, &terms);
+                // Bound memoization, never the vocabulary or the source scan.
+                // At most8192 entries and1MiB of raw/normalized UTF-8 payload;
+                // table/vector metadata has the same finite entry bound.
+                let bytes = token.len() + terms.iter().map(String::len).sum::<usize>();
+                if self.tokens.len() < 8192 && bytes <= 1_048_576 - self.cached_bytes {
+                    self.cached_bytes += bytes;
+                    self.tokens.insert(token.to_owned(), terms);
+                }
+            }
+        }
+        vocabulary
+    }
+}
+
+fn insert_vocabulary_terms(vocabulary: &mut HashSet<String>, terms: &[String]) {
+    for term in terms {
+        if !vocabulary.contains(term) {
+            vocabulary.insert(term.clone());
+        }
+    }
+}
+
+/// Bounded operation-local memo. It caches normalization, never occurrences or
+/// scores: every input still receives its exact ordered token sequence.
+#[derive(Default)]
+pub(crate) struct OrderedSearchTokens {
+    raw: std::collections::HashMap<String, Vec<std::sync::Arc<str>>>,
+    words: std::collections::HashMap<String, Option<std::sync::Arc<str>>>,
+    bytes: usize,
+}
+
+impl OrderedSearchTokens {
+    fn can_cache(&self, bytes: usize) -> bool {
+        self.raw.len() + self.words.len() < 8192 && bytes <= 1_048_576 - self.bytes
+    }
+
+    fn word(&mut self, word: &str) -> Option<std::sync::Arc<str>> {
+        if let Some(cached) = self.words.get(word) {
+            return cached.clone();
+        }
+        let term = normalize_search_term(word, RussianFunctionWords::Drop)
+            .map(stem_search_term)
+            .map(std::sync::Arc::<str>::from);
+        let bytes = word.len() + term.as_ref().map_or(0, |term| term.len());
+        if self.can_cache(bytes) {
+            self.bytes += bytes;
+            self.words.insert(word.to_owned(), term.clone());
+        }
+        term
+    }
+
+    pub(crate) fn tokens(&mut self, raw: &str) -> Vec<std::sync::Arc<str>> {
+        let prepared = prepare_lexical_text(raw);
+        let mut result = Vec::new();
+        for token in prepared.split_whitespace() {
+            self.append_token(token, &mut result);
+        }
+        result
+    }
+
+    fn append_token(&mut self, token: &str, result: &mut Vec<std::sync::Arc<str>>) {
+        if let Some(cached) = self.raw.get(token) {
+            result.extend(cached.iter().cloned());
+            return;
+        }
+        let mut terms = token
+            .split(|c: char| !c.is_alphanumeric())
+            .filter_map(|word| self.word(word))
+            .collect::<Vec<_>>();
+        terms.extend(
+            normalize_reference_like_term(token)
+                .into_iter()
+                .map(stem_search_term)
+                .map(std::sync::Arc::<str>::from),
+        );
+        let bytes = token.len() + terms.iter().map(|term| term.len()).sum::<usize>();
+        result.extend(terms.iter().cloned());
+        if self.can_cache(bytes) {
+            self.bytes += bytes;
+            self.raw.insert(token.to_owned(), terms);
+        }
+    }
 }
 
 fn stem_search_term(term: String) -> String {
@@ -93,18 +225,25 @@ fn is_cyrillic(term: &str) -> bool {
     !term.is_empty() && term.chars().all(|c| matches!(c, 'а'..='я' | 'ё'))
 }
 
-fn prepare_lexical_text(raw: &str) -> String {
+fn prepare_lexical_text(raw: &str) -> Cow<'_, str> {
     static EPISODE_REF: LazyLock<Result<Regex, regex::Error>> =
         LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+"));
     static QUOTED: LazyLock<Result<Regex, regex::Error>> =
         LazyLock::new(|| Regex::new(r#""([^\"]*)""#));
 
-    let mut s = raw.to_string();
-    if let Ok(regex) = EPISODE_REF.as_ref() {
-        s = regex.replace_all(&s, " ").into_owned();
+    let mut s = Cow::Borrowed(raw);
+    if let Ok(regex) = EPISODE_REF.as_ref()
+        && let Cow::Owned(replaced) = regex.replace_all(&s, " ")
+    {
+        s = Cow::Owned(replaced);
     }
-    if let Ok(regex) = QUOTED.as_ref() {
-        s = regex.replace_all(&s, " $1 ").into_owned();
+    // The capture replacement prepares expansion state even for no matches.
+    // A quote is a necessary condition, so ordinary keys need no replacement.
+    if s.contains('"')
+        && let Ok(regex) = QUOTED.as_ref()
+        && let Cow::Owned(replaced) = regex.replace_all(&s, " $1 ")
+    {
+        s = Cow::Owned(replaced);
     }
 
     s
@@ -129,7 +268,7 @@ fn append_lexical_token(
             .split(|character: char| !character.is_alphanumeric())
             .filter_map(|term| normalize_search_term(term, russian_function_words)),
     );
-    terms.extend(search_reference_terms(token));
+    terms.extend(normalize_reference_like_term(token));
 }
 
 /// Extract collapsed reference-like terms (for example `R-0712` -> `r0712`).
@@ -198,12 +337,12 @@ fn query_term_is_hard_anchor(term: &str) -> bool {
 
 fn normalize_reference_like_term(raw: &str) -> Option<String> {
     let token = raw.trim_matches(|character: char| !character.is_alphanumeric());
-    if token.len() < 3 || looks_like_iso_date(token) {
+    if token.len() < 3 || !token.bytes().any(|byte| byte.is_ascii_digit()) {
         return None;
     }
 
     let has_separator = token.chars().any(|character| !character.is_alphanumeric());
-    if !has_separator {
+    if !has_separator || looks_like_iso_date(token) {
         return None;
     }
 
@@ -211,7 +350,10 @@ fn normalize_reference_like_term(raw: &str) -> Option<String> {
         .chars()
         .filter(|character| character.is_alphanumeric())
         .flat_map(char::to_lowercase)
-        .collect::<String>();
+        .fold(String::with_capacity(token.len()), |mut text, character| {
+            text.push(character);
+            text
+        });
     if collapsed.len() < 3 {
         return None;
     }
@@ -235,13 +377,12 @@ fn normalize_reference_like_term(raw: &str) -> Option<String> {
 }
 
 fn looks_like_iso_date(token: &str) -> bool {
-    let segments = token
+    let mut segments = token
         .split(['-', '/'])
-        .filter(|segment| !segment.is_empty())
-        .collect::<Vec<_>>();
+        .filter(|segment| !segment.is_empty());
     matches!(
-        segments.as_slice(),
-        [year, month] | [year, month, ..]
+        (segments.next(), segments.next()),
+        (Some(year), Some(month))
             if year.len() == 4
                 && year.chars().all(|character| character.is_ascii_digit())
                 && month.len() == 2
@@ -253,7 +394,13 @@ fn normalize_search_term(
     raw: &str,
     russian_function_words: RussianFunctionWords,
 ) -> Option<String> {
-    let token = raw.trim().to_lowercase();
+    let raw = raw.trim();
+    // A single UTF-8 byte is ASCII and cannot expand under lowercase.
+    if raw.len() < 2 {
+        return None;
+    }
+    let token = raw.to_lowercase();
+    // Unicode lowercase can shrink a multi-byte character (K -> k).
     if token.len() < 2 {
         return None;
     }
@@ -266,13 +413,15 @@ fn normalize_search_term(
         return None;
     }
 
-    Some(singularize_search_term(&token))
+    Some(singularize_search_term(token))
 }
 
-fn singularize_search_term(token: &str) -> String {
+fn singularize_search_term(mut token: String) -> String {
     if token.len() > 4 && token.ends_with("ies") {
-        let stem = token.trim_end_matches("ies");
-        return format!("{stem}y");
+        let stem_len = token.trim_end_matches("ies").len();
+        token.truncate(stem_len);
+        token.push('y');
+        return token;
     }
 
     if token.len() > 4
@@ -282,10 +431,10 @@ fn singularize_search_term(token: &str) -> String {
         && !token.ends_with("is")
         && !token.ends_with("as")
     {
-        return token[..token.len() - 1].to_string();
+        token.truncate(token.len() - 1);
     }
 
-    token.to_string()
+    token
 }
 
 fn is_russian_search_stopword(token: &str) -> bool {
@@ -403,6 +552,18 @@ fn is_search_stopword(token: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vocabulary_keeps_every_term_after_memoization_capacity_is_exhausted() {
+        let keys = (0..20_000)
+            .map(|n| format!("carrier{n:05}"))
+            .collect::<Vec<_>>();
+        let actual = IndexTokenVocabulary::default().vocabulary(keys.iter().map(String::as_str));
+        let expected = (0..20_000)
+            .map(|n| format!("carrier{n:05}"))
+            .collect::<HashSet<_>>();
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn term_presence_respects_quote_preprocessing_across_sentence_boundaries() {

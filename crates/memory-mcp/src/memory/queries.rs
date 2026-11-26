@@ -37,6 +37,55 @@ pub fn build_select_episodes_by_content_query(
     (sql, Value::Object(vars))
 }
 
+/// First-hit union after each term's own order/cap, then same-view hydration.
+pub(crate) fn build_select_episode_candidate_batch_query(
+    cutoff: &str,
+    terms: &[String],
+    limit: i32,
+    seen: &[String],
+) -> (String, Value) {
+    let mut vars = serde_json::Map::from_iter([
+        ("cutoff".into(), json!(cutoff)),
+        ("limit".into(), json!(limit)),
+        ("seen".into(), json!(seen)),
+    ]);
+    // Normalize each visible source once, then retain only thin membership
+    // rows. Independent term limits still apply before the first-hit union;
+    // no full source or normalized text is copied into a term's sort input.
+    let queries = terms
+        .iter()
+        .map(|term| {
+            if term.trim().is_empty() {
+                String::new()
+            } else {
+                term.to_lowercase()
+            }
+        })
+        .collect::<Vec<_>>();
+    vars.insert("queries".into(), json!(queries));
+    // At most eight borrowed predicates; a database closure would clone its
+    // captured long normalized string for each partially matching term.
+    let predicates = (0..terms.len())
+        .map(|rank| format!("$normalized CONTAINS $queries[{rank}]"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let pool = format!(
+        "(SELECT id AS record, episode_id, t_ref, {{ LET $normalized = string::lowercase(content); RETURN IF $normalized CONTAINSALL $queries THEN array::repeat(true, array::len($queries)) ELSE IF $normalized CONTAINSANY $queries THEN [{predicates}] ELSE array::repeat(false, array::len($queries)) END; }} AS matched_terms FROM episode WHERE t_ref <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)))"
+    );
+    vars.insert(
+        "term_ranks".into(),
+        json!((0..terms.len()).collect::<Vec<_>>()),
+    );
+    let groups = "array::map($term_ranks, |$term_rank| (SELECT record, episode_id, t_ref, $term_rank AS term_rank FROM $pool WHERE matched_terms[$term_rank] = true ORDER BY t_ref DESC, episode_id ASC LIMIT $limit))";
+    let union = format!(
+        "SELECT VALUE hit[1].* FROM (SELECT episode_id, array::min([term_rank, record, episode_id, t_ref]) AS hit FROM array::flatten({groups}) GROUP BY episode_id) WHERE episode_id NOT IN $seen ORDER BY hit[0] ASC, hit[3] DESC, hit[2] ASC"
+    );
+    (
+        format!("RETURN {{ LET $pool = {pool}; RETURN ({union}); }}"),
+        Value::Object(vars),
+    )
+}
+
 /// Selects immutable episode content visible at both a world-valid instant
 /// and one exact server-owned knowledge revision. Legacy rows without a
 /// committed revision are intentionally omitted from historical reads.

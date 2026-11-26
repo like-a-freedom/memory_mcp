@@ -165,3 +165,146 @@ async fn one_capture_cannot_merge_stages_from_two_public_reads() {
     );
     assert_eq!(capture.stages().unwrap().len(), 1);
 }
+
+mod common;
+
+struct Inventories {
+    phases: std::sync::Mutex<Vec<String>>,
+    rows: std::sync::Mutex<Vec<memory_mcp::eval_support::retrieval::CandidateInventory>>,
+    work: std::sync::Mutex<Vec<memory_mcp::eval_support::retrieval::LexicalWork>>,
+}
+impl memory_mcp::eval_support::retrieval::CandidateObserver for Inventories {
+    fn observe_phase(&self, stage: &str, _: f64) {
+        self.phases.lock().unwrap().push(stage.to_owned());
+    }
+    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
+        self.rows.lock().unwrap().push(inventory.clone());
+    }
+    fn observe_work(&self, work: &memory_mcp::eval_support::retrieval::LexicalWork) {
+        self.work.lock().unwrap().push(work.clone());
+    }
+}
+
+#[tokio::test]
+async fn public_read_observes_actual_time_visible_candidate_payload_without_source_text() {
+    use memory_mcp::eval_support::retrieval::{
+        ContextEvidenceCapture, assemble_context_recording_evidence,
+    };
+    let (service, db) = common::make_service_with_client().await;
+    for (id, content, source, keys, valid) in [
+        (
+            "fact:probea",
+            "archive source alpha",
+            "episode:probea",
+            vec!["M-42", "Été"],
+            "2026-01-01T00:00:00Z",
+        ),
+        (
+            "fact:probeb",
+            "archive source beta",
+            "episode:probeb",
+            vec!["M-42", "Été"],
+            "2026-01-01T00:00:00Z",
+        ),
+        (
+            "fact:future",
+            "archive source future",
+            "episode:future",
+            vec![],
+            "2027-01-01T00:00:00Z",
+        ),
+    ] {
+        db.create(id, json!({"fact_id":id,"fact_type":"observation","content":content,"quote":content,
+            "source_episode":source,"t_valid":valid,"t_ingested":valid,"confidence":0.9,"index_keys":keys,
+            "scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
+            "org", &["t_valid", "t_ingested"]).await.unwrap();
+    }
+    let sink = Arc::new(Inventories {
+        phases: std::sync::Mutex::new(Vec::new()),
+        rows: std::sync::Mutex::new(Vec::new()),
+        work: std::sync::Mutex::new(Vec::new()),
+    });
+    let capture = ContextEvidenceCapture::with_candidate_observer("episode:probea", sink.clone());
+    let request = serde_json::from_value(
+        json!({"query":"archive source","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"}),
+    )
+    .unwrap();
+    assemble_context_recording_evidence(&service, request, &capture)
+        .await
+        .unwrap();
+    assert_eq!(
+        *sink.phases.lock().unwrap(),
+        [
+            "channels.completed",
+            "subject.resolved",
+            "topics.completed",
+            "fusion.completed",
+            "admission.completed",
+            "selection.completed"
+        ]
+    );
+    let observed = sink.rows.lock().unwrap();
+    let initial = observed
+        .iter()
+        .find(|row| row.stage == "facts.initial_fetched")
+        .expect("actual candidate boundary must be emitted before ranking");
+    assert_eq!(initial.records, 2);
+    assert_eq!(initial.content_bytes, 39);
+    assert_eq!(initial.max_content_bytes, 20);
+    assert_eq!(initial.index_keys, 4);
+    assert_eq!(initial.index_key_bytes, 18);
+    assert_eq!(initial.max_index_key_bytes, 5);
+    assert_eq!(initial.unique_contents, 2);
+    assert_eq!(initial.unique_sources, 2);
+    assert_eq!(capture.candidates().unwrap().len(), observed.len());
+    let work = sink.work.lock().unwrap();
+    assert!(
+        !work.is_empty(),
+        "actual dictionary construction must be observed"
+    );
+    assert_eq!(work[0].records, 2);
+    assert_eq!(work[0].stage, "lexical.pool");
+    assert_eq!(work[0].content_dictionaries, 2);
+    assert_eq!(
+        work[0].index_dictionaries, 1,
+        "different fact identities with equal key lists share one dictionary"
+    );
+    let admission = work
+        .iter()
+        .find(|item| item.stage == "admission.topics")
+        .expect("completed admission must report its own actual dictionary work");
+    assert_eq!(admission.records, 2);
+    assert_eq!(admission.content_dictionaries, 2);
+    assert_eq!(admission.index_dictionaries, 1);
+    let serialized = serde_json::to_string(initial).unwrap();
+    assert!(!serialized.contains("archive source"));
+    assert!(!serialized.contains("index-only"));
+    assert!(!serialized.contains("episode:probe"));
+}
+
+#[tokio::test]
+async fn duplicate_query_grounding_can_choose_a_different_source_sentence() {
+    use memory_mcp::eval_support::retrieval::{
+        ContextEvidenceCapture, assemble_context_recording_evidence,
+    };
+    let (service, db) = common::make_service_with_client().await;
+    let content = "Falcon Falcon. Falcon archive source.";
+    db.create("fact:distinctspan", json!({"fact_id":"fact:distinctspan","fact_type":"observation",
+        "content":content,"quote":content,"source_episode":"episode:distinctspan",
+        "t_valid":"2026-01-01T00:00:00Z","t_ingested":"2026-01-01T00:00:00Z","confidence":0.9,
+        "index_keys":[],"scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}}),
+        "org", &["t_valid","t_ingested"]).await.unwrap();
+    let request = serde_json::from_value(json!({"query":"Falcon Falcon Falcon Falcon Falcon Falcon Falcon Falcon Falcon Falcon archive source",
+        "budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"})).unwrap();
+    let capture = ContextEvidenceCapture::new("episode:distinctspan");
+    let actual = assemble_context_recording_evidence(&service, request, &capture)
+        .await
+        .unwrap();
+    assert_eq!(actual.items.len(), 1);
+    assert_eq!(actual.items[0].fact_id, "fact:distinctspan");
+    assert_eq!(actual.items[0].quote, content);
+    // Original query: "Falcon Falcon" scores28 vs19 for the second sentence.
+    // Unique query: first scores1 vs10. Full coverage + phrase support gives
+    // 0.55 +0.20 =0.75, whereas reusing the first span would give only0.55.
+    assert_eq!(actual.items[0].grounding, Some(0.75));
+}

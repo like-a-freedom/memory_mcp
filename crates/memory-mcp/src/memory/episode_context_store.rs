@@ -2,8 +2,8 @@
 //!
 //! Memory owns the episode lifecycle, so the episode reads the
 //! retrieval pipeline performs belong here rather than in the
-//! knowledge store. The method bodies are unchanged from the single
-//! store this split came from.
+//! knowledge store. Literal-substring fallback candidates use a first-hit
+//! union before full payload hydration.
 //!
 //! `select_episodes_via_entity` is the deliberate exception: it joins
 //! `episode`, `fact` and `edge`, so it spans two owners. It is kept
@@ -102,44 +102,34 @@ impl EpisodeContextStore {
         Ok((rows, truncated))
     }
 
-    /// Selects one independently limited literal-substring result group for
-    /// each lexical fallback term, preserving the order used by retrieval.
-    pub async fn select_episodes_for_terms(
+    /// First-hit union of independently limited literal-substring candidates.
+    /// Each complete payload is hydrated only once, after the original term cap.
+    pub async fn select_episode_candidates(
         &self,
         cutoff: &str,
         terms: &[String],
         limit_per_term: i32,
-    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        already_seen: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
         const MAX_TERMS_PER_RPC: usize = 8;
-
-        let mut result_groups = Vec::with_capacity(terms.len());
-        for term_batch in terms.chunks(MAX_TERMS_PER_RPC) {
-            let mut vars = serde_json::Map::from_iter([
-                ("cutoff".to_string(), json!(cutoff)),
-                ("limit".to_string(), json!(limit_per_term)),
-            ]);
-            let mut subqueries = Vec::with_capacity(term_batch.len());
-            for (index, term) in term_batch.iter().enumerate() {
-                let (sql, term_vars) =
-                    crate::memory::queries::build_select_episodes_by_content_query(
-                        cutoff,
-                        Some(term),
-                        limit_per_term,
-                    );
-                if let Some(query) = term_vars.get("query") {
-                    vars.insert(format!("query_{index}"), query.clone());
-                }
-                let sql = sql.replace("$query", &format!("$query_{index}"));
-                subqueries.push(format!("({sql})"));
-            }
-            let sql = format!("RETURN [{}]", subqueries.join(", "));
-            let groups = self
-                .db
-                .query_row_groups(&sql, Some(Value::Object(vars)), term_batch.len())
-                .await?;
-            result_groups.extend(groups);
+        let mut candidates = Vec::new();
+        let mut seen = already_seen.to_vec();
+        for batch in terms.chunks(MAX_TERMS_PER_RPC) {
+            let (sql, vars) = crate::memory::queries::build_select_episode_candidate_batch_query(
+                cutoff,
+                batch,
+                limit_per_term,
+                &seen,
+            );
+            let rows = self.db.query_rows(&sql, Some(vars)).await?;
+            seen.extend(
+                rows.iter()
+                    .filter_map(|row| row.get("episode_id").and_then(Value::as_str))
+                    .map(str::to_owned),
+            );
+            candidates.extend(rows);
         }
-        Ok(result_groups)
+        Ok(candidates)
     }
 
     /// Read one source episode and a bounded, ordered neighborhood from its

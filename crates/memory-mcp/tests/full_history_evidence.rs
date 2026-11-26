@@ -7,6 +7,28 @@ use std::{
     time::{Duration, Instant},
 };
 
+struct CandidateProgress;
+impl memory_mcp::eval_support::retrieval::CandidateObserver for CandidateProgress {
+    fn observe_phase(&self, stage: &str, elapsed_ms: f64) {
+        println!(
+            "FULL_HISTORY_PHASE {}",
+            serde_json::json!({"stage":stage,"elapsed_ms":elapsed_ms})
+        );
+        std::io::stdout().flush().unwrap();
+    }
+    fn observe_work(&self, work: &memory_mcp::eval_support::retrieval::LexicalWork) {
+        println!("FULL_HISTORY_WORK {}", serde_json::to_string(work).unwrap());
+        std::io::stdout().flush().unwrap();
+    }
+    fn observe(&self, inventory: &memory_mcp::eval_support::retrieval::CandidateInventory) {
+        println!(
+            "FULL_HISTORY_CANDIDATES {}",
+            serde_json::to_string(inventory).unwrap()
+        );
+        std::io::stdout().flush().unwrap();
+    }
+}
+
 struct QueryProgress(Instant);
 
 impl memory_mcp::eval_support::QueryObserver for QueryProgress {
@@ -67,14 +89,19 @@ async fn observe(case_id: &str) {
         serde_json::json!({"query":case["query"],"budget":5,"compact":false}),
     )
     .unwrap();
-    let started = Instant::now();
     println!(
         "FULL_HISTORY_START {}",
         serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
     );
-    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(episode);
+    let capture =
+        memory_mcp::eval_support::retrieval::ContextEvidenceCapture::with_candidate_observer(
+            episode,
+            Arc::new(CandidateProgress),
+        );
+    let read_budget = Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap());
+    let started = Instant::now();
     let observed = tokio::time::timeout(
-        Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap()),
+        read_budget,
         memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
             &service, request, &capture,
         ),
@@ -82,9 +109,14 @@ async fn observe(case_id: &str) {
     .await;
     match observed {
         Ok(Ok(receipt)) => {
+            let elapsed = started.elapsed();
             println!(
                 "FULL_HISTORY_RECEIPT {}",
-                serde_json::json!({"case_id":case_id,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"receipt":receipt})
+                serde_json::json!({"case_id":case_id,"elapsed_ms":elapsed.as_secs_f64()*1000.0,"receipt":receipt})
+            );
+            assert!(
+                elapsed <= read_budget,
+                "a cooperatively completed read still must meet the registered elapsed budget"
             );
             assert!(
                 receipt
@@ -119,6 +151,12 @@ async fn full_history_dropdown_retains_reviewed_source() {
 #[ignore = "requires registered full snapshot clone and input; local diagnostic only"]
 async fn full_history_toolbar_retains_reviewed_source() {
     observe("f61a096f").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "requires registered full snapshot clone and input; local diagnostic only"]
+async fn full_history_directory_retains_reviewed_source() {
+    observe("6d975a08").await;
 }
 
 #[tokio::test]

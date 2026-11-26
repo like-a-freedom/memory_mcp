@@ -8,19 +8,18 @@ use crate::error::MemoryError;
 use crate::models::Fact;
 use crate::shared::search::{
     query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
-    search_query_terms, unique_query_terms,
+    search_query_term_set, search_query_term_set_many, search_query_terms, unique_query_terms,
 };
-use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap, record_term_set};
+use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap};
 use crate::storage::ContextFactQuery;
 use crate::storage::value_helpers::{json_f64, json_string};
 
 use super::filtering::{fact_record_matches_type, raw_array, raw_object};
-use super::types::RetrievalTier;
 
 #[derive(Debug)]
 pub(crate) struct LexicalQueryResult {
     pub(crate) records: Vec<Value>,
-    pub(crate) retrieval_tier: RetrievalTier,
+    pub(crate) native_fact_ids: HashSet<String>,
 }
 
 pub(crate) struct FactQueryParams<'a> {
@@ -28,6 +27,8 @@ pub(crate) struct FactQueryParams<'a> {
     pub(crate) query_opt: Option<&'a str>,
     pub(crate) limit: i32,
     pub(crate) fact_types: &'a [String],
+    #[cfg(feature = "eval-support")]
+    pub(crate) trace: super::diagnostics::EvidenceRecorder<'a>,
 }
 
 pub(crate) async fn select_fact_records_for_query(
@@ -47,20 +48,35 @@ pub(crate) async fn select_fact_records_for_query(
         })
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let initial = rank_lexical_candidates(initial, &query_terms);
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_candidates(params.trace, "facts.initial_fetched", &initial);
+    let native_fact_ids = initial
+        .iter()
+        .filter_map(|record| {
+            record
+                .get("fact_id")
+                .and_then(crate::storage::value_helpers::unwrap_record_string)
+        })
+        .collect::<HashSet<_>>();
+    let initial = rank_lexical_candidates(
+        initial,
+        &query_terms,
+        #[cfg(feature = "eval-support")]
+        params.trace,
+    );
 
     let Some(_query) = params.query_opt else {
         return Ok(LexicalQueryResult {
             records: initial.records,
-            retrieval_tier: RetrievalTier::Direct,
+            native_fact_ids,
         });
     };
 
     let fallback_terms = build_lexical_fallback_queries(&query_terms);
 
-    let term_groups = service
+    let mut fallback_records = service
         .knowledge_store()
-        .select_facts_for_lexical_terms(
+        .select_lexical_fact_candidates(
             params.cutoff_iso,
             &fallback_terms,
             candidate_limit,
@@ -68,8 +84,13 @@ pub(crate) async fn select_fact_records_for_query(
         )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let mut fallback_records = term_groups.into_iter().flatten().collect::<Vec<_>>();
 
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_candidates(
+        params.trace,
+        "facts.term_groups_fetched",
+        &fallback_records,
+    );
     let mut seen_fact_ids = HashSet::new();
     fallback_records.retain(|record| {
         let Some(fact_id) = record
@@ -81,7 +102,18 @@ pub(crate) async fn select_fact_records_for_query(
         seen_fact_ids.insert(fact_id)
     });
 
-    let fallback_records = rank_lexical_candidates(fallback_records, &query_terms);
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_candidates(
+        params.trace,
+        "facts.term_groups_deduplicated",
+        &fallback_records,
+    );
+    let fallback_records = rank_lexical_candidates(
+        fallback_records,
+        &query_terms,
+        #[cfg(feature = "eval-support")]
+        params.trace,
+    );
 
     let initial_score = initial.top_query_score;
     let fallback_score = fallback_records.top_query_score;
@@ -99,36 +131,44 @@ pub(crate) async fn select_fact_records_for_query(
             || scanned_score > best_score
         {
             return Ok(LexicalQueryResult {
-                records: scanned_records,
-                retrieval_tier: RetrievalTier::EpisodeFallback,
+                records: union_lexical_records(
+                    scanned_records,
+                    initial.records.into_iter().chain(fallback_records.records),
+                ),
+                native_fact_ids,
             });
         }
     }
 
-    if fallback_score > initial_score {
-        return Ok(LexicalQueryResult {
-            records: fallback_records.records,
-            retrieval_tier: RetrievalTier::EpisodeFallback,
-        });
-    }
-
-    if !initial.records.is_empty() {
-        return Ok(LexicalQueryResult {
-            records: initial.records,
-            retrieval_tier: RetrievalTier::Direct,
-        });
-    }
-
-    let retrieval_tier = if fallback_records.records.is_empty() {
-        RetrievalTier::Direct
+    let records = if fallback_score > initial_score || initial.records.is_empty() {
+        union_lexical_records(fallback_records.records, initial.records)
     } else {
-        RetrievalTier::EpisodeFallback
+        union_lexical_records(initial.records, fallback_records.records)
     };
-
     Ok(LexicalQueryResult {
-        records: fallback_records.records,
-        retrieval_tier,
+        records,
+        native_fact_ids,
     })
+}
+
+// Keep the winning pool's score/order while retaining individually useful rows
+// from other bounded channels. Native evidence belongs only to actual initial
+// FTS hits, never to every member of this union.
+fn union_lexical_records(
+    primary: Vec<Value>,
+    secondary: impl IntoIterator<Item = Value>,
+) -> Vec<Value> {
+    let mut seen = HashSet::new();
+    primary
+        .into_iter()
+        .chain(secondary)
+        .filter(|record| {
+            record
+                .get("fact_id")
+                .and_then(crate::storage::value_helpers::unwrap_record_string)
+                .is_none_or(|id| seen.insert(id))
+        })
+        .collect()
 }
 
 pub(crate) fn lexical_candidate_limit(limit: i32) -> i32 {
@@ -269,6 +309,8 @@ async fn scan_fact_records_by_query_terms(
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_candidates(params.trace, "facts.scan_fetched", &records);
     let filtered = records
         .into_iter()
         .filter(|record| fact_record_matches_type(record, params.fact_types))
@@ -297,10 +339,20 @@ struct RankedLexicalCandidates {
 }
 
 pub(crate) fn rank_lexical_records(records: Vec<Value>, query_terms: &[String]) -> Vec<Value> {
-    rank_lexical_candidates(records, query_terms).records
+    rank_lexical_candidates(
+        records,
+        query_terms,
+        #[cfg(feature = "eval-support")]
+        None,
+    )
+    .records
 }
 
-fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> RankedLexicalCandidates {
+fn rank_lexical_candidates(
+    records: Vec<Value>,
+    query_terms: &[String],
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+) -> RankedLexicalCandidates {
     if query_terms.is_empty() {
         return RankedLexicalCandidates {
             records,
@@ -309,15 +361,22 @@ fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> Ranke
         };
     }
 
-    let anchor_profile = build_lexical_anchor_profile(&records, query_terms);
+    let features = lexical_candidate_features(
+        &records,
+        query_terms,
+        #[cfg(feature = "eval-support")]
+        trace,
+    );
+    let anchor_profile = build_lexical_anchor_profile(&features, query_terms);
 
     // Metrics depend on immutable text/index keys and this candidate pool, not
     // on the score written below. Compute once rather than tokenize every
     // source again for both sides of every sort comparison.
     let mut ranked = records
         .into_iter()
-        .map(|mut record| {
-            let metrics = lexical_record_metrics(&record, query_terms, &anchor_profile);
+        .zip(features)
+        .map(|(mut record, features)| {
+            let metrics = lexical_record_metrics(&features, query_terms, &anchor_profile);
             let soft_anchor_bonus = if metrics.base_score <= 1 {
                 metrics.soft_anchor_mass * 0.35
             } else {
@@ -384,7 +443,10 @@ fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> Ranke
     }
 }
 
-fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> LexicalAnchorProfile {
+fn build_lexical_anchor_profile(
+    records: &[LexicalCandidateFeatures],
+    query_terms: &[String],
+) -> LexicalAnchorProfile {
     let unique_terms = unique_query_terms(query_terms);
     if unique_terms.is_empty() {
         return LexicalAnchorProfile::default();
@@ -395,9 +457,8 @@ fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> Le
     let mut doc_freq = HashMap::<String, usize>::new();
 
     for record in records {
-        let record_terms = record_term_set(record);
         for term in &unique_terms {
-            if record_terms.contains(term) {
+            if record.content.vocabulary.contains(term) || record.index_terms.contains(term) {
                 *doc_freq.entry(term.clone()).or_default() += 1;
             }
         }
@@ -430,33 +491,101 @@ fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> Le
     }
 }
 
+struct ContentLexicalFeatures {
+    vocabulary: HashSet<String>,
+    best_terms: Vec<std::sync::Arc<str>>,
+}
+
+struct LexicalCandidateFeatures {
+    content: std::sync::Arc<ContentLexicalFeatures>,
+    index_terms: std::sync::Arc<HashSet<String>>,
+}
+
+fn lexical_candidate_features(
+    records: &[Value],
+    query_terms: &[String],
+    #[cfg(feature = "eval-support")] trace: super::diagnostics::EvidenceRecorder<'_>,
+) -> Vec<LexicalCandidateFeatures> {
+    // Exact borrowed text keys: no source/ID equivalence assumption and no
+    // digest-collision risk. Different index keys remain separate per record.
+    let mut content_cache = HashMap::new();
+    let mut index_cache = HashMap::new();
+    let mut index_tokens = crate::shared::search::IndexTokenVocabulary::default();
+    let mut content_tokens = crate::shared::search::OrderedSearchTokens::default();
+    let features = records
+        .iter()
+        .map(|record| {
+            let content = raw_object(record)
+                .and_then(|map| map.get("content"))
+                .and_then(json_string)
+                .unwrap_or_default();
+            let content = content_cache
+                .entry(content)
+                .or_insert_with(|| {
+                    std::sync::Arc::new(ContentLexicalFeatures {
+                        vocabulary: search_query_term_set(content),
+                        best_terms: best_matching_content_terms_with_tokens(
+                            content,
+                            query_terms,
+                            &mut content_tokens,
+                        ),
+                    })
+                })
+                .clone();
+            let keys = raw_object(record)
+                .and_then(|map| map.get("index_keys"))
+                .and_then(raw_array)
+                .into_iter()
+                .flatten()
+                .filter_map(json_string)
+                .collect::<Vec<_>>();
+            let index_terms = index_cache
+                .entry(keys)
+                .or_insert_with_key(|keys| {
+                    std::sync::Arc::new(index_tokens.vocabulary(keys.iter().copied()))
+                })
+                .clone();
+            LexicalCandidateFeatures {
+                content,
+                index_terms,
+            }
+        })
+        .collect();
+    #[cfg(feature = "eval-support")]
+    super::diagnostics::record_work(
+        trace,
+        super::diagnostics::LexicalWork {
+            stage: "lexical.pool",
+            elapsed_ms: 0.0,
+            records: records.len(),
+            content_dictionaries: content_cache.len(),
+            index_dictionaries: index_cache.len(),
+        },
+    );
+    features
+}
+
 fn lexical_record_metrics(
-    record: &Value,
+    features: &LexicalCandidateFeatures,
     query_terms: &[String],
     anchor_profile: &LexicalAnchorProfile,
 ) -> LexicalRecordMetrics {
-    let content_terms = best_matching_content_terms(
-        raw_object(record)
-            .and_then(|map| map.get("content"))
-            .and_then(json_string)
-            .unwrap_or_default(),
-        query_terms,
-    );
-    let index_terms = raw_object(record)
-        .and_then(|map| map.get("index_keys"))
-        .and_then(raw_array)
-        .into_iter()
-        .flatten()
-        .filter_map(json_string)
-        .flat_map(search_query_terms)
-        .collect::<Vec<_>>();
-    let record_terms = content_terms
+    let content_terms = &features.content.best_terms;
+    let index_terms = &features.index_terms;
+    let requested = query_terms
         .iter()
-        .chain(&index_terms)
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let content_matches = content_terms
+        .iter()
+        .map(AsRef::as_ref)
+        .filter(|term| requested.contains(term))
         .collect::<HashSet<_>>();
     let matched_terms = unique_query_terms(query_terms)
         .into_iter()
-        .filter(|term| record_terms.contains(term))
+        .filter(|term| {
+            index_terms.contains(term.as_str()) || content_matches.contains(term.as_str())
+        })
         .collect::<Vec<_>>();
     let weighted_overlap = matched_terms
         .iter()
@@ -477,9 +606,13 @@ fn lexical_record_metrics(
         .map(|term| anchor_profile.weight_for(term))
         .sum::<f64>();
 
-    let (content_score, phrase_overlap) = content_term_scores(&content_terms, query_terms);
+    let (content_score, phrase_overlap) = content_term_scores(content_terms, query_terms);
     LexicalRecordMetrics {
-        base_score: content_score + query_term_overlap_for_terms(&index_terms, query_terms),
+        base_score: content_score
+            + query_terms
+                .iter()
+                .filter(|term| index_terms.contains(term.as_str()))
+                .count(),
         phrase_overlap,
         weighted_overlap,
         hard_anchor_hits,
@@ -508,27 +641,162 @@ fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
         + lexical_index_key_overlap(record, query_terms)
 }
 
+/// Exact, fusion-local dictionaries. A fact ID never substitutes for content or
+/// key equality; the cache dies with this immutable ranking call.
+pub(crate) struct FactLexicalCache<'a> {
+    query_terms: Vec<String>,
+    grounding_terms: Vec<String>,
+    contents: HashMap<&'a str, std::sync::Arc<FusionContentFeatures>>,
+    indexes: HashMap<Vec<&'a str>, std::sync::Arc<HashSet<String>>>,
+    index_tokens: crate::shared::search::IndexTokenVocabulary,
+    content_tokens: crate::shared::search::OrderedSearchTokens,
+}
+
+struct FusionContentFeatures {
+    vocabulary: HashSet<String>,
+    score: usize,
+    grounding_score: usize,
+}
+
+impl<'a> FactLexicalCache<'a> {
+    pub(crate) fn new(query_terms: &[String]) -> Self {
+        Self {
+            query_terms: query_terms.to_vec(),
+            grounding_terms: unique_query_terms(query_terms),
+            contents: HashMap::new(),
+            indexes: HashMap::new(),
+            index_tokens: crate::shared::search::IndexTokenVocabulary::default(),
+            content_tokens: Default::default(),
+        }
+    }
+    pub(crate) fn features(&mut self, fact: &'a Fact) -> FactLexicalFeatures {
+        let content_features = if let Some(features) = self.contents.get(fact.content.as_str()) {
+            features.clone()
+        } else {
+            // Removing duplicate query terms can change the winning span. Score
+            // both queries independently while normalizing each source span once.
+            let [score, grounding_score] = best_content_scores(
+                &fact.content,
+                &self.query_terms,
+                &self.grounding_terms,
+                &mut self.content_tokens,
+            );
+            let features = std::sync::Arc::new(FusionContentFeatures {
+                vocabulary: search_query_term_set(&fact.content),
+                score,
+                grounding_score,
+            });
+            self.contents.insert(&fact.content, features.clone());
+            features
+        };
+        let keys = fact
+            .index_keys
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        let index_terms = self
+            .indexes
+            .entry(keys)
+            .or_insert_with_key(|keys| {
+                std::sync::Arc::new(self.index_tokens.vocabulary(keys.iter().copied()))
+            })
+            .clone();
+        let index_score = |query: &[String]| {
+            query
+                .iter()
+                .filter(|term| index_terms.contains(term.as_str()))
+                .count()
+        };
+        FactLexicalFeatures {
+            score: content_features.score + index_score(&self.query_terms),
+            grounding_score: content_features.grounding_score + index_score(&self.grounding_terms),
+            content_features,
+            index_terms,
+        }
+    }
+}
+
+fn best_content_scores(
+    text: &str,
+    query: &[String],
+    grounding_query: &[String],
+    tokens: &mut crate::shared::search::OrderedSearchTokens,
+) -> [usize; 2] {
+    if query.is_empty() || !crate::shared::search::has_search_query_terms(text) {
+        return [0, 0];
+    }
+    let scores = |terms: &[std::sync::Arc<str>]| {
+        let score = score_content_terms(terms, query);
+        [
+            score,
+            if query == grounding_query {
+                score
+            } else {
+                score_content_terms(terms, grounding_query)
+            },
+        ]
+    };
+    let mut spans = local_content_segments(text)
+        .map(|segment| tokens.tokens(segment))
+        .filter(|terms| !terms.is_empty());
+    let Some(first) = spans.next() else {
+        return scores(&tokens.tokens(text));
+    };
+    spans.fold(scores(&first), |best, terms| {
+        let candidate = scores(&terms);
+        [best[0].max(candidate[0]), best[1].max(candidate[1])]
+    })
+}
+
+/// Immutable features shared by fusion, grounding and matched-term decisions.
+pub(crate) struct FactLexicalFeatures {
+    content_features: std::sync::Arc<FusionContentFeatures>,
+    index_terms: std::sync::Arc<HashSet<String>>,
+    score: usize,
+    grounding_score: usize,
+}
+impl FactLexicalFeatures {
+    pub(crate) fn contains(&self, term: &str) -> bool {
+        self.content_features.vocabulary.contains(term) || self.index_terms.contains(term)
+    }
+    pub(crate) fn score(&self) -> usize {
+        self.score
+    }
+    pub(crate) fn grounding_score(&self) -> usize {
+        self.grounding_score
+    }
+}
+
 pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
     if query_terms.is_empty() {
         return 0;
     }
-
-    let mut fact_terms = search_query_terms(&fact.content)
-        .into_iter()
-        .collect::<HashSet<_>>();
-    for index_key in &fact.index_keys {
-        fact_terms.extend(search_query_terms(index_key));
-    }
-
+    let fact_terms = crate::shared::search_lexical::fact_term_set(fact);
     query_terms
         .iter()
         .filter(|term| fact_terms.contains(term.as_str()))
         .count()
 }
 
+pub(crate) struct TextLexicalScorer<'a> {
+    query: &'a [String],
+    tokens: crate::shared::search::OrderedSearchTokens,
+}
+impl<'a> TextLexicalScorer<'a> {
+    pub(crate) fn new(query: &'a [String]) -> Self {
+        Self {
+            query,
+            tokens: Default::default(),
+        }
+    }
+    pub(crate) fn score(&mut self, text: &str) -> usize {
+        let terms = best_matching_content_terms_with_tokens(text, self.query, &mut self.tokens);
+        score_content_terms(&terms, self.query)
+    }
+}
+
 pub(crate) fn lexical_query_score_for_text(text: &str, query_terms: &[String]) -> usize {
-    let content_terms = best_matching_content_terms(text, query_terms);
-    score_content_terms(&content_terms, query_terms)
+    TextLexicalScorer::new(query_terms).score(text)
 }
 
 /// Keep immutable text scores outside the stable comparator. A minimum of one
@@ -538,10 +806,11 @@ pub(super) fn rank_episodes_by_query(
     query_terms: &[String],
     minimum_score: usize,
 ) -> Vec<crate::models::Episode> {
+    let mut scorer = TextLexicalScorer::new(query_terms);
     let mut scored = episodes
         .into_iter()
         .map(|episode| {
-            let score = lexical_query_score_for_text(&episode.content, query_terms);
+            let score = scorer.score(&episode.content);
             (episode, score)
         })
         .filter(|(_, score)| *score >= minimum_score)
@@ -562,7 +831,7 @@ pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) 
 }
 
 fn lexical_ngram_overlap_for_terms(
-    content_terms: &[String],
+    content_terms: &[impl AsRef<str>],
     query_terms: &[String],
     width: usize,
 ) -> usize {
@@ -570,66 +839,76 @@ fn lexical_ngram_overlap_for_terms(
         return 0;
     }
 
-    let record_ngrams = content_terms
-        .windows(width)
-        .map(|window| window.join(" "))
-        .collect::<HashSet<_>>();
-
-    query_terms
-        .windows(width)
-        .filter(|window| record_ngrams.contains(&window.join(" ")))
-        .count()
+    // Only query windows can contribute. Keep their multiplicities in a small
+    // dictionary, rather than hashing/storing every window of a long source.
+    // Removing a matched window counts it once per query occurrence, regardless
+    // of repeated source occurrences, exactly as membership in the old set did.
+    let mut remaining = HashMap::new();
+    for window in query_terms.windows(width) {
+        let key: [&str; 3] =
+            std::array::from_fn(|n| window.get(n).map(String::as_str).unwrap_or_default());
+        *remaining.entry(key).or_default() += 1;
+    }
+    let mut score = 0;
+    for window in content_terms.windows(width) {
+        let key: [&str; 3] =
+            std::array::from_fn(|n| window.get(n).map(AsRef::as_ref).unwrap_or_default());
+        score += remaining.remove(&key).unwrap_or(0);
+        if remaining.is_empty() {
+            break;
+        }
+    }
+    score
 }
 
-fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String> {
+fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<std::sync::Arc<str>> {
+    best_matching_content_terms_with_tokens(text, query_terms, &mut Default::default())
+}
+
+fn best_matching_content_terms_with_tokens(
+    text: &str,
+    query_terms: &[String],
+    tokens: &mut crate::shared::search::OrderedSearchTokens,
+) -> Vec<std::sync::Arc<str>> {
     if query_terms.is_empty() {
-        return search_query_terms(text);
+        return tokens.tokens(text);
     }
     if !crate::shared::search::has_search_query_terms(text) {
         return Vec::new();
     }
-
-    let mut spans = local_content_spans(text);
-    let Some(mut best_terms) = spans.next() else {
-        return search_query_terms(text);
-    };
-    let mut best_score = score_content_terms(&best_terms, query_terms);
-    let mut best_len = best_terms.len();
-
-    for candidate_terms in spans {
-        let candidate_score = score_content_terms(&candidate_terms, query_terms);
-        let candidate_len = candidate_terms.len();
-        let should_replace = candidate_score > best_score
-            || (candidate_score == best_score && candidate_len < best_len);
-        if should_replace {
-            best_len = candidate_len;
-            best_score = candidate_score;
-            best_terms = candidate_terms;
+    let mut best: Option<(usize, Vec<std::sync::Arc<str>>)> = None;
+    for segment in local_content_segments(text) {
+        let candidate = tokens.tokens(segment);
+        if candidate.is_empty() {
+            continue;
+        }
+        let score = score_content_terms(&candidate, query_terms);
+        if best.as_ref().is_none_or(|(old_score, old)| {
+            score > *old_score || (score == *old_score && candidate.len() < old.len())
+        }) {
+            best = Some((score, candidate));
         }
     }
-
-    best_terms
+    best.map_or_else(|| tokens.tokens(text), |(_, terms)| terms)
 }
 
-fn local_content_spans(text: &str) -> impl Iterator<Item = Vec<String>> + '_ {
-    // Identical sentences have identical scores and lengths. Their later
-    // occurrences cannot replace the first winner, so normalize each once.
-    // Keep the original order and the full-text fallback's occurrence counts.
+fn local_content_segments(text: &str) -> impl Iterator<Item = &str> {
     let mut seen = HashSet::new();
     text.trim()
         .split_inclusive(['.', '!', '?', ';', '\n'])
         .map(str::trim)
         .filter(|segment| !segment.is_empty())
         .filter(move |segment| seen.insert(*segment))
-        .map(search_query_terms)
-        .filter(|terms| !terms.is_empty())
 }
 
-fn score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+fn score_content_terms(content_terms: &[impl AsRef<str>], query_terms: &[String]) -> usize {
     content_term_scores(content_terms, query_terms).0
 }
 
-fn content_term_scores(content_terms: &[String], query_terms: &[String]) -> (usize, usize) {
+fn content_term_scores(
+    content_terms: &[impl AsRef<str>],
+    query_terms: &[String],
+) -> (usize, usize) {
     let unigram_overlap = query_term_overlap_for_terms(content_terms, query_terms);
     let bigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 2);
     let trigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
@@ -640,40 +919,49 @@ fn content_term_scores(content_terms: &[String], query_terms: &[String]) -> (usi
     )
 }
 
-fn query_term_overlap_for_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+fn query_term_overlap_for_terms(
+    content_terms: &[impl AsRef<str>],
+    query_terms: &[String],
+) -> usize {
     if query_terms.is_empty() || content_terms.is_empty() {
         return 0;
     }
 
-    let content_terms = content_terms.iter().collect::<HashSet<_>>();
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term))
-        .count()
+    let mut remaining = HashMap::<&str, usize>::new();
+    for term in query_terms {
+        *remaining.entry(term).or_default() += 1;
+    }
+    let mut score = 0;
+    for term in content_terms {
+        score += remaining.remove(term.as_ref()).unwrap_or(0);
+        if remaining.is_empty() {
+            break;
+        }
+    }
+    score
 }
 
 fn lexical_index_key_overlap(record: &Value, query_terms: &[String]) -> usize {
-    raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
-        .and_then(raw_array)
-        .map(|index_keys| {
-            let terms = index_keys
-                .iter()
-                .filter_map(json_string)
-                .flat_map(search_query_terms)
-                .collect::<Vec<_>>();
-            query_term_overlap_for_terms(&terms, query_terms)
-        })
-        .unwrap_or(0)
+    let terms = search_query_term_set_many(
+        raw_object(record)
+            .and_then(|map| map.get("index_keys"))
+            .and_then(raw_array)
+            .into_iter()
+            .flatten()
+            .filter_map(json_string),
+    );
+    query_terms
+        .iter()
+        .filter(|term| terms.contains(term.as_str()))
+        .count()
 }
 
 fn lexical_index_key_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
-    let terms = fact
-        .index_keys
+    let terms = search_query_term_set_many(fact.index_keys.iter().map(String::as_str));
+    query_terms
         .iter()
-        .flat_map(|index_key| search_query_terms(index_key))
-        .collect::<Vec<_>>();
-    query_term_overlap_for_terms(&terms, query_terms)
+        .filter(|term| terms.contains(term.as_str()))
+        .count()
 }
 
 fn lexical_ft_score(record: &Value) -> f64 {
@@ -725,13 +1013,18 @@ pub(crate) async fn select_episode_records_for_query(
         return Ok(initial);
     }
 
-    let term_groups = service
+    let initial_ids = initial
+        .iter()
+        .filter_map(|row| row.get("episode_id").and_then(json_string))
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let term_candidates = service
         .episode_context_store()
-        .select_episodes_for_terms(cutoff_iso, &fallback_terms, limit)
+        .select_episode_candidates(cutoff_iso, &fallback_terms, limit, &initial_ids)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let mut records = initial;
-    records.extend(term_groups.into_iter().flatten());
+    records.extend(term_candidates);
 
     let mut seen_episode_ids = HashSet::new();
     records.retain(|record| {
@@ -760,6 +1053,17 @@ mod tests {
         lexical_record_metrics, rank_lexical_records, search_query_terms,
         select_fact_records_for_query,
     };
+
+    fn flatten_fixture_groups(groups: Value) -> Value {
+        Value::Array(
+            groups
+                .as_array()
+                .expect("fixture groups")
+                .iter()
+                .flat_map(|group| group.as_array().expect("fixture rows").iter().cloned())
+                .collect(),
+        )
+    }
 
     #[test]
     fn lexical_score_preserves_global_quote_boundary_empty_guard() {
@@ -1001,7 +1305,13 @@ mod tests {
 
         let signatures = (0..256)
             .map(|_| {
-                let metrics = lexical_record_metrics(&record, &query_terms, &anchor_profile);
+                let features = super::lexical_candidate_features(
+                    std::slice::from_ref(&record),
+                    &query_terms,
+                    #[cfg(feature = "eval-support")]
+                    None,
+                );
+                let metrics = lexical_record_metrics(&features[0], &query_terms, &anchor_profile);
                 (
                     metrics.weighted_overlap.to_bits(),
                     metrics.hard_anchor_mass.to_bits(),
@@ -1157,8 +1467,8 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
-                    if sql.starts_with("RETURN [") {
-                        return Ok(json!([
+                    if sql.contains("array::min([term_rank") {
+                        return Ok(flatten_fixture_groups(json!([
                             [],
                             [],
                             [],
@@ -1213,7 +1523,7 @@ mod tests {
                                 "t_ingested": "2026-01-08T10:30:00Z",
                                 "scope": "org"
                             }]
-                        ]));
+                        ])));
                     }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
@@ -1300,6 +1610,8 @@ mod tests {
                 query_opt: Some("atlas launch checklist"),
                 limit: 10,
                 fact_types: &[],
+                #[cfg(feature = "eval-support")]
+                trace: None,
             },
         )
         .await
@@ -1311,10 +1623,7 @@ mod tests {
             .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            lexical_result.retrieval_tier,
-            super::RetrievalTier::EpisodeFallback
-        );
+        assert!(lexical_result.native_fact_ids.is_empty());
         assert_eq!(
             fact_ids,
             vec!["fact:shared", "fact:launch-only", "fact:atlas-only"]
@@ -1382,7 +1691,7 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
-                    if sql.starts_with("RETURN [") {
+                    if sql.contains("array::min([term_rank") {
                         let support_group = json!({
                             "fact_id": "fact:support-group",
                             "fact_type": "note",
@@ -1416,14 +1725,14 @@ mod tests {
                             "scope": "org",
                             "ft_score": 3.0
                         });
-                        return Ok(json!([
+                        return Ok(flatten_fixture_groups(json!([
                             [support_group.clone()],
                             [support_group.clone()],
                             [support_group],
                             [],
                             [generic_support],
                             [generic_group]
-                        ]));
+                        ])));
                     }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
@@ -1499,6 +1808,8 @@ mod tests {
                 query_opt: Some("lgbtq support group"),
                 limit: 10,
                 fact_types: &[],
+                #[cfg(feature = "eval-support")]
+                trace: None,
             },
         )
         .await
@@ -1517,7 +1828,6 @@ mod tests {
     async fn lexical_scan_fallback_observes_bitemporal_ingestion_and_invalidation() {
         let query = "Orion launch mission";
         let cutoff = "2026-01-15T00:00:00Z";
-        let fallback_group_count = build_lexical_fallback_queries(&search_query_terms(query)).len();
         let future_ingested = json!({
             "fact_id": "fact:future-ingested",
             "fact_type": "note",
@@ -1542,12 +1852,8 @@ mod tests {
         let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
             |sql| sql.contains("FROM fact"),
             move |sql, _vars| {
-                if sql.starts_with("RETURN [") {
-                    return Ok(Value::Array(
-                        (0..fallback_group_count)
-                            .map(|_| Value::Array(Vec::new()))
-                            .collect(),
-                    ));
+                if sql.contains("array::min([term_rank") {
+                    return Ok(Value::Array(Vec::new()));
                 }
                 if sql.contains("search::score") {
                     return Ok(Value::Array(Vec::new()));
@@ -1577,6 +1883,8 @@ mod tests {
                 query_opt: Some(query),
                 limit: 10,
                 fact_types: &[],
+                #[cfg(feature = "eval-support")]
+                trace: None,
             },
         )
         .await
@@ -1612,19 +1920,12 @@ mod tests {
         let fallback_record = record;
         let db = crate::service::mock_db::MockDbClient::new()
             .expect_query_with(
-                |sql| sql.contains("search::score") && !sql.starts_with("RETURN ["),
+                |sql| sql.contains("search::score") && !sql.contains("array::min([term_rank"),
                 move |_, _| Ok(json!([initial_record.clone()])),
             )
             .expect_query_with(
-                |sql| sql.starts_with("RETURN [") && sql.contains("search::score"),
-                move |_, _| {
-                    Ok(Value::Array(vec![
-                        Value::Array(vec![
-                            fallback_record.clone()
-                        ]);
-                        fallback_group_count
-                    ]))
-                },
+                |sql| sql.contains("array::min([term_rank") && sql.contains("search::score"),
+                move |_, _| Ok(Value::Array(vec![fallback_record.clone()])),
             );
         let service = crate::service::MemoryService::new(
             Arc::new(db),
@@ -1643,12 +1944,14 @@ mod tests {
                 query_opt: Some(query),
                 limit: 10,
                 fact_types: &[],
+                #[cfg(feature = "eval-support")]
+                trace: None,
             },
         )
         .await
         .expect("tied lexical channels should be ranked");
 
-        assert_eq!(result.retrieval_tier, super::RetrievalTier::Direct);
+        assert!(!result.native_fact_ids.is_empty());
         assert_eq!(result.records.len(), 1);
         assert_eq!(result.records[0]["fact_id"], "fact:tie");
     }
@@ -1705,7 +2008,7 @@ mod tests {
                 // The context store now runs the full-text fact retrieval through
                 // the core `query` op; serve the canned per-term records here.
                 if sql.contains("search::score") {
-                    if sql.starts_with("RETURN [") {
+                    if sql.contains("array::min([term_rank") {
                         let answer = json!({
                             "fact_id": "fact:answer",
                             "fact_type": "note",
@@ -1728,11 +2031,11 @@ mod tests {
                             "scope": "org",
                             "ft_score": 8.0
                         });
-                        return Ok(json!([
+                        return Ok(flatten_fixture_groups(json!([
                             [answer.clone()],
                             [generic, answer.clone()],
                             [answer]
-                        ]));
+                        ])));
                     }
                     let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
                     return Ok(Value::Array(match query.as_deref() {
@@ -1811,6 +2114,8 @@ mod tests {
                 query_opt: Some("What degree did I graduate with?"),
                 limit: 5,
                 fact_types: &[],
+                #[cfg(feature = "eval-support")]
+                trace: None,
             },
         )
         .await
@@ -1822,10 +2127,7 @@ mod tests {
             .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            lexical_result.retrieval_tier,
-            super::RetrievalTier::EpisodeFallback
-        );
+        assert!(lexical_result.native_fact_ids.is_empty());
         assert_eq!(fact_ids.first().copied(), Some("fact:answer"));
     }
 }

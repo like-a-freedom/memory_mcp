@@ -6,7 +6,7 @@
 //! lives apart from the knowledge-owned graph reads it used to be
 //! bundled with.
 //!
-//! The method bodies are unchanged from `app_store.rs`.
+//! Heat-only writes do not return the immutable source payload.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -64,7 +64,7 @@ impl FactAccessStore {
                    IF access_count < $int_min - $boost THEN $int_min \
                    ELSE access_count + $boost END \
                  ELSE access_count END, \
-                 last_accessed = type::datetime($last_accessed)",
+                 last_accessed = type::datetime($last_accessed) RETURN NONE",
                 Some(json!({
                     "fact_id": record_id,
                     "boost": boost,
