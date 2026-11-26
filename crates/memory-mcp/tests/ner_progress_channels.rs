@@ -356,7 +356,9 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
                     let mut buf = [0u8; 1024];
                     assert!(stream.read(&mut buf).expect("resolver request") > 0);
                     entered_tx.send(()).expect("report blocked resolver");
-                    let _ = gate_rx.recv_timeout(Duration::from_secs(30));
+                    gate_rx
+                        .recv_timeout(Duration::from_secs(30))
+                        .expect("release resolver only after initialize returns");
                     return;
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -447,7 +449,7 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
 
     // Unblock the HTTP fixture so the child can exit cleanly.
     let _ = gate_tx.send(());
-    let _ = server_handle.join();
+    server_handle.join().expect("blocked resolver fixture");
     drop(stdin);
     let exit_deadline = std::time::Instant::now() + Duration::from_secs(10);
     while child.try_wait().expect("poll server exit").is_none() {
