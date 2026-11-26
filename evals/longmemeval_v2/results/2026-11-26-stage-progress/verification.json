@@ -1,0 +1,123 @@
+{
+  "schema": "memory-quality-verification/v1",
+  "base_revision": "54877d2cccda3b9b8ce39b9319b8dc5e513ebd07",
+  "platform": "aarch64-apple-darwin",
+  "compiler": "rustc1.100.0(0ef1bc3862026-11-09)",
+  "models": false,
+  "results": {
+    "production": {
+      "command": "cargo test --locked -p memory_mcp --no-fail-fast (sandbox)",
+      "exit_code": 101,
+      "test_summaries": 170,
+      "passed": 2809,
+      "failed": 8,
+      "ignored": 45
+    },
+    "production-native": {
+      "command": "cargo test --locked -p memory_mcp --no-fail-fast (native, FSEvents access)",
+      "exit_code": 0,
+      "test_summaries": 170,
+      "passed": 2817,
+      "failed": 0,
+      "ignored": 45
+    },
+    "harness": {
+      "command": "cargo test --locked -p eval-harness -- --test-threads=1",
+      "exit_code": 0,
+      "test_summaries": 43,
+      "passed": 929,
+      "failed": 0,
+      "ignored": 22
+    },
+    "opt-in-public": {
+      "command": "cargo test --locked -p memory_mcp --features eval-support --test retrieval_partial_evidence --test long_history_stage_evidence --test historical_query_grounding --test historical_selector_exclusions --test retrieval_query_projection --test retrieval_query_batching",
+      "exit_code": 0,
+      "test_summaries": 6,
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0
+    },
+    "resource-matched-default": {
+      "command": "cargo test --locked -p memory_mcp --test lexical_term_set_resource -- --nocapture",
+      "exit_code": 0,
+      "test_summaries": 1,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    },
+    "clippy-workspace": {
+      "command": "cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings",
+      "exit_code": 0
+    },
+    "clippy-diagnostics": {
+      "command": "cargo clippy --locked -p memory_mcp --features eval-support,test-fixtures --test retrieval_partial_evidence --test full_history_evidence --test lexical_term_set_resource --test long_history_stage_evidence --test historical_query_grounding --test historical_selector_exclusions -- -D warnings",
+      "exit_code": 0
+    },
+    "fmt": {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    }
+  },
+  "native_gate": {
+    "counts": {
+      "failed": 0,
+      "invalid": 0,
+      "passed": 8,
+      "unobserved": 0
+    },
+    "all_cases_pass": true,
+    "no_regressions": true,
+    "candidate_identity": {
+      "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+      "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+      "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+      "product_binary_sha256": "b72238916ddf938111ab43db69d18ddf83aaddabb33bd19795c89b7491cbc49b",
+      "product_revision": "54877d2c+lexical-stage-reuse",
+      "suite_id": "memory-decisions"
+    }
+  },
+  "source_sha256": {
+    "crates/memory-mcp/src/eval_support/retrieval.rs": "6e2a0ea15bbbd0f82593f396ba4ed71251ebd8a1619cd3cecff05c31b8dccd2d",
+    "crates/memory-mcp/src/memory/retrieval.rs": "a7c317fe4c36f4fdaff67a6189c0c1d25ba3f9ab4958211fc8701e24148369ea",
+    "crates/memory-mcp/src/memory/retrieval/budget.rs": "d04507b15832ed8ff7789b51afcd94eae4a6a2e24a70d4dc7109685c917198ca",
+    "crates/memory-mcp/src/memory/retrieval/diagnostics.rs": "569c697fa934027ad80b04a06b74ff2adcf802aa5620f8d044d060bd06618f71",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "89200e3592cf41c5ed8ddb02db5b35eee765db3d36a2f4152a5c0980a9e3b41b",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "1ca4ab85fb0c95ab5f5b9075e59708424159cbb5d50dd7e9f5f6c3aa31fde3a6",
+    "crates/memory-mcp/src/memory/retrieval/views.rs": "b086b1a6bb24422ef8a9ece86bf54a51e0a37c58f5e38c855f1a589cab6de33e",
+    "crates/memory-mcp/src/shared/search.rs": "4db2f7c4eb95a0b89760306d099703e78e7e192ad0853c13d4d7bf7b62ec8079",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "cf7cc893559fafe0505b7b6c1cae57effa577e8fff49392e618a8231fa5598ab",
+    "crates/memory-mcp/tests/lexical_term_set_resource.rs": "ea23d1630b5c955ddbf8a1025b4d17e219f467db78fdd813f58ac050d59dc78b",
+    "crates/memory-mcp/tests/retrieval_partial_evidence.rs": "e1a0934198d718cec876a9f06908a4ed576d137815562c5b202089bd8cc75311"
+  },
+  "resource_control": {
+    "baseline_caller_thread_allocations": 534786,
+    "candidate_caller_thread_allocations": 114542,
+    "unchanged_bound": 200000,
+    "expected_source_ids_and_confidence_and_grounding_preserved": true,
+    "all_thread_allocations_or_bytes_or_peak_or_end_to_end_latency": false
+  },
+  "full_history_acceptance": {
+    "scheduled_cases_in_final_capture": 2,
+    "completed_contexts": 0,
+    "final_context_source_recall": "unobserved",
+    "read_acceptance_seconds": 30,
+    "outer_process_seconds": 45,
+    "additional_development_process_attempts": 5,
+    "narrow_fts_prior_development_process_attempts": 15,
+    "new_seven_case_answers": 0,
+    "historical_seven_case_correct": 2,
+    "historical_seven_case_total": 7,
+    "C2_admitted": false
+  },
+  "limits": [
+    "Native suite rerun after sandbox run failed7 FSEvents/startup controls and1 MCP initialization timeout; all original failures retained. Native success does not by itself assign cause of the MCP timeout.",
+    "Test totals include existing architecture lints and doctests, not only independent production scenarios. Ignored tests are not passed.",
+    "Current gate ran during verification and is not a latency comparison.",
+    "Caller-owned partial capture survives cooperative cancellation/errors, not SIGKILL.",
+    "Equivalent small-control work reduction is not whole-history acceptance. Task7 Step4/5 remain open."
+  ],
+  "staged_whitespace_check": {
+    "command": "git diff --cached --check -- . ':(exclude)evals/**/*.log' ':(exclude)evals/**/*.txt' ':(exclude)evals/**/*.patch'",
+    "raw_exclusion_reason": "Preserve byte-exact command/sample outputs and unified-patch blank context lines; source and documentation stay checked."
+  }
+}

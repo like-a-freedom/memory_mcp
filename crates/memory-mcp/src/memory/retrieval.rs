@@ -183,20 +183,17 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
 }
 
 #[cfg(feature = "eval-support")]
-pub(crate) async fn assemble_context_with_evidence(
+pub(crate) async fn assemble_context_recording_evidence(
     ctx: &AssembleContextDeps,
     request: AssembleContextRequest,
-    source_episode: &str,
+    capture: &diagnostics::ContextEvidenceCapture,
 ) -> Result<diagnostics::ContextEvidence, MemoryError> {
-    let trace = std::sync::Mutex::new(diagnostics::Recorder {
-        started: Instant::now(),
-        source_episode: source_episode.to_owned(),
-        stages: Vec::new(),
-    });
+    let trace = &capture.recorder;
+    let source_episode = capture.begin()?;
     let access = AccessPayload::from_payload(request.access.clone());
     let source_rows = ctx
         .episode_context_store()
-        .select_episode_by_id(source_episode)
+        .select_episode_by_id(&source_episode)
         .await?;
     let formation = source_rows
         .into_iter()
@@ -215,7 +212,7 @@ pub(crate) async fn assemble_context_with_evidence(
         })).ok()
         })
         .collect::<Vec<_>>();
-    diagnostics::record(Some(&trace), "formation", &formation);
+    diagnostics::record(Some(trace), "formation", &formation);
     let command = crate::memory::api::RecallCommand {
         query: request.query.clone(),
         budget: request.budget,
@@ -225,7 +222,7 @@ pub(crate) async fn assemble_context_with_evidence(
         &RetrievalPort {
             ctx,
             request,
-            trace: Some(&trace),
+            trace: Some(trace),
         },
         &crate::memory::retrieval_deps::RateLimitDeps {
             rate_limiter: &ctx.rate_limiter,
@@ -233,11 +230,8 @@ pub(crate) async fn assemble_context_with_evidence(
         &command,
     )
     .await?;
-    let recorder = trace
-        .into_inner()
-        .map_err(|_| MemoryError::Validation("evaluation evidence recorder poisoned".into()))?;
     Ok(diagnostics::ContextEvidence {
-        stages: recorder.stages,
+        stages: capture.stages()?,
         items,
     })
 }

@@ -1,0 +1,24 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.86s
+     Running tests/retrieval_partial_evidence.rs (target/debug/build/memory_mcp/6c5569c979e00a17/out/retrieval_partial_evidence-6c5569c979e00a17)
+
+running 1 test
+test cancelled_public_read_retains_completed_source_stage_without_claiming_selection ... FAILED
+
+failures:
+
+---- cancelled_public_read_retains_completed_source_stage_without_claiming_selection stdout ----
+
+thread 'cancelled_public_read_retains_completed_source_stage_without_claiming_selection' (6238169) panicked at crates/memory-mcp/tests/retrieval_partial_evidence.rs:49:5:
+assertion `left == right` failed: unobserved stages must not be invented
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cancelled_public_read_retains_completed_source_stage_without_claiming_selection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_partial_evidence`

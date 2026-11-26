@@ -1,0 +1,628 @@
+diff --git a/crates/memory-mcp/src/eval_support/retrieval.rs b/crates/memory-mcp/src/eval_support/retrieval.rs
+index b2fdcb98..194da16b 100644
+--- a/crates/memory-mcp/src/eval_support/retrieval.rs
++++ b/crates/memory-mcp/src/eval_support/retrieval.rs
+@@ -143,15 +143,28 @@ pub async fn new_eval_reembed_service(
+ 
+ /// Immutable source-filtered receipts from the actual context pipeline.
+ /// Raw evidence is returned only to this explicit eval caller, never logged.
+-pub use crate::memory::retrieval::diagnostics::{ContextEvidence, RetrievalStage};
++pub use crate::memory::retrieval::diagnostics::{
++    ContextEvidence, ContextEvidenceCapture, RetrievalStage,
++};
+ 
+ pub async fn assemble_context_with_evidence(
+     service: &MemoryService,
+     request: crate::models::AssembleContextRequest,
+     source_episode: &str,
++) -> Result<ContextEvidence, MemoryError> {
++    let capture = ContextEvidenceCapture::new(source_episode);
++    assemble_context_recording_evidence(service, request, &capture).await
++}
++
++/// Use one caller-owned capture per read; inspect its stages after cancellation.
++/// This does not impose a hard deadline on synchronous work inside the future.
++pub async fn assemble_context_recording_evidence(
++    service: &MemoryService,
++    request: crate::models::AssembleContextRequest,
++    capture: &ContextEvidenceCapture,
+ ) -> Result<ContextEvidence, MemoryError> {
+     let deps = crate::memory::retrieval_deps::AssembleContextDeps::from(service);
+-    crate::memory::retrieval::assemble_context_with_evidence(&deps, request, source_episode).await
++    crate::memory::retrieval::assemble_context_recording_evidence(&deps, request, capture).await
+ }
+ 
+ #[cfg(test)]
+diff --git a/crates/memory-mcp/src/memory/retrieval.rs b/crates/memory-mcp/src/memory/retrieval.rs
+index 83cc3626..1f165f39 100644
+--- a/crates/memory-mcp/src/memory/retrieval.rs
++++ b/crates/memory-mcp/src/memory/retrieval.rs
+@@ -183,20 +183,17 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
+ }
+ 
+ #[cfg(feature = "eval-support")]
+-pub(crate) async fn assemble_context_with_evidence(
++pub(crate) async fn assemble_context_recording_evidence(
+     ctx: &AssembleContextDeps,
+     request: AssembleContextRequest,
+-    source_episode: &str,
++    capture: &diagnostics::ContextEvidenceCapture,
+ ) -> Result<diagnostics::ContextEvidence, MemoryError> {
+-    let trace = std::sync::Mutex::new(diagnostics::Recorder {
+-        started: Instant::now(),
+-        source_episode: source_episode.to_owned(),
+-        stages: Vec::new(),
+-    });
++    let trace = &capture.recorder;
++    let source_episode = capture.begin()?;
+     let access = AccessPayload::from_payload(request.access.clone());
+     let source_rows = ctx
+         .episode_context_store()
+-        .select_episode_by_id(source_episode)
++        .select_episode_by_id(&source_episode)
+         .await?;
+     let formation = source_rows
+         .into_iter()
+@@ -215,7 +212,7 @@ pub(crate) async fn assemble_context_with_evidence(
+         })).ok()
+         })
+         .collect::<Vec<_>>();
+-    diagnostics::record(Some(&trace), "formation", &formation);
++    diagnostics::record(Some(trace), "formation", &formation);
+     let command = crate::memory::api::RecallCommand {
+         query: request.query.clone(),
+         budget: request.budget,
+@@ -225,7 +222,7 @@ pub(crate) async fn assemble_context_with_evidence(
+         &RetrievalPort {
+             ctx,
+             request,
+-            trace: Some(&trace),
++            trace: Some(trace),
+         },
+         &crate::memory::retrieval_deps::RateLimitDeps {
+             rate_limiter: &ctx.rate_limiter,
+@@ -233,11 +230,8 @@ pub(crate) async fn assemble_context_with_evidence(
+         &command,
+     )
+     .await?;
+-    let recorder = trace
+-        .into_inner()
+-        .map_err(|_| MemoryError::Validation("evaluation evidence recorder poisoned".into()))?;
+     Ok(diagnostics::ContextEvidence {
+-        stages: recorder.stages,
++        stages: capture.stages()?,
+         items,
+     })
+ }
+diff --git a/crates/memory-mcp/src/memory/retrieval/budget.rs b/crates/memory-mcp/src/memory/retrieval/budget.rs
+index 990fce97..0eb079a9 100644
+--- a/crates/memory-mcp/src/memory/retrieval/budget.rs
++++ b/crates/memory-mcp/src/memory/retrieval/budget.rs
+@@ -401,15 +401,7 @@ pub(super) async fn collect_episode_fallback_items(
+             }
+     });
+ 
+-    episodes.sort_by(|left, right| {
+-        super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
+-            .cmp(&super::lexical::lexical_query_score_for_text(
+-                &left.content,
+-                &query_terms,
+-            ))
+-            .then_with(|| right.t_ref.cmp(&left.t_ref))
+-            .then_with(|| left.episode_id.cmp(&right.episode_id))
+-    });
++    let episodes = super::lexical::rank_episodes_by_query(episodes, &query_terms, 0);
+ 
+     use super::views::{EpisodeFallbackParams, build_episode_fallback_items};
+ 
+diff --git a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+index 7aec43c8..e002b243 100644
+--- a/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
++++ b/crates/memory-mcp/src/memory/retrieval/diagnostics.rs
+@@ -20,8 +20,55 @@ pub struct ContextEvidence {
+     pub items: Vec<AssembledContextItem>,
+ }
+ 
++/// One explicitly requested diagnostic read. Owned by the caller so completed
++/// stages survive cancellation or a storage error in the read future.
++pub struct ContextEvidenceCapture {
++    pub(super) recorder: Mutex<Recorder>,
++}
++
++impl ContextEvidenceCapture {
++    pub fn new(source_episode: &str) -> Self {
++        Self {
++            recorder: Mutex::new(Recorder {
++                started: Instant::now(),
++                read_started: false,
++                source_episode: source_episode.to_owned(),
++                stages: Vec::new(),
++            }),
++        }
++    }
++
++    pub(super) fn begin(&self) -> Result<String, crate::error::MemoryError> {
++        let mut recorder = self.recorder.lock().map_err(|_| {
++            crate::error::MemoryError::Validation("evaluation evidence recorder poisoned".into())
++        })?;
++        if recorder.read_started {
++            return Err(crate::error::MemoryError::Validation(
++                "evaluation evidence capture supports only one read".into(),
++            ));
++        }
++        recorder.read_started = true;
++        recorder.started = Instant::now();
++        Ok(recorder.source_episode.clone())
++    }
++
++    /// Only observed boundaries are present. A partial capture is not a
++    /// completed context, and an empty stage is not proof of absent candidates.
++    pub fn stages(&self) -> Result<Vec<RetrievalStage>, crate::error::MemoryError> {
++        self.recorder
++            .lock()
++            .map(|recorder| recorder.stages.clone())
++            .map_err(|_| {
++                crate::error::MemoryError::Validation(
++                    "evaluation evidence recorder poisoned".into(),
++                )
++            })
++    }
++}
++
+ pub(super) struct Recorder {
+     pub(super) started: Instant,
++    read_started: bool,
+     pub(super) source_episode: String,
+     pub(super) stages: Vec<RetrievalStage>,
+ }
+diff --git a/crates/memory-mcp/src/memory/retrieval/lexical.rs b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+index 89e67d5d..6517d63d 100644
+--- a/crates/memory-mcp/src/memory/retrieval/lexical.rs
++++ b/crates/memory-mcp/src/memory/retrieval/lexical.rs
+@@ -531,6 +531,30 @@ pub(crate) fn lexical_query_score_for_text(text: &str, query_terms: &[String]) -
+     score_content_terms(&content_terms, query_terms)
+ }
+ 
++/// Keep immutable text scores outside the stable comparator. A minimum of one
++/// implements the historical query-match filter; zero preserves all admissions.
++pub(super) fn rank_episodes_by_query(
++    episodes: Vec<crate::models::Episode>,
++    query_terms: &[String],
++    minimum_score: usize,
++) -> Vec<crate::models::Episode> {
++    let mut scored = episodes
++        .into_iter()
++        .map(|episode| {
++            let score = lexical_query_score_for_text(&episode.content, query_terms);
++            (episode, score)
++        })
++        .filter(|(_, score)| *score >= minimum_score)
++        .collect::<Vec<_>>();
++    scored.sort_by(|(left, left_score), (right, right_score)| {
++        right_score
++            .cmp(left_score)
++            .then_with(|| right.t_ref.cmp(&left.t_ref))
++            .then_with(|| left.episode_id.cmp(&right.episode_id))
++    });
++    scored.into_iter().map(|(episode, _)| episode).collect()
++}
++
+ pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
+     let content_terms = best_matching_content_terms(&fact.content, query_terms);
+     score_content_terms(&content_terms, query_terms)
+@@ -558,30 +582,22 @@ fn lexical_ngram_overlap_for_terms(
+ }
+ 
+ fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String> {
+-    let fallback_terms = search_query_terms(text);
+-    if fallback_terms.is_empty() || query_terms.is_empty() {
+-        return fallback_terms;
++    if query_terms.is_empty() {
++        return search_query_terms(text);
++    }
++    if !crate::shared::search::has_search_query_terms(text) {
++        return Vec::new();
+     }
+ 
+-    let mut spans = local_content_spans(text).into_iter();
+-    let Some((mut best_terms, best_span_width)) = spans.next() else {
+-        return fallback_terms;
++    let mut spans = local_content_spans(text);
++    let Some(mut best_terms) = spans.next() else {
++        return search_query_terms(text);
+     };
+-    let mut best_score = adjusted_span_score(
+-        score_content_terms(&best_terms, query_terms),
+-        best_span_width,
+-    );
++    let mut best_score = score_content_terms(&best_terms, query_terms);
+     let mut best_len = best_terms.len();
+ 
+-    for (candidate_terms, span_width) in spans {
+-        if candidate_terms.is_empty() {
+-            continue;
+-        }
+-
+-        let candidate_score = adjusted_span_score(
+-            score_content_terms(&candidate_terms, query_terms),
+-            span_width,
+-        );
++    for candidate_terms in spans {
++        let candidate_score = score_content_terms(&candidate_terms, query_terms);
+         let candidate_len = candidate_terms.len();
+         let should_replace = candidate_score > best_score
+             || (candidate_score == best_score && candidate_len < best_len);
+@@ -595,49 +611,18 @@ fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String
+     best_terms
+ }
+ 
+-fn local_content_spans(text: &str) -> Vec<(Vec<String>, usize)> {
+-    let sentence_terms = sentence_like_segments(text)
+-        .into_iter()
+-        .map(|segment| search_query_terms(&segment))
++fn local_content_spans(text: &str) -> impl Iterator<Item = Vec<String>> + '_ {
++    // Identical sentences have identical scores and lengths. Their later
++    // occurrences cannot replace the first winner, so normalize each once.
++    // Keep the original order and the full-text fallback's occurrence counts.
++    let mut seen = HashSet::new();
++    text.trim()
++        .split_inclusive(['.', '!', '?', ';', '\n'])
++        .map(str::trim)
++        .filter(|segment| !segment.is_empty())
++        .filter(move |segment| seen.insert(*segment))
++        .map(search_query_terms)
+         .filter(|terms| !terms.is_empty())
+-        .collect::<Vec<_>>();
+-
+-    if sentence_terms.is_empty() {
+-        return vec![(search_query_terms(text), 1)];
+-    }
+-
+-    sentence_terms
+-        .iter()
+-        .cloned()
+-        .map(|terms| (terms, 1))
+-        .collect::<Vec<_>>()
+-}
+-
+-fn adjusted_span_score(raw_score: usize, span_width: usize) -> usize {
+-    raw_score.saturating_sub(span_width.saturating_sub(1) * 2)
+-}
+-
+-fn sentence_like_segments(text: &str) -> Vec<String> {
+-    let mut segments = Vec::new();
+-    let mut current = String::new();
+-
+-    for character in text.trim().chars() {
+-        current.push(character);
+-        if matches!(character, '.' | '!' | '?' | ';' | '\n') {
+-            let segment = current.trim();
+-            if !segment.is_empty() {
+-                segments.push(segment.to_string());
+-            }
+-            current.clear();
+-        }
+-    }
+-
+-    let trailing = current.trim();
+-    if !trailing.is_empty() {
+-        segments.push(trailing.to_string());
+-    }
+-
+-    segments
+ }
+ 
+ fn score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+@@ -776,6 +761,82 @@ mod tests {
+         select_fact_records_for_query,
+     };
+ 
++    #[test]
++    fn lexical_score_preserves_global_quote_boundary_empty_guard() {
++        assert_eq!(
++            super::lexical_query_score_for_text(r#"a"1-2.3"b"#, &["a12".into()]),
++            0
++        );
++    }
++
++    #[test]
++    fn repeated_identical_sentences_keep_the_single_best_span_score() {
++        assert_eq!(
++            super::lexical_query_score_for_text(
++                &"archive source details. ".repeat(128),
++                &["archive".into(), "source".into()]
++            ),
++            4
++        );
++    }
++
++    fn reference_text_score(text: &str, query: &[String]) -> usize {
++        fn score(terms: &[String], query: &[String]) -> usize {
++            let unigram = query.iter().filter(|term| terms.contains(term)).count();
++            let bigram = query
++                .windows(2)
++                .filter(|q| terms.windows(2).any(|c| c == *q))
++                .count();
++            let trigram = query
++                .windows(3)
++                .filter(|q| terms.windows(3).any(|c| c == *q))
++                .count();
++            unigram + 2 * bigram + 3 * trigram
++        }
++        let fallback = search_query_terms(text);
++        if fallback.is_empty() || query.is_empty() {
++            return score(&fallback, query);
++        }
++        // Literal old sentence traversal, independent of the streaming iterator.
++        let mut segments = Vec::new();
++        let mut current = String::new();
++        for ch in text.trim().chars() {
++            current.push(ch);
++            if matches!(ch, '.' | '!' | '?' | ';' | '\n') {
++                segments.push(std::mem::take(&mut current));
++            }
++        }
++        segments.push(current);
++        segments
++            .iter()
++            .map(|segment| search_query_terms(segment.trim()))
++            .filter(|terms| !terms.is_empty())
++            .map(|terms| score(&terms, query))
++            .max()
++            .unwrap_or_else(|| score(&fallback, query))
++    }
++
++    proptest::proptest! {
++        #![proptest_config(proptest::test_runner::Config {
++            cases:128, failure_persistence:None,
++            rng_seed:proptest::test_runner::RngSeed::Fixed(20261126),
++            ..proptest::test_runner::Config::default()
++        })]
++        #[test]
++        fn streaming_scores_match_independent_whole_traversal(
++            parts in proptest::collection::vec(proptest::sample::select(vec![
++                "archive", "source", "details", "архив", "проектами", "R-0712", "episode:abc123",
++                "AND", "a\"1-2.3\"b", " ", "\n", ".", "!", "?", ";", "\r\n", "\"", "échelle"
++            ]),0..80),
++            query in proptest::sample::select(vec!["archive source", "source archive source", "проект архив", "R-0712 details", "", "a12"])
++        ) {
++            let text = parts.join(" ");
++            let terms = search_query_terms(query);
++            proptest::prop_assert_eq!(super::lexical_query_score_for_text(&text,&terms), reference_text_score(&text,&terms));
++            proptest::prop_assert_eq!(crate::shared::search::has_search_query_terms(&text), !search_query_terms(&text).is_empty());
++        }
++    }
++
+     fn test_record(fact_id: &str, content: &str, t_valid: &str) -> Value {
+         json!({
+             "fact_id": fact_id,
+diff --git a/crates/memory-mcp/src/memory/retrieval/pipeline.rs b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+index 3a76437a..5361b380 100644
+--- a/crates/memory-mcp/src/memory/retrieval/pipeline.rs
++++ b/crates/memory-mcp/src/memory/retrieval/pipeline.rs
+@@ -356,18 +356,12 @@ async fn historical_episode_fallback(
+                 .window_start
+                 .is_none_or(|start| episode.t_ref >= start)
+             && request.window_end.is_none_or(|end| episode.t_ref <= end)
+-            && (query_terms.is_empty()
+-                || super::lexical::lexical_query_score_for_text(&episode.content, &query_terms) > 0)
+-    });
+-    episodes.sort_by(|left, right| {
+-        super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
+-            .cmp(&super::lexical::lexical_query_score_for_text(
+-                &left.content,
+-                &query_terms,
+-            ))
+-            .then_with(|| right.t_ref.cmp(&left.t_ref))
+-            .then_with(|| left.episode_id.cmp(&right.episode_id))
+     });
++    let episodes = super::lexical::rank_episodes_by_query(
++        episodes,
++        &query_terms,
++        usize::from(!query_terms.is_empty()),
++    );
+     let mut items =
+         super::views::build_episode_fallback_items(super::views::EpisodeFallbackParams {
+             episodes,
+diff --git a/crates/memory-mcp/src/memory/retrieval/views.rs b/crates/memory-mcp/src/memory/retrieval/views.rs
+index f2df226e..0a9af75e 100644
+--- a/crates/memory-mcp/src/memory/retrieval/views.rs
++++ b/crates/memory-mcp/src/memory/retrieval/views.rs
+@@ -66,8 +66,10 @@ where
+         .take(params.budget.max(1) as usize)
+         .map(|episode| {
+             let lexical_score = fallback_lexical_score(&episode.content, &query_terms);
+-            let confidence = episode_fallback_confidence(&episode, &query_terms, params.cutoff);
+-            let grounding = episode_fallback_grounding(&episode.content, &query_terms);
++            let confidence = episode_fallback_confidence(
++                &episode, &query_terms, params.cutoff, lexical_score,
++            );
++            let grounding = episode_fallback_grounding(lexical_score, &query_terms);
+             let mut provenance = json!({
+                 "source_episode": episode.episode_id,
+                 "source_type": episode.source_type,
+@@ -160,14 +162,11 @@ fn fallback_lexical_score(content: &str, query_terms: &[String]) -> f64 {
+     }
+ }
+ 
+-fn episode_fallback_grounding(content: &str, query_terms: &[String]) -> Option<f64> {
++fn episode_fallback_grounding(lexical_score: f64, query_terms: &[String]) -> Option<f64> {
+     if query_terms.is_empty() {
+         None
+     } else {
+-        Some(
+-            (fallback_lexical_score(content, query_terms) / query_terms.len() as f64)
+-                .clamp(0.0, 1.0),
+-        )
++        Some((lexical_score / query_terms.len() as f64).clamp(0.0, 1.0))
+     }
+ }
+ 
+@@ -175,8 +174,8 @@ fn episode_fallback_confidence(
+     episode: &Episode,
+     query_terms: &[String],
+     cutoff: DateTime<Utc>,
++    lexical_score: f64,
+ ) -> f64 {
+-    let lexical_score = fallback_lexical_score(&episode.content, query_terms);
+     let lexical_coverage = if query_terms.is_empty() {
+         0.0
+     } else {
+diff --git a/crates/memory-mcp/src/shared/search.rs b/crates/memory-mcp/src/shared/search.rs
+index 8a6aa005..2cb4ff45 100644
+--- a/crates/memory-mcp/src/shared/search.rs
++++ b/crates/memory-mcp/src/shared/search.rs
+@@ -31,6 +31,18 @@ pub fn search_query_terms(raw: &str) -> Vec<String> {
+         .collect()
+ }
+ 
++/// Checks the existing global preprocessing/filtering rule without allocating
++/// an ordered vector for the entire source. Stemming never removes a vector
++/// entry, so the first admitted lexical token is sufficient.
++pub(crate) fn has_search_query_terms(raw: &str) -> bool {
++    let prepared = prepare_lexical_text(raw);
++    prepared.split_whitespace().any(|token| {
++        let mut terms = Vec::new();
++        append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
++        !terms.is_empty()
++    })
++}
++
+ /// The same vocabulary when order and occurrence counts are irrelevant.
+ /// Deduplicate tokens only after the shared episode/quote preprocessing, before
+ /// their context-free normalization. Repeated source text needs no repeated work.
+@@ -392,6 +404,24 @@ fn is_search_stopword(token: &str) -> bool {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn term_presence_respects_quote_preprocessing_across_sentence_boundaries() {
++        assert!(!has_search_query_terms(r#"a"1-2.3"b"#));
++    }
++
++    #[test]
++    fn term_presence_excludes_episode_references_and_function_words() {
++        assert!(!has_search_query_terms("episode:abc123 AND OR NOT и"));
++    }
++
++    #[test]
++    fn term_presence_keeps_a_reference_inside_long_repeated_text() {
++        assert!(has_search_query_terms(&format!(
++            "{} R-0712",
++            "AND ".repeat(128)
++        )));
++    }
++
+     #[test]
+     fn normalize_text_lowercases_and_collapses_whitespace() {
+         assert_eq!(normalize_text("  Hello   WORLD  "), "hello world");
+diff --git a/crates/memory-mcp/tests/full_history_evidence.rs b/crates/memory-mcp/tests/full_history_evidence.rs
+index 008ed006..0b1ca329 100644
+--- a/crates/memory-mcp/tests/full_history_evidence.rs
++++ b/crates/memory-mcp/tests/full_history_evidence.rs
+@@ -72,10 +72,11 @@ async fn observe(case_id: &str) {
+         "FULL_HISTORY_START {}",
+         serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
+     );
++    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(episode);
+     let observed = tokio::time::timeout(
+         Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap()),
+-        memory_mcp::eval_support::retrieval::assemble_context_with_evidence(
+-            &service, request, episode,
++        memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
++            &service, request, &capture,
+         ),
+     )
+     .await;
+@@ -94,6 +95,11 @@ async fn observe(case_id: &str) {
+             );
+         }
+         other => {
++            println!(
++                "FULL_HISTORY_PARTIAL_RECEIPT {}",
++                serde_json::json!({"case_id":case_id,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"completed":false,"stages":capture.stages().unwrap()})
++            );
++            std::io::stdout().flush().unwrap();
+             println!(
+                 "FULL_HISTORY_FAILURE {}",
+                 serde_json::json!({"case_id":case_id,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"error":format!("{other:?}")})
+diff --git a/crates/memory-mcp/tests/lexical_term_set_resource.rs b/crates/memory-mcp/tests/lexical_term_set_resource.rs
+index e80d2371..b84f96b3 100644
+--- a/crates/memory-mcp/tests/lexical_term_set_resource.rs
++++ b/crates/memory-mcp/tests/lexical_term_set_resource.rs
+@@ -93,3 +93,75 @@ proptest! {
+         prop_assert_eq!(actual, expected);
+     }
+ }
++
++mod common;
++
++#[tokio::test]
++async fn episode_fallback_reuses_lexical_features_with_bounded_allocations() {
++    use memory_mcp::models::AssembleContextRequest;
++    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
++    use memory_mcp::storage::DbClient;
++
++    let (service, db) = common::make_service_with_client().await;
++    // All scores and reference times tie; the ID tie-break is independently
++    // checked. Different source IDs/content prevent source deduplication.
++    for n in 0..16 {
++        let id = format!("episode:resource{n:02}");
++        db.create(
++            &id,
++            json!({
++                "episode_id":id, "source_type":"document", "source_id":format!("archive-{n}"),
++                "content":format!("{} Record {n}", "archive source details. ".repeat(128)),
++                "t_ref":"2026-03-01T00:00:00Z", "t_ingested":"2026-03-01T00:00:00Z",
++                "policy_tags":[]
++            }),
++            "org",
++            &["t_ref", "t_ingested"],
++        )
++        .await
++        .unwrap();
++    }
++    let rows = memory_mcp::memory::EpisodeContextStore::new(db, "org")
++        .select_episodes_by_content("2026-05-01T00:00:00Z", Some("archive source"), 20)
++        .await
++        .unwrap();
++    assert_eq!(
++        rows.len(),
++        16,
++        "fixture must expose all16 source candidates at the fixed cutoff"
++    );
++    let expected = [
++        "episode:resource00",
++        "episode:resource01",
++        "episode:resource02",
++        "episode:resource03",
++        "episode:resource04",
++    ];
++    let request: AssembleContextRequest = serde_json::from_value(json!({
++        "query":"archive source", "budget":5, "compact":false,
++        "as_of":"2026-05-01T00:00:00Z"
++    }))
++    .unwrap();
++    ALLOCATIONS.with(|counter| counter.set(Some(0)));
++    let actual = AssembleContextCapability::assemble_context_from_service(&service, request).await;
++    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
++    let actual = actual.unwrap();
++    assert_eq!(
++        actual
++            .iter()
++            .map(|item| item.source_episode.clone())
++            .collect::<Vec<_>>(),
++        expected
++    );
++    assert!(actual.iter().all(|item| item.grounding == Some(1.0)));
++    assert!(
++        actual
++            .iter()
++            .all(|item| (item.confidence - 0.7993775933609959).abs() < 1e-12)
++    );
++    println!("EPISODE_FALLBACK_ALLOCATIONS {count}");
++    assert!(
++        count < 200_000,
++        "fixed16-source read must not normalize long source text per sort comparison; observed {count}"
++    );
++}

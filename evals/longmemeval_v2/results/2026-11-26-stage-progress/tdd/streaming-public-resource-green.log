@@ -1,0 +1,23 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.18s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/91ae2d905b3d5730/out/lexical_term_set_resource-91ae2d905b3d5730)
+
+running 3 tests
+LEXICAL_SET_ALLOCATIONS 54
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+EPISODE_FALLBACK_ALLOCATIONS 114546
+test episode_fallback_reuses_lexical_features_with_bounded_allocations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/retrieval_partial_evidence.rs (target/debug/build/memory_mcp/6c5569c979e00a17/out/retrieval_partial_evidence-6c5569c979e00a17)
+
+running 4 tests
+test cancelled_public_read_retains_completed_source_stage_without_claiming_selection ... ok
+test failed_public_read_does_not_expose_a_policy_excluded_source ... ok
+test failed_public_read_retains_source_evidence_and_original_storage_error ... ok
+test one_capture_cannot_merge_stages_from_two_public_reads ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

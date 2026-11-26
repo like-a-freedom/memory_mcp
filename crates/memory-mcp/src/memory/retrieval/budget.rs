@@ -401,15 +401,7 @@ pub(super) async fn collect_episode_fallback_items(
             }
     });
 
-    episodes.sort_by(|left, right| {
-        super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
-            .cmp(&super::lexical::lexical_query_score_for_text(
-                &left.content,
-                &query_terms,
-            ))
-            .then_with(|| right.t_ref.cmp(&left.t_ref))
-            .then_with(|| left.episode_id.cmp(&right.episode_id))
-    });
+    let episodes = super::lexical::rank_episodes_by_query(episodes, &query_terms, 0);
 
     use super::views::{EpisodeFallbackParams, build_episode_fallback_items};
 

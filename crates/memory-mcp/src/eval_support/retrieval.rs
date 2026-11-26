@@ -143,15 +143,28 @@ pub async fn new_eval_reembed_service(
 
 /// Immutable source-filtered receipts from the actual context pipeline.
 /// Raw evidence is returned only to this explicit eval caller, never logged.
-pub use crate::memory::retrieval::diagnostics::{ContextEvidence, RetrievalStage};
+pub use crate::memory::retrieval::diagnostics::{
+    ContextEvidence, ContextEvidenceCapture, RetrievalStage,
+};
 
 pub async fn assemble_context_with_evidence(
     service: &MemoryService,
     request: crate::models::AssembleContextRequest,
     source_episode: &str,
 ) -> Result<ContextEvidence, MemoryError> {
+    let capture = ContextEvidenceCapture::new(source_episode);
+    assemble_context_recording_evidence(service, request, &capture).await
+}
+
+/// Use one caller-owned capture per read; inspect its stages after cancellation.
+/// This does not impose a hard deadline on synchronous work inside the future.
+pub async fn assemble_context_recording_evidence(
+    service: &MemoryService,
+    request: crate::models::AssembleContextRequest,
+    capture: &ContextEvidenceCapture,
+) -> Result<ContextEvidence, MemoryError> {
     let deps = crate::memory::retrieval_deps::AssembleContextDeps::from(service);
-    crate::memory::retrieval::assemble_context_with_evidence(&deps, request, source_episode).await
+    crate::memory::retrieval::assemble_context_recording_evidence(&deps, request, capture).await
 }
 
 #[cfg(test)]

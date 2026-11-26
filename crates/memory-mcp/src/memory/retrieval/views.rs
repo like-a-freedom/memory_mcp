@@ -66,8 +66,10 @@ where
         .take(params.budget.max(1) as usize)
         .map(|episode| {
             let lexical_score = fallback_lexical_score(&episode.content, &query_terms);
-            let confidence = episode_fallback_confidence(&episode, &query_terms, params.cutoff);
-            let grounding = episode_fallback_grounding(&episode.content, &query_terms);
+            let confidence = episode_fallback_confidence(
+                &episode, &query_terms, params.cutoff, lexical_score,
+            );
+            let grounding = episode_fallback_grounding(lexical_score, &query_terms);
             let mut provenance = json!({
                 "source_episode": episode.episode_id,
                 "source_type": episode.source_type,
@@ -160,14 +162,11 @@ fn fallback_lexical_score(content: &str, query_terms: &[String]) -> f64 {
     }
 }
 
-fn episode_fallback_grounding(content: &str, query_terms: &[String]) -> Option<f64> {
+fn episode_fallback_grounding(lexical_score: f64, query_terms: &[String]) -> Option<f64> {
     if query_terms.is_empty() {
         None
     } else {
-        Some(
-            (fallback_lexical_score(content, query_terms) / query_terms.len() as f64)
-                .clamp(0.0, 1.0),
-        )
+        Some((lexical_score / query_terms.len() as f64).clamp(0.0, 1.0))
     }
 }
 
@@ -175,8 +174,8 @@ fn episode_fallback_confidence(
     episode: &Episode,
     query_terms: &[String],
     cutoff: DateTime<Utc>,
+    lexical_score: f64,
 ) -> f64 {
-    let lexical_score = fallback_lexical_score(&episode.content, query_terms);
     let lexical_coverage = if query_terms.is_empty() {
         0.0
     } else {

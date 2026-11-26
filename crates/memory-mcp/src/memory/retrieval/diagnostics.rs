@@ -20,8 +20,55 @@ pub struct ContextEvidence {
     pub items: Vec<AssembledContextItem>,
 }
 
+/// One explicitly requested diagnostic read. Owned by the caller so completed
+/// stages survive cancellation or a storage error in the read future.
+pub struct ContextEvidenceCapture {
+    pub(super) recorder: Mutex<Recorder>,
+}
+
+impl ContextEvidenceCapture {
+    pub fn new(source_episode: &str) -> Self {
+        Self {
+            recorder: Mutex::new(Recorder {
+                started: Instant::now(),
+                read_started: false,
+                source_episode: source_episode.to_owned(),
+                stages: Vec::new(),
+            }),
+        }
+    }
+
+    pub(super) fn begin(&self) -> Result<String, crate::error::MemoryError> {
+        let mut recorder = self.recorder.lock().map_err(|_| {
+            crate::error::MemoryError::Validation("evaluation evidence recorder poisoned".into())
+        })?;
+        if recorder.read_started {
+            return Err(crate::error::MemoryError::Validation(
+                "evaluation evidence capture supports only one read".into(),
+            ));
+        }
+        recorder.read_started = true;
+        recorder.started = Instant::now();
+        Ok(recorder.source_episode.clone())
+    }
+
+    /// Only observed boundaries are present. A partial capture is not a
+    /// completed context, and an empty stage is not proof of absent candidates.
+    pub fn stages(&self) -> Result<Vec<RetrievalStage>, crate::error::MemoryError> {
+        self.recorder
+            .lock()
+            .map(|recorder| recorder.stages.clone())
+            .map_err(|_| {
+                crate::error::MemoryError::Validation(
+                    "evaluation evidence recorder poisoned".into(),
+                )
+            })
+    }
+}
+
 pub(super) struct Recorder {
     pub(super) started: Instant,
+    read_started: bool,
     pub(super) source_episode: String,
     pub(super) stages: Vec<RetrievalStage>,
 }

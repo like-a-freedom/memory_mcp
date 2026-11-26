@@ -1,0 +1,46 @@
+{
+  "base_revision": "54877d2c",
+  "scope": "one exposed full-history dropdown diagnostic; no models; not30s acceptance",
+  "process": {
+    "case_id": "0c6b0c60",
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-p8l65f4w/full_history_evidence",
+      "full_history_dropdown_retains_reviewed_source",
+      "--ignored",
+      "--nocapture"
+    ],
+    "pid": 83899,
+    "copy_seconds": 0.5250316250021569,
+    "elapsed_seconds": 135.63790354097728,
+    "external_timeout": false,
+    "exit_code": 101
+  },
+  "read_elapsed_ms": 121191.63625,
+  "completed_contexts": 0,
+  "scheduled_contexts": 1,
+  "observed_source_stages": [
+    {
+      "stage": "formation",
+      "elapsed_ms": 0.510125,
+      "reviewed_span_present": true
+    },
+    {
+      "stage": "ranked_fact_candidates",
+      "elapsed_ms": 86146.142958,
+      "reviewed_span_present": true
+    },
+    {
+      "stage": "episode_candidates",
+      "elapsed_ms": 114305.15325,
+      "reviewed_span_present": true
+    }
+  ],
+  "unobserved_stages": [
+    "selected_pre_packaging",
+    "packed_context"
+  ],
+  "cpu_sample_status": "failed: macOS sample could not examine owned child under sandbox; raw command log retained",
+  "causal_limits": "Stage offsets are cumulative, not isolated costs. Source survives these boundaries. Later stages remain unknown; no full-history answer or end-to-end speedup claim.",
+  "snapshot_unchanged": true,
+  "tdd_limits": "Initial missing-API compile checks are not runtime regression assertions. Future-owned-recorder mutation reproducibly loses the completed stage (0 rather than1); restored caller-owned code retains it. Single-capture reuse runtime RED is retained. Invalid seed visibility attempts precede fixed-time real-store resource RED."
+}

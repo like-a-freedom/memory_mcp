@@ -93,3 +93,75 @@ proptest! {
         prop_assert_eq!(actual, expected);
     }
 }
+
+mod common;
+
+#[tokio::test]
+async fn episode_fallback_reuses_lexical_features_with_bounded_allocations() {
+    use memory_mcp::models::AssembleContextRequest;
+    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+    use memory_mcp::storage::DbClient;
+
+    let (service, db) = common::make_service_with_client().await;
+    // All scores and reference times tie; the ID tie-break is independently
+    // checked. Different source IDs/content prevent source deduplication.
+    for n in 0..16 {
+        let id = format!("episode:resource{n:02}");
+        db.create(
+            &id,
+            json!({
+                "episode_id":id, "source_type":"document", "source_id":format!("archive-{n}"),
+                "content":format!("{} Record {n}", "archive source details. ".repeat(128)),
+                "t_ref":"2026-03-01T00:00:00Z", "t_ingested":"2026-03-01T00:00:00Z",
+                "policy_tags":[]
+            }),
+            "org",
+            &["t_ref", "t_ingested"],
+        )
+        .await
+        .unwrap();
+    }
+    let rows = memory_mcp::memory::EpisodeContextStore::new(db, "org")
+        .select_episodes_by_content("2026-05-01T00:00:00Z", Some("archive source"), 20)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows.len(),
+        16,
+        "fixture must expose all16 source candidates at the fixed cutoff"
+    );
+    let expected = [
+        "episode:resource00",
+        "episode:resource01",
+        "episode:resource02",
+        "episode:resource03",
+        "episode:resource04",
+    ];
+    let request: AssembleContextRequest = serde_json::from_value(json!({
+        "query":"archive source", "budget":5, "compact":false,
+        "as_of":"2026-05-01T00:00:00Z"
+    }))
+    .unwrap();
+    ALLOCATIONS.with(|counter| counter.set(Some(0)));
+    let actual = AssembleContextCapability::assemble_context_from_service(&service, request).await;
+    let count = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
+    let actual = actual.unwrap();
+    assert_eq!(
+        actual
+            .iter()
+            .map(|item| item.source_episode.clone())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    assert!(actual.iter().all(|item| item.grounding == Some(1.0)));
+    assert!(
+        actual
+            .iter()
+            .all(|item| (item.confidence - 0.7993775933609959).abs() < 1e-12)
+    );
+    println!("EPISODE_FALLBACK_ALLOCATIONS {count}");
+    assert!(
+        count < 200_000,
+        "fixed16-source read must not normalize long source text per sort comparison; observed {count}"
+    );
+}

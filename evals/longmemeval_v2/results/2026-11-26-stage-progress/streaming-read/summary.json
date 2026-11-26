@@ -1,0 +1,48 @@
+{
+  "scheduled_contexts": 2,
+  "completed_contexts": 0,
+  "status": "resource_failure",
+  "source_carriers_verified_before_read": 2,
+  "processes": [
+    {
+      "case_id": "0c6b0c60",
+      "command": [
+        "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-sw2xy32n/full_history_evidence",
+        "full_history_dropdown_retains_reviewed_source",
+        "--ignored",
+        "--nocapture"
+      ],
+      "pid": 87461,
+      "copy_seconds": 0.5327059999981429,
+      "elapsed_seconds": 45.18733991598128,
+      "external_timeout": true,
+      "exit_code": -9
+    },
+    {
+      "case_id": "f61a096f",
+      "command": [
+        "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-sw2xy32n/full_history_evidence",
+        "full_history_toolbar_retains_reviewed_source",
+        "--ignored",
+        "--nocapture"
+      ],
+      "pid": 87547,
+      "copy_seconds": 0.4941481669957284,
+      "elapsed_seconds": 45.11624445900088,
+      "external_timeout": true,
+      "exit_code": -9
+    }
+  ],
+  "observed_partial_or_final_receipts": 0,
+  "unobserved_stages": [
+    "ranked_fact_candidates",
+    "episode_candidates",
+    "selected_pre_packaging",
+    "packed_context"
+  ],
+  "cpu_observations": {
+    "0c6b0c60": "20s sample: rank_lexical_candidates / lexical_record_metrics / best_matching_content_terms",
+    "f61a096f": "20s sample: SQL query_row_groups / SurrealDB execution and value cloning; application lexical work also present"
+  },
+  "limits": "Two exposed development cases, one process each; 30s cooperative acceptance /45s external process bound. No completed context, new answers, end-to-end speedup, or peak-memory improvement demonstrated. Caller-owned capture cannot survive SIGKILL unless read out before termination. Different sample stacks do not assign total stage cost."
+}

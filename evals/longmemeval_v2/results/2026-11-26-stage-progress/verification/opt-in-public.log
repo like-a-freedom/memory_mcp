@@ -1,0 +1,92 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.07s
+     Running tests/historical_query_grounding.rs (target/debug/build/memory_mcp/2b6ceb6fcad17845/out/historical_query_grounding-2b6ceb6fcad17845)
+
+running 14 tests
+test historical_fact_with_shared_predicate_cannot_answer_another_subject ... ok
+test historical_natural_question_preserves_fact_identity_and_current_role ... ok
+test historical_multi_subject_question_does_not_require_combined_name ... ok
+test historical_numeric_subject_identifiers_remain_distinct ... ok
+test historical_mentioned_subject_cannot_replace_declared_subject ... ok
+test historical_transliterated_alias_reports_omitted_expansion ... ok
+test historical_explicit_subject_matches_case_variant ... ok
+test historical_similar_explicit_subjects_do_not_create_false_conflict ... ok
+test historical_explicit_subject_does_not_trust_prior_fuzzy_alias ... ok
+test historical_ranking_does_not_use_future_fts_statistics ... ok
+test historical_250_facts_fit_candidate_scan ... ok
+test historical_249_facts_fit_candidate_scan ... ok
+test historical_251_facts_report_truncated_scan ... ok
+test historical_old_declared_subject_survives_distractor_history ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+     Running tests/historical_selector_exclusions.rs (target/debug/build/memory_mcp/8627772f508879ca/out/historical_selector_exclusions-8627772f508879ca)
+
+running 6 tests
+test historical_read_does_not_broaden_through_the_current_alias_projection ... ok
+test historical_read_ignores_a_triple_link_added_after_its_revision ... ok
+test historical_read_ignores_a_later_sibling_from_the_same_episode ... ok
+test historical_read_does_not_traverse_an_edge_added_after_its_revision ... ok
+test historical_read_ignores_a_community_summary_added_after_its_revision ... ok
+test historical_read_ignores_experience_added_after_its_revision ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/1b99687c70336e6e/out/long_history_stage_evidence-1b99687c70336e6e)
+
+running 6 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+2026-11-26T12:33:58.046348Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+
+     Running tests/retrieval_partial_evidence.rs (target/debug/build/memory_mcp/6c5569c979e00a17/out/retrieval_partial_evidence-6c5569c979e00a17)
+
+running 4 tests
+test cancelled_public_read_retains_completed_source_stage_without_claiming_selection ... ok
+test failed_public_read_retains_source_evidence_and_original_storage_error ... ok
+test one_capture_cannot_merge_stages_from_two_public_reads ... ok
+test failed_public_read_does_not_expose_a_policy_excluded_source ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/retrieval_query_batching.rs (target/debug/build/memory_mcp/6011d5bf5e54d7fb/out/retrieval_query_batching-6011d5bf5e54d7fb)
+
+running 7 tests
+test episode_subqueries_preserve_unicode_casefolded_substring_groups ... ok
+test fact_fallback_batches_term_queries_within_the_rpc_budget ... ok
+test episode_fallback_batches_terms_without_changing_substring_queries ... ok
+test episode_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test fact_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test source_fact_reads_keep_independent_limits_in_batches_of_eight ... ok
+test surreal_subqueries_preserve_each_ordered_fact_score_group ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 16 tests
+test archival_existence_does_not_read_fact_payload ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+

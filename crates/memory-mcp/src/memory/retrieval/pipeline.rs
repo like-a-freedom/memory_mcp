@@ -356,18 +356,12 @@ async fn historical_episode_fallback(
                 .window_start
                 .is_none_or(|start| episode.t_ref >= start)
             && request.window_end.is_none_or(|end| episode.t_ref <= end)
-            && (query_terms.is_empty()
-                || super::lexical::lexical_query_score_for_text(&episode.content, &query_terms) > 0)
     });
-    episodes.sort_by(|left, right| {
-        super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
-            .cmp(&super::lexical::lexical_query_score_for_text(
-                &left.content,
-                &query_terms,
-            ))
-            .then_with(|| right.t_ref.cmp(&left.t_ref))
-            .then_with(|| left.episode_id.cmp(&right.episode_id))
-    });
+    let episodes = super::lexical::rank_episodes_by_query(
+        episodes,
+        &query_terms,
+        usize::from(!query_terms.is_empty()),
+    );
     let mut items =
         super::views::build_episode_fallback_items(super::views::EpisodeFallbackParams {
             episodes,

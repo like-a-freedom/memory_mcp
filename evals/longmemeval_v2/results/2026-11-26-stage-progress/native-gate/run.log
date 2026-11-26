@@ -1,0 +1,31 @@
+suite 1/1: memory-decisions started (8 expected cases)
+suite 1/1: memory-decisions finished (8 cases, 79619 ms)
+# Evaluation Report — nightly
+
+**Verdict:** PASSED
+**Schema:** `memory-mcp-eval/v2`
+**Run ID:** `run-1795696415`
+**Duration:** 79740ms
+**Budget:** passed
+
+## Coverage
+
+**Expected cases:** 8
+**Outcomes:** 8 (failed: 0, invalid: 0)
+
+**Gates:** 0 (failed: 0, invalid: 0)
+
+| Status | Count |
+|--------|-------|
+| Passed | 8 |
+| Quality Failed | 0 |
+| Invalid | 0 |
+
+## Suite Metrics
+
+| Suite | Total | Passed | Failed | Invalid | Metrics |
+|-------|-------|--------|--------|---------|--------|
+| memory-decisions | 8 | 8 | 0 | 0 | decision_success_rate=1.0000, evidence_success_rate=1.0000, probe_success_rate=1.0000, temporal_decision_success_rate=1.0000, temporal_evidence_success_rate=1.0000, temporal_probe_success_rate=1.0000 |
+
+profile=nightly total=8 passed=8 quality_failed=0 invalid=0 duration_ms=79740
+RESULT: PASSED

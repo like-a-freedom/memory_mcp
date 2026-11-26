@@ -1,0 +1,37 @@
+{
+  "completed_contexts": 0,
+  "scheduled_contexts": 2,
+  "reviewed_span_presence_in_final_context": "unobserved",
+  "processes": [
+    {
+      "case_id": "0c6b0c60",
+      "command": [
+        "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-74ies0i9/full_history_evidence",
+        "full_history_dropdown_retains_reviewed_source",
+        "--ignored",
+        "--nocapture"
+      ],
+      "pid": 86622,
+      "copy_seconds": 0.5311013329774141,
+      "elapsed_seconds": 45.14561883400893,
+      "external_timeout": true,
+      "exit_code": -9
+    },
+    {
+      "case_id": "f61a096f",
+      "command": [
+        "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-74ies0i9/full_history_evidence",
+        "full_history_toolbar_retains_reviewed_source",
+        "--ignored",
+        "--nocapture"
+      ],
+      "pid": 86733,
+      "copy_seconds": 0.48447608298738487,
+      "elapsed_seconds": 45.116340582986595,
+      "external_timeout": true,
+      "exit_code": -9
+    }
+  ],
+  "status": "resource_failure",
+  "stage_limits": "Both externally killed at45s; no final/partial return. Source formation is observed before the reads; later stages unknown.20s samples locate application CPU in rank_lexical_candidates / lexical_record_metrics / best_matching_content_terms. No exact end-to-end or peak-memory comparison is inferred."
+}

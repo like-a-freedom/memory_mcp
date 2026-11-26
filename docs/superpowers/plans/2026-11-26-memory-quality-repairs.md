@@ -206,28 +206,62 @@ candidate produces0/2 contexts, source carriers2/2; a separately registered
 120/150s diagnostic also produces0/2. No seven-answer rerun or C2 admission.
 See `evals/longmemeval_v2/results/2026-11-26-narrow-fts/README.md` and `summary.json`.
 
-**Next substeps before Step 4 can pass:**
+**Follow-up before Step 4 can pass:**
 
-1. Preserve source-linked partial stage receipts when the public diagnostic
-   times out; test a controlled interruption after a completed boundary. Capture
-   late application CPU activity once under a frozen outer bound. Current
-   completed-query observations cannot assign the remaining CPU time to a stage.
-2. Episode fallback sorts in `budget.rs` and historical `pipeline.rs` recalculate
-   full lexical text scores inside comparisons. Establish an independent ordered
-   oracle (ties, duplicate query terms, empty query, temporal/access exclusions)
-   and a bounded-work RED; then reuse immutable per-episode scores. Keep all
-   fallback candidates and source limits. A code smell alone is not its latency
-   measurement; verify the diagnosed full-history path before promotion.
-3. Schema inventory completed:33/33 current local-profile migrations applied,
+1. [x] Caller-owned source-linked capture retains completed stages after future
+   cancellation or storage error; four public controls cover interruption,
+   access exclusion, original error and single-read identity. Missing-API compile
+   checks are setup; runtime reuse RED and future-owned-recorder mutation are
+   recorded separately. A120/150s full dropdown diagnostic observes the reviewed
+   source through ranked fact candidates86.146s and episode candidates114.305s;
+   selection/packing unknown. Capture does not survive SIGKILL by itself.
+2. [x] Reuse immutable per-episode sort scores and response lexical features;
+   stream sentence normalization preserving global quote/episode preprocessing,
+   full text, limits and earliest tied winner. Fixed16-source public read retains
+   exact ID order/confidence/grounding; caller-thread allocations534786→114542
+   under unchanged200000 bound. Two literal controls and128 independently scored
+   old-traversal cases pass; public temporal/access controls pass. This establishes
+   equivalent bounded work on the control, not full-history latency acceptance.
+3. [x] Schema inventory completed:33/33 current local-profile migrations applied,
    no static checksum mismatch (dynamic embedding008 excluded), actual indexes
-   recorded. Inspect graph execution plans before changing graph indexes.
+   recorded. Graph execution plans still need inspection before changing indexes.
    Many edge calls do not establish missing indexes or the sole cause.
    Preserve historical formation and compare any separately registered rebuilt
    store explicitly; never silently migrate the original snapshot to pass.
-4. Re-register the final source/binary after the diagnosed repair; one bounded
+4. [ ] Measure actual lexical candidate inventory before another optimization.
+   Under the same frozen whole-store/query/time/source contract, retain bounded
+   count/digest metadata: record count, total/max content and index-key bytes,
+   unique exact contents/source identities, completed channels and per-record work.
+   Persist completed boundaries incrementally so outer process death cannot erase
+   them; raw text stays in explicit source-filtered evidence only. Inspect payload
+   hydration/graph plans separately from application normalization. Current20s
+   samples differ: dropdown application metrics, toolbar also SQL/value cloning;
+   they do not establish one dominant cause for the whole read.
+5. [ ] If duplicate exact content is measured, public resource RED then minimal
+   request-local immutable feature reuse or same-statement deduplicated hydration.
+   Compare exact scores, ordered IDs, source/provenance/quotes and valid/transaction
+   visibility against independent oracles, including index-only matches and ties.
+   Keep all candidate caps, fallback terms and source limits. If measurements point
+   elsewhere, ledger the evidence and change this mechanism before coding.
+6. [ ] Re-register the final source/binary after the diagnosed repair; one bounded
    capture per case must yield complete receipts and both exact reviewed spans
    under the original30s acceptance, plus native8/8. Only then register the seven
    unchanged reader/judge tasks and evaluate answers separately.
+
+Additional follow-up evidence:
+`evals/longmemeval_v2/results/2026-11-26-stage-progress/README.md`.
+All five new process attempts retained: one partial120/150s diagnostic and two
+30/45s pairs, before/after streaming. Both pairs produce0/2 completed contexts;
+the final two are externally killed45.187/45.116s with no returned partial/final
+receipt. Fifteen earlier narrow-FTS attempts remain unchanged, total20 development
+process attempts on two exposed cases. No new seven-answer run, no C2 admission.
+
+Follow-up verification: native production2817pass/0fail/45ignored, harness929/
+0/22, opt-in public53/0/0; native gate8/8,no_regressions,0invalid/unobserved.
+Required workspace clippy, diagnostic clippy and fmt pass. Sandbox run retained
+7 FSEvents/startup failures and1 MCP initialization timeout; unchanged-source
+native full run passes. Ignored is not passed; totals include existing lints and
+doctests. This verifies the equivalent repairs, not Step4/5 acceptance.
 
 The first combined production run exposed11 controlled-adapter failures: naive
 `(SELECT` counts treated nested projections as extra batch reads. A new public

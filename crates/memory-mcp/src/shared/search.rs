@@ -31,6 +31,18 @@ pub fn search_query_terms(raw: &str) -> Vec<String> {
         .collect()
 }
 
+/// Checks the existing global preprocessing/filtering rule without allocating
+/// an ordered vector for the entire source. Stemming never removes a vector
+/// entry, so the first admitted lexical token is sufficient.
+pub(crate) fn has_search_query_terms(raw: &str) -> bool {
+    let prepared = prepare_lexical_text(raw);
+    prepared.split_whitespace().any(|token| {
+        let mut terms = Vec::new();
+        append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
+        !terms.is_empty()
+    })
+}
+
 /// The same vocabulary when order and occurrence counts are irrelevant.
 /// Deduplicate tokens only after the shared episode/quote preprocessing, before
 /// their context-free normalization. Repeated source text needs no repeated work.
@@ -391,6 +403,24 @@ fn is_search_stopword(token: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn term_presence_respects_quote_preprocessing_across_sentence_boundaries() {
+        assert!(!has_search_query_terms(r#"a"1-2.3"b"#));
+    }
+
+    #[test]
+    fn term_presence_excludes_episode_references_and_function_words() {
+        assert!(!has_search_query_terms("episode:abc123 AND OR NOT и"));
+    }
+
+    #[test]
+    fn term_presence_keeps_a_reference_inside_long_repeated_text() {
+        assert!(has_search_query_terms(&format!(
+            "{} R-0712",
+            "AND ".repeat(128)
+        )));
+    }
 
     #[test]
     fn normalize_text_lowercases_and_collapses_whitespace() {

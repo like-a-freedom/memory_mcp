@@ -72,10 +72,11 @@ async fn observe(case_id: &str) {
         "FULL_HISTORY_START {}",
         serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
     );
+    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(episode);
     let observed = tokio::time::timeout(
         Duration::from_secs(input["limits"]["read_seconds"].as_u64().unwrap()),
-        memory_mcp::eval_support::retrieval::assemble_context_with_evidence(
-            &service, request, episode,
+        memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
+            &service, request, &capture,
         ),
     )
     .await;
@@ -94,6 +95,11 @@ async fn observe(case_id: &str) {
             );
         }
         other => {
+            println!(
+                "FULL_HISTORY_PARTIAL_RECEIPT {}",
+                serde_json::json!({"case_id":case_id,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"completed":false,"stages":capture.stages().unwrap()})
+            );
+            std::io::stdout().flush().unwrap();
             println!(
                 "FULL_HISTORY_FAILURE {}",
                 serde_json::json!({"case_id":case_id,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"error":format!("{other:?}")})

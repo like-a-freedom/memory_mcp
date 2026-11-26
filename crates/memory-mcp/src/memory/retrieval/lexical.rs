@@ -531,6 +531,30 @@ pub(crate) fn lexical_query_score_for_text(text: &str, query_terms: &[String]) -
     score_content_terms(&content_terms, query_terms)
 }
 
+/// Keep immutable text scores outside the stable comparator. A minimum of one
+/// implements the historical query-match filter; zero preserves all admissions.
+pub(super) fn rank_episodes_by_query(
+    episodes: Vec<crate::models::Episode>,
+    query_terms: &[String],
+    minimum_score: usize,
+) -> Vec<crate::models::Episode> {
+    let mut scored = episodes
+        .into_iter()
+        .map(|episode| {
+            let score = lexical_query_score_for_text(&episode.content, query_terms);
+            (episode, score)
+        })
+        .filter(|(_, score)| *score >= minimum_score)
+        .collect::<Vec<_>>();
+    scored.sort_by(|(left, left_score), (right, right_score)| {
+        right_score
+            .cmp(left_score)
+            .then_with(|| right.t_ref.cmp(&left.t_ref))
+            .then_with(|| left.episode_id.cmp(&right.episode_id))
+    });
+    scored.into_iter().map(|(episode, _)| episode).collect()
+}
+
 pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
     let content_terms = best_matching_content_terms(&fact.content, query_terms);
     score_content_terms(&content_terms, query_terms)
@@ -558,30 +582,22 @@ fn lexical_ngram_overlap_for_terms(
 }
 
 fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String> {
-    let fallback_terms = search_query_terms(text);
-    if fallback_terms.is_empty() || query_terms.is_empty() {
-        return fallback_terms;
+    if query_terms.is_empty() {
+        return search_query_terms(text);
+    }
+    if !crate::shared::search::has_search_query_terms(text) {
+        return Vec::new();
     }
 
-    let mut spans = local_content_spans(text).into_iter();
-    let Some((mut best_terms, best_span_width)) = spans.next() else {
-        return fallback_terms;
+    let mut spans = local_content_spans(text);
+    let Some(mut best_terms) = spans.next() else {
+        return search_query_terms(text);
     };
-    let mut best_score = adjusted_span_score(
-        score_content_terms(&best_terms, query_terms),
-        best_span_width,
-    );
+    let mut best_score = score_content_terms(&best_terms, query_terms);
     let mut best_len = best_terms.len();
 
-    for (candidate_terms, span_width) in spans {
-        if candidate_terms.is_empty() {
-            continue;
-        }
-
-        let candidate_score = adjusted_span_score(
-            score_content_terms(&candidate_terms, query_terms),
-            span_width,
-        );
+    for candidate_terms in spans {
+        let candidate_score = score_content_terms(&candidate_terms, query_terms);
         let candidate_len = candidate_terms.len();
         let should_replace = candidate_score > best_score
             || (candidate_score == best_score && candidate_len < best_len);
@@ -595,49 +611,18 @@ fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String
     best_terms
 }
 
-fn local_content_spans(text: &str) -> Vec<(Vec<String>, usize)> {
-    let sentence_terms = sentence_like_segments(text)
-        .into_iter()
-        .map(|segment| search_query_terms(&segment))
+fn local_content_spans(text: &str) -> impl Iterator<Item = Vec<String>> + '_ {
+    // Identical sentences have identical scores and lengths. Their later
+    // occurrences cannot replace the first winner, so normalize each once.
+    // Keep the original order and the full-text fallback's occurrence counts.
+    let mut seen = HashSet::new();
+    text.trim()
+        .split_inclusive(['.', '!', '?', ';', '\n'])
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .filter(move |segment| seen.insert(*segment))
+        .map(search_query_terms)
         .filter(|terms| !terms.is_empty())
-        .collect::<Vec<_>>();
-
-    if sentence_terms.is_empty() {
-        return vec![(search_query_terms(text), 1)];
-    }
-
-    sentence_terms
-        .iter()
-        .cloned()
-        .map(|terms| (terms, 1))
-        .collect::<Vec<_>>()
-}
-
-fn adjusted_span_score(raw_score: usize, span_width: usize) -> usize {
-    raw_score.saturating_sub(span_width.saturating_sub(1) * 2)
-}
-
-fn sentence_like_segments(text: &str) -> Vec<String> {
-    let mut segments = Vec::new();
-    let mut current = String::new();
-
-    for character in text.trim().chars() {
-        current.push(character);
-        if matches!(character, '.' | '!' | '?' | ';' | '\n') {
-            let segment = current.trim();
-            if !segment.is_empty() {
-                segments.push(segment.to_string());
-            }
-            current.clear();
-        }
-    }
-
-    let trailing = current.trim();
-    if !trailing.is_empty() {
-        segments.push(trailing.to_string());
-    }
-
-    segments
 }
 
 fn score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
@@ -775,6 +760,82 @@ mod tests {
         lexical_record_metrics, rank_lexical_records, search_query_terms,
         select_fact_records_for_query,
     };
+
+    #[test]
+    fn lexical_score_preserves_global_quote_boundary_empty_guard() {
+        assert_eq!(
+            super::lexical_query_score_for_text(r#"a"1-2.3"b"#, &["a12".into()]),
+            0
+        );
+    }
+
+    #[test]
+    fn repeated_identical_sentences_keep_the_single_best_span_score() {
+        assert_eq!(
+            super::lexical_query_score_for_text(
+                &"archive source details. ".repeat(128),
+                &["archive".into(), "source".into()]
+            ),
+            4
+        );
+    }
+
+    fn reference_text_score(text: &str, query: &[String]) -> usize {
+        fn score(terms: &[String], query: &[String]) -> usize {
+            let unigram = query.iter().filter(|term| terms.contains(term)).count();
+            let bigram = query
+                .windows(2)
+                .filter(|q| terms.windows(2).any(|c| c == *q))
+                .count();
+            let trigram = query
+                .windows(3)
+                .filter(|q| terms.windows(3).any(|c| c == *q))
+                .count();
+            unigram + 2 * bigram + 3 * trigram
+        }
+        let fallback = search_query_terms(text);
+        if fallback.is_empty() || query.is_empty() {
+            return score(&fallback, query);
+        }
+        // Literal old sentence traversal, independent of the streaming iterator.
+        let mut segments = Vec::new();
+        let mut current = String::new();
+        for ch in text.trim().chars() {
+            current.push(ch);
+            if matches!(ch, '.' | '!' | '?' | ';' | '\n') {
+                segments.push(std::mem::take(&mut current));
+            }
+        }
+        segments.push(current);
+        segments
+            .iter()
+            .map(|segment| search_query_terms(segment.trim()))
+            .filter(|terms| !terms.is_empty())
+            .map(|terms| score(&terms, query))
+            .max()
+            .unwrap_or_else(|| score(&fallback, query))
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config {
+            cases:128, failure_persistence:None,
+            rng_seed:proptest::test_runner::RngSeed::Fixed(20261126),
+            ..proptest::test_runner::Config::default()
+        })]
+        #[test]
+        fn streaming_scores_match_independent_whole_traversal(
+            parts in proptest::collection::vec(proptest::sample::select(vec![
+                "archive", "source", "details", "архив", "проектами", "R-0712", "episode:abc123",
+                "AND", "a\"1-2.3\"b", " ", "\n", ".", "!", "?", ";", "\r\n", "\"", "échelle"
+            ]),0..80),
+            query in proptest::sample::select(vec!["archive source", "source archive source", "проект архив", "R-0712 details", "", "a12"])
+        ) {
+            let text = parts.join(" ");
+            let terms = search_query_terms(query);
+            proptest::prop_assert_eq!(super::lexical_query_score_for_text(&text,&terms), reference_text_score(&text,&terms));
+            proptest::prop_assert_eq!(crate::shared::search::has_search_query_terms(&text), !search_query_terms(&text).is_empty());
+        }
+    }
 
     fn test_record(fact_id: &str, content: &str, t_valid: &str) -> Value {
         json!({
