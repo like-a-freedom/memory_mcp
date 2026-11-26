@@ -1,0 +1,315 @@
+{
+  "schema_version": "memory-mcp-native-preparation-refresh/v1",
+  "revision": "r28-native-identity-admission-v2",
+  "previous_revision": "r27-upstream-session-order",
+  "reason": "Reprepare frozen sources with production identity-admission v2 and shared production claim configuration; never waive runtime identity checks.",
+  "preparation_command": "EMBEDDINGS_ENABLED=true EMBEDDINGS_PROVIDER=local-candle EMBEDDINGS_MODEL=intfloat/multilingual-e5-small EMBEDDINGS_MODEL_DIR=\"$PWD/target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3\" RETRIEVAL_RERANKER_MODEL_DIR=\"$PWD/target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825\" RETRIEVAL_RERANKER_ADMISSION_FLOOR=0 target/debug/memory-eval prepare-retrieval-quality --sources evals/corpora/retrieval-quality-v1/sources.json --output /tmp/retrieval-quality-native-r28.json",
+  "preparation_exit_code": 0,
+  "source_bundle_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c",
+  "inventory_sha256": "515349902548c49f1cf162d6d74653af1d27c5a20877455be8f9ab9e27ed89ca",
+  "previous_active_manifest_sha256": "ec720673f9dc0ea2f77f278ca3224a4672fea10f2af812ef8a5b9ca945363079",
+  "active_manifest_sha256": "3715339f31c628cb37551c71c4b9c388886a4eb15f17112a0aba9aee11021f1a",
+  "cases_and_labels_unchanged": true,
+  "cases_and_labels_sha256": "c0a30cb3374e9597140568c34cf71dc9fe9c165186ac57313af85e59b54a5f05",
+  "native_case_count": 37,
+  "native_fact_count": 927,
+  "episode_binding_count": 980,
+  "previous_native_preparation": {
+    "claim_rollout_stage": "evidence",
+    "embedding_dimension": 384,
+    "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+    "extractor_fingerprint": "anno",
+    "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+    "model": "intfloat/multilingual-e5-small",
+    "model_files_sha256": {
+      "config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+      "model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+      "tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
+    },
+    "provider_label": "local-candle",
+    "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+    "schema_version": "memory-mcp-native-preparation/v1",
+    "similarity_threshold": 0.7,
+    "source_bundle_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c"
+  },
+  "actual_native_preparation": {
+    "claim_rollout_stage": "evidence",
+    "embedding_dimension": 384,
+    "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+    "extractor_fingerprint": "anno|identity-admission=v2",
+    "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+    "model": "intfloat/multilingual-e5-small",
+    "model_files_sha256": {
+      "config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+      "model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+      "tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
+    },
+    "provider_label": "local-candle",
+    "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+    "schema_version": "memory-mcp-native-preparation/v1",
+    "similarity_threshold": 0.7,
+    "source_bundle_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c"
+  },
+  "comparisons": [
+    {
+      "case_id": "http-task-16",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "http-task-short",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "http-task-paraphrase",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-original",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-sink",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-levels",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-config",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-correlation",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "logging-russian",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "unknown-database",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "unknown-url",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "unknown-task",
+      "expected_native_facts": 10,
+      "actual_native_facts": 10,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "7b533d6fc61c771f4e38b698ffceb16605760a479686f6ae7a4ca1adf25e776d"
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "expected_native_facts": 35,
+      "actual_native_facts": 35,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "dbfaef3f97c632e1c5202b3297a30ed5d7508d90cc6bbae028d38be675642967"
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "expected_native_facts": 35,
+      "actual_native_facts": 35,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "dbfaef3f97c632e1c5202b3297a30ed5d7508d90cc6bbae028d38be675642967"
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "expected_native_facts": 42,
+      "actual_native_facts": 42,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "6159c9efefe211b4a747f6d504da679e47002d6b9fdf1b1d498348d9c5a2da33"
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "expected_native_facts": 42,
+      "actual_native_facts": 42,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "6159c9efefe211b4a747f6d504da679e47002d6b9fdf1b1d498348d9c5a2da33"
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "expected_native_facts": 43,
+      "actual_native_facts": 43,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "336c55603001e4be89a05a71e7c01e6ca3573d30625cd2add2e99fa4411343c0"
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "expected_native_facts": 43,
+      "actual_native_facts": 43,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "336c55603001e4be89a05a71e7c01e6ca3573d30625cd2add2e99fa4411343c0"
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "expected_native_facts": 47,
+      "actual_native_facts": 47,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "329a325e2896b01c440639ee506f39828dca092487f07ae4a3886f029070fe3c"
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "expected_native_facts": 47,
+      "actual_native_facts": 47,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "329a325e2896b01c440639ee506f39828dca092487f07ae4a3886f029070fe3c"
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "expected_native_facts": 36,
+      "actual_native_facts": 36,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "c03335ac8d64d166b5c408c74e4e9bb81b37ed2923e5841d4c1785b643c47c7c"
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "expected_native_facts": 47,
+      "actual_native_facts": 47,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "f589b9359b73d9213aa95b83d9b17abfd1526f62c970cdd66de92a604e0a3448"
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "expected_native_facts": 47,
+      "actual_native_facts": 47,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "f589b9359b73d9213aa95b83d9b17abfd1526f62c970cdd66de92a604e0a3448"
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "expected_native_facts": 55,
+      "actual_native_facts": 55,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "2b7fecb23dc08b9e3fc5b9c82dc715e2dfbe387b86518e8e1cbacef9089ecd29"
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "expected_native_facts": 55,
+      "actual_native_facts": 55,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "2b7fecb23dc08b9e3fc5b9c82dc715e2dfbe387b86518e8e1cbacef9089ecd29"
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "expected_native_facts": 35,
+      "actual_native_facts": 35,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "c673deffe7d45f9f895a5b37383426630ce568090d7c80f567c8ee9c6d6beb9d"
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "expected_native_facts": 35,
+      "actual_native_facts": 35,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "c673deffe7d45f9f895a5b37383426630ce568090d7c80f567c8ee9c6d6beb9d"
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "expected_native_facts": 37,
+      "actual_native_facts": 37,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "5ce29fb6f0fbb56fbb9ecffc0fa10dc9e4b18ff106b3f1b43ef9500e1c73a3b2"
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "expected_native_facts": 37,
+      "actual_native_facts": 37,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "5ce29fb6f0fbb56fbb9ecffc0fa10dc9e4b18ff106b3f1b43ef9500e1c73a3b2"
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "expected_native_facts": 39,
+      "actual_native_facts": 39,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "2d9f081d3e1922db750d4f0c6b497df51a78b8a37011f9ca0ecc44b3c5bdc161"
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "expected_native_facts": 39,
+      "actual_native_facts": 39,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "2d9f081d3e1922db750d4f0c6b497df51a78b8a37011f9ca0ecc44b3c5bdc161"
+    },
+    {
+      "case_id": "historical-observed-cutoff",
+      "expected_native_facts": 2,
+      "actual_native_facts": 2,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "fbcc18f0edd53c7497ed8e4fd4d8ca263e43a767e0b0e89cc6296834b6c509da"
+    },
+    {
+      "case_id": "policy-public-evidence",
+      "expected_native_facts": 2,
+      "actual_native_facts": 2,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "94fe3f236d00f7c3f3733f7414dff0907300b6f6459a73af2558b752a6f82e3f"
+    },
+    {
+      "case_id": "policy-denied-abstention",
+      "expected_native_facts": 1,
+      "actual_native_facts": 1,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "aad3093b05c52522e7c37e48eca3fc487958b9a98cd34d69f2c1656eb579e0fb"
+    },
+    {
+      "case_id": "qualified-other-project",
+      "expected_native_facts": 2,
+      "actual_native_facts": 2,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "3ce0d18c9b280631a5ac405d9961485293bf8785e286fde1b32bdf76e7e68749"
+    },
+    {
+      "case_id": "timeline-atlas-q2-reverse-quarter",
+      "expected_native_facts": 2,
+      "actual_native_facts": 2,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "84f4ee403e6d11097d0987c287a74271fccab29d1b8851668dbc17c3132fe11e"
+    },
+    {
+      "case_id": "timeline-atlas-q1-cross-project-abstention",
+      "expected_native_facts": 2,
+      "actual_native_facts": 2,
+      "exact_fact_multiset_equal": true,
+      "native_fact_multiset_sha256": "84f4ee403e6d11097d0987c287a74271fccab29d1b8851668dbc17c3132fe11e"
+    }
+  ],
+  "acceptance_limits": "Source-only preparation proves exact persisted binding compatibility, not retrieval scores or held-out accuracy. Existing queries, labels, coverage and six quality floors remain unchanged."
+}

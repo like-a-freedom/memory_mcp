@@ -2,12 +2,24 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn run_preparation(raw: serde_json::Value) -> (std::process::Output, bool) {
+    run_preparation_with_claim_stage(raw, None)
+}
+
+fn run_preparation_with_claim_stage(
+    raw: serde_json::Value,
+    claim_stage: Option<&str>,
+) -> (std::process::Output, bool) {
     let directory = tempfile::tempdir().expect("temporary corpus directory");
     let sources = directory.path().join("sources.json");
     let output = directory.path().join("preparation.json");
     std::fs::write(&sources, serde_json::to_vec(&raw).expect("source JSON"))
         .expect("write source bundle");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_memory-eval"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+    command.env_remove("MEMORY_CLAIM_ROLLOUT_STAGE");
+    if let Some(stage) = claim_stage {
+        command.env("MEMORY_CLAIM_ROLLOUT_STAGE", stage);
+    }
+    let mut child = command
         .args(["prepare-retrieval-quality", "--sources"])
         .arg(sources)
         .arg("--output")
@@ -130,4 +142,17 @@ fn release_profile_reports_missing_native_provider_as_invalid_coverage() {
             .all(|outcome| outcome["status"] == "invalid")
     );
     assert_ne!(report["verdict"], "passed");
+}
+
+#[test]
+fn preparation_rejects_invalid_claim_configuration_before_loading_provider() {
+    let (result, output_exists) =
+        run_preparation_with_claim_stage(serde_json::json!([source()]), Some("unshipped-stage"));
+    assert_eq!(result.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("claim rollout configuration is invalid"),
+        "native preparation must validate the same claim configuration as production: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!output_exists);
 }

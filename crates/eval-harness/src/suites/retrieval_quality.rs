@@ -273,6 +273,10 @@ struct RetrievalRuntime {
 
 impl RetrievalRuntime {
     async fn from_environment() -> Result<Self, &'static str> {
+        let claim_stage = memory_mcp::config::claims::ClaimConfig::from_env()
+            .map_err(|_| "claim rollout configuration is invalid")?
+            .rollout_stage
+            .to_string();
         let embedding_config = memory_mcp::config::EmbeddingConfig::from_env()
             .map_err(|_| "embedding provider configuration is invalid")?;
         let surreal_config = memory_mcp::config::SurrealConfig::from_env()
@@ -284,8 +288,6 @@ impl RetrievalRuntime {
         )
         .await
         .map_err(|_| "a real embedding provider could not be initialized")?;
-        let claim_stage =
-            std::env::var("MEMORY_CLAIM_ROLLOUT_STAGE").unwrap_or_else(|_| "disabled".into());
         let mut model_files_sha256 = BTreeMap::new();
         if resolved.provider_label == "local-candle" {
             use std::io::Read;
