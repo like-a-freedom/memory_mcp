@@ -1,0 +1,21 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.70s
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 1 test
+
+thread 'lexical_sort_receives_only_candidate_identity_and_rank_fields' (6025312) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:570:5:
+assertion `left == right` failed: the actual engine must discard full source payload before sorting candidates
+  left: String("Filter")
+ right: "SelectProject"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... FAILED
+
+failures:
+
+failures:
+    lexical_sort_receives_only_candidate_identity_and_rank_fields
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_query_projection`

@@ -19,13 +19,7 @@ impl memory_mcp::eval_support::QueryObserver for QueryProgress {
     }
 }
 
-async fn observe(case_id: &str) {
-    let input: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(std::env::var("MEMORY_FULL_HISTORY_INPUT").expect("registered input path"))
-            .unwrap(),
-    )
-    .unwrap();
-    let case = &input["cases"][case_id];
+async fn connect_snapshot() -> Arc<SurrealDbClient> {
     let config = SurrealConfigBuilder::new()
         .embedded(true)
         .credentials("root", "root")
@@ -34,7 +28,17 @@ async fn observe(case_id: &str) {
         .data_dir(std::env::var("MEMORY_FULL_HISTORY_STORE").expect("disposable snapshot clone"))
         .build()
         .unwrap();
-    let db = Arc::new(SurrealDbClient::connect(&config).await.unwrap());
+    Arc::new(SurrealDbClient::connect(&config).await.unwrap())
+}
+
+async fn observe(case_id: &str) {
+    let input: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(std::env::var("MEMORY_FULL_HISTORY_INPUT").expect("registered input path"))
+            .unwrap(),
+    )
+    .unwrap();
+    let case = &input["cases"][case_id];
+    let db = connect_snapshot().await;
     db.set_eval_query_observer(Arc::new(QueryProgress(Instant::now())));
     let episodes = memory_mcp::memory::episode_store::EpisodeStoreClient::new(db.clone(), "main");
     let sources = episodes
@@ -109,4 +113,28 @@ async fn full_history_dropdown_retains_reviewed_source() {
 #[ignore = "requires registered full snapshot clone and input; local diagnostic only"]
 async fn full_history_toolbar_retains_reviewed_source() {
     observe("f61a096f").await;
+}
+
+#[tokio::test]
+#[ignore = "requires a disposable full snapshot clone; metadata observation, not quality acceptance"]
+async fn full_history_schema_inventory() {
+    use memory_mcp::storage::DbClient;
+
+    let db = connect_snapshot().await;
+    for (kind, sql) in [
+        (
+            "migrations",
+            "SELECT script_name, checksum, status FROM script_migration ORDER BY script_name ASC",
+        ),
+        ("fact", "INFO FOR TABLE fact"),
+        ("edge", "INFO FOR TABLE edge"),
+        ("episode", "INFO FOR TABLE episode"),
+    ] {
+        let inventory = db.query(sql, None, "main").await.unwrap();
+        println!(
+            "FULL_HISTORY_SCHEMA {}",
+            serde_json::json!({"kind":kind,"inventory":inventory})
+        );
+        std::io::stdout().flush().unwrap();
+    }
 }

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-schema-audit-d49eed58/full_history_evidence",
+    "full_history_schema_inventory",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 19.178765916993143
+}

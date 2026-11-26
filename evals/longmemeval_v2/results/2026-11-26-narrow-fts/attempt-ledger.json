@@ -1,0 +1,138 @@
+{
+  "schema": "diagnostic-attempts/v1",
+  "attempts": [
+    {
+      "id": "baseline-setup-01",
+      "classification": "invalid_fixture",
+      "reason": "private store client is not public; no visibility widened",
+      "log": "tdd/invalid-private-import.log"
+    },
+    {
+      "id": "baseline-setup-02",
+      "classification": "invalid_fixture",
+      "reason": "datetime setup passed strings to typed update; fixed test setup",
+      "log": "tdd/invalid-datetime-fixture.log"
+    },
+    {
+      "id": "baseline-characterization",
+      "classification": "passed_existing_behavior",
+      "log": "tdd/baseline-semantic-green.log"
+    },
+    {
+      "id": "narrow-sort-resource",
+      "classification": "observed_red",
+      "reason": "actual Sort input includes full payload before query repair",
+      "log": "tdd/narrow-sort-plan-red.log"
+    },
+    {
+      "id": "plan-wrapper",
+      "classification": "test_expectation_refinement",
+      "reason": "candidate engine retains transparent Subquery wrapper before narrow SelectProject",
+      "log": "tdd/plan-wrapper-adjustment.log"
+    },
+    {
+      "id": "candidate-green",
+      "classification": "passed",
+      "log": "tdd/all-dimensions-green.log"
+    },
+    {
+      "id": "full-history-debug",
+      "classification": "resource_failure",
+      "case_count": 2,
+      "completed_contexts": 0,
+      "source_carriers_available": 2,
+      "models": false
+    },
+    {
+      "id": "optimized-comparison",
+      "classification": "resource_failure",
+      "registration": "optimized-comparison/registration.json",
+      "reason": "matched opt-level3 baseline/candidate: 0/4 contexts, all outcomes retained",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "metric-cache",
+      "classification": "resource_failure",
+      "registration": "metric-cache/registration.json",
+      "reason": "single metric computation per sort candidate; 0/2 contexts",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "metric-cache-profile",
+      "classification": "resource_failure",
+      "registration": "metric-cache-profile/registration.json",
+      "reason": "one registered diagnostic CPU sample; 0/1 contexts",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "feature-reuse",
+      "classification": "resource_failure",
+      "registration": "feature-reuse/registration.json",
+      "reason": "reuse immutable content features and fallback maxima; 0/2 contexts",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "unique-token-set",
+      "classification": "resource_failure",
+      "registration": "unique-token-set/registration.json",
+      "reason": "same vocabulary with per-occurrence normalization removed; 0/2 contexts under original30s bound",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "complete-stage-diagnostic",
+      "classification": "resource_failure",
+      "registration": "complete-stage-diagnostic/registration.json",
+      "reason": "separate120s diagnostic, not original acceptance; 0/2 contexts",
+      "raw_summary": "summary.json"
+    },
+    {
+      "id": "allocation-test-setup",
+      "classification": "invalid_fixture",
+      "reason": "ambiguous HashSet assertion element type; no production RED claimed",
+      "log": "tdd/invalid-allocation-test-type-inference.log"
+    },
+    {
+      "id": "term-set-allocation",
+      "classification": "observed_red_then_green",
+      "red_allocations": 30044,
+      "green_allocations": 54,
+      "oracle": "exact vocabulary and128 fixed-seed token-set equivalence cases",
+      "red_log": "tdd/term-set-allocation-red.log",
+      "green_log": "tdd/term-set-allocation-green.log"
+    },
+    {
+      "id": "combined-production-adapters",
+      "classification": "verification_failure_fixed",
+      "failures": 11,
+      "log": "tdd/production-initial-adapter-failures.log",
+      "resolution": "Shared test-only outer-group reader; real SQL oracle unchanged."
+    },
+    {
+      "id": "nested-batch-adapter",
+      "classification": "observed_red_then_green",
+      "log": "tdd/grouped-adapter-red.log",
+      "green_log": "tdd/grouped-adapter-lib-green.log"
+    },
+    {
+      "id": "obsolete-source-name-lint",
+      "classification": "obsolete_policy_inventory",
+      "log": "tdd/production-obsolete-name-lint-failure.log",
+      "resolution": "Remove obsolete helper-name pin; preserve best-span behavior and ranking controls; no dead wrapper."
+    },
+    {
+      "id": "test-helper-layout",
+      "classification": "verification_failure_fixed",
+      "failures": 2,
+      "log": "tdd/production-test-helper-layout-failure.log",
+      "green_log": "tdd/source-integrity-green.log",
+      "resolution": "Normal Rust child module; original architecture rules unchanged."
+    },
+    {
+      "id": "schema-audit",
+      "classification": "completed_metadata_observation",
+      "registration": "schema-audit/registration.json",
+      "summary": "schema-audit/summary.json",
+      "quality_acceptance": false
+    }
+  ]
+}

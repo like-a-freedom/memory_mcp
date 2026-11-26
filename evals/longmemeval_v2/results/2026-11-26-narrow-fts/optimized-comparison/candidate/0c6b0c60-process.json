@@ -1,0 +1,14 @@
+{
+  "case_id": "0c6b0c60",
+  "command": [
+    "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-optimized-bin-8b2wc36r/full_history_evidence",
+    "full_history_dropdown_retains_reviewed_source",
+    "--ignored",
+    "--nocapture"
+  ],
+  "pid": 60837,
+  "copy_seconds": 0.5709927089919802,
+  "elapsed_seconds": 45.1469382919895,
+  "external_timeout": true,
+  "exit_code": -9
+}

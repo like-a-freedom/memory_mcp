@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--features",
+    "eval-support",
+    "--test",
+    "full_history_evidence",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "build_seconds": 27.056158666993724,
+  "binary_sha256": "c748bff4c92c40b72c5e55430f0e5e11cc4b73eed2e0ea3b90e041e0b10c5866",
+  "query_source_sha256": "3a376360af6c08b648b562e9aaaae2715fd8740a88ede0981ee6334915f71606",
+  "test_source_sha256": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f",
+  "registration_sha256": "1eeab274cbb991894223de27ab355a0015dc0aa5246c08d58fd3ba188e1a4f22"
+}

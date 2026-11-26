@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-26",
+  "method": "keenable-cli search and fetch; local pinned engine source and actual embedded execution plan",
+  "sources": [
+    {
+      "url": "https://surrealdb.com/docs/reference/query-language/statements/select",
+      "used_for": "SELECT supports subquery sources, sorting and LIMIT; documentation alone does not establish physical operator order."
+    },
+    {
+      "url": "https://surrealdb.com/docs/reference/query-language/language-primitives/record-links",
+      "used_for": "Record-id fields permit property dereferencing in the active database."
+    }
+  ],
+  "engine": "surrealdb-core4.0.1",
+  "local_engine_source": "src/exec/ir/phys/order.rs",
+  "local_engine_finding": "Physical binder attaches sorting before normal SELECT projection; actual candidate plan tested as hydration projection above LIMIT above narrow sort input.",
+  "limitations": [
+    "Documentation is not proof of source equivalence; independent full-row oracle and actual engine plan are required.",
+    "No universal snapshot-consistency or all-concurrency performance claim is inferred from the finite tests."
+  ]
+}

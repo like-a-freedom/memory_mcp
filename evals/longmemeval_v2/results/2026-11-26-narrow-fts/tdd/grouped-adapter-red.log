@@ -1,0 +1,24 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.98s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/526bba5550d0e6e4/out/memory_mcp-526bba5550d0e6e4)
+
+running 1 test
+test service::mock_db::tests::grouped_query_counts_outer_reads_despite_nested_selects_and_quoted_parentheses ... FAILED
+
+failures:
+
+---- service::mock_db::tests::grouped_query_counts_outer_reads_despite_nested_selects_and_quoted_parentheses stdout ----
+
+thread 'service::mock_db::tests::grouped_query_counts_outer_reads_despite_nested_selects_and_quoted_parentheses' (6122632) panicked at crates/memory-mcp/src/service/mock_db.rs:529:9:
+assertion `left == right` failed
+  left: Array [Array [], Array [], Array [], Array [], Array []]
+ right: Array [Array [], Array []]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service::mock_db::tests::grouped_query_counts_outer_reads_despite_nested_selects_and_quoted_parentheses
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2062 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p memory_mcp --lib`

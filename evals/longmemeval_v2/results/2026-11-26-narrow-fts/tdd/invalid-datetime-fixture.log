@@ -1,0 +1,32 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.77s
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f9fd3dda82621839/out/retrieval_query_projection-f9fd3dda82621839)
+
+running 3 tests
+2026-11-26T11:06:58.212069Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=94234  args.truncated_chars=8000  result={}
+2026-11-26T11:06:58.212069Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=94234  args.truncated_chars=8000  result={}
+2026-11-26T11:06:58.212069Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=94234  args.truncated_chars=8000  result={}
+
+thread 'lexical_projection_preserves_complete_sources_and_temporal_visibility' (6023503) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:501:31:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query statement errors:\nstatement 0: Couldn't coerce value for field `t_ingested` of `fact:14ea2b8f8c788bb69c53e78a`: Expected `datetime` but found `'2026-05-01T00:00:00+00:00'`")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'lexical_projection_preserves_type_filter_and_index_key_match' (6023505) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:501:31:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query statement errors:\nstatement 0: Couldn't coerce value for field `t_ingested` of `fact:14ea2b8f8c788bb69c53e78a`: Expected `datetime` but found `'2026-05-01T00:00:00+00:00'`")
+
+thread 'lexical_projection_preserves_each_limited_group_and_repeated_term' (6023504) panicked at crates/memory-mcp/tests/retrieval_query_projection.rs:501:31:
+called `Result::unwrap()` on an `Err` value: Storage("SurrealDB query statement errors:\nstatement 0: Couldn't coerce value for field `t_ingested` of `fact:14ea2b8f8c788bb69c53e78a`: Expected `datetime` but found `'2026-05-01T00:00:00+00:00'`")
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... FAILED
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... FAILED
+test lexical_projection_preserves_type_filter_and_index_key_match ... FAILED
+
+failures:
+
+failures:
+    lexical_projection_preserves_complete_sources_and_temporal_visibility
+    lexical_projection_preserves_each_limited_group_and_repeated_term
+    lexical_projection_preserves_type_filter_and_index_key_match
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.27s
+
+error: test failed, to rerun pass `-p memory_mcp --test retrieval_query_projection`

@@ -1,0 +1,35 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+error[E0283]: type annotations needed
+  --> crates/memory-mcp/tests/lexical_term_set_resource.rs:58:91
+   |
+58 |     assert_eq!(actual, ["falcon", "deployment", "status", "42", "m42"].map(str::to_owned).into());
+   |                                                                                           ^^^^
+   |
+   = note: the type must implement `From<[std::string::String; 5]>`
+   = note: required for `[std::string::String; 5]` to implement `Into<_>`
+help: try using a fully qualified path to specify the expected types
+   |
+58 -     assert_eq!(actual, ["falcon", "deployment", "status", "42", "m42"].map(str::to_owned).into());
+58 +     assert_eq!(actual, <[std::string::String; 5] as Into<T>>::into(["falcon", "deployment", "status", "42", "m42"].map(str::to_owned)));
+   |
+
+error[E0283]: type annotations needed
+  --> crates/memory-mcp/tests/lexical_term_set_resource.rs:58:91
+   |
+58 |     assert_eq!(actual, ["falcon", "deployment", "status", "42", "m42"].map(str::to_owned).into());
+   |     --------------------------------------------------------------------------------------^^^^--- type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `HashSet<std::string::String>: PartialEq<_>` found in the following crates: `rkyv`, `std`:
+           - impl<K, AK, S> PartialEq<rkyv::collections::swiss_table::set::ArchivedHashSet<AK>> for HashSet<K, S>
+             where K: Hash, K: Eq, K: Borrow<AK>, AK: Hash, AK: Eq, S: BuildHasher;
+           - impl<T, S, A> PartialEq for HashSet<T, S, A>
+             where T: Eq, T: Hash, S: BuildHasher, A: Allocator;
+help: try using a fully qualified path to specify the expected types
+   |
+58 -     assert_eq!(actual, ["falcon", "deployment", "status", "42", "m42"].map(str::to_owned).into());
+58 +     assert_eq!(actual, <[std::string::String; 5] as Into<T>>::into(["falcon", "deployment", "status", "42", "m42"].map(str::to_owned)));
+   |
+
+For more information about this error, try `rustc --explain E0283`.
+error: could not compile `memory_mcp` (test "lexical_term_set_resource") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

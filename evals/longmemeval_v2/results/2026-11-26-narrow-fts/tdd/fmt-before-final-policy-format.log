@@ -1,0 +1,21 @@
+Diff in /Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp/tests/no_duplicate_implementations.rs:37:
+ /// copy of something in `shared/search_lexical.rs` and is not: a grep result
+ /// generalises, a read does not. Recording them is what stops the next reader
+ /// from "consolidating" one and silently changing retrieval.
+-const NOT_DUPLICATES: &[(&str, &str, &str)] = &[
+-    (
+-        "lexical_query_overlap_for_fact",
+-        "src/memory/retrieval/lexical.rs",
+-        "A `Fact`-typed entry point beside the `Value`-typed `lexical_query_overlap`. \
++const NOT_DUPLICATES: &[(&str, &str, &str)] = &[(
++    "lexical_query_overlap_for_fact",
++    "src/memory/retrieval/lexical.rs",
++    "A `Fact`-typed entry point beside the `Value`-typed `lexical_query_overlap`. \
+          One operation, two input types: the `Value` form parses the record first, \
+          and the `Fact` form does not have to.",
+-    ),
+-];
++)];
+ 
+ // The former matched_query_terms_for_record helper was inlined into the one
+ // lexical_record_metrics pass; it still uses the best span, not the whole-text

@@ -1,0 +1,22 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/52692148c44e46f2/out/lexical_term_set_resource-52692148c44e46f2)
+
+running 2 tests
+proptest: FileFailurePersistence::SourceParallel set, but failed to find lib.rs or main.rs
+LEXICAL_SET_ALLOCATIONS 30044
+
+thread 'repeated_source_vocabulary_has_bounded_normalization_allocations' (6081636) panicked at crates/memory-mcp/tests/lexical_term_set_resource.rs:60:5:
+repeated vocabulary must not allocate per occurrence; observed 30044
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... FAILED
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+
+failures:
+
+failures:
+    repeated_source_vocabulary_has_bounded_normalization_allocations
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p memory_mcp --test lexical_term_set_resource`

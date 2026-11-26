@@ -113,7 +113,8 @@ No model experiment or memory-quality improvement is inferred from this test.
 ## Task 7 — Full saved-history retrieval: bounded diagnosis and equivalent repair
 
 This task follows the report's P1 action, not a rerun of stopped C1. Current
-diagnostic status: **source carrier 2/2; no completed full context; repair pending**.
+diagnostic status: **source carrier 2/2; no completed full context; equivalent
+query/ranking/set repairs implemented, full-history acceptance still pending**.
 Original seven answers remain 2/7. Opt-in captured attempts are resource failures,
 not absent-candidate scores. All attempts, amendments and original snapshot hashes
 remain in `evals/longmemeval_v2/results/2026-11-26-full-history/`.
@@ -147,7 +148,7 @@ not promoted because the hypothesis sounds plausible.
   and process timeouts. Verify original snapshot hashes after every attempt.
 - [x] Add existing completed-query observer and bounded native CPU sample after
   the first resource failure. Report missing later stages explicitly unknown.
-- [ ] **Step 1: Pin the real storage equivalence oracle.** Extend the existing
+- [x] **Step 1: Pin the real storage equivalence oracle.** Extend the existing
   projection/batching integration targets with public store calls and a literal
   pre-change full-row SQL reference at one fixed cutoff. Independently seed
   content-only and index-key-only matches, tied scores/dates, repeated terms,
@@ -156,7 +157,7 @@ not promoted because the hypothesis sounds plausible.
   and temporal fields. Exercise enough shared payload to expose wide sorting.
   Baseline characterization must pass; the new resource/plan contract must first
   reproduce the expensive behavior before changing the owning query.
-- [ ] **Step 2: Test the minimal query-shape repair.** Rank a narrow tuple of
+- [x] **Step 2: Test the minimal query-shape repair.** Rank a narrow tuple of
   record identity, score and tie-break fields; hydrate only winners, retaining
   per-term order and limits in the same statement read view. Reuse the existing
   canonical field projection; no table-name parameter, new service container,
@@ -164,7 +165,7 @@ not promoted because the hypothesis sounds plausible.
   cache whole stores or return a reviewed source directly. If the engine cannot
   express a consistent equivalent query, stop this design and record that fact
   before trying another measured mechanism.
-- [ ] **Step 3: Verify semantics and cost independently.** Run
+- [x] **Step 3: Verify semantics and cost independently.** Run
   `cargo test --locked -p memory_mcp --features eval-support --test retrieval_query_projection`
   and the corresponding `--test retrieval_query_batching`; add the relevant
   public context cases if behavior crosses the query boundary. Require exact
@@ -189,3 +190,55 @@ not promoted because the hypothesis sounds plausible.
 The wider P2/P3 proposals in the repair report (independent entity generalization,
 cross-client citation transport and confirmation study) remain separate future
 work, not checkmarks earned by this follow-up.
+
+**Task 7 measured outcome, 26 November:** independent wide-SQL oracle and actual
+execution-plan resource RED → GREEN pass; projection16, batching7, public source
+stages6 and term-set2 controls pass. Candidate metrics/maxima are reused without
+changing ordering or score arithmetic. Shared set normalization preserves exact
+vocabulary and ordered/count-valued callers; allocation RED30,044 → GREEN54 on
+the fixed repeated-source control, plus128 fixed-seed vocabulary cases. These
+are equivalence/resource observations, not full-history quality acceptance.
+
+Matched opt-level3 baseline/narrow SQL calls sum4.655→2.773s (dropdown7 calls)
+and28.184→9.319s (toolbar15 calls); both variants fail to complete contexts.
+All15 registered development process attempts are retained. Final original-bound
+candidate produces0/2 contexts, source carriers2/2; a separately registered
+120/150s diagnostic also produces0/2. No seven-answer rerun or C2 admission.
+See `evals/longmemeval_v2/results/2026-11-26-narrow-fts/README.md` and `summary.json`.
+
+**Next substeps before Step 4 can pass:**
+
+1. Preserve source-linked partial stage receipts when the public diagnostic
+   times out; test a controlled interruption after a completed boundary. Capture
+   late application CPU activity once under a frozen outer bound. Current
+   completed-query observations cannot assign the remaining CPU time to a stage.
+2. Episode fallback sorts in `budget.rs` and historical `pipeline.rs` recalculate
+   full lexical text scores inside comparisons. Establish an independent ordered
+   oracle (ties, duplicate query terms, empty query, temporal/access exclusions)
+   and a bounded-work RED; then reuse immutable per-episode scores. Keep all
+   fallback candidates and source limits. A code smell alone is not its latency
+   measurement; verify the diagnosed full-history path before promotion.
+3. Schema inventory completed:33/33 current local-profile migrations applied,
+   no static checksum mismatch (dynamic embedding008 excluded), actual indexes
+   recorded. Inspect graph execution plans before changing graph indexes.
+   Many edge calls do not establish missing indexes or the sole cause.
+   Preserve historical formation and compare any separately registered rebuilt
+   store explicitly; never silently migrate the original snapshot to pass.
+4. Re-register the final source/binary after the diagnosed repair; one bounded
+   capture per case must yield complete receipts and both exact reviewed spans
+   under the original30s acceptance, plus native8/8. Only then register the seven
+   unchanged reader/judge tasks and evaluate answers separately.
+
+The first combined production run exposed11 controlled-adapter failures: naive
+`(SELECT` counts treated nested projections as extra batch reads. A new public
+MockDbClient scenario observed5 groups instead of2 before fixing the shared
+test-only outer-group reader. Real SQL equivalence targets already passed;
+existing output assertions and group-count validation remain in place.
+
+Latest verification: native production2810pass/0fail/45ignored, harness929pass/
+0fail/22ignored, opt-in public targets41pass. Native current gate8/8,
+no_regressions=true,0invalid/unobserved. Strict workspace and opt-in clippy/fmt
+pass. Source-inventory lint updated for the intentionally fused helper; normal
+child-module layout satisfies unchanged source-tree rules. All intermediate
+verification failures retained. This closes verification of these equivalent
+repairs, **not Step4 full-history acceptance or the seven-answer evaluation**.

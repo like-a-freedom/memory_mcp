@@ -1,0 +1,19 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.76s
+     Running tests/query_scaling_regressions.rs (target/debug/build/memory_mcp/bae4d80cc96b7e9e/out/query_scaling_regressions-bae4d80cc96b7e9e)
+
+running 10 tests
+test archival_signal_reads_chunk_episode_ids_at_sixty_four ... ok
+test bounded_hub_candidates_preserve_the_existing_entity_prefix ... ok
+test hub_edge_reads_chunk_candidate_ids_at_the_owner_limit ... ok
+test community_offset_page_repeats_an_edge_after_an_earlier_insert ... ok
+test community_offset_page_skips_an_edge_invalidated_after_page_one ... ok
+test duplicate_fact_accesses_each_increment_and_saturate_at_i64_max ... ok
+test lexical_fallback_uses_full_bitemporal_visibility ... ok
+test one_batched_hub_edge_read_matches_per_entity_direction_reads ... ok
+test map_view_preserves_hub_ranking_while_reducing_neighbor_reads ... ok
+test batched_archival_signals_match_bitemporal_and_heat_checks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+

@@ -614,7 +614,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     fn grouped_rows(sql: &str, mut rows_for_index: impl FnMut(usize) -> Vec<Value>) -> Value {
-        let group_count = sql.matches("(SELECT").count();
+        let group_count = crate::service::mock_db::grouped_select_queries(sql).len();
         Value::Array(
             (0..group_count)
                 .map(|index| Value::Array(rows_for_index(index)))
@@ -623,12 +623,9 @@ mod tests {
     }
 
     fn grouped_fts_rows(sql: &str, mut rows_for_term: impl FnMut(&str) -> Vec<Value>) -> Value {
-        let grouped_sql = sql
-            .strip_prefix("RETURN [")
-            .expect("FTS groups come from a grouped RETURN query");
-        let terms = grouped_sql
-            .split("(SELECT")
-            .skip(1)
+        let groups = crate::service::mock_db::grouped_select_queries(sql);
+        let terms = groups
+            .into_iter()
             .map(|subquery| {
                 subquery
                     .split("@1@ ")

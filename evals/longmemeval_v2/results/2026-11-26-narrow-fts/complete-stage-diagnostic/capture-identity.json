@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "memory_mcp",
+    "--features",
+    "eval-support",
+    "--test",
+    "full_history_evidence",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "binary_sha256": "67a091f53b4611f59e15d31d5ee3e50eb9c90cf32524bf426df394dc21c13225",
+  "registration_sha256": "64809b8460482163f7ca360f2b68571ca488f53c623712b9a5464284f584fd5e"
+}

@@ -166,8 +166,20 @@ pub fn build_select_facts_filtered_query(
         // Keep the query in the vars object for instrumentation and test
         // doubles; SurrealDB 3.0 uses the escaped literal in MATCHES above.
         vars.insert("query".to_string(), json!(query));
+        // SurrealDB sorts before projecting a SELECT's fields. A separate
+        // projection boundary keeps full text/quotes/vectors out of sort runs;
+        // only the limited winners are hydrated in this statement's read view.
+        let projection = NONSEMANTIC_FACT_PROJECTION
+            .split(',')
+            .map(str::trim)
+            .map(|field| match field {
+                "fact_id" | "t_valid" => field.to_owned(),
+                _ => format!("record.{field} AS {field}"),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
         format!(
-            "SELECT {NONSEMANTIC_FACT_PROJECTION}, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal}) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT {projection}, ft_score FROM (SELECT id AS record, fact_id, t_valid, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal})) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
         format!(

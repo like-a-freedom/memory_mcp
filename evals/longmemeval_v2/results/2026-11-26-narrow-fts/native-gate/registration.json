@@ -1,0 +1,18 @@
+{
+  "schema": "native-regression-registration/v1",
+  "native_only": true,
+  "models": false,
+  "product_binary_sha256": "1030c823eaa8bfa256797148f94c7ccf6dc23934a6729dd2c6a0ef0ce1bb4e5d",
+  "runner_binary_sha256": "987e7bc2b0a379afb5bdb9bca18777ee67bf6a6a30f252724784751ceb9b1610",
+  "baseline_index_sha256": "665c7a9799df8b95d4e3728ad4b2497abfe60b20f3deb97b2b2aef770028e903",
+  "profile_sha256": "b3740ed049e44d3d45cd9d62928b2074a5ef5d272ae8ae941a871d1517852ad0",
+  "expected_cases": 8,
+  "external_seconds": 180,
+  "no_reruns": true,
+  "source_sha256": {
+    "crates/memory-mcp/src/knowledge/queries.rs": "1f9536823ea11b28c3f238c65e0708ceb16f7ffdb57037cbdebf8ef6ec30c3f8",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "632e70f29a9e163264c746db24be098988422b4eb8a94b41af660fb6e093d06a",
+    "crates/memory-mcp/src/shared/search.rs": "4d8ac8ba6f2ac9554d30b3efa3a9427cf0073c6c19537eefae16bc63c8fd88a0",
+    "crates/memory-mcp/src/shared/search_lexical.rs": "b69713f459d0d5406cea3f60e3e1c44dbb28a916302e0a48c4875c5a7bd12a6b"
+  }
+}

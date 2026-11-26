@@ -1,0 +1,95 @@
+[
+  {
+    "name": "harness",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "eval-harness",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "seconds": 117.7340724169917,
+    "log": "evals/longmemeval_v2/results/2026-11-26-narrow-fts/verification/harness.log"
+  },
+  {
+    "name": "workspace-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 15.693641166988527,
+    "log": "evals/longmemeval_v2/results/2026-11-26-narrow-fts/verification/workspace-clippy.log"
+  },
+  {
+    "name": "diagnostic-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--features",
+      "eval-support,test-fixtures",
+      "--test",
+      "lexical_term_set_resource",
+      "--test",
+      "retrieval_query_projection",
+      "--test",
+      "retrieval_query_batching",
+      "--test",
+      "long_history_stage_evidence",
+      "--test",
+      "query_scaling_regressions",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 10.241350041993428,
+    "log": "evals/longmemeval_v2/results/2026-11-26-narrow-fts/verification/diagnostic-clippy.log"
+  },
+  {
+    "name": "build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--bin",
+      "memory_mcp",
+      "-p",
+      "eval-harness",
+      "--bin",
+      "memory-eval"
+    ],
+    "exit_code": 0,
+    "seconds": 1.8941050000139512,
+    "log": "evals/longmemeval_v2/results/2026-11-26-narrow-fts/verification/build.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 1,
+    "seconds": 2.7528970000275876,
+    "log": "evals/longmemeval_v2/results/2026-11-26-narrow-fts/tdd/fmt-before-final-policy-format.log",
+    "note": "retained failed formatting check; final formatted source is checked separately"
+  }
+]

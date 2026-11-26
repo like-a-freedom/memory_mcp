@@ -1,0 +1,14 @@
+{
+  "case_id": "0c6b0c60",
+  "command": [
+    "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-8afgkqta/full_history_evidence",
+    "full_history_dropdown_retains_reviewed_source",
+    "--ignored",
+    "--nocapture"
+  ],
+  "pid": 66907,
+  "copy_seconds": 0.513946124992799,
+  "elapsed_seconds": 148.22209429199575,
+  "external_timeout": false,
+  "exit_code": 101
+}

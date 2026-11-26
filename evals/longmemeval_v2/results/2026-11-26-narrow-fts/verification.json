@@ -1,0 +1,104 @@
+{
+  "schema": "memory-equivalent-repair-verification/v1",
+  "date": "2026-11-26",
+  "host": "aarch64-apple-darwin",
+  "rustc": "1.100.0",
+  "base_revision": "ab4a06ae56282d92efa1aa574d1a90fedcf23c42",
+  "remote_or_local_model_calls": 0,
+  "production": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "memory_mcp",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "passed": 2810,
+    "failed": 0,
+    "ignored": 45,
+    "log": "verification/production.log"
+  },
+  "harness": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "eval-harness",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "passed": 929,
+    "failed": 0,
+    "ignored": 22,
+    "log": "verification/harness.log"
+  },
+  "feature_targets": {
+    "exit_code": 0,
+    "passed": 41,
+    "failed": 0,
+    "ignored": 0,
+    "log": "verification/feature-targets-final.log"
+  },
+  "clippy": {
+    "workspace_exit_code": 0,
+    "workspace_log": "verification/workspace-clippy-shipping.log",
+    "diagnostic_exit_code": 0,
+    "diagnostic_log": "verification/diagnostic-clippy-final.log"
+  },
+  "fmt_exit_code": 0,
+  "native_gate": {
+    "counts": {
+      "failed": 0,
+      "invalid": 0,
+      "passed": 8,
+      "unobserved": 0
+    },
+    "all_cases_pass": true,
+    "no_regressions": true,
+    "receipt": "native-gate/comparison.json",
+    "latency_comparison": false
+  },
+  "source_sha256": {
+    "crates/memory-mcp/src/knowledge/queries.rs": "1f9536823ea11b28c3f238c65e0708ceb16f7ffdb57037cbdebf8ef6ec30c3f8",
+    "crates/memory-mcp/src/memory/retrieval.rs": "07525d72f9b5dbe5d717b1cdc0e5f1738b62f866615711d97f2b0115f9d3ad49",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "632e70f29a9e163264c746db24be098988422b4eb8a94b41af660fb6e093d06a",
+    "crates/memory-mcp/src/service/mock_db.rs": "c8f53fca2e3be33ec37e5c07037b3cdb96d9f84eb539905d95f426db59ded9b9",
+    "crates/memory-mcp/src/shared/search.rs": "4d8ac8ba6f2ac9554d30b3efa3a9427cf0073c6c19537eefae16bc63c8fd88a0",
+    "crates/memory-mcp/src/shared/search_lexical.rs": "b69713f459d0d5406cea3f60e3e1c44dbb28a916302e0a48c4875c5a7bd12a6b",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "34bbf20c97674042e85d39ad86ee3159708f5ec6fefe3f98f00bd5284aeda172",
+    "crates/memory-mcp/tests/no_duplicate_implementations.rs": "a2631496642aa3d102e87eb5ef84bb8f34315d646a9982a497a67b13895f6d36",
+    "crates/memory-mcp/tests/query_scaling_regressions.rs": "ed308a6d33c96c7dc612577f00f116d0a5a10538b9b297e20c3b4efc56d3cf46",
+    "crates/memory-mcp/tests/retrieval_query_projection.rs": "5c5280ee39a6a84beb7d2053b5ec34580f916d068577de6fe2a769b0404e21a2",
+    "crates/memory-mcp/src/service/mock_db/grouped_queries.rs": "4e3e913094f4b543b2eefea381f16da4e603d45f608f6402057f13728634e3c9",
+    "crates/memory-mcp/tests/lexical_term_set_resource.rs": "2f95ff2f62610f0c2150a75c38c11cb59cb3d00ec86b127b0add6bf1b0bd0b12"
+  },
+  "captured_core_source_unchanged": true,
+  "diagnostic_test_evolution": {
+    "original_test_available_at_revision": "ab4a06ae56282d92efa1aa574d1a90fedcf23c42",
+    "original_sha256": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f",
+    "current_sha256": "34bbf20c97674042e85d39ad86ee3159708f5ec6fefe3f98f00bd5284aeda172",
+    "change": "Added separately ignored metadata inventory and factored the unchanged snapshot connection setup; earlier full-history logs retain their original registration."
+  },
+  "schema_audit": "schema-audit/summary.json",
+  "full_history_acceptance": {
+    "passed": false,
+    "completed_contexts": 0,
+    "required_contexts": 2,
+    "source_carriers": 2,
+    "registered_read_seconds": 30
+  },
+  "archived_answers": {
+    "correct": 2,
+    "total": 7,
+    "new_answers": 0
+  },
+  "limitations": [
+    "Ignored tests are not passed. Counts include existing architecture lints and doctests, not all distinct product scenarios.",
+    "Exact storage oracle and finite ranking controls do not prove every possible concurrency/input/float ordering.",
+    "All failed captures, invalid fixture attempts and intermediate verification failures are retained."
+  ]
+}

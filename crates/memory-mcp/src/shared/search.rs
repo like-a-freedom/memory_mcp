@@ -25,19 +25,35 @@ pub fn preprocess_search_query(raw: &str) -> String {
 /// case matches content written in another. The native full-text analyzer
 /// stems too, but admission compares terms inside the application.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
-    static RUSSIAN_STEMMER: LazyLock<Stemmer> =
-        LazyLock::new(|| Stemmer::create(Algorithm::Russian));
-
     lexical_terms(raw, RussianFunctionWords::Drop)
         .into_iter()
-        .map(|term| {
-            if is_cyrillic(&term) {
-                RUSSIAN_STEMMER.stem(&term).into_owned()
-            } else {
-                term
-            }
-        })
+        .map(stem_search_term)
         .collect()
+}
+
+/// The same vocabulary when order and occurrence counts are irrelevant.
+/// Deduplicate tokens only after the shared episode/quote preprocessing, before
+/// their context-free normalization. Repeated source text needs no repeated work.
+pub(crate) fn search_query_term_set(raw: &str) -> HashSet<String> {
+    let prepared = prepare_lexical_text(raw);
+    let mut seen_tokens = HashSet::new();
+    let mut terms = Vec::new();
+    for token in prepared.split_whitespace() {
+        if seen_tokens.insert(token) {
+            append_lexical_token(&mut terms, token, RussianFunctionWords::Drop);
+        }
+    }
+    terms.into_iter().map(stem_search_term).collect()
+}
+
+fn stem_search_term(term: String) -> String {
+    static RUSSIAN_STEMMER: LazyLock<Stemmer> =
+        LazyLock::new(|| Stemmer::create(Algorithm::Russian));
+    if is_cyrillic(&term) {
+        RUSSIAN_STEMMER.stem(&term).into_owned()
+    } else {
+        term
+    }
 }
 
 /// Word terms that ingestion counts. Every Russian word counts here, because
@@ -65,7 +81,7 @@ fn is_cyrillic(term: &str) -> bool {
     !term.is_empty() && term.chars().all(|c| matches!(c, 'а'..='я' | 'ё'))
 }
 
-fn lexical_terms(raw: &str, russian_function_words: RussianFunctionWords) -> Vec<String> {
+fn prepare_lexical_text(raw: &str) -> String {
     static EPISODE_REF: LazyLock<Result<Regex, regex::Error>> =
         LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+"));
     static QUOTED: LazyLock<Result<Regex, regex::Error>> =
@@ -79,17 +95,29 @@ fn lexical_terms(raw: &str, russian_function_words: RussianFunctionWords) -> Vec
         s = regex.replace_all(&s, " $1 ").into_owned();
     }
 
-    let mut terms = Vec::new();
-    for token in s.split_whitespace() {
-        terms.extend(
-            token
-                .split(|character: char| !character.is_alphanumeric())
-                .filter_map(|term| normalize_search_term(term, russian_function_words)),
-        );
-        terms.extend(search_reference_terms(token));
-    }
+    s
+}
 
+fn lexical_terms(raw: &str, russian_function_words: RussianFunctionWords) -> Vec<String> {
+    let prepared = prepare_lexical_text(raw);
+    let mut terms = Vec::new();
+    for token in prepared.split_whitespace() {
+        append_lexical_token(&mut terms, token, russian_function_words);
+    }
     terms
+}
+
+fn append_lexical_token(
+    terms: &mut Vec<String>,
+    token: &str,
+    russian_function_words: RussianFunctionWords,
+) {
+    terms.extend(
+        token
+            .split(|character: char| !character.is_alphanumeric())
+            .filter_map(|term| normalize_search_term(term, russian_function_words)),
+    );
+    terms.extend(search_reference_terms(token));
 }
 
 /// Extract collapsed reference-like terms (for example `R-0712` -> `r0712`).

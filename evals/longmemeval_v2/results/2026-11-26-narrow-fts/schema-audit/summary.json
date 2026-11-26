@@ -1,0 +1,40 @@
+{
+  "schema": "frozen-history-schema-summary/v1",
+  "expected_catalog_count": 33,
+  "observed_count": 33,
+  "missing": [],
+  "unexpected": [],
+  "not_applied": [],
+  "static_checksum_mismatches": [],
+  "dynamic_checksum_exclusion": [
+    "008_fact_semantic_embeddings.surql"
+  ],
+  "actual_indexes": {
+    "fact": [
+      "fact_claim_backfill_cursor_idx",
+      "fact_content_search",
+      "fact_embedding_hnsw",
+      "fact_index_keys_search",
+      "fact_project",
+      "fact_project_type",
+      "fact_source_episode",
+      "fact_t_valid"
+    ],
+    "edge": [
+      "edge_from_to_idx",
+      "edge_in",
+      "edge_out",
+      "edge_relation",
+      "edge_t_valid",
+      "edge_temporal_idx"
+    ],
+    "episode": [
+      "episode_episode_id",
+      "episode_project",
+      "episode_source_context",
+      "episode_source_id",
+      "episode_t_ref"
+    ]
+  },
+  "not_a_latency_or_quality_run": true
+}

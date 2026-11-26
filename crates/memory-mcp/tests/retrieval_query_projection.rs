@@ -473,3 +473,311 @@ async fn source_neighborhood_projection_preserves_order_and_content() {
     assert!(rows.iter().all(|row| row.get("id").is_none()));
     assert!(rows.iter().all(|row| row.get("policy_tags").is_some()));
 }
+
+// Public storage characterization for late materialization. The independent SQL
+// oracle deliberately pins the old query semantics rather than using its builder.
+async fn assert_lexical_fact_projection(
+    terms: &[&str],
+    limit: i32,
+    fact_types: &[String],
+) -> Vec<Vec<Value>> {
+    let (service, db) = common::make_service_with_client().await;
+    let valid = chrono::DateTime::parse_from_rfc3339("2026-05-01T00:00:00Z")
+        .unwrap()
+        .to_utc();
+    let quote = "full source payload αβ ".repeat(256);
+    for (name, content, kind, valid_days, ingested_days, invalid, invalid_ingested, keys) in [
+        (
+            "old",
+            "falcon location note",
+            "note",
+            0,
+            0,
+            None,
+            None,
+            vec![],
+        ),
+        (
+            "tie-a",
+            "falcon location note",
+            "note",
+            1,
+            0,
+            None,
+            None,
+            vec![],
+        ),
+        (
+            "tie-b",
+            "falcon location note",
+            "note",
+            1,
+            0,
+            None,
+            None,
+            vec![],
+        ),
+        (
+            "index",
+            "unrelated index carrier",
+            "note",
+            0,
+            0,
+            None,
+            None,
+            vec!["falcon"],
+        ),
+        (
+            "both",
+            "falcon location note",
+            "note",
+            0,
+            0,
+            None,
+            None,
+            vec!["falcon", "location"],
+        ),
+        (
+            "future-ingestion",
+            "falcon location note",
+            "note",
+            0,
+            4,
+            None,
+            None,
+            vec![],
+        ),
+        (
+            "future-valid",
+            "falcon location note",
+            "note",
+            4,
+            0,
+            None,
+            None,
+            vec![],
+        ),
+        (
+            "closed",
+            "falcon location note",
+            "note",
+            0,
+            0,
+            Some(1),
+            Some(1),
+            vec![],
+        ),
+        (
+            "late-closure",
+            "falcon location note",
+            "note",
+            0,
+            0,
+            Some(1),
+            Some(4),
+            vec![],
+        ),
+        (
+            "other-type",
+            "falcon location note",
+            "decision",
+            0,
+            0,
+            None,
+            None,
+            vec![],
+        ),
+    ] {
+        let source = format!("episode:projection-{name}");
+        let id = service
+            .add_fact(
+                kind,
+                content,
+                &quote,
+                &source,
+                valid + Duration::days(valid_days),
+                0.91,
+                Vec::new(),
+                vec!["lexical".into()],
+                Provenance::agent_observation(&source),
+            )
+            .await
+            .unwrap();
+        let mut assignments = vec![
+            "t_ingested = type::datetime($ingested)",
+            "index_keys = $keys",
+        ];
+        if invalid.is_some() {
+            assignments.push("t_invalid = type::datetime($invalid)");
+        }
+        if invalid_ingested.is_some() {
+            assignments.push("t_invalid_ingested = type::datetime($invalid_ingested)");
+        }
+        db.query(&format!("UPDATE type::record($id) SET {}", assignments.join(", ")), Some(json!({
+            "id": id,
+            "ingested": normalize_dt(valid + Duration::days(ingested_days)),
+            "invalid": invalid.map(|days| normalize_dt(valid + Duration::days(days))),
+            "invalid_ingested": invalid_ingested.map(|days| normalize_dt(valid + Duration::days(days))),
+            "keys": keys,
+        })), "org").await.unwrap();
+    }
+    let cutoff = "2026-05-04T00:00:00Z";
+    const ORACLE: &str = "SELECT fact_id, fact_type, content, quote, source_episode, t_valid, t_ingested, t_invalid, t_invalid_ingested, confidence, index_keys, access_count, last_accessed, entity_links, scope, policy_tags, provenance, search::score(1) AS ft_score FROM fact WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) __TYPES__ AND (content @1@ __TERM__ OR index_keys @1@ __TERM__) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit";
+    let mut expected = vec![];
+    for term in terms {
+        let sql = ORACLE
+            .replace(
+                "__TYPES__",
+                if fact_types.is_empty() {
+                    ""
+                } else {
+                    "AND fact_type IN $fact_types"
+                },
+            )
+            .replace("__TERM__", &serde_json::to_string(term).unwrap());
+        let rows = db
+            .query(
+                &sql,
+                Some(json!({"cutoff":cutoff,"limit":limit,"fact_types":fact_types})),
+                "org",
+            )
+            .await
+            .unwrap();
+        expected.push(rows.as_array().unwrap().clone());
+    }
+    let mut actual = vec![];
+    for term in terms {
+        let (sql, vars) = memory_mcp::knowledge::queries::build_select_facts_filtered_query(
+            cutoff,
+            Some(term),
+            limit,
+            fact_types,
+        );
+        if std::env::var_os("MEMORY_LEXICAL_PLAN_DIAGNOSTICS").is_some() {
+            let plan = db
+                .query(&format!("{sql} EXPLAIN"), Some(vars.clone()), "org")
+                .await
+                .unwrap();
+            println!("LEXICAL_QUERY_PLAN {}", json!({"sql":sql,"plan":plan}));
+        }
+        let rows = db.query(&sql, Some(vars), "org").await.unwrap();
+        actual.push(rows.as_array().unwrap().clone());
+    }
+    assert_eq!(
+        actual, expected,
+        "exact ordered candidates, score and all source fields must match the independent full-row oracle"
+    );
+    let sources: Vec<_> = actual[0]
+        .iter()
+        .map(|row| row["source_episode"].as_str().unwrap())
+        .collect();
+    assert!(!sources.contains(&"episode:projection-future-ingestion"));
+    assert!(!sources.contains(&"episode:projection-future-valid"));
+    assert!(!sources.contains(&"episode:projection-closed"));
+    assert_eq!(actual[0][0]["quote"], quote);
+    actual
+}
+
+#[tokio::test]
+async fn lexical_projection_preserves_complete_sources_and_temporal_visibility() {
+    let actual = assert_lexical_fact_projection(&["falcon"], 20, &[]).await;
+    let sources = actual[0]
+        .iter()
+        .map(|row| row["source_episode"].as_str().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        sources,
+        [
+            "episode:projection-both",
+            "episode:projection-old",
+            "episode:projection-tie-a",
+            "episode:projection-tie-b",
+            "episode:projection-index",
+            "episode:projection-late-closure",
+            "episode:projection-other-type"
+        ]
+        .into()
+    );
+}
+
+#[tokio::test]
+async fn lexical_projection_preserves_each_limited_group_and_repeated_term() {
+    let actual = assert_lexical_fact_projection(&["falcon", "absent", "falcon"], 2, &[]).await;
+    assert_eq!(actual[0].len(), 2);
+    assert!(actual[1].is_empty());
+    assert_eq!(actual[0], actual[2]);
+}
+
+#[tokio::test]
+async fn lexical_projection_preserves_type_filter_and_index_key_match() {
+    let actual = assert_lexical_fact_projection(&["falcon"], 20, &["note".into()]).await;
+    assert_eq!(actual[0].len(), 6);
+    assert!(
+        actual[0]
+            .iter()
+            .any(|row| row["source_episode"] == "episode:projection-index")
+    );
+    assert!(actual[0].iter().all(|row| row["fact_type"] == "note"));
+}
+
+#[tokio::test]
+async fn lexical_sort_receives_only_candidate_identity_and_rank_fields() {
+    let (_, db) = common::make_service_with_client().await;
+    let (sql, vars) = memory_mcp::knowledge::queries::build_select_facts_filtered_query(
+        "2026-05-04T00:00:00Z",
+        Some("falcon"),
+        2,
+        &[],
+    );
+    let plan = db
+        .query(&format!("{sql} EXPLAIN"), Some(vars), "org")
+        .await
+        .unwrap();
+    fn find_sort(node: &Value) -> Option<&Value> {
+        if node["operator"] == "Sort" {
+            return Some(node);
+        }
+        node.get("children")
+            .and_then(Value::as_array)?
+            .iter()
+            .find_map(find_sort)
+    }
+    let sort = plan
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(find_sort)
+        .expect("an actual FTS sort");
+    let mut input = &sort["children"][0];
+    while input["operator"] == "Subquery" {
+        input = &input["children"][0];
+    }
+    assert_eq!(
+        input["operator"], "SelectProject",
+        "the actual engine must discard full source payload before sorting candidates"
+    );
+    assert_eq!(
+        input["attributes"]["projections"],
+        "record, fact_id, t_valid, ft_score"
+    );
+    let hydration = &plan.as_array().unwrap()[0];
+    assert_eq!(hydration["operator"], "SelectProject");
+    let limited = &hydration["children"][0];
+    assert_eq!(limited["operator"], "Limit", "only winners may be hydrated");
+    assert_eq!(&limited["children"][0], sort);
+}
+
+#[tokio::test]
+async fn lexical_projection_preserves_multiword_matching_on_both_indexes() {
+    let actual = assert_lexical_fact_projection(&["falcon location"], 20, &[]).await;
+    assert!(
+        actual[0]
+            .iter()
+            .any(|row| row["source_episode"] == "episode:projection-both")
+    );
+    assert!(
+        actual[0]
+            .iter()
+            .all(|row| row["source_episode"] != "episode:projection-index")
+    );
+}

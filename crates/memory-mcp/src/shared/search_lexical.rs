@@ -8,16 +8,16 @@ use std::collections::HashSet;
 
 use crate::models::Fact;
 
-use super::search::search_query_terms;
+use super::search::search_query_term_set;
 
 /// Subset of `query_terms` that appear in `text` (both normalized via
-/// [`search_query_terms`]). Empty `query_terms` yields an empty set.
+/// [`super::search::search_query_terms`]). Empty `query_terms` yields an empty set.
 pub fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashSet<String> {
     if query_terms.is_empty() {
         return HashSet::new();
     }
 
-    let content_terms = search_query_terms(text).into_iter().collect::<HashSet<_>>();
+    let content_terms = search_query_term_set(text);
 
     query_terms
         .iter()
@@ -42,11 +42,9 @@ pub fn fact_term_set(fact: &Fact) -> HashSet<String> {
 /// things to read) but they are the same operation, so the operation lives
 /// here once and each caller reads its own two fields.
 fn term_set_of(content: &str, index_keys: &[String]) -> HashSet<String> {
-    let mut terms = search_query_terms(content)
-        .into_iter()
-        .collect::<HashSet<_>>();
+    let mut terms = search_query_term_set(content);
     for index_key in index_keys {
-        terms.extend(search_query_terms(index_key));
+        terms.extend(search_query_term_set(index_key));
     }
     terms
 }

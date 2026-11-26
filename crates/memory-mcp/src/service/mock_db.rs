@@ -44,6 +44,9 @@ struct TransactionRule {
 type CreateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 
+mod grouped_queries;
+pub(crate) use grouped_queries::grouped_select_queries;
+
 /// Configurable mock database client for tests.
 ///
 /// By default, reads return empty values. Unconfigured scalar `query` calls
@@ -370,7 +373,7 @@ impl DbClient for MockDbClient {
             }
         }
         if sql.starts_with("RETURN [") {
-            let group_count = sql.matches("(SELECT").count();
+            let group_count = grouped_select_queries(sql).len();
             return Ok(Value::Array(
                 (0..group_count).map(|_| Value::Array(Vec::new())).collect(),
             ));
@@ -513,6 +516,19 @@ mod tests {
             .await
             .expect("empty grouped response");
 
+        assert_eq!(result, json!([[], []]));
+    }
+
+    #[tokio::test]
+    async fn grouped_query_counts_outer_reads_despite_nested_selects_and_quoted_parentheses() {
+        let result = MockDbClient::new()
+            .query(
+                r#"RETURN [(SELECT record.content FROM (SELECT id AS record FROM fact WHERE content = "(SELECT \"quoted\")")), (SELECT * FROM episode WHERE content = '(SELECT)')]"#,
+                None,
+                "org",
+            )
+            .await
+            .expect("empty grouped response");
         assert_eq!(result, json!([[], []]));
     }
 

@@ -47,11 +47,11 @@ pub(crate) async fn select_fact_records_for_query(
         })
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let initial = rank_lexical_records(initial, &query_terms);
+    let initial = rank_lexical_candidates(initial, &query_terms);
 
     let Some(_query) = params.query_opt else {
         return Ok(LexicalQueryResult {
-            records: initial,
+            records: initial.records,
             retrieval_tier: RetrievalTier::Direct,
         });
     };
@@ -81,13 +81,14 @@ pub(crate) async fn select_fact_records_for_query(
         seen_fact_ids.insert(fact_id)
     });
 
-    let fallback_records = rank_lexical_records(fallback_records, &query_terms);
+    let fallback_records = rank_lexical_candidates(fallback_records, &query_terms);
 
-    let initial_score = top_query_score(&initial, &query_terms);
-    let fallback_score = top_query_score(&fallback_records, &query_terms);
+    let initial_score = initial.top_query_score;
+    let fallback_score = fallback_records.top_query_score;
     let best_score = initial_score.max(fallback_score);
-    let best_phrase_overlap = top_phrase_overlap(&initial, &query_terms)
-        .max(top_phrase_overlap(&fallback_records, &query_terms));
+    let best_phrase_overlap = initial
+        .top_phrase_overlap
+        .max(fallback_records.top_phrase_overlap);
 
     if query_terms.len() >= 3 && (best_score < query_terms.len().min(4) || best_phrase_overlap == 0)
     {
@@ -106,26 +107,26 @@ pub(crate) async fn select_fact_records_for_query(
 
     if fallback_score > initial_score {
         return Ok(LexicalQueryResult {
-            records: fallback_records,
+            records: fallback_records.records,
             retrieval_tier: RetrievalTier::EpisodeFallback,
         });
     }
 
-    if !initial.is_empty() {
+    if !initial.records.is_empty() {
         return Ok(LexicalQueryResult {
-            records: initial,
+            records: initial.records,
             retrieval_tier: RetrievalTier::Direct,
         });
     }
 
-    let retrieval_tier = if fallback_records.is_empty() {
+    let retrieval_tier = if fallback_records.records.is_empty() {
         RetrievalTier::Direct
     } else {
         RetrievalTier::EpisodeFallback
     };
 
     Ok(LexicalQueryResult {
-        records: fallback_records,
+        records: fallback_records.records,
         retrieval_tier,
     })
 }
@@ -160,6 +161,7 @@ impl LexicalAnchorProfile {
 #[derive(Debug, Clone, Copy, Default)]
 struct LexicalRecordMetrics {
     base_score: usize,
+    phrase_overlap: usize,
     weighted_overlap: f64,
     hard_anchor_hits: usize,
     hard_anchor_mass: f64,
@@ -288,35 +290,53 @@ async fn scan_fact_records_by_query_terms(
     Ok(filtered)
 }
 
-pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[String]) -> Vec<Value> {
+struct RankedLexicalCandidates {
+    records: Vec<Value>,
+    top_query_score: usize,
+    top_phrase_overlap: usize,
+}
+
+pub(crate) fn rank_lexical_records(records: Vec<Value>, query_terms: &[String]) -> Vec<Value> {
+    rank_lexical_candidates(records, query_terms).records
+}
+
+fn rank_lexical_candidates(records: Vec<Value>, query_terms: &[String]) -> RankedLexicalCandidates {
     if query_terms.is_empty() {
-        return records;
+        return RankedLexicalCandidates {
+            records,
+            top_query_score: 0,
+            top_phrase_overlap: 0,
+        };
     }
 
     let anchor_profile = build_lexical_anchor_profile(&records, query_terms);
 
-    for record in &mut records {
-        let metrics = lexical_record_metrics(record, query_terms, &anchor_profile);
-        let soft_anchor_bonus = if metrics.base_score <= 1 {
-            metrics.soft_anchor_mass * 0.35
-        } else {
-            0.0
-        };
-        let combined_score = dampened_lexical_ft_score(record)
-            + metrics.base_score as f64
-            + (metrics.hard_anchor_mass * 2.0)
-            + soft_anchor_bonus;
-        if let Some(object) = record.as_object_mut() {
-            object.insert("ft_score".to_string(), json!(combined_score));
-        } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
-            object.insert("ft_score".to_string(), json!(combined_score));
-        }
-    }
+    // Metrics depend on immutable text/index keys and this candidate pool, not
+    // on the score written below. Compute once rather than tokenize every
+    // source again for both sides of every sort comparison.
+    let mut ranked = records
+        .into_iter()
+        .map(|mut record| {
+            let metrics = lexical_record_metrics(&record, query_terms, &anchor_profile);
+            let soft_anchor_bonus = if metrics.base_score <= 1 {
+                metrics.soft_anchor_mass * 0.35
+            } else {
+                0.0
+            };
+            let combined_score = dampened_lexical_ft_score(&record)
+                + metrics.base_score as f64
+                + (metrics.hard_anchor_mass * 2.0)
+                + soft_anchor_bonus;
+            if let Some(object) = record.as_object_mut() {
+                object.insert("ft_score".to_string(), json!(combined_score));
+            } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
+                object.insert("ft_score".to_string(), json!(combined_score));
+            }
+            (record, metrics)
+        })
+        .collect::<Vec<_>>();
 
-    records.sort_by(|left, right| {
-        let right_metrics = lexical_record_metrics(right, query_terms, &anchor_profile);
-        let left_metrics = lexical_record_metrics(left, query_terms, &anchor_profile);
-
+    ranked.sort_by(|(left, left_metrics), (right, right_metrics)| {
         right_metrics
             .hard_anchor_hits
             .cmp(&left_metrics.hard_anchor_hits)
@@ -347,7 +367,21 @@ pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[Strin
             .then_with(|| lexical_fact_id(left).cmp(&lexical_fact_id(right)))
     });
 
-    records
+    let top_query_score = ranked
+        .iter()
+        .map(|(_, metrics)| metrics.base_score)
+        .max()
+        .unwrap_or(0);
+    let top_phrase_overlap = ranked
+        .iter()
+        .map(|(_, metrics)| metrics.phrase_overlap)
+        .max()
+        .unwrap_or(0);
+    RankedLexicalCandidates {
+        records: ranked.into_iter().map(|(record, _)| record).collect(),
+        top_query_score,
+        top_phrase_overlap,
+    }
 }
 
 fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> LexicalAnchorProfile {
@@ -401,7 +435,29 @@ fn lexical_record_metrics(
     query_terms: &[String],
     anchor_profile: &LexicalAnchorProfile,
 ) -> LexicalRecordMetrics {
-    let matched_terms = matched_query_terms_for_record(record, query_terms);
+    let content_terms = best_matching_content_terms(
+        raw_object(record)
+            .and_then(|map| map.get("content"))
+            .and_then(json_string)
+            .unwrap_or_default(),
+        query_terms,
+    );
+    let index_terms = raw_object(record)
+        .and_then(|map| map.get("index_keys"))
+        .and_then(raw_array)
+        .into_iter()
+        .flatten()
+        .filter_map(json_string)
+        .flat_map(search_query_terms)
+        .collect::<Vec<_>>();
+    let record_terms = content_terms
+        .iter()
+        .chain(&index_terms)
+        .collect::<HashSet<_>>();
+    let matched_terms = unique_query_terms(query_terms)
+        .into_iter()
+        .filter(|term| record_terms.contains(term))
+        .collect::<Vec<_>>();
     let weighted_overlap = matched_terms
         .iter()
         .map(|term| anchor_profile.weight_for(term))
@@ -421,8 +477,10 @@ fn lexical_record_metrics(
         .map(|term| anchor_profile.weight_for(term))
         .sum::<f64>();
 
+    let (content_score, phrase_overlap) = content_term_scores(&content_terms, query_terms);
     LexicalRecordMetrics {
-        base_score: lexical_query_score(record, query_terms),
+        base_score: content_score + query_term_overlap_for_terms(&index_terms, query_terms),
+        phrase_overlap,
         weighted_overlap,
         hard_anchor_hits,
         hard_anchor_mass,
@@ -430,50 +488,10 @@ fn lexical_record_metrics(
     }
 }
 
-fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> Vec<String> {
-    if query_terms.is_empty() {
-        return Vec::new();
-    }
-
-    let mut record_terms = best_matching_content_terms(
-        raw_object(record)
-            .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
-            .and_then(json_string)
-            .unwrap_or_default(),
-        query_terms,
-    )
-    .into_iter()
-    .collect::<HashSet<_>>();
-
-    if let Some(index_keys) = raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
-        .and_then(raw_array)
-    {
-        for value in index_keys {
-            if let Some(index_key) = json_string(value) {
-                record_terms.extend(search_query_terms(index_key));
-            }
-        }
-    }
-
-    unique_query_terms(query_terms)
-        .into_iter()
-        .filter(|term| record_terms.contains(term.as_str()))
-        .collect()
-}
-
 fn top_query_score(records: &[Value], query_terms: &[String]) -> usize {
     records
         .iter()
         .map(|record| lexical_query_score(record, query_terms))
-        .max()
-        .unwrap_or(0)
-}
-
-fn top_phrase_overlap(records: &[Value], query_terms: &[String]) -> usize {
-    records
-        .iter()
-        .map(|record| lexical_phrase_overlap(record, query_terms))
         .max()
         .unwrap_or(0)
 }
@@ -486,13 +504,8 @@ fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
             .unwrap_or_default(),
         query_terms,
     );
-    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms)
-        + lexical_index_key_overlap(record, query_terms);
-    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
-        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-
-    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+    score_content_terms(&content_terms, query_terms)
+        + lexical_index_key_overlap(record, query_terms)
 }
 
 pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
@@ -515,35 +528,13 @@ pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]
 
 pub(crate) fn lexical_query_score_for_text(text: &str, query_terms: &[String]) -> usize {
     let content_terms = best_matching_content_terms(text, query_terms);
-    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms);
-    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
-        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-
-    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+    score_content_terms(&content_terms, query_terms)
 }
 
 pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
     let content_terms = best_matching_content_terms(&fact.content, query_terms);
-    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms)
-        + lexical_index_key_overlap_for_fact(fact, query_terms);
-    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
-        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
-
-    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
-}
-
-fn lexical_phrase_overlap(record: &Value, query_terms: &[String]) -> usize {
-    let content_terms = best_matching_content_terms(
-        raw_object(record)
-            .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
-            .and_then(json_string)
-            .unwrap_or_default(),
-        query_terms,
-    );
-    lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
-        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3)
+    score_content_terms(&content_terms, query_terms)
+        + lexical_index_key_overlap_for_fact(fact, query_terms)
 }
 
 fn lexical_ngram_overlap_for_terms(
@@ -650,12 +641,18 @@ fn sentence_like_segments(text: &str) -> Vec<String> {
 }
 
 fn score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
-    let unigram_overlap = query_term_overlap_for_terms(content_terms, query_terms);
-    let phrase_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 2)
-        + lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
-    let trigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
+    content_term_scores(content_terms, query_terms).0
+}
 
-    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+fn content_term_scores(content_terms: &[String], query_terms: &[String]) -> (usize, usize) {
+    let unigram_overlap = query_term_overlap_for_terms(content_terms, query_terms);
+    let bigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 2);
+    let trigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
+    let phrase_overlap = bigram_overlap + trigram_overlap;
+    (
+        unigram_overlap + (phrase_overlap * 2) + trigram_overlap,
+        phrase_overlap,
+    )
 }
 
 fn query_term_overlap_for_terms(content_terms: &[String], query_terms: &[String]) -> usize {

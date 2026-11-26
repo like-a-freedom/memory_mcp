@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running unittests src/lib.rs (target/debug/build/memory_mcp/526bba5550d0e6e4/out/memory_mcp-526bba5550d0e6e4)
+
+running 13 tests
+test memory::retrieval::lexical::tests::lexical_candidate_limit_preserves_preexpanded_limits ... ok
+test memory::retrieval::lexical::tests::build_lexical_fallback_queries_skips_standalone_temporal_terms_for_month_year_queries ... ok
+test memory::retrieval::lexical::tests::build_lexical_fallback_queries_skips_generic_singletons_when_hard_anchor_exists ... ok
+test memory::retrieval::lexical::tests::rank_lexical_records_promotes_more_specific_query_overlap ... ok
+test memory::retrieval::lexical::tests::rank_lexical_records_prioritizes_hard_anchor_matches_over_generic_overlap ... ok
+test memory::retrieval::lexical::tests::rank_lexical_records_promotes_soft_anchor_matches_for_rare_lowercase_terms ... ok
+test memory::retrieval::lexical::tests::rank_lexical_records_prefers_sentence_cohesion_over_cross_sentence_term_soup ... ok
+test memory::retrieval::lexical::tests::initial_and_fallback_ties_keep_same_tier ... ok
+test memory::retrieval::lexical::tests::lexical_scan_fallback_observes_bitemporal_ingestion_and_invalidation ... ok
+test memory::retrieval::lexical::tests::term_order_preserves_dedup_winner ... ok
+test memory::retrieval::lexical::tests::select_fact_records_for_short_query_uses_term_fallback ... ok
+test memory::retrieval::lexical::tests::select_fact_records_for_query_prefers_term_fallback_with_better_overlap ... ok
+test memory::retrieval::lexical::tests::lexical_record_metrics_are_bitwise_stable_for_identical_input ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 2049 filtered out; finished in 0.03s
+

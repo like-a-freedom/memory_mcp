@@ -1,0 +1,494 @@
+{
+  "schema": "full-history-equivalent-repair-summary/v1",
+  "native_only": true,
+  "models": false,
+  "attempts": [
+    {
+      "attempt": ".",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/Users/solovey/Documents/dev/memory_mcp/target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 59393,
+        "copy_seconds": 0.6445858329825569,
+        "elapsed_seconds": 45.20701591699617,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 7,
+      "completed_query_us_sum": 2716960,
+      "last_completed_query_elapsed_ms": 2783.478583,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 4
+      },
+      "log": "0c6b0c60.log"
+    },
+    {
+      "attempt": "complete-stage-diagnostic",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-8afgkqta/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 66907,
+        "copy_seconds": 0.513946124992799,
+        "elapsed_seconds": 148.22209429199575,
+        "external_timeout": false,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "0c6b0c60",
+        "elapsed_ms": 129926.50549999998,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 101,
+      "completed_query_us_sum": 15141307,
+      "last_completed_query_elapsed_ms": 107208.86345799999,
+      "sql_categories": {
+        "edge": 78,
+        "fts": 4
+      },
+      "log": "complete-stage-diagnostic/0c6b0c60.log"
+    },
+    {
+      "attempt": "complete-stage-diagnostic",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-8afgkqta/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 67163,
+        "copy_seconds": 1.3761186249903403,
+        "elapsed_seconds": 145.57158366701333,
+        "external_timeout": false,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "f61a096f",
+        "elapsed_ms": 132537.27183399998,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 109,
+      "completed_query_us_sum": 26343138,
+      "last_completed_query_elapsed_ms": 68907.115417,
+      "sql_categories": {
+        "edge": 70,
+        "fts": 24
+      },
+      "log": "complete-stage-diagnostic/f61a096f.log"
+    },
+    {
+      "attempt": ".",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/Users/solovey/Documents/dev/memory_mcp/target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 59451,
+        "copy_seconds": 1.1794046670256648,
+        "elapsed_seconds": 45.190090416988824,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 15,
+      "completed_query_us_sum": 9000135,
+      "last_completed_query_elapsed_ms": 9345.292917,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 12
+      },
+      "log": "f61a096f.log"
+    },
+    {
+      "attempt": "feature-reuse",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-5osc7b6a/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 65383,
+        "copy_seconds": 0.4883869999903254,
+        "elapsed_seconds": 45.00512975000311,
+        "external_timeout": true,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "0c6b0c60",
+        "elapsed_ms": 30080.701250000002,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 75,
+      "completed_query_us_sum": 9263731,
+      "last_completed_query_elapsed_ms": 29980.410875,
+      "sql_categories": {
+        "edge": 59,
+        "fts": 4
+      },
+      "log": "feature-reuse/0c6b0c60.log"
+    },
+    {
+      "attempt": "feature-reuse",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-5osc7b6a/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 65496,
+        "copy_seconds": 0.5101424580207095,
+        "elapsed_seconds": 43.33343483399949,
+        "external_timeout": false,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "f61a096f",
+        "elapsed_ms": 30319.515917,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 23,
+      "completed_query_us_sum": 14277614,
+      "last_completed_query_elapsed_ms": 30116.41575,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 19
+      },
+      "log": "feature-reuse/f61a096f.log"
+    },
+    {
+      "attempt": "metric-cache",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-me33em5u/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 64450,
+        "copy_seconds": 0.5627726659877226,
+        "elapsed_seconds": 45.11363908299245,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 7,
+      "completed_query_us_sum": 2739762,
+      "last_completed_query_elapsed_ms": 2753.991583,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 4
+      },
+      "log": "metric-cache/0c6b0c60.log"
+    },
+    {
+      "attempt": "metric-cache",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-me33em5u/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 64648,
+        "copy_seconds": 0.5862264999886975,
+        "elapsed_seconds": 45.128648042009445,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 15,
+      "completed_query_us_sum": 9215179,
+      "last_completed_query_elapsed_ms": 9274.648791000001,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 12
+      },
+      "log": "metric-cache/f61a096f.log"
+    },
+    {
+      "attempt": "metric-cache-profile",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-rurb5ii9/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 64807,
+        "copy_seconds": 0.5251549590029754,
+        "elapsed_seconds": 45.112233499996364,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 7,
+      "completed_query_us_sum": 2628569,
+      "last_completed_query_elapsed_ms": 2641.903625,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 4
+      },
+      "log": "metric-cache-profile/0c6b0c60.log"
+    },
+    {
+      "attempt": "optimized-comparison/baseline",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-optimized-bin-girrg701/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 60531,
+        "copy_seconds": 0.5976038330118172,
+        "elapsed_seconds": 45.21640666699386,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 7,
+      "completed_query_us_sum": 4654555,
+      "last_completed_query_elapsed_ms": 4667.847625,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 4
+      },
+      "log": "optimized-comparison/baseline/0c6b0c60.log"
+    },
+    {
+      "attempt": "optimized-comparison/baseline",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-optimized-bin-girrg701/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 60620,
+        "copy_seconds": 0.4901789590076078,
+        "elapsed_seconds": 45.17594995800755,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 15,
+      "completed_query_us_sum": 28183790,
+      "last_completed_query_elapsed_ms": 28241.167917,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 12
+      },
+      "log": "optimized-comparison/baseline/f61a096f.log"
+    },
+    {
+      "attempt": "optimized-comparison/candidate",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-optimized-bin-8b2wc36r/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 60837,
+        "copy_seconds": 0.5709927089919802,
+        "elapsed_seconds": 45.1469382919895,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 7,
+      "completed_query_us_sum": 2773478,
+      "last_completed_query_elapsed_ms": 2787.131375,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 4
+      },
+      "log": "optimized-comparison/candidate/0c6b0c60.log"
+    },
+    {
+      "attempt": "optimized-comparison/candidate",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-optimized-bin-8b2wc36r/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 60907,
+        "copy_seconds": 0.4620756249933038,
+        "elapsed_seconds": 45.250556417013286,
+        "external_timeout": true,
+        "exit_code": -9
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": null,
+      "completed_queries": 15,
+      "completed_query_us_sum": 9319261,
+      "last_completed_query_elapsed_ms": 9378.696625,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 12
+      },
+      "log": "optimized-comparison/candidate/f61a096f.log"
+    },
+    {
+      "attempt": "unique-token-set",
+      "case_id": "0c6b0c60",
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-la_7ydmc/full_history_evidence",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 66377,
+        "copy_seconds": 0.5371966249949764,
+        "elapsed_seconds": 44.11426837500767,
+        "external_timeout": false,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "0c6b0c60",
+        "elapsed_ms": 30091.919625,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 89,
+      "completed_query_us_sum": 10886114,
+      "last_completed_query_elapsed_ms": 29909.988375,
+      "sql_categories": {
+        "edge": 73,
+        "fts": 4
+      },
+      "log": "unique-token-set/0c6b0c60.log"
+    },
+    {
+      "attempt": "unique-token-set",
+      "case_id": "f61a096f",
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-metric-cache-la_7ydmc/full_history_evidence",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "pid": 66498,
+        "copy_seconds": 0.5001776660210453,
+        "elapsed_seconds": 43.614100915991,
+        "external_timeout": false,
+        "exit_code": 101
+      },
+      "source_carrier": true,
+      "completed_context": false,
+      "observed_failure": {
+        "case_id": "f61a096f",
+        "elapsed_ms": 30126.468708,
+        "error": "Err(Elapsed(()))"
+      },
+      "completed_queries": 24,
+      "completed_query_us_sum": 14788999,
+      "last_completed_query_elapsed_ms": 29046.1915,
+      "sql_categories": {
+        "edge": 0,
+        "fts": 20
+      },
+      "log": "unique-token-set/f61a096f.log"
+    }
+  ],
+  "acceptance": {
+    "registered_read_seconds": 30,
+    "latest_registered_candidate": "unique-token-set",
+    "completed_contexts": 0,
+    "required_contexts": 2,
+    "passed": false
+  },
+  "extended_diagnostic": {
+    "registered_read_seconds": 120,
+    "external_process_seconds": 150,
+    "completed_contexts": 0,
+    "required_contexts": 2,
+    "acceptance_run": false
+  },
+  "archive_answers": {
+    "correct": 2,
+    "total": 7,
+    "new_answers": 0
+  },
+  "limitations": [
+    "Completed SQL observer excludes unfinished SQL and application CPU.",
+    "Stage receipts unavailable on timed-out reads; absent stages are unknown, not zero.",
+    "One capture per variant/case; no latency distribution or treatment effect.",
+    "Frozen historical formation/index state unchanged; no migrations or reformation."
+  ],
+  "schema_audit": "schema-audit/summary.json",
+  "native_regression_gate": "native-gate/comparison.json",
+  "verification": "verification.json"
+}

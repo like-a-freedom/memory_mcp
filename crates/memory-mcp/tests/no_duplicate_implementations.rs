@@ -37,26 +37,19 @@ const CANONICAL: &[(&str, Option<&str>)] = &[
 /// copy of something in `shared/search_lexical.rs` and is not: a grep result
 /// generalises, a read does not. Recording them is what stops the next reader
 /// from "consolidating" one and silently changing retrieval.
-const NOT_DUPLICATES: &[(&str, &str, &str)] = &[
-    (
-        "matched_query_terms_for_record",
-        "src/memory/retrieval/lexical.rs",
-        "It collects `best_matching_content_terms`, which picks the best-scoring \
-         span of the content and narrows the match to that span. The shared \
-         `matched_query_terms_for_fact` unions every term in the content. Those \
-         answer different questions — 'which span of this record matches' and \
-         'which terms does this record contain' — and the span score feeds the \
-         ranking below it. Routing one through the other would change which \
-         candidates rank higher, with every unit test still green.",
-    ),
-    (
-        "lexical_query_overlap_for_fact",
-        "src/memory/retrieval/lexical.rs",
-        "A `Fact`-typed entry point beside the `Value`-typed `lexical_query_overlap`. \
+const NOT_DUPLICATES: &[(&str, &str, &str)] = &[(
+    "lexical_query_overlap_for_fact",
+    "src/memory/retrieval/lexical.rs",
+    "A `Fact`-typed entry point beside the `Value`-typed `lexical_query_overlap`. \
          One operation, two input types: the `Value` form parses the record first, \
          and the `Fact` form does not have to.",
-    ),
-];
+)];
+
+// The former matched_query_terms_for_record helper was inlined into the one
+// lexical_record_metrics pass; it still uses the best span, not the whole-text
+// shared term set. The observable sentence-cohesion ranking scenario protects
+// that distinction. Keeping its old function name would require dead code and
+// this source-inventory lint is not behavioral evidence.
 
 /// A rename that must not be undone, with the file it lives in and why the two
 /// same-named things are not the same thing.

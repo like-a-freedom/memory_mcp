@@ -1,0 +1,7 @@
+{
+  "path": "crates/memory-mcp/src/shared/search_lexical.rs",
+  "before_sha256": "9da44c9e9a8aedde42a988b589aac56cd457c5053fc179b1e3c21909b8c3f768",
+  "after_sha256": "b69713f459d0d5406cea3f60e3e1c44dbb28a916302e0a48c4875c5a7bd12a6b",
+  "change": "Qualify one rustdoc link only; no function body or capture changed. Reversing this exact replacement reconstructs the capture source.",
+  "reconstruction_matches_capture": true
+}

@@ -1,0 +1,74 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.20s
+     Running tests/lexical_term_set_resource.rs (target/debug/build/memory_mcp/92aec90f97bc0031/out/lexical_term_set_resource-92aec90f97bc0031)
+
+running 2 tests
+test repeated_source_vocabulary_has_bounded_normalization_allocations ... ok
+test term_sets_preserve_the_ordered_tokenizer_vocabulary ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/4d4d22d1f07b8399/out/long_history_stage_evidence-4d4d22d1f07b8399)
+
+running 6 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+2026-11-26T11:49:50.495555Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+
+     Running tests/query_scaling_regressions.rs (target/debug/build/memory_mcp/bae4d80cc96b7e9e/out/query_scaling_regressions-bae4d80cc96b7e9e)
+
+running 10 tests
+test archival_signal_reads_chunk_episode_ids_at_sixty_four ... ok
+test community_offset_page_repeats_an_edge_after_an_earlier_insert ... ok
+test bounded_hub_candidates_preserve_the_existing_entity_prefix ... ok
+test duplicate_fact_accesses_each_increment_and_saturate_at_i64_max ... ok
+test hub_edge_reads_chunk_candidate_ids_at_the_owner_limit ... ok
+test community_offset_page_skips_an_edge_invalidated_after_page_one ... ok
+test lexical_fallback_uses_full_bitemporal_visibility ... ok
+test one_batched_hub_edge_read_matches_per_entity_direction_reads ... ok
+test map_view_preserves_hub_ranking_while_reducing_neighbor_reads ... ok
+test batched_archival_signals_match_bitemporal_and_heat_checks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+     Running tests/retrieval_query_batching.rs (target/debug/build/memory_mcp/7c84b5bac3e675c4/out/retrieval_query_batching-7c84b5bac3e675c4)
+
+running 7 tests
+test episode_subqueries_preserve_unicode_casefolded_substring_groups ... ok
+test fact_fallback_batches_term_queries_within_the_rpc_budget ... ok
+test episode_fallback_batches_terms_without_changing_substring_queries ... ok
+test fact_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test episode_term_batches_are_limited_to_eight_groups_per_rpc ... ok
+test source_fact_reads_keep_independent_limits_in_batches_of_eight ... ok
+test surreal_subqueries_preserve_each_ordered_fact_score_group ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+
+     Running tests/retrieval_query_projection.rs (target/debug/build/memory_mcp/f869acb25d4d9b70/out/retrieval_query_projection-f869acb25d4d9b70)
+
+running 16 tests
+test lexical_sort_receives_only_candidate_identity_and_rank_fields ... ok
+test facets_preserve_group_order_while_projecting_episode_inputs ... ok
+test source_siblings_preserve_no_embedding_mode ... ok
+test source_siblings_do_not_materialize_2048d_vectors ... ok
+test source_siblings_do_not_materialize_17d_vectors ... ok
+test source_siblings_do_not_materialize_1536d_vectors ... ok
+test source_neighborhood_projection_preserves_order_and_content ... ok
+test active_fact_existence_preserves_bitemporal_invalidation_boundaries ... ok
+test archival_existence_does_not_read_fact_payload ... ok
+test source_siblings_do_not_materialize_384d_vectors ... ok
+test source_siblings_do_not_materialize_3072d_vectors ... ok
+test source_siblings_do_not_materialize_768d_vectors ... ok
+test lexical_projection_preserves_complete_sources_and_temporal_visibility ... ok
+test lexical_projection_preserves_multiword_matching_on_both_indexes ... ok
+test lexical_projection_preserves_type_filter_and_index_key_match ... ok
+test lexical_projection_preserves_each_limited_group_and_repeated_term ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+

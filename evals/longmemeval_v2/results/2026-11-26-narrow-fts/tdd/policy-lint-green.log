@@ -1,0 +1,13 @@
+    Blocking waiting for file lock on build directory
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.54s
+     Running tests/no_duplicate_implementations.rs (target/debug/build/memory_mcp/fda27a24ccdda3c7/out/no_duplicate_implementations-fda27a24ccdda3c7)
+
+running 4 tests
+test the_three_ranking_paths_still_exist ... ok
+test a_name_that_looks_duplicated_but_is_not_stays_where_it_is ... ok
+test a_deliberate_rename_is_still_where_it_was_put ... ok
+test each_concern_has_exactly_one_implementation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+

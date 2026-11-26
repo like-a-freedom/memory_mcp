@@ -1,0 +1,55 @@
+{
+  "schema": "full-history-diagnostic/v1",
+  "base_revision": "ab4a06ae56282d92efa1aa574d1a90fedcf23c42",
+  "trajectory_count": 100,
+  "trajectory_file_sha256": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+  "snapshot_file_sha256": {
+    "LOCK": "c44c5a0d5f47c2be4045a04fe3ce254711a231fdee879b845610568b33595ce0",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "2037771f83909280e0014c5d7765af813734983cd8a770fa74d2b170d2eb2edf",
+    "vlog/00000000000000000002.vlog": "bbe8e8701fb570d6a96974f0a5ef73d1f4108c54ef6279461029a1e99619d355",
+    "vlog/00000000000000000003.vlog": "ec529d22010a42b0a6bbb8b485d1fb3a7c58d0c7f39334a300890bbb2beb2337",
+    "wal/00000000000000000302.wal": "e7b86747da86b5aeb96398fe90ed9c4e84a67bc40b8175d0ad55dd94621fb987"
+  },
+  "cases": {
+    "0c6b0c60": {
+      "trajectory_id": "4ae82e48",
+      "trajectory_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "trajectory_bytes": 382024,
+      "segment_index": 0,
+      "segment_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+      "query": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "required_serialized_span": "\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '\u2022 Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '\u2022'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible"
+    },
+    "f61a096f": {
+      "trajectory_id": "06c70de4",
+      "trajectory_sha256": "ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90",
+      "trajectory_bytes": 4677154,
+      "segment_index": 4,
+      "segment_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+      "query": "I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.",
+      "required_serialized_span": "\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'"
+    }
+  },
+  "limits": {
+    "read_seconds": 120,
+    "child_seconds": 150,
+    "models": false
+  },
+  "policy": "Each case reads a separate disposable full-store copy. No reformation, no filtered store, no model answers; all outcomes retained. Missing stages stay unknown. Embeddings disabled, existing historical formation unchanged.",
+  "diagnostic_amendment": "Separate completion diagnosis only, not acceptance or a successful30s repeat. All unique-token-set30s reads failed; retain them. Allow120s cooperative/150s external once per case, same full snapshot/query/budget/sources and optimized code. Observe actual stages/source coverage before choosing further repairs. Optional20s CPU sample. No models, no C2 admission, no full-latency speedup claim against censored45s baseline.",
+  "candidate_source_sha256": {
+    "crates/memory-mcp/src/knowledge/queries.rs": "1f9536823ea11b28c3f238c65e0708ceb16f7ffdb57037cbdebf8ef6ec30c3f8",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "632e70f29a9e163264c746db24be098988422b4eb8a94b41af660fb6e093d06a",
+    "crates/memory-mcp/src/shared/search.rs": "4d8ac8ba6f2ac9554d30b3efa3a9427cf0073c6c19537eefae16bc63c8fd88a0",
+    "crates/memory-mcp/src/shared/search_lexical.rs": "b69713f459d0d5406cea3f60e3e1c44dbb28a916302e0a48c4875c5a7bd12a6b",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f",
+    "crates/memory-mcp/tests/retrieval_query_projection.rs": "5c5280ee39a6a84beb7d2053b5ec34580f916d068577de6fe2a769b0404e21a2",
+    "crates/memory-mcp/tests/lexical_term_set_resource.rs": "2f95ff2f62610f0c2150a75c38c11cb59cb3d00ec86b127b0add6bf1b0bd0b12"
+  },
+  "profile": {
+    "CARGO_PROFILE_TEST_OPT_LEVEL": "3"
+  }
+}

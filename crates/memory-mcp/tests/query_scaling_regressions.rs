@@ -1,6 +1,8 @@
 #![cfg(all(feature = "eval-support", feature = "test-fixtures"))]
 
 mod common;
+#[path = "../src/service/mock_db/grouped_queries.rs"]
+mod grouped_queries;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -138,7 +140,7 @@ impl DbClient for LexicalFallbackDb {
         namespace: &str,
     ) -> Result<Value, memory_mcp::MemoryError> {
         if sql.starts_with("RETURN [") {
-            let group_count = sql.matches("(SELECT").count();
+            let group_count = grouped_queries::grouped_select_queries(sql).len();
             return Ok(Value::Array(
                 (0..group_count).map(|_| Value::Array(Vec::new())).collect(),
             ));
