@@ -52,24 +52,42 @@ def score_reviewed_spans(cohort, trajectories, per_question):
         if not isinstance(memory_context, list):
             raise ValueError(f"memory context is missing or malformed for {case_id}")
         text_items = [
-            decode_saved_text(item["value"])
+            item["value"]
             for item in memory_context
             if isinstance(item, dict)
             and item.get("type") == "text"
             and isinstance(item.get("value"), str)
         ]
-        matches = sum(span in item for item in text_items)
+        # ordered-segments-v1 stores source trees inside JSON strings. Match the
+        # complete literal serialization, rather than partially decoding escapes
+        # (which leaves protected backslashes and quoted labels incomparable).
+        # Excerpts need not be complete JSON documents. This is source presence,
+        # not a claim of decoded readability or correct interpretation.
+        serialized_span = json.dumps(span, ensure_ascii=False)[1:-1]
+        representations = [
+            {
+                name for name, present in (
+                    ("raw_text", span in item),
+                    ("legacy_saved_text", span in decode_saved_text(item)),
+                    ("json_string_serialized", serialized_span in item),
+                ) if present
+            }
+            for item in text_items
+        ]
+        matches = sum(bool(forms) for forms in representations)
         cases[case_id] = {
             "trajectory_id": trajectory_id,
             "reviewed_span_sha256": review["span_sha256"],
             "present": matches > 0,
             "matching_text_items": matches,
+            "matching_representations": sorted(set().union(*representations)),
         }
 
     present = sum(result["present"] for result in cases.values())
     selected = len(cases)
     return {
-        "schema": "memory-mcp-longmemeval-v2-reviewed-span-coverage/v1",
+        "schema": "memory-mcp-longmemeval-v2-reviewed-span-coverage/v2",
+        "comparison_contract": "complete verified span in one text item: raw, legacy newline/tab escapes, or exact JSON-string serialization; not decoded readability or semantic sufficiency",
         "reviewed_span_coverage": {
             "present": present,
             "selected": selected,

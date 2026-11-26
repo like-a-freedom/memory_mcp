@@ -13,7 +13,7 @@ import statistics
 import sys
 
 from .exact_answer_quality import exact_phrase_set_match
-from .reviewed_span_coverage import decode_saved_text, read_jsonl
+from .reviewed_span_coverage import decode_saved_text, read_jsonl, score_reviewed_spans
 from .text_cohort import verified_span
 
 
@@ -41,6 +41,7 @@ def diagnose(cohort, trajectories, truth, prompts, readers, stage_receipts=None)
     if stage_receipts is not None:
         if stage_receipts.get('schema') != 'memory-mcp-source-stage-receipts/v1' or not set(stage_receipts.get('cases', {})) <= ids:
             raise ValueError('stage receipt schema or case identities do not match')
+    span_coverage = score_reviewed_spans(cohort, trajectories, prompts)
     cases = {}
     latencies = []
     for case_id, review in cohort['reviews'].items():
@@ -60,8 +61,7 @@ def diagnose(cohort, trajectories, truth, prompts, readers, stage_receipts=None)
             raise ValueError('missing memory context is not an empty observed context')
         text = '\n'.join(decode_saved_text(item['value']) for item in context
                          if item.get('type') == 'text' and isinstance(item.get('value'), str))
-        complete = any(span in decode_saved_text(item['value']) for item in context
-                       if item.get('type') == 'text' and isinstance(item.get('value'), str))
+        complete = span_coverage['cases'][case_id]['present']
         marker_presence = {marker: marker in text for marker in markers}
         reader = reader_rows.get(case_id)
         if reader and 'memory_context_sha256' in reader:
@@ -88,6 +88,7 @@ def diagnose(cohort, trajectories, truth, prompts, readers, stage_receipts=None)
             'evidence_selection': 'unknown_no_intermediate_receipt',
             'packaging': 'unknown_no_prepackaging_receipt',
             'delivered_complete_reviewed_span': complete,
+            'source_presence_representations': span_coverage['cases'][case_id]['matching_representations'],
             'delivered_support_markers': marker_presence,
             'context_nonempty': bool(text.strip()),
             'context_tokens': prompt.get('memory_context_token_count'),
@@ -145,6 +146,7 @@ def diagnose(cohort, trajectories, truth, prompts, readers, stage_receipts=None)
         'schema': 'memory-mcp-long-history-diagnosis/v1',
         'answer_contract': 'strict normalized phrase-set equality against independently reviewed accepted answers; unlisted valid paraphrases may be false negatives',
         'stage_contract': 'full-span absence is conservative; marker presence alone never establishes semantic sufficiency; missing intermediate receipts stay unknown',
+        'source_presence_contract': span_coverage['comparison_contract'],
         'selected': len(cases),
         'correct': sum(case['reader_verdict'] == 'correct' for case in cases.values()),
         'complete_reviewed_spans': sum(case['delivered_complete_reviewed_span'] for case in cases.values()),
