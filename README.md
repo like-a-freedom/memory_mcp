@@ -2044,14 +2044,16 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 | `openai-compatible` | External OpenAI-compatible HTTP API | 1536 (configurable) | Yes, every call |
 | `ollama` | External Ollama HTTP API | 1536 (configurable) | Yes, every call |
 
+The OpenAI-compatible provider automatically sends `input_type: "passage"` for stored documents and `input_type: "query"` for searches when required by the known NVIDIA Nemotron embedding model IDs (including `nvidia/nemotron-3.5-embed-1b`) or detected from a structured missing-parameter response. Ordinary models retain the existing request format. No additional setting is needed. Unknown models require an API preflight even when the dimension is configured; known models with a dimension override can resolve offline. An API that silently accepts a request without the required parameter cannot be detected automatically. Changing the embedding model or its input contract changes the embedding identity; use the existing `reembed` maintenance workflow to rebuild incompatible stored vectors.
+
 #### How it works at startup
 
 At startup the server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
-For remote providers (`openai-compatible`, `ollama`) the effective dimension is normally detected with a single short **dimension probe** request to the provider.
+For remote providers (`openai-compatible`, `ollama`) the effective dimension is normally detected with a short preflight to the provider. OpenAI-compatible contract detection can use up to three requests within one bounded timeout.
 Two startup behaviors keep this from blocking `serve`:
 
-- If `SURREALDB_EMBEDDING_DIMENSION` is set, the probe is skipped entirely: the override is authoritative at startup, so the server resolves its embedding identity without any network access. A wrong override then surfaces as a dimension-validation error on embed; use `reembed` as the recovery path.
-- If no override is set and the provider is unreachable, the probe fails fast (single attempt, bounded by a short probe timeout) and the server degrades to lexical/graph-only retrieval instead of stalling startup.
+- If `SURREALDB_EMBEDDING_DIMENSION` is set, the override is authoritative at startup. Ollama and known OpenAI-compatible model profiles resolve without network access; unknown OpenAI-compatible models still need a contract preflight. A wrong override surfaces as a dimension-validation error on embed; use `reembed` as the recovery path.
+- If a required preflight cannot reach the provider, it fails within a short timeout and the stdio server degrades to lexical/graph-only retrieval instead of stalling startup. HTTP startup fails when its deployment provider cannot be resolved.
 
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
 In normal `serve` startup, the Active Namespace is checked before semantic retrieval is enabled.
@@ -2077,7 +2079,7 @@ This keeps the public MCP tool surface unchanged while giving operators a determ
 
 A remote embedding provider is an external dependency, so the server separates startup availability from later semantic recovery:
 
-1. Startup performs one bounded dimension preflight. If the remote endpoint is unavailable, the server logs `embedding.preflight_failed` and `embedding.startup_decision`, installs the disabled provider, and continues with lexical/graph-only retrieval. MCP operations do not wait for the provider's runtime retry loop. Remote HTTP errors include the sanitized endpoint, model, and bounded `response_payload`; JSON fields such as `api_key`, `authorization`, `token`, `input`, and `prompt` are redacted.
+1. Startup performs a bounded preflight when needed. If the remote endpoint is unavailable, the server logs `embedding.preflight_failed` and `embedding.startup_decision`, installs the disabled provider, and continues with lexical/graph-only retrieval. MCP operations do not wait for the provider's runtime retry loop. Remote HTTP errors include the sanitized endpoint, model, and bounded `response_payload`; JSON fields such as `api_key`, `authorization`, `token`, `input`, and `prompt` are redacted.
 2. When `EMBEDDINGS_AUTO_RECOVERY` is enabled, a background worker waits `EMBEDDINGS_RECOVERY_INTERVAL_SECS` (default `60`) and probes again. Probe failures use `15s → 30s → 60s` exponential backoff capped at `300s`; transport failures and HTTP errors, including `404`, remain retryable. After three consecutive failures the repetitive probe event is logged at debug level.
 3. If the probe dimension matches the active index and the persisted signature is equal or absent, the worker first persists `embedding_state:fact.status = "backfill_pending"`, then swaps in the provider, invalidates the context cache, and backfills facts created while degraded. Only after backfill completes does it persist `status = "ready"`. Backfill selects only `embedding IS NONE`, uses `fact_id` order and batches of `100`, and never drops the HNSW index.
 4. If the dimension matches but the signature differs, the worker enables the provider for new writes, logs `embedding.reembed_required`, and backfills only facts without vectors. It preserves the old persisted signature and never rewrites existing vectors, so a restart remains degraded until `reembed`. If the dimension differs, semantic mode stays disabled and `embedding.reembed_required` points to `reembed`.

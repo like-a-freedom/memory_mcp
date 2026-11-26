@@ -80,6 +80,33 @@ pub fn build_embedding_signature(
     base_url: Option<&str>,
     dimension: usize,
 ) -> String {
+    build_embedding_signature_for_contract(
+        provider_label,
+        model,
+        base_url,
+        dimension,
+        provider_label == "openai-compatible" && model.is_some_and(requires_input_type),
+    )
+}
+
+pub(crate) fn requires_input_type(model: &str) -> bool {
+    matches!(
+        model,
+        "nvidia/nemotron-3.5-embed-1b"
+            | "nvidia/nemotron-3-embed-1b"
+            | "nvidia/llama-nemotron-embed-1b-v2"
+            | "nvidia/Nemotron-3.5-Embed-1B-BF16"
+            | "nvidia/Nemotron-3.5-Embed-1B-NVFP4"
+    )
+}
+
+pub(crate) fn build_embedding_signature_for_contract(
+    provider_label: &str,
+    model: Option<&str>,
+    base_url: Option<&str>,
+    dimension: usize,
+    passage_query: bool,
+) -> String {
     use sha2::{Digest, Sha256};
 
     let mut material = json!({
@@ -88,6 +115,9 @@ pub fn build_embedding_signature(
         "base_url": base_url.map(|url| url.trim_end_matches('/')),
         "dimension": dimension,
     });
+    if passage_query {
+        material["input_contract"] = json!("input-type-query-passage-v1");
+    }
     if provider_label == "local-candle" {
         material["input_contract"] = json!("e5-query-passage-v2");
     }
@@ -627,5 +657,44 @@ mod tests {
                 },
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod input_contract_regression {
+    use super::*;
+
+    #[test]
+    fn nemotron_contract_changes_signature_but_ordinary_models_keep_theirs() {
+        let legacy = build_embedding_signature_for_contract(
+            "openai-compatible",
+            Some("nvidia/nemotron-3.5-embed-1b"),
+            Some("https://example.test/v1"),
+            2048,
+            false,
+        );
+        let current = build_embedding_signature_for_contract(
+            "openai-compatible",
+            Some("nvidia/nemotron-3.5-embed-1b"),
+            Some("https://example.test/v1"),
+            2048,
+            true,
+        );
+        assert_ne!(legacy, current);
+        assert_eq!(
+            build_embedding_signature(
+                "openai-compatible",
+                Some("text-embedding-3-small"),
+                None,
+                1536
+            ),
+            build_embedding_signature_for_contract(
+                "openai-compatible",
+                Some("text-embedding-3-small"),
+                None,
+                1536,
+                false
+            )
+        );
     }
 }

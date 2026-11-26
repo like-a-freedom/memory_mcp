@@ -194,6 +194,7 @@ pub async fn build_memory_service_from_env(
                 &config.embedding,
                 &effective_data_dir,
                 target.dimension,
+                target.input_type,
             )
             .await?
         }
@@ -207,6 +208,7 @@ pub async fn build_memory_service_from_env(
                     .as_ref()
                     .map(|value| value.dimension)
                     .unwrap_or_else(|| config.embedding.fallback_dimension()),
+                target.as_ref().is_some_and(|value| value.input_type),
             )
             .await?
         }

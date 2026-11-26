@@ -383,6 +383,7 @@ pub async fn resolve_embedding_policy(
         &config,
         &data_dir,
         target.dimension,
+        target.input_type,
     )
     .await
     .map_err(|err| format!("embedding provider init error: {err}"))?;

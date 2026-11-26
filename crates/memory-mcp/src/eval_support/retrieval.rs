@@ -37,6 +37,7 @@ pub async fn create_eval_embedding_provider(
         config,
         data_dir,
         target.dimension,
+        target.input_type,
     )
     .await?;
 

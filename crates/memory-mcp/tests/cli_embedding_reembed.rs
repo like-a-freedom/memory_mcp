@@ -18,7 +18,7 @@ use tokio::time::timeout;
 const NAMESPACE: &str = "org";
 const DATABASE: &str = "memory";
 const FACT_ID: &str = "fact:cli-dimension-transition";
-const MODEL: &str = "fixture-model";
+const MODEL: &str = "text-embedding-3-small";
 const FIXTURE_DATA_DIR_ENV: &str = "MEMORY_MCP_TEST_REEMBED_DATA_DIR";
 const FIXTURE_DIMENSION_ENV: &str = "MEMORY_MCP_TEST_REEMBED_DIMENSION";
 
@@ -253,7 +253,12 @@ async fn seed_stale_fact_from_child(data_dir: &Path, dimension: usize) {
     );
 }
 
-fn run_reembed_cli_blocking(data_dir: &Path, endpoint: &str, target_dimension: usize) -> Output {
+fn run_reembed_cli_blocking(
+    data_dir: &Path,
+    endpoint: &str,
+    target_dimension: usize,
+    model: &str,
+) -> Output {
     let home = data_dir.join("home");
     std::fs::create_dir_all(&home).expect("create isolated child home");
     let mut command = Command::new(env!("CARGO_BIN_EXE_memory_mcp"));
@@ -273,7 +278,7 @@ fn run_reembed_cli_blocking(data_dir: &Path, endpoint: &str, target_dimension: u
         )
         .env("EMBEDDINGS_ENABLED", "true")
         .env("EMBEDDINGS_PROVIDER", "openai-compatible")
-        .env("EMBEDDINGS_MODEL", MODEL)
+        .env("EMBEDDINGS_MODEL", model)
         .env("EMBEDDINGS_BASE_URL", endpoint)
         .env("EMBEDDINGS_API_KEY", "test-only")
         .env("EMBEDDINGS_AUTO_RECOVERY", "false")
@@ -289,10 +294,47 @@ async fn run_reembed_cli(data_dir: &Path, endpoint: &str, target_dimension: usiz
     let data_dir = data_dir.to_path_buf();
     let endpoint = endpoint.to_string();
     tokio::task::spawn_blocking(move || {
-        run_reembed_cli_blocking(&data_dir, &endpoint, target_dimension)
+        run_reembed_cli_blocking(&data_dir, &endpoint, target_dimension, MODEL)
     })
     .await
     .expect("bounded CLI process worker completes")
+}
+
+#[tokio::test]
+async fn cli_reembed_uses_passage_for_nvidia_model() {
+    let _gate = DIMENSION_TRANSITION_GATE.lock().await;
+    let temp_dir = tempfile::tempdir().expect("isolated CLI RocksDB root");
+    seed_stale_fact_from_child(temp_dir.path(), 384).await;
+    let (endpoint, requests, server) = spawn_embedding_endpoint(384).await;
+    let path = temp_dir.path().to_path_buf();
+    let url = endpoint.clone();
+    let model = "nvidia/nemotron-3.5-embed-1b";
+    let output =
+        tokio::task::spawn_blocking(move || run_reembed_cli_blocking(&path, &url, 384, model))
+            .await
+            .expect("CLI worker");
+    server.abort();
+    assert!(
+        output.status.success(),
+        "CLI reembed failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let captured = requests.lock().await;
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0]["input_type"], "passage");
+    drop(captured);
+    let db = SurrealDbClient::connect(&storage_config(temp_dir.path(), 384))
+        .await
+        .expect("reopen database");
+    let fact = db
+        .select_one(FACT_ID, NAMESPACE)
+        .await
+        .expect("read fact")
+        .expect("fact exists");
+    assert_eq!(
+        fact["embedding_signature"],
+        build_embedding_signature("openai-compatible", Some(model), Some(&endpoint), 384)
+    );
 }
 
 async fn declared_index_dimension(db: &SurrealDbClient) -> Option<usize> {
@@ -404,4 +446,240 @@ async fn cli_reembed_1536_to_3072_rewrites_vector_and_index() {
 #[tokio::test]
 async fn cli_reembed_changes_signature_at_768() {
     assert_cli_dimension_transition(768, 768).await;
+}
+
+#[tokio::test]
+async fn nvidia_remote_provider_sends_passage_and_query_roles() {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let (endpoint, requests, server) = spawn_embedding_endpoint(3).await;
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(endpoint),
+        model: Some("nvidia/nemotron-3.5-embed-1b".into()),
+        dimension_override: Some(3),
+        ..Default::default()
+    };
+    let provider =
+        memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp")
+            .await
+            .expect("resolve provider")
+            .provider;
+    provider.embed("stored passage").await.expect("passage");
+    provider
+        .embed_query("search question")
+        .await
+        .expect("query");
+    let captured = requests.lock().await;
+    assert_eq!(captured.len(), 2);
+    assert_eq!(captured[0]["input_type"], "passage");
+    assert_eq!(captured[1]["input_type"], "query");
+    server.abort();
+}
+
+#[tokio::test]
+async fn ordinary_remote_provider_omits_input_type() {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let (endpoint, requests, server) = spawn_embedding_endpoint(3).await;
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(endpoint),
+        model: Some("text-embedding-3-small".into()),
+        dimension_override: Some(3),
+        ..Default::default()
+    };
+    let provider =
+        memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp")
+            .await
+            .expect("resolve provider")
+            .provider;
+    provider
+        .embed_query("search question")
+        .await
+        .expect("query");
+    assert!(requests.lock().await[0].get("input_type").is_none());
+    server.abort();
+}
+
+#[tokio::test]
+async fn nvidia_preflight_sends_passage() {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let (endpoint, requests, server) = spawn_embedding_endpoint(3).await;
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(endpoint),
+        model: Some("nvidia/nemotron-3.5-embed-1b".into()),
+        ..Default::default()
+    };
+    memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp")
+        .await
+        .expect("resolve provider");
+    assert_eq!(requests.lock().await[0]["input_type"], "passage");
+    server.abort();
+}
+
+#[tokio::test]
+async fn unknown_model_requiring_input_type_is_detected_automatically() {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+    let address = listener.local_addr().expect("address");
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let observed = requests.clone();
+    let server = tokio::spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                break;
+            };
+            let Ok((request, body_start)) = read_request(&mut stream).await else {
+                continue;
+            };
+            let body: Value = serde_json::from_slice(&request[body_start..]).expect("request JSON");
+            let missing = body.get("input_type").is_none();
+            observed.lock().await.push(body);
+            let (status, response) = if missing {
+                (
+                    "422 Unprocessable Entity",
+                    json!({"detail":[{"loc":["body","input_type"],"type":"missing"}]}),
+                )
+            } else {
+                ("200 OK", json!({"data":[{"embedding":[0.1,0.2,0.3]}]}))
+            };
+            let response = response.to_string();
+            let wire = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
+                response.len()
+            );
+            stream
+                .write_all(wire.as_bytes())
+                .await
+                .expect("send response");
+        }
+    });
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(format!("http://{address}/v1")),
+        model: Some("unknown-model".into()),
+        dimension_override: Some(3),
+        ..Default::default()
+    };
+    let resolved =
+        memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp")
+            .await
+            .expect("detect required input_type");
+    resolved.provider.embed("document").await.expect("document");
+    resolved
+        .provider
+        .embed_query("question")
+        .await
+        .expect("query");
+    let captured = requests.lock().await;
+    assert!(captured[0].get("input_type").is_none());
+    assert_eq!(captured[1]["input_type"], "passage");
+    assert_eq!(captured[2]["input_type"], "query");
+    assert_eq!(captured[3]["input_type"], "passage");
+    assert_eq!(captured[4]["input_type"], "query");
+    assert_ne!(
+        resolved.signature,
+        build_embedding_signature(
+            "openai-compatible",
+            Some("unknown-model"),
+            config.base_url.as_deref(),
+            3
+        )
+    );
+    server.abort();
+}
+
+async fn assert_probe_does_not_retry(status: &str, response: Value) {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+    let address = listener.local_addr().expect("address");
+    let status = status.to_owned();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.expect("probe");
+        let (_, _) = read_request(&mut stream).await.expect("request");
+        let body = response.to_string();
+        let wire = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(wire.as_bytes()).await.expect("response");
+        timeout(Duration::from_millis(250), listener.accept())
+            .await
+            .is_err()
+    });
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(format!("http://{address}/v1")),
+        model: Some("unknown-model".into()),
+        dimension_override: Some(3),
+        ..Default::default()
+    };
+    assert!(
+        memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp")
+            .await
+            .is_err()
+    );
+    assert!(
+        server.await.expect("server completed"),
+        "unexpected contract retry"
+    );
+}
+
+#[tokio::test]
+async fn authentication_failure_does_not_trigger_contract_retry() {
+    assert_probe_does_not_retry(
+        "401 Unauthorized",
+        json!({"error":{"param":"input_type","code":"missing"}}),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn unrelated_validation_failure_does_not_trigger_contract_retry() {
+    assert_probe_does_not_retry(
+        "422 Unprocessable Entity",
+        json!({"detail":[{"loc":["body","model"],"type":"missing","msg":"input_type"}]}),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn incompatible_passage_and_query_dimensions_reject_the_model() {
+    use memory_mcp::config::EmbeddingProviderKind;
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+    let address = listener.local_addr().expect("address");
+    let server = tokio::spawn(async move {
+        for index in 0..3 {
+            let (mut stream, _) = listener.accept().await.expect("probe");
+            let (_, _) = read_request(&mut stream).await.expect("request");
+            let (status, body) = match index {
+                0 => (
+                    "400 Bad Request",
+                    json!({"error":{"param":"input_type","code":"missing_required_parameter"}}),
+                ),
+                1 => ("200 OK", json!({"data":[{"embedding":[0.1,0.2,0.3]}]})),
+                _ => ("200 OK", json!({"data":[{"embedding":[0.1,0.2]}]})),
+            };
+            let body = body.to_string();
+            let wire = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(wire.as_bytes()).await.expect("response");
+        }
+    });
+    let config = EmbeddingConfig {
+        provider: EmbeddingProviderKind::OpenAiCompatible,
+        base_url: Some(format!("http://{address}/v1")),
+        model: Some("unknown-model".into()),
+        dimension_override: Some(3),
+        ..Default::default()
+    };
+    let result =
+        memory_mcp::eval_support::retrieval::create_eval_embedding_provider(&config, "/tmp").await;
+    assert!(
+        result.is_err(),
+        "different passage and query widths must be rejected"
+    );
+    server.await.expect("server completed");
 }

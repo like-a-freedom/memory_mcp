@@ -14,7 +14,7 @@ use crate::config::{
 use crate::embedding::backfill_store::EmbeddingBackfillStoreClient;
 use crate::embedding::providers::{
     EmbeddingProvider, ResolvedEmbeddingTarget, create_embedding_provider_with_dimension,
-    probe_remote_embedding_dimension,
+    probe_remote_embedding_dimension, resolve_embedding_target_identity,
 };
 use crate::error::MemoryError;
 use crate::knowledge::fact_service::FactService;
@@ -33,9 +33,32 @@ use tokio_util::sync::CancellationToken;
 pub(crate) trait EmbeddingRecoveryBackend: Send + Sync {
     async fn probe_dimension(&self) -> Result<usize, MemoryError>;
 
+    async fn probe_target(
+        &self,
+        config: &EmbeddingConfig,
+    ) -> Result<ResolvedEmbeddingTarget, MemoryError> {
+        let dimension = self.probe_dimension().await?;
+        Ok(ResolvedEmbeddingTarget {
+            provider_label: config.provider_label(),
+            model: config.model.clone(),
+            dimension,
+            signature: build_embedding_signature(
+                config.provider_label(),
+                config.model.as_deref(),
+                config.base_url.as_deref(),
+                dimension,
+            ),
+            input_type: config
+                .model
+                .as_deref()
+                .is_some_and(crate::config::requires_input_type),
+        })
+    }
+
     async fn create_provider(
         &self,
         dimension: usize,
+        input_type: bool,
     ) -> Result<Arc<dyn EmbeddingProvider>, MemoryError>;
 }
 
@@ -75,11 +98,27 @@ impl EmbeddingRecoveryBackend for ConfiguredEmbeddingRecoveryBackend {
         probe_remote_embedding_dimension(&self.config).await
     }
 
+    async fn probe_target(
+        &self,
+        _config: &EmbeddingConfig,
+    ) -> Result<ResolvedEmbeddingTarget, MemoryError> {
+        let mut config = self.config.clone();
+        config.dimension_override = None;
+        resolve_embedding_target_identity(&config, &self.data_dir).await
+    }
+
     async fn create_provider(
         &self,
         dimension: usize,
+        input_type: bool,
     ) -> Result<Arc<dyn EmbeddingProvider>, MemoryError> {
-        create_embedding_provider_with_dimension(&self.config, &self.data_dir, dimension).await
+        create_embedding_provider_with_dimension(
+            &self.config,
+            &self.data_dir,
+            dimension,
+            input_type,
+        )
+        .await
     }
 }
 
@@ -93,6 +132,7 @@ pub(crate) enum RecoveryDecision {
     },
 }
 
+#[cfg(test)]
 pub(crate) fn choose_recovery_decision(
     config: &EmbeddingConfig,
     index_dimension: usize,
@@ -103,6 +143,10 @@ pub(crate) fn choose_recovery_decision(
         provider_label: config.provider_label(),
         model: config.model.clone(),
         dimension: probed_dimension,
+        input_type: config
+            .model
+            .as_deref()
+            .is_some_and(crate::config::requires_input_type),
         signature: build_embedding_signature(
             config.provider_label(),
             config.model.as_deref(),
@@ -437,11 +481,24 @@ async fn run_recovery_cycle(
         .as_ref()
         .and_then(|record| record.get("active_signature"))
         .and_then(Value::as_str);
-    let probed_dimension = backend.probe_dimension().await?;
+    let resolved = backend.probe_target(config).await?;
+    let probed_dimension = resolved.dimension;
+    let decision = if probed_dimension != index_dimension {
+        RecoveryDecision::DimensionMismatch {
+            index_dimension,
+            probed_dimension,
+        }
+    } else if stored_signature.is_some_and(|signature| signature != resolved.signature) {
+        RecoveryDecision::EnableForNewFacts(resolved)
+    } else {
+        RecoveryDecision::FullRecovery(resolved)
+    };
 
-    match choose_recovery_decision(config, index_dimension, stored_signature, probed_dimension) {
+    match decision {
         RecoveryDecision::FullRecovery(target) => {
-            let provider = backend.create_provider(target.dimension).await?;
+            let provider = backend
+                .create_provider(target.dimension, target.input_type)
+                .await?;
             install_recovery_provider(service, &db, &target, provider.clone(), true).await?;
             log_recovery_event(
                 service.logger,
@@ -468,7 +525,9 @@ async fn run_recovery_cycle(
             Ok(RecoveryCycleOutcome::Completed)
         }
         RecoveryDecision::EnableForNewFacts(target) => {
-            let provider = backend.create_provider(target.dimension).await?;
+            let provider = backend
+                .create_provider(target.dimension, target.input_type)
+                .await?;
             install_recovery_provider(service, &db, &target, provider.clone(), false).await?;
             log_recovery_event(
                 service.logger,
@@ -988,6 +1047,7 @@ mod tests {
         async fn create_provider(
             &self,
             _dimension: usize,
+            _input_type: bool,
         ) -> Result<Arc<dyn EmbeddingProvider>, crate::error::MemoryError> {
             self.provider_creation_count.fetch_add(1, Ordering::SeqCst);
             Ok(self.provider.clone())

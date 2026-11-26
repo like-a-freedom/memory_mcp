@@ -317,6 +317,7 @@ async fn resolve_tenant_embedding(
         model: policy.model.clone(),
         dimension: policy.dimension,
         signature: policy.signature.clone(),
+        input_type: false,
     };
     let decision = match crate::service::startup::resolve_namespace_embedding_decision(
         bound_db, namespace, &target,

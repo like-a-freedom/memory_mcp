@@ -522,7 +522,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_embedding_startup_resolves_offline_with_explicit_dimension_override() {
-        // Offline startup with an explicit dimension override must not touch
+        // A known model and explicit dimension override must not touch
         // the network at all: the target resolves from configuration and the
         // empty namespace bootstraps to `ready` for that signature.
         let namespace = "org".to_string();
@@ -538,7 +538,7 @@ mod tests {
         let config = crate::config::EmbeddingConfig {
             provider: crate::config::EmbeddingProviderKind::OpenAiCompatible,
             base_url: Some("http://192.0.2.1:9999/v1".to_string()),
-            model: Some("test-model".to_string()),
+            model: Some("text-embedding-3-small".to_string()),
             api_key: None,
             dimension_override: Some(1536),
             timeout_secs: 15,
@@ -596,6 +596,30 @@ mod tests {
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::RecoverMissingEmbeddings { .. }
+        ));
+    }
+
+    #[test]
+    fn changed_input_contract_disables_semantic_search_at_same_dimension() {
+        let legacy = crate::config::build_embedding_signature_for_contract(
+            "openai-compatible",
+            Some("unknown-model"),
+            Some("https://example.test/v1"),
+            384,
+            false,
+        );
+        let target = crate::config::build_embedding_signature_for_contract(
+            "openai-compatible",
+            Some("unknown-model"),
+            Some("https://example.test/v1"),
+            384,
+            true,
+        );
+        let state = serde_json::json!({"status": "ready", "active_signature": legacy});
+        let decision = decide_embedding_startup("main", Some(&state), &[384], 12, 0, &target, 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::DisableSemantic { .. }
         ));
     }
 

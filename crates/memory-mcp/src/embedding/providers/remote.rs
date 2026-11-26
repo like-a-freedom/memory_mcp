@@ -78,7 +78,9 @@ fn sanitize_remote_error_payload(payload: &[u8]) -> String {
     }
 }
 
-async fn read_remote_error_payload(response: &mut reqwest::Response) -> String {
+async fn read_remote_error_payload_and_json(
+    response: &mut reqwest::Response,
+) -> (String, Option<Value>) {
     let mut payload = Vec::new();
     let mut truncated = false;
 
@@ -99,16 +101,25 @@ async fn read_remote_error_payload(response: &mut reqwest::Response) -> String {
             }
             Ok(None) => break,
             Err(error) => {
-                return format!("<response body read failed: {error}>");
+                return (format!("<response body read failed: {error}>"), None);
             }
         }
     }
 
+    let parsed = if truncated {
+        None
+    } else {
+        serde_json::from_slice(&payload).ok()
+    };
     let mut sanitized = sanitize_remote_error_payload(&payload);
     if truncated {
         sanitized.push_str("…<truncated>");
     }
-    sanitized
+    (sanitized, parsed)
+}
+
+async fn read_remote_error_payload(response: &mut reqwest::Response) -> String {
+    read_remote_error_payload_and_json(response).await.0
 }
 
 pub(super) fn redact_endpoint_for_log(endpoint: &str) -> String {
@@ -393,6 +404,14 @@ async fn response_json(
     })
 }
 
+fn openai_body(model: &str, input: &str, input_type: Option<&str>) -> Value {
+    let mut body = json!({"model": model, "input": input});
+    if let Some(input_type) = input_type {
+        body["input_type"] = json!(input_type);
+    }
+    body
+}
+
 /// Fetches and parses an OpenAI-compatible embedding, retrying on both
 /// transport errors and transient data errors (e.g. empty `data[0].embedding`
 /// from overloaded or rate-limited providers).
@@ -402,6 +421,7 @@ async fn request_openai_embedding_and_parse(
     model: &str,
     api_key: Option<&str>,
     input: &str,
+    input_type: Option<&str>,
 ) -> Result<Vec<f64>, MemoryError> {
     let mut headers =
         HeaderMap::from_iter([(CONTENT_TYPE, HeaderValue::from_static("application/json"))]);
@@ -421,7 +441,7 @@ async fn request_openai_embedding_and_parse(
                 let response = client
                     .post(&endpoint)
                     .headers(headers.clone())
-                    .json(&json!({"model": model, "input": input}))
+                    .json(&openai_body(model, input, input_type))
                     .send()
                     .await
                     .map_err(map_send_error)?;
@@ -476,6 +496,7 @@ pub(super) struct OpenAiCompatibleEmbeddingProvider {
     model: String,
     api_key: Option<String>,
     dimension: usize,
+    input_type: bool,
 }
 
 impl OpenAiCompatibleEmbeddingProvider {
@@ -485,6 +506,7 @@ impl OpenAiCompatibleEmbeddingProvider {
         model: String,
         api_key: Option<String>,
         dimension: usize,
+        input_type: bool,
     ) -> Self {
         Self {
             client,
@@ -492,6 +514,7 @@ impl OpenAiCompatibleEmbeddingProvider {
             model,
             api_key,
             dimension,
+            input_type,
         }
     }
 }
@@ -528,6 +551,7 @@ async fn request_openai_embedding_once(
     model: &str,
     api_key: Option<&str>,
     input: &str,
+    input_type: Option<&str>,
 ) -> Result<Vec<f64>, MemoryError> {
     let mut headers =
         HeaderMap::from_iter([(CONTENT_TYPE, HeaderValue::from_static("application/json"))]);
@@ -542,7 +566,7 @@ async fn request_openai_embedding_once(
     let response = client
         .post(&endpoint)
         .headers(headers)
-        .json(&json!({"model": model, "input": input}))
+        .json(&openai_body(model, input, input_type))
         .send()
         .await
         .map_err(|err| {
@@ -594,6 +618,110 @@ async fn request_ollama_body_once(
         })
 }
 
+/// Resolve the remote wire contract without sending memory contents.
+pub(super) async fn detect_openai_capabilities(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+    api_key: Option<&str>,
+) -> Result<(usize, bool), MemoryError> {
+    async fn probe(
+        client: &reqwest::Client,
+        base_url: &str,
+        model: &str,
+        api_key: Option<&str>,
+        role: Option<&str>,
+    ) -> Result<Result<Vec<f64>, bool>, MemoryError> {
+        let endpoint = format!("{}/embeddings", base_url.trim_end_matches('/'));
+        let mut request = client.post(&endpoint).json(&openai_body(
+            model,
+            "memory_mcp embedding capability probe",
+            role,
+        ));
+        if let Some(key) = api_key {
+            request = request.bearer_auth(key);
+        }
+        let mut response = request.send().await.map_err(|e| {
+            MemoryError::Transient(format!(
+                "embedding probe transport failure: {}",
+                classify_send_error(&e)
+            ))
+        })?;
+        let status = response.status();
+        if !status.is_success() {
+            let (payload, parsed) = read_remote_error_payload_and_json(&mut response).await;
+            let parsed = parsed.unwrap_or(Value::Null);
+            let missing = matches!(status.as_u16(), 400 | 422)
+                && (parsed.pointer("/error/param").and_then(Value::as_str) == Some("input_type")
+                    && matches!(
+                        parsed.pointer("/error/code").and_then(Value::as_str),
+                        Some("missing") | Some("missing_required_parameter")
+                    )
+                    || parsed
+                        .get("detail")
+                        .and_then(Value::as_array)
+                        .is_some_and(|items| {
+                            items.iter().any(|item| {
+                                item.get("type").and_then(Value::as_str) == Some("missing")
+                                    && item.get("loc").and_then(Value::as_array).is_some_and(
+                                        |loc| {
+                                            loc.last().and_then(Value::as_str) == Some("input_type")
+                                        },
+                                    )
+                            })
+                        }));
+            if missing && role.is_none() {
+                return Ok(Err(true));
+            }
+            return Err(MemoryError::Storage(format!(
+                "embedding probe returned status {}; {}",
+                status.as_u16(),
+                remote_error_context(&endpoint, model, &payload)
+            )));
+        }
+        let body: Value = response.json().await.map_err(|e| {
+            MemoryError::Storage(format!("embedding probe response decode failed: {e}"))
+        })?;
+        let vector = parse_openai_embedding(&body)?;
+        if vector.is_empty() || vector.iter().any(|v| !v.is_finite()) {
+            return Err(MemoryError::Storage(
+                "invalid embedding probe vector".into(),
+            ));
+        }
+        Ok(Ok(vector))
+    }
+    let known = crate::config::requires_input_type(model);
+    let future = async {
+        let first = probe(client, base_url, model, api_key, known.then_some("passage")).await?;
+        let (passage, asymmetric) = match first {
+            Ok(vector) => (vector, known),
+            Err(_) => (
+                probe(client, base_url, model, api_key, Some("passage"))
+                    .await?
+                    .map_err(|_| MemoryError::Storage("embedding passage probe refused".into()))?,
+                true,
+            ),
+        };
+        if asymmetric {
+            let query = probe(client, base_url, model, api_key, Some("query"))
+                .await?
+                .map_err(|_| MemoryError::Storage("embedding query probe refused".into()))?;
+            if passage.len() != query.len() {
+                return Err(MemoryError::Storage(
+                    "embedding query and passage dimensions differ".into(),
+                ));
+            }
+        }
+        Ok((passage.len(), asymmetric))
+    };
+    tokio::time::timeout(
+        Duration::from_secs(REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS),
+        future,
+    )
+    .await
+    .map_err(|_| MemoryError::Transient("embedding capability probe timed out".into()))?
+}
+
 pub(super) async fn detect_openai_embedding_dimension(
     client: &reqwest::Client,
     base_url: &str,
@@ -602,7 +730,14 @@ pub(super) async fn detect_openai_embedding_dimension(
 ) -> Result<usize, MemoryError> {
     let embedding = tokio::time::timeout(
         Duration::from_secs(REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS),
-        request_openai_embedding_once(client, base_url, model, api_key, "dimension probe"),
+        request_openai_embedding_once(
+            client,
+            base_url,
+            model,
+            api_key,
+            "dimension probe",
+            crate::config::requires_input_type(model).then_some("passage"),
+        ),
     )
     .await
     .map_err(|_| {
@@ -654,9 +789,22 @@ impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
             &self.model,
             self.api_key.as_deref(),
             input,
+            self.input_type.then_some("passage"),
         )
         .await?;
 
+        validate_dimension(embedding, self.dimension)
+    }
+    async fn embed_query(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+        let embedding = request_openai_embedding_and_parse(
+            &self.client,
+            &self.base_url,
+            &self.model,
+            self.api_key.as_deref(),
+            input,
+            self.input_type.then_some("query"),
+        )
+        .await?;
         validate_dimension(embedding, self.dimension)
     }
 }

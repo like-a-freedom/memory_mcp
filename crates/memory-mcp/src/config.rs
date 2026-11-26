@@ -14,6 +14,7 @@ mod target;
 
 pub use constants::*;
 pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
+pub(crate) use embedding::{build_embedding_signature_for_contract, requires_input_type};
 pub use fs_watch::{ENV_INGESTION_INBOX, FsWatchConfig};
 pub use lifecycle::LifecycleConfig;
 pub use memory::CacheLimits;

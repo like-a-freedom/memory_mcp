@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{Value, json};
 
-use crate::config::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
+use crate::config::{EmbeddingConfig, EmbeddingProviderKind};
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::storage::value_helpers::json_f64;
@@ -20,7 +20,7 @@ use local::LocalCandleEmbeddingProvider;
 use remote::{
     OllamaEmbeddingProvider, OpenAiCompatibleEmbeddingProvider,
     REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS, detect_ollama_embedding_dimension,
-    detect_openai_embedding_dimension,
+    detect_openai_capabilities, detect_openai_embedding_dimension,
 };
 
 pub(crate) fn embedding_endpoint_for_log(endpoint: &str) -> String {
@@ -79,6 +79,7 @@ pub(crate) struct ResolvedEmbeddingTarget {
     pub(crate) model: Option<String>,
     pub(crate) dimension: usize,
     pub(crate) signature: String,
+    pub(crate) input_type: bool,
 }
 
 impl DisabledEmbeddingProvider {
@@ -266,19 +267,80 @@ pub(crate) async fn resolve_embedding_target_identity(
             "RETRIEVAL_RERANKER_MODEL_DIR requires the local-candle provider".into(),
         ));
     }
-    let dimension = resolve_embedding_dimension(config, data_dir).await?;
-    let signature = build_embedding_signature(
+    let known = config.provider == EmbeddingProviderKind::OpenAiCompatible
+        && config
+            .model
+            .as_deref()
+            .is_some_and(crate::config::requires_input_type);
+    let known_symmetric = matches!(
+        config.model.as_deref(),
+        Some("text-embedding-3-small" | "text-embedding-3-large" | "text-embedding-ada-002")
+    );
+    let (dimension, input_type) = if config.provider == EmbeddingProviderKind::OpenAiCompatible
+        && (config.dimension_override.is_none() || !known && !known_symmetric)
+    {
+        let client = build_probe_http_client(config.timeout_secs)?;
+        let (actual, contract) = detect_openai_capabilities(
+            &client,
+            config
+                .base_url
+                .as_deref()
+                .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_BASE_URL".into()))?,
+            config
+                .model
+                .as_deref()
+                .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".into()))?,
+            config.api_key.as_deref(),
+        )
+        .await?;
+        (config.dimension_override.unwrap_or(actual), contract)
+    } else {
+        (resolve_embedding_dimension(config, data_dir).await?, known)
+    };
+    let signature = crate::config::build_embedding_signature_for_contract(
         config.provider_label(),
         config.model.as_deref(),
         config.base_url.as_deref(),
         dimension,
+        input_type,
     );
-
+    if config.provider == EmbeddingProviderKind::OpenAiCompatible {
+        let mut event = std::collections::HashMap::new();
+        event.insert("op".to_string(), json!("embedding.input_contract_resolved"));
+        event.insert("dimension".to_string(), json!(dimension));
+        event.insert("model".to_string(), json!(config.model));
+        event.insert(
+            "contract".to_string(),
+            json!(if input_type {
+                "query-passage"
+            } else {
+                "symmetric"
+            }),
+        );
+        event.insert(
+            "source".to_string(),
+            json!(
+                if known || known_symmetric && config.dimension_override.is_some() {
+                    "model-profile"
+                } else {
+                    "api"
+                }
+            ),
+        );
+        if let Some(endpoint) = config.base_url.as_deref() {
+            event.insert(
+                "endpoint".to_string(),
+                json!(embedding_endpoint_for_log(endpoint)),
+            );
+        }
+        crate::logging::emit(event, LogLevel::Info);
+    }
     Ok(ResolvedEmbeddingTarget {
         provider_label: config.provider_label(),
         model: config.model.clone(),
         dimension,
         signature,
+        input_type,
     })
 }
 
@@ -295,6 +357,7 @@ pub(crate) async fn create_embedding_provider_with_dimension(
     config: &EmbeddingConfig,
     data_dir: &str,
     resolved_dimension: usize,
+    input_type: bool,
 ) -> Result<Arc<dyn EmbeddingProvider>, MemoryError> {
     let client = build_embedding_http_client(config.timeout_secs)?;
 
@@ -345,6 +408,7 @@ pub(crate) async fn create_embedding_provider_with_dimension(
                     .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
                 config.api_key.clone(),
                 resolved_dimension,
+                input_type,
             )) as Arc<dyn EmbeddingProvider>)
         }
         EmbeddingProviderKind::Ollama => Ok(Arc::new(OllamaEmbeddingProvider::new(
@@ -852,7 +916,7 @@ mod tests {
         let config = EmbeddingConfig {
             provider: EmbeddingProviderKind::OpenAiCompatible,
             base_url: Some(UNREACHABLE_BASE_URL.to_string()),
-            model: Some("test-model".to_string()),
+            model: Some("text-embedding-3-small".to_string()),
             dimension_override: Some(1536),
             timeout_secs: 15,
             ..EmbeddingConfig::default()
@@ -944,6 +1008,7 @@ mod tests {
             model: Some("nvidia/test-model".to_string()),
             dimension,
             signature: signature.clone(),
+            input_type: false,
         };
 
         assert_eq!(target.dimension, 2048);
