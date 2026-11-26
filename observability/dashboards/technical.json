@@ -4137,7 +4137,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Facts the background walk projected into claims, by outcome.\n\n**The slow half of the claims pipeline, and the one that can fall behind silently.** Extraction derives facts immediately; claims are projected from them by a background walk, so a projection that stalls leaves facts in the store with no claims above them \u2014 the graph quietly less complete than the facts it was built from, with nothing failing.\n\nRead against *Active relations* beside it: backfill flowing with a flat relation count means claims are being derived and not kept, and a standing zero with a non-zero fact count means the walk has not run.",
+          "description": "Rate of idempotent attempts to ensure a projection job for each fact with an identifier, by outcome. An `ensured` attempt means the job exists after the call; it may already have existed. A `failed` attempt means ensuring the job failed.\n\nThis is scheduling activity, not completed fact projection, unique facts processed, or worker throughput. Pair it with the durable claim-job queue and active-relation level to assess whether the background worker is keeping up.",
           "fieldConfig": {
             "defaults": {
               "unit": "ops",
@@ -4186,13 +4186,13 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "memory:claim_backfill_facts:rate15m",
+              "expr": "memory:claim_backfill_job_ensure_attempts:rate15m",
               "legendFormat": "",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Claims backfilled, per second",
+          "title": "Projection job ensure attempts, per second",
           "type": "stat"
         },
         {

@@ -319,7 +319,7 @@ impl ClaimService {
                 super::telemetry::ClaimMetricStage::Project,
                 draft.schema_ref.family,
                 "persisted",
-                "persisted",
+                "none",
             );
         }
         for skip in &result.skips {

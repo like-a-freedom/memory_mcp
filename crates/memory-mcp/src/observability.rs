@@ -1447,13 +1447,25 @@ pub(crate) mod tests {
             claims_telemetry::record_pipeline_event(
                 ClaimMetricStage::Project,
                 ClaimSchemaFamily::Attribute,
-                "duplicate",
+                "persisted",
                 "none",
+            );
+            claims_telemetry::record_pipeline_event(
+                ClaimMetricStage::Project,
+                ClaimSchemaFamily::Attribute,
+                "skipped",
+                "missing_subject",
+            );
+            claims_telemetry::record_pipeline_event(
+                ClaimMetricStage::Project,
+                ClaimSchemaFamily::Attribute,
+                "failed",
+                "internal",
             );
             claims_telemetry::record_pipeline_duration(
                 ClaimMetricStage::Reconcile,
                 ClaimSchemaFamily::Attribute,
-                "duplicate",
+                "skipped",
                 std::time::Duration::from_millis(5),
             );
             claims_telemetry::record_candidate_count(
@@ -1462,7 +1474,8 @@ pub(crate) mod tests {
                 2,
             );
             claims_telemetry::set_active_relations(ClaimSchemaFamily::Attribute, "duplicate", 1.0);
-            claims_telemetry::record_backfill_fact("projected", "none");
+            claims_telemetry::record_backfill_fact("ensured", "none");
+            claims_telemetry::record_backfill_fact("failed", "internal");
             crate::http::registry::provisioning::record_registry_reconciliation(
                 "missing_namespace",
             );
@@ -1498,6 +1511,65 @@ pub(crate) mod tests {
              promised them, but nothing recorded into them: a declared family \
              no recorder writes is absent from every scrape, and a panel \
              reading it looks like a subsystem that is switched off: {missing:?}"
+        );
+
+        let project_events: Vec<&str> = exposition
+            .lines()
+            .filter(|line| line.starts_with("memory_claim_pipeline_total{"))
+            .collect();
+        for (outcome, reason_code) in [
+            ("persisted", "none"),
+            ("skipped", "missing_subject"),
+            ("failed", "internal"),
+        ] {
+            assert!(
+                project_events.iter().any(|line| {
+                    line.contains("stage=\"project\"")
+                        && line.contains("schema=\"attribute\"")
+                        && line.contains(&format!("outcome=\"{outcome}\""))
+                        && line.contains(&format!("reason_code=\"{reason_code}\""))
+                }),
+                "the bounded project outcome `{outcome}` must remain selectable \
+                 in the production exposition with reason `{reason_code}`: \
+                 {project_events:?}"
+            );
+        }
+
+        assert!(
+            exposition.lines().any(|line| {
+                line.starts_with("memory_claim_pipeline_duration_seconds")
+                    && line.contains("stage=\"reconcile\"")
+                    && line.contains("outcome=\"skipped\"")
+            }),
+            "a skipped reconciliation page must remain distinguishable from \
+             an unknown outcome: {exposition}"
+        );
+
+        let backfill_events: Vec<&str> = exposition
+            .lines()
+            .filter(|line| line.starts_with("memory_claim_backfill_facts_total{"))
+            .collect();
+        for (outcome, reason_code) in [("ensured", "none"), ("failed", "internal")] {
+            assert!(
+                backfill_events.iter().any(|line| {
+                    line.contains(&format!("outcome=\"{outcome}\""))
+                        && line.contains(&format!("reason_code=\"{reason_code}\""))
+                }),
+                "the bounded backfill outcome `{outcome}` must remain selectable \
+                 in the production exposition with reason `{reason_code}`: \
+                 {backfill_events:?}"
+            );
+        }
+
+        assert!(
+            exposition.lines().any(|line| {
+                line.starts_with("# HELP memory_claim_backfill_facts_total ")
+                    && line.contains("ensure attempts")
+                    && line.contains("fact with an identifier")
+                    && line.contains("not unique facts")
+                    && line.contains("completed fact projections")
+            }),
+            "the backfill metric help must not imply unique or completed facts: {exposition}"
         );
     }
 

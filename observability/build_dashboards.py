@@ -1263,21 +1263,18 @@ def technical() -> dict:
             graph_mode="area",
         ),
         stat(
-            "Claims backfilled, per second",
-            "memory:claim_backfill_facts:rate15m",
+            "Projection job ensure attempts, per second",
+            "memory:claim_backfill_job_ensure_attempts:rate15m",
             "ops",
             (8, 8, 4, 8),
-            "Facts the background walk projected into claims, by outcome.\n\n"
-            "**The slow half of the claims pipeline, and the one that can fall "
-            "behind silently.** Extraction derives facts immediately; claims are "
-            "projected from them by a background walk, so a projection that "
-            "stalls leaves facts in the store with no claims above them — the "
-            "graph quietly less complete than the facts it was built from, "
-            "with nothing failing.\n\n"
-            "Read against *Active relations* beside it: backfill flowing with a "
-            "flat relation count means claims are being derived and not kept, "
-            "and a standing zero with a non-zero fact count means the walk has "
-            "not run.",
+            "Rate of idempotent attempts to ensure a projection job for each "
+            "fact with an identifier, by outcome. An `ensured` attempt means "
+            "the job exists after the call; it may already have existed. A "
+            "`failed` attempt means ensuring the job failed.\n\n"
+            "This is scheduling activity, not completed fact projection, "
+            "unique facts processed, or worker throughput. Pair it with the "
+            "durable claim-job queue and active-relation level to assess whether "
+            "the background worker is keeping up.",
             graph_mode="area",
         ),
         timeseries(

@@ -451,11 +451,11 @@ groups:
           )
 
 
-  # Backfill is the slow half of the claims pipeline: facts already
-      # extracted being projected into claims by the background walk rather than
-      # at extract time. It is counted apart from the pipeline events for that
-      # reason, and it is the series that says whether that walk is keeping up.
-      - record: memory:claim_backfill_facts:rate15m
+      # This counter reports idempotent projection-job ensure attempts for
+      # identified facts, not completed projections or unique facts. A rising
+      # rate means the backfill walk is scheduling/re-ensuring work, not that the
+      # worker has finished projecting it.
+      - record: memory:claim_backfill_job_ensure_attempts:rate15m
         expr: |
           (
             sum by (outcome, reason_code) (

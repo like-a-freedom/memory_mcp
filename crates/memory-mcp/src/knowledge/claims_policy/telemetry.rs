@@ -41,7 +41,12 @@ pub(crate) fn schema_label(family: ClaimSchemaFamily) -> &'static str {
     }
 }
 
-/// Outcome label. Unknown values collapse to `other`.
+/// Pipeline outcome label. Unknown values collapse to `other`.
+///
+/// Relation decisions and processing statuses share this bounded label because
+/// the same metric families record both. Keeping known lifecycle outcomes
+/// distinct makes skipped work, persisted work and failures observable without
+/// admitting free-form values.
 pub(crate) fn outcome_label(outcome: &str) -> &'static str {
     match outcome {
         "duplicate" => "duplicate",
@@ -50,14 +55,32 @@ pub(crate) fn outcome_label(outcome: &str) -> &'static str {
         "contradiction" => "contradiction",
         "temporal_ambiguity" => "temporal_ambiguity",
         "coexist" => "coexist",
+        "persisted" => "persisted",
+        "skipped" => "skipped",
+        "failed" => "failed",
+        "ensured" => "ensured",
         _ => "other",
     }
 }
 
+fn relation_outcome_label(outcome: &str) -> Option<&'static str> {
+    match outcome {
+        "duplicate" => Some("duplicate"),
+        "supersession" => Some("supersession"),
+        "correction" => Some("correction"),
+        "contradiction" => Some("contradiction"),
+        "temporal_ambiguity" => Some("temporal_ambiguity"),
+        "coexist" => Some("coexist"),
+        _ => None,
+    }
+}
+
 /// Reason-code label. Bounded categories only — full reason text stays in
-/// the trace event and durable job state.
+/// the trace event and durable job state. `none` means the outcome has no
+/// associated reason (for example, successful projection or backfill).
 pub(crate) fn reason_label(reason_code: &str) -> &'static str {
     match reason_code {
+        "none" => "none",
         // Built-in skip reasons
         "invalid_value" => "invalid_value",
         "invalid_unit" => "invalid_unit",
@@ -75,11 +98,6 @@ pub(crate) fn reason_label(reason_code: &str) -> &'static str {
         "contradiction" => "contradiction",
         "temporal_ambiguity" => "temporal_ambiguity",
         "coexist" => "coexist",
-        // Backfill
-        "completed" => "completed",
-        "skipped" => "skipped",
-        "failed" => "failed",
-        "retry_scheduled" => "retry_scheduled",
         // Error buckets (full messages remain in trace/job state)
         "validation" => "validation",
         "storage" => "storage",
@@ -130,6 +148,7 @@ pub const METRIC_BACKFILL_FACTS_TOTAL: &str = "memory_claim_backfill_facts_total
 // ─── Metric emission helpers (no-op without a recorder) ──────────────────────
 
 /// Increment `memory_claim_pipeline_total{stage,schema,outcome,reason_code}`.
+/// The outcome is a bounded relation decision or pipeline status.
 pub(crate) fn record_pipeline_event(
     stage: ClaimMetricStage,
     schema: ClaimSchemaFamily,
@@ -147,6 +166,7 @@ pub(crate) fn record_pipeline_event(
 }
 
 /// Record `memory_claim_pipeline_duration_seconds{stage,schema,outcome}`.
+/// The outcome is a bounded relation decision or page status.
 pub(crate) fn record_pipeline_duration(
     stage: ClaimMetricStage,
     schema: ClaimSchemaFamily,
@@ -192,12 +212,13 @@ pub(crate) fn set_active_relations(schema: ClaimSchemaFamily, outcome: &str, val
     metrics::gauge!(
         METRIC_RELATIONS_ACTIVE,
         "schema" => schema_label(schema),
-        "outcome" => outcome_label(outcome),
+        "outcome" => relation_outcome_label(outcome).unwrap_or("other"),
     )
     .set(value);
 }
 
-/// Increment `memory_claim_backfill_facts_total{outcome,reason_code}`.
+/// Increment `memory_claim_backfill_facts_total{outcome,reason_code}` once for
+/// each fact with an identifier whose projection-job ensure is attempted.
 pub(crate) fn record_backfill_fact(outcome: &str, reason_code: &str) {
     metrics::counter!(
         METRIC_BACKFILL_FACTS_TOTAL,
@@ -239,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn outcome_label_covers_persisted_vocabulary() {
+    fn outcome_label_covers_bounded_vocabulary() {
         for ok in [
             "duplicate",
             "supersession",
@@ -247,6 +268,10 @@ mod tests {
             "contradiction",
             "temporal_ambiguity",
             "coexist",
+            "persisted",
+            "skipped",
+            "failed",
+            "ensured",
         ] {
             assert_eq!(outcome_label(ok), ok);
         }
@@ -256,7 +281,10 @@ mod tests {
     #[test]
     fn reason_label_categorizes_known_codes() {
         assert_eq!(reason_label("invalid_value"), "invalid_value");
+        assert_eq!(reason_label("none"), "none");
         assert_eq!(reason_label("storage"), "storage");
+        assert_eq!(reason_label("failed"), "other");
+        assert_eq!(reason_label("completed"), "other");
         assert_eq!(reason_label("made-up"), "other");
     }
 
@@ -330,6 +358,6 @@ mod tests {
 
     #[test]
     fn record_backfill_fact_is_safe_without_recorder() {
-        record_backfill_fact("completed", "completed");
+        record_backfill_fact("ensured", "none");
     }
 }

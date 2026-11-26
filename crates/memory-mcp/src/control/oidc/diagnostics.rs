@@ -146,24 +146,26 @@ mod tests {
         let _level = crate::logging::capture::LevelOverride::install("info");
         let sink = crate::logging::capture::install();
         let d = ProviderDiagnostics::default();
+        const DEGRADATION_REASON: &str = "diagnostics_dedup_test";
+        const RECOVERY_REASON: &str = "diagnostics_recovery_test";
         d.transition(
             ProviderComponent::Metadata,
             ProviderState::Backoff,
-            "http",
+            DEGRADATION_REASON,
             Some(502),
             Duration::from_secs(1),
         );
         d.transition(
             ProviderComponent::Metadata,
             ProviderState::Backoff,
-            "http",
+            DEGRADATION_REASON,
             Some(502),
             Duration::from_secs(2),
         );
         d.transition(
             ProviderComponent::Metadata,
             ProviderState::Ready,
-            "success",
+            RECOVERY_REASON,
             None,
             Duration::ZERO,
         );
@@ -171,14 +173,22 @@ mod tests {
         assert_eq!(
             lines
                 .iter()
-                .filter(|l| l.contains("op=oidc.provider.state_changed") && l.contains("WARN"))
+                .filter(|l| {
+                    l.contains("op=oidc.provider.state_changed")
+                        && l.contains("WARN")
+                        && l.contains(&format!("reason={DEGRADATION_REASON}"))
+                })
                 .count(),
             1
         );
         assert_eq!(
             lines
                 .iter()
-                .filter(|l| l.contains("op=oidc.provider.state_changed") && l.contains("INFO"))
+                .filter(|l| {
+                    l.contains("op=oidc.provider.state_changed")
+                        && l.contains("INFO")
+                        && l.contains(&format!("reason={RECOVERY_REASON}"))
+                })
                 .count(),
             1
         );

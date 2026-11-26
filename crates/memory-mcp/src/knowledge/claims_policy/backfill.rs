@@ -107,7 +107,7 @@ pub(crate) async fn run_backfill_page(
             .await;
 
         match &scheduled {
-            Ok(()) => super::telemetry::record_backfill_fact("completed", "completed"),
+            Ok(()) => super::telemetry::record_backfill_fact("ensured", "none"),
             Err(_) => super::telemetry::record_backfill_fact("failed", "internal"),
         }
 

@@ -673,7 +673,10 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         name: "memory_claim_pipeline_total",
         kind: MetricKind::Counter,
         unit: None,
-        help: "Claim pipeline events by stage, schema, outcome and reason. \
+        help: "Claim pipeline events by stage, schema, bounded outcome and \
+               bounded reason. Outcome covers relation decisions and processing \
+               statuses (persisted, skipped, failed); reason is \
+               none when no reason applies. \
                The labels are bounded and carry no claim, subject or project \
                identifier: those are the values that would turn a counter into \
                a disclosure.",
@@ -682,7 +685,8 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         name: "memory_claim_pipeline_duration_seconds",
         kind: MetricKind::Histogram,
         unit: Some(metrics::Unit::Seconds),
-        help: "Claim reconciliation duration, by stage and schema.",
+        help: "Claim pipeline page duration by stage, schema and bounded \
+               relation-decision or processing-status outcome.",
     },
     MetricDescription {
         name: "memory_claim_candidates_considered",
@@ -709,7 +713,10 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         name: "memory_claim_backfill_facts_total",
         kind: MetricKind::Counter,
         unit: None,
-        help: "Facts backfilled into the claim store, by outcome and reason.",
+        help: "Backfill projection-job ensure attempts, one per fact with an identifier. \
+               Outcome `ensured` means the idempotent job ensure succeeded; the \
+               job may already exist. `failed` means ensure failed. These are \
+               attempts, not unique facts or completed fact projections.",
     },
     MetricDescription {
         name: "memory_fs_watch_revisions_total",

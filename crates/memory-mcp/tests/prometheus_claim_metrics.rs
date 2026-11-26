@@ -77,16 +77,16 @@ fn all_five_metric_families_appear() {
     // Family 5: memory_claim_backfill_facts_total{outcome,reason_code}
     counter!(
         METRIC_BACKFILL_FACTS_TOTAL,
-        "outcome" => "completed",
-        "reason_code" => "completed",
+        "outcome" => "ensured",
+        "reason_code" => "none",
     )
     .increment(10);
     counter!(
         METRIC_BACKFILL_FACTS_TOTAL,
-        "outcome" => "skipped",
-        "reason_code" => "skipped",
+        "outcome" => "failed",
+        "reason_code" => "internal",
     )
-    .increment(42);
+    .increment(2);
 
     let output = handle.render();
 
@@ -129,18 +129,18 @@ fn all_five_metric_families_appear() {
         "active relations gauge: {output}"
     );
 
-    // backfill facts total
+    // backfill projection-job ensure attempts
     assert!(
         output.contains("memory_claim_backfill_facts_total{")
-            && output.contains("outcome=\"completed\"")
-            && output.contains("reason_code=\"completed\""),
-        "backfill completed count: {output}"
+            && output.contains("outcome=\"ensured\"")
+            && output.contains("reason_code=\"none\""),
+        "backfill ensure-success count: {output}"
     );
     assert!(
         output.contains("memory_claim_backfill_facts_total{")
-            && output.contains("outcome=\"skipped\"")
-            && output.contains("reason_code=\"skipped\""),
-        "backfill skipped count: {output}"
+            && output.contains("outcome=\"failed\"")
+            && output.contains("reason_code=\"internal\""),
+        "backfill ensure-failure count: {output}"
     );
 }
 
@@ -183,12 +183,10 @@ fn no_forbidden_identifier_appears_as_label() {
 /// A failure on the claim pipeline has to be selectable, or an alert for it
 /// matches an empty vector and never fires.
 ///
-/// The recorded `outcome` is a *reconciliation outcome* — duplicate,
-/// supersession, contradiction — and `outcome_label` collapses anything else
-/// to `other`. So a post-projection failure, which is recorded as
-/// `outcome="failed"`, reaches the exposition as `outcome="other"` like every
-/// other non-reconciliation value. The reason it was a failure is in
-/// `reason_code`, which is where the bounded error buckets live.
+/// The recorded outcome includes both reconciliation decisions and bounded
+/// processing statuses. A post-projection failure reaches the exposition as
+/// `outcome="failed"`; its bounded cause remains independently selectable in
+/// `reason_code`.
 ///
 /// An alert written against `outcome="error"` therefore matches nothing at
 /// all: the label value does not exist, `sum()` of empty is empty, and
@@ -203,16 +201,16 @@ fn a_claim_pipeline_failure_is_selectable_by_its_reason_code() {
         METRIC_PIPELINE_TOTAL,
         "stage" => "project",
         "schema" => "attribute",
-        "outcome" => "other",
+        "outcome" => "failed",
         "reason_code" => "internal",
     )
     .increment(1);
 
     let output = handle.render();
     assert!(
-        output.contains(r#"outcome="other""#) && output.contains(r#"reason_code="internal""#),
-        "a projection failure must be reachable by its reason code, since `error` \
-         is not a value the outcome vocabulary has: {output}"
+        output.contains(r#"outcome="failed""#) && output.contains(r#"reason_code="internal""#),
+        "a projection failure must be independently reachable by its bounded \
+         outcome and reason labels: {output}"
     );
     assert!(
         !output.contains(r#"outcome="error""#),

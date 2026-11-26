@@ -456,8 +456,7 @@ mod tests {
     /// the run it belonged to — and `RUST_LOG` could not raise or lower it.
     ///
     /// The rendered line is asserted, not the event: the level is what an
-    /// operator filters on, and reading it back out of a structure would not
-    /// prove the line carries it.
+    /// operator filters on, and the sensitive error value must stay redacted.
     #[tokio::test]
     async fn a_failing_job_is_logged_with_its_level() {
         let registry = test_registry().await;
@@ -480,9 +479,7 @@ mod tests {
         assert!(
             recorded.iter().any(|line| {
                 line.contains("op=http.job.failed")
-                    // Quoted as one value: a `MemoryError` is prose, and the
-                    // line must not break it into a first word and noise.
-                    && line.contains(r#"error="storage error: disk is gone""#)
+                    && line.contains("error=[redacted]")
                     && line.contains("ERROR")
             }),
             "a failed job must be logged at error level: {recorded:?}"
@@ -522,7 +519,7 @@ mod tests {
         assert!(
             recorded.iter().any(|line| {
                 line.contains("op=http.job.failed")
-                    && line.contains(r#"error="validation error: bad dimension""#)
+                    && line.contains("error=[redacted]")
                     && line.contains("WARN")
             }),
             "a failed job must be logged at the level its error asks for: {recorded:?}"

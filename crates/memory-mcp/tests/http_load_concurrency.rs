@@ -132,9 +132,11 @@ fn explain_response_contains_marker(payload_text: &str, marker: &str) -> bool {
     payload["result"]["structuredContent"]["result"]
         .as_array()
         .is_some_and(|items| {
-            items
-                .iter()
-                .any(|item| item["content"].as_str().is_some_and(|c| c.contains(marker)))
+            items.iter().any(|item| {
+                item["citation_context"]
+                    .as_str()
+                    .is_some_and(|context| context.contains(marker))
+            })
         })
 }
 

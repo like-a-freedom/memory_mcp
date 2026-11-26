@@ -1191,7 +1191,7 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains(&format!("op={TEST_ONLY_OP}"))
                     && line.contains("WARN")
-                    && line.contains(r#"error="tenant t1: disk is gone""#)
+                    && line.contains("error=[redacted]")
             }),
             "a runtime warning must be a filterable, levelled line: {recorded:?}"
         );
@@ -1354,7 +1354,7 @@ mod tests {
         assert!(
             recorded
                 .iter()
-                .any(|line| line.contains("error=\"registry unreachable\"")),
+                .any(|line| line.contains("error=[redacted]")),
             "the warning must name an `error` field: {recorded:?}"
         );
         assert!(

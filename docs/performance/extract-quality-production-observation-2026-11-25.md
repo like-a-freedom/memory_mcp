@@ -46,6 +46,39 @@ and deterministic evaluation. A population claim about deployed semantic
 quality additionally requires an approved, privacy-preserving sample with
 reviewed source labels. The current metrics do not provide those labels.
 
+## Claim telemetry contract audit
+
+A separate read-only query at `2026-11-25T23:00:00Z` covered the preceding
+22 days. It returned an estimated 229 project pipeline events, all labeled
+`outcome="other"` (reason labels: 36 `ambiguous_subject`, 4 `missing_subject`,
+1 `other`, 43 `unknown_cardinality`, and 145 `unstructured_colon_value`). It
+also returned one quantity reconciliation page-duration observation labeled
+`outcome="other"` and one matching candidate-count observation. The exact
+aggregate responses are in the [telemetry audit receipt](extract-quality-telemetry-contract-audit-2026-11-26-query-receipt.json).
+
+Source inspection found that the claim telemetry mapper accepted relation
+decisions but collapsed the known processing statuses `persisted`, `skipped`,
+`failed`, and `completed` to `other`. The page counter is emitted once per
+persisted relation, while page duration is emitted even for an empty/skipped
+page; therefore an absent reconciliation counter does not establish that no
+page ran. Since the production metric reports only version `1.41.0`, without an
+image digest or source revision, the aggregate is consistent with the mapper
+defect but does not attest the exact deployed artifact.
+
+The local fix gives `persisted`, `skipped` and `failed` distinct bounded
+outcomes, replaces the backfill's misleading `completed` label with `ensured`,
+and uses `reason_code="none"` when a successful event has no reason. Production
+history cannot be reclassified after the fact. The fix requires a deployed
+build and a fresh post-deployment window before these labels can qualify any
+comparison; it does not establish a semantic-quality or latency improvement.
+The same source audit found that the backfill counter increments when an
+idempotent projection-job ensure succeeds for a fact with an identifier, not
+when fact projection completes. Its local outcome is now `ensured`; the metric
+help says it counts ensure attempts, including repeats, and not unique facts or
+completed projections. The dashboard recording rule and panel now label this
+as job-ensure attempt rate; they explicitly avoid treating it as worker
+throughput.
+
 ## Reproduction queries
 
 The following PromQL expressions were evaluated at the fixed window end,

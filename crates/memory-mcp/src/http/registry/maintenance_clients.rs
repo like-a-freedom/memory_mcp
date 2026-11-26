@@ -153,6 +153,15 @@ impl DbClient for MaintenanceDbClient {
         self.observe(self.delegate.query(sql, vars, namespace).await)
     }
 
+    async fn transaction_query(
+        &self,
+        sql: &str,
+        vars: Option<serde_json::Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        self.observe(self.delegate.transaction_query(sql, vars, namespace).await)
+    }
+
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
         self.observe(self.delegate.apply_migrations(namespace).await)
     }

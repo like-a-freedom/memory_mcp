@@ -224,7 +224,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
             .as_array()
             .is_some_and(|items| {
                 items.iter().any(|item| {
-                    item["content"]
+                    item["citation_context"]
                         .as_str()
                         .is_some_and(|content| content.contains("tenant_a_positive_control_marker"))
                 })

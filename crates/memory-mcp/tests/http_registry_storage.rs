@@ -119,8 +119,8 @@ fn production_binary_does_not_select_fixture_storage() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("registry") || stderr.contains("storage"),
-        "startup failure must name the storage cause, got: {stderr}"
+        stderr.contains("op=http.serve_failed") && stderr.contains("error=[redacted]"),
+        "startup failure must be structured while keeping the error redacted, got: {stderr}"
     );
 }
 
