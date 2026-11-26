@@ -1590,8 +1590,7 @@ pub(super) async fn filter_candidates(
                 typed_answer_slot_support(query, &item.fact.content, &subject_terms) == Some(true);
             let facet =
                 matched_secondary_query_facet(query, &item.fact.content, &item.fact.index_keys);
-            let facet_admitted =
-                score < floor && !has_independent_admission_evidence(&item) && facet.is_some();
+            let facet_admitted = score < floor && facet.is_some();
             if score < floor
                 && !has_independent_admission_evidence(&item)
                 && !facet_admitted

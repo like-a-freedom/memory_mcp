@@ -3311,3 +3311,85 @@ async fn terminal_project_scope_keeps_selected_policy_beside_unrelated_ownership
         "unrelated ownership is not the policy owner"
     );
 }
+
+async fn negative_reranker_facet_receipt(
+    content: &str,
+) -> memory_mcp::eval_support::retrieval::ContextEvidence {
+    let service = new_eval_retrieval_service(
+        test_db().await as Arc<dyn DbClient>,
+        "main".into(),
+        eval_config(Arc::new(RejectingReranker), 0.7),
+    )
+    .await
+    .expect("negative reranker component service");
+    service
+        .add_fact(
+            "note",
+            content,
+            content,
+            "episode:reranking-proof-control",
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("independent facet control fact");
+    memory_mcp::eval_support::retrieval::assemble_context_with_evidence(
+        &service,
+        assemble_request("backup setup, retention policy, archive rotation in orbit_store"),
+        "episode:reranking-proof-control",
+    )
+    .await
+    .expect("public negative reranker assembly")
+}
+
+#[tokio::test]
+async fn negative_reranker_retains_independently_complete_facet_after_packaging() {
+    let receipt = negative_reranker_facet_receipt(
+        "Backup retention policy keeps verified snapshots for thirty days.",
+    )
+    .await;
+    assert_eq!(
+        receipt.items.len(),
+        1,
+        "a complete facet remains independent evidence"
+    );
+    assert_eq!(
+        receipt.items[0].provenance["reranking"]["facet_admitted"],
+        true
+    );
+    assert!(
+        receipt.items[0].provenance["reranking"]["relevance_logit"]
+            .as_f64()
+            .unwrap()
+            < 0.0
+    );
+}
+
+#[tokio::test]
+async fn negative_reranker_rejects_weak_lexical_matches_spread_across_facets() {
+    let receipt = negative_reranker_facet_receipt(
+        "Backup summaries and retention tickets are indexed in orbit_store.",
+    )
+    .await;
+    let bounded = receipt
+        .stages
+        .iter()
+        .find(|stage| stage.stage == "bounded_fact_candidates")
+        .expect("actual pre-reranker boundary");
+    assert_eq!(
+        bounded.items.len(),
+        1,
+        "the weak lexical candidate must reach the reranker"
+    );
+    assert_eq!(
+        bounded.items[0].provenance["retrieval_admission"]["basis"],
+        "lexical"
+    );
+    assert!(
+        receipt.items.is_empty(),
+        "partial words across facets cannot override a negative reranker"
+    );
+}
