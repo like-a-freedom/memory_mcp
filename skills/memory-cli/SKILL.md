@@ -21,7 +21,8 @@ before running a command.
    server startup; commands never pass, invent, or probe a namespace, scope, or
    project.
 3. **Bi-temporal truth.** Use the source's time for `--t-ref`; use `--as-of` for
-   historical recall.
+   historical recall only when both time axes should agree. Prefer independent
+   `--valid-at` and `--known-at`/`--known-revision`; omit `--t-ingested`.
 4. **Append, then invalidate.** Preserve source identity and the audit trail.
 5. **Machine-readable boundary.** Parse stdout as JSON and use the process exit
    status. Keep logs and diagnostics separate from persisted content.
@@ -42,16 +43,21 @@ Exact flags remain behind that pointer; this file owns behavior and order.
    `source_id`, truthful reference time, and bounded, secret-free content.
 
    *Completion:* every required value is traceable and safe to place on the
-   command line in the current environment.
+   command line or stdin in the current environment.
 
 2. **Ingest once.** Run `memory_mcp ingest` with explicit flags. Capture stdout,
-   stderr, and exit status separately.
+   stderr, and exit status separately. Use `--content-stdin` for multiline
+   content; a URL/path supplied as content remains literal. Explicit file/URL
+   imports require operator authorization and the separate `import` command.
 
    *Completion:* parse a returned `episode_id`, or report `pending` while
    preserving the intended source handles.
 
 3. **Extract and inspect.** Run `memory_mcp extract --episode-id ...`. Inspect
-   facts and warnings rather than treating exit zero as fact capture.
+   facts and warnings rather than treating exit zero as fact capture. Free-form
+   extraction is heuristic, not guaranteed empty or guaranteed successful.
+   Prefer verified structured summaries for explicit decisions. Evidence pairs
+   default on, with a shared 4 KiB JSON budget; `--compact` omits them.
 
    *Completion:* classify the result as `verified`, `episode-only`, or
    `pending`.
@@ -82,7 +88,8 @@ leave the operation `pending`.
 3. Run `memory_mcp explain` for every item used as evidence.
 
 *Completion:* all used claims have provenance; empty results and failures are
-reported explicitly; no write command ran during the recall workflow.
+reported explicitly; no capture/canonicalization command ran during recall.
+Assembly is a logical read and may durably update fact-access heat.
 
 ## Workflow: serve
 

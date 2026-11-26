@@ -18,6 +18,30 @@
       "prompt": "Объедини подтвержденные алиасы Alice Smith и A. Smith в одну сущность через Memory MCP.",
       "expected_output": "Agent selects canonicalize, treats resolve as a mutation, uses the fully qualified resolve tool, and reports the canonical entity ID without claiming unsupported merges.",
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Хочу помнить ссылку https://example.org/spec и путь /work/spec.md как текст, не открывая их. Укажи дату события, а t_ingested выставь на прошлый месяц.",
+      "expected_output": "Use live host-qualified ingest with literal content and truthful t_ref; omit/reject caller t_ingested, do not fetch or open either reference. Explain server-owned transaction time.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Повтори историческое чтение после позднего исправления: valid_at уже известен, сервер вернул snapshot. Первый ответ partial и пустой. Что передать при уточнении?",
+      "expected_output": "Reuse context.snapshot.valid_at and known_revision, omit as_of/known_at, retain other selectors. Respect one-refinement guidance and partial/omission metadata; empty retry never proves absence.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "extract вернул facts, но statement и quote отсутствуют, fact_evidence_omitted=true. Это провал? Нужна точная цитата из длинного источника.",
+      "expected_output": "Do not infer no facts from omitted evidence; default evidence is all-or-none under shared 4 KiB JSON cap. Explain with canonical IDs, select one item for Unicode-scalar continuations, inspect quote verification and truncation under 32 KiB envelope.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Разговорный источник после extract дал один note, а другой текст — пустой facts. Можно ли сказать, что free-form всегда не поддерживается и источник не recallable?",
+      "expected_output": "No universal free-form claim: source-dependent heuristics may yield facts/note/none. Classify actual result; empty means no canonical facts confirmed, while episode source fallback can still return text. Recall may update access heat, not capture new facts.",
+      "files": []
     }
   ]
 }

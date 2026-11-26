@@ -5,37 +5,28 @@ response, or choosing an app. The connected server schema is authoritative.
 
 ## Tool names
 
-MCP skills call fully qualified tool names. Hosts render qualification
-differently:
-
-- this repository's Codex surface uses `mcp_memory-mcp_ingest`,
-  `mcp_memory-mcp_extract`, `mcp_memory-mcp_resolve`,
-  `mcp_memory-mcp_assemble_context`, `mcp_memory-mcp_explain`,
-  `mcp_memory-mcp_invalidate`, `mcp_memory-mcp_open_app`, and
-  `mcp_memory-mcp_app_command`;
-- hosts using `ServerName:tool_name` convention may expose
-  `memory-mcp:ingest`, and so on.
-
-Use the exact qualified name listed by the connected host. The tables below use
-raw names only to identify the operation.
+Use the exact qualified name advertised by the connected host. Hosts may expose
+`mcp__memory__ingest`, `memory-mcp:ingest`, or another server prefix; do not copy a
+prefix from another environment or invent a bare tool. The table identifies
+operations, not literal callable names. Tool schemas remain authoritative.
 
 ## Canonical tools
 
 | Tool | Required caller input | Expected result |
 |---|---|---|
-| `ingest` | `source_type`, `source_id`, `content`, `t_ref`; optional `policy_tags` | created or existing `episode_id` |
+| `ingest` | `source_type`, `source_id`, `content`, `t_ref`; optional `policy_tags`, paired `source_group`/`source_position` | created or existing `episode_id` |
 | `extract` | exactly one source: `episode_id` or inline `content`/`text` | entities, facts, links, warnings |
 | `resolve` | `entity_type`, `canonical_name`; optional aliases | canonical `entity_id` |
-| `assemble_context` | `query`; optional fact types, `as_of`, budget, view/window fields | ranked context items |
+| `assemble_context` | `query`; optional fact types, `valid_at`, `known_at`/`known_revision`, legacy `as_of`, budget, view/window fields | ranked context items |
 | `explain` | `context_items` encoded as required by the exposed schema | citation-ready provenance |
 | `invalidate` | `fact_id`, `reason`, `t_invalid` | persisted invalidation confirmation |
 
 `extract` with inline `content`/`text` is an ingest-then-extract: it creates a
 new episode (default `source_type` `ad-hoc`) before extracting, so it is not a
-way to re-extract stored content — pass `episode_id` for that. Extracting
-free-form prose yields no durable facts and the episode stays `episode-only`;
-the response's `guidance` names this and points at the structured-summary format
-or the `ingestion_review` app. See the capture SOP for the exact format.
+way to re-extract stored content — pass `episode_id` for that. Free-form extraction uses source-type-dependent heuristics and can produce
+facts, a fallback note or no durable facts. Inspect the actual result; do not
+classify by input format alone. An empty fact set is `episode-only`. Structured
+summaries and `ingestion_review` are recovery options, not guaranteed outcomes.
 
 Arguments use flat `snake_case` fields. Do not wrap them in `payload`. Inspect
 the live schema for optional fields and enums rather than inventing them. No
@@ -55,8 +46,47 @@ Successful tool responses use an envelope with `status`, `result`, and
 `guidance`. List results also expose pagination metadata. MCP errors are
 failures, not empty results; preserve known handles and report `pending`.
 
+## Evidence and source boundaries
+
+`ingest.content` is literal text. URLs and file paths are never fetched/opened.
+Omit `t_ingested`: the server rejects caller transaction times. An ordered stream
+may supply both `source_group` and positive one-based `source_position`; do not
+invent stream identity/order for unrelated documents. Credential-bearing writes
+can be refused; redact and retry only within the authorized source boundary.
+External reads require the separate authorized operator CLI import workflow.
+
+`extract.include_fact_evidence` defaults to true. Complete `statement` and
+`source_quote` pairs share a 4 KiB serialized JSON budget. If any pair is missing
+or the budget is exceeded, all pairs are omitted and `fact_evidence_omitted` is
+true. Facts can still exist. Set `include_fact_evidence=false` for compact output;
+use `explain` for the evidence you need. Claim rollout defaults to `evidence`,
+but an operator can configure another stage; unknown role/coverage is not proof
+that a claim is current, contradicted or absent.
+
+Read the memory contract before using temporal selectors. Historical metadata is
+under `context`: preserve snapshot fields and inspect partial completeness and
+omissions. Assembly can persist fact-access heat; logical recall is not a
+zero-write storage operation.
+
+## Bounded explain
+
+`context_items` is a JSON-array **string**, containing returned item objects or
+canonical source-ID strings. The envelope is capped at 32 KiB; inspect `status`,
+`partial_reasons`, `next_offset` and item-level metadata even with `compact=false`.
+Use `item_offset` to select one submitted item. Source/provenance continuations
+require exactly one selected item. For an explicit source window pass
+`source_offset` and optionally `source_limit_scalars` (maximum 8000); offsets count
+Unicode scalars, not bytes. Follow `citation_context_next_offset` and
+`provenance_next_offset`; provenance pages contain at most 20 sources.
+
+Default citation context is a bounded window, not the entire source. A returned
+quote is not automatically verified: inspect `quote_verified`,
+`quote_contained_in_window`, `quote_complete` and
+`citation_context_covers_entire_source`. Do not claim an exact citation from an
+unverified or truncated excerpt. Preserve the source and fact IDs exactly.
+
 `resolve` is not a lookup. It calls resolve-or-create and can persist a new
-canonical entity or aliases. Keep it out of the read-only recall SOP.
+canonical entity or aliases. Keep it out of the recall SOP.
 
 ## App routing
 

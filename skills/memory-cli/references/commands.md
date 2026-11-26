@@ -8,16 +8,18 @@ help is authoritative.
 
 | Command | Required input |
 |---|---|
-| `memory_mcp ingest` | `--source-type`, `--source-id`, `--content`, `--t-ref`; optional repeatable `--policy-tag` |
+| `memory_mcp ingest` | `--source-type`, `--source-id`, exactly one of `--content` / `--content-stdin`, `--t-ref`; optional repeatable `--policy-tag` |
 | `memory_mcp extract` | `--episode-id`, or inline content plus its source metadata |
 | `memory_mcp resolve` | `--entity-type`, `--canonical-name`; aliases are repeatable |
-| `memory_mcp assemble-context` | `--query`; optional fact type, `as_of`, budget, view mode, temporal windows |
+| `memory_mcp assemble-context` | `--query`; optional fact type, independent valid/knowledge time, budget, view mode, temporal windows |
 | `memory_mcp explain` | `--context-items` containing the JSON array from assembly |
 | `memory_mcp invalidate` | `--fact-id`, `--reason`, `--t-invalid` |
 
 Flag names are kebab-case forms of the shared snake_case parameter names.
-Repeatable values use repeated flags. Optional assembly controls include fact
-type, `as_of`, budget, view mode, and temporal windows. No ordinary command
+Repeatable values use repeated flags. Assembly supports `--valid-at` and either
+`--known-at` or `--known-revision`. Legacy `--as-of` sets both axes and cannot be
+combined with those flags. See the memory contract for partial historical results
+and repeatable snapshots. No ordinary command
 accepts a `--scope`, `--project`, or `--namespace` flag: the Active Namespace is
 server startup configuration and is never selected per command.
 
@@ -27,7 +29,7 @@ until their cause is corrected; do not parse diagnostic text as a successful
 response.
 
 `resolve` invokes resolve-or-create. It may persist a new entity or aliases and
-therefore belongs to the canonicalize workflow, not read-only recall.
+therefore belongs to the canonicalize workflow, not recall.
 
 ## Operational commands
 
@@ -46,3 +48,43 @@ budget, and uses terminal states `running`, `completed`, `completed_with_errors`
 
 Hidden lifecycle commands are implementation interfaces for installed hooks,
 not public commands for ad-hoc agent use.
+
+## Literal capture and explicit operator import
+
+`ingest --content` stores the supplied bytes as text, including any URL/path.
+`--content-stdin` reads UTF-8 stdin, up to 8 MiB, without shell argument expansion.
+Omit `--t-ingested`: server transaction time is authoritative and overrides are
+rejected. `extract --episode-id` reuses stored content; inline `--content`/`--text`
+ingests a new episode first. Free-form extraction is heuristic and can return
+facts, a fallback note or no facts. Inspect the result rather than assuming any
+of these outcomes. Prefer verified structured summaries for explicit decisions.
+
+Only use operator import when the external read is explicitly authorized:
+
+```text
+memory_mcp import file --root <absolute-directory> --path <relative-file> --source-type document --t-ref <ISO8601>
+memory_mcp import url --url <public-HTTPS-URL> --source-type web --t-ref <ISO8601>
+```
+
+The importer generates the source ID and ingests parsed content; extract the
+returned episode separately. File reads are root-confined, refuse traversal and symlink escapes outside the
+root, and cap input at 4 MiB. URL import refuses credentials, redirects and
+non-public destinations and caps the response at 4 MiB. Import is not a way to
+bypass a refused credential-bearing write or to grant an agent arbitrary access.
+
+## Evidence and bounded provenance
+
+Extraction returns statement/quote pairs by default within a shared 4 KiB JSON
+budget. Missing pairs or overflow omit all pairs and set `fact_evidence_omitted`;
+this is not an empty-fact verdict. `extract --compact` opts out. Claim rollout
+defaults to `evidence`; configured stages and unknown role/coverage still matter.
+
+`explain` accepts `--item-offset`, `--source-offset`, `--source-limit-scalars`
+(maximum 8000, requires source offset), and `--provenance-offset`. Source and
+provenance continuations need exactly one selected item. The envelope is bounded
+to 32 KiB, default source context to 1200 Unicode scalars, provenance pages to 20
+sources. Follow response `next_offset`, `citation_context_next_offset` and
+`provenance_next_offset`; offsets count Unicode scalars for source text.
+Check quote verification/completeness and entire-source flags before quoting.
+A partial response is not evidence that omitted content is absent. Assembly is
+a logical read and can persist fact-access heat.

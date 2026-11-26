@@ -19,7 +19,8 @@ express the session-backed intent.
    server startup; agents never pass, invent, or probe a namespace, scope, or
    project per request.
 3. **Bi-temporal truth.** Supply the source's valid time as `t_ref`; the server
-   records transaction time. Use `as_of` for point-in-time recall.
+   owns transaction time: omit `t_ingested`. Use independent `valid_at` and
+   `known_at`/`known_revision` for historical recall; legacy `as_of` sets both axes.
 4. **Append, then invalidate.** Preserve the audit trail. A changed source gets a
    new `source_id`; an outdated fact is invalidated rather than overwritten.
 5. **Evidence over absence.** Empty recall means no matching durable fact at the
@@ -45,7 +46,8 @@ and app routing. The reference owns details; this file owns behavior and order.
 Use when verified source material must outlive the current session.
 
 1. **Frame the source.** Identify the authoritative source, deterministic
-   `source_id`, truthful `t_ref`, and bounded, secret-free content.
+   `source_id`, truthful `t_ref`, and bounded, secret-free literal content.
+   A path or URL in `content` is stored as text, never read or fetched.
 
    *Completion:* every required field is known and traceable to the source.
 
@@ -62,13 +64,16 @@ Use when verified source material must outlive the current session.
    a new episode first, so it is not a re-extraction.
 
    A result with no extracted facts is `episode-only`: the source is stored but
-   nothing durable is recallable. Free-form prose extracts nothing; only
-   structured summaries do. To capture facts, ingest content shaped as a
-   summary: markdown section headings (`## Decisions`, `## Facts`,
+   no canonical extracted facts are confirmed. The stored episode may still
+   appear through source fallback; that does not turn it into an extracted fact. Free-form extraction is heuristic and source-type dependent; it can produce
+   facts or a fallback note, and can also return none. For explicit decisions
+   and facts, prefer a source-faithful structured summary: markdown section headings (`## Decisions`, `## Facts`,
    `## Pending items`) with bullet items, or `Decision: …` / `Fact: …` lines.
    The response's `guidance` field states which path applies. When the input is
-   already free-form, open the `ingestion_review` app and approve the draft
-   note instead of relying on automatic extraction.
+   already free-form and extraction is empty, consider the `ingestion_review`
+   app when available, or prepare a verified summary without inventing claims.
+   Evidence pairs are returned by default within a shared 4 KiB JSON budget;
+   `fact_evidence_omitted` means inspect provenance rather than infer no facts.
 
    *Completion:* the result is classified as `verified`, `episode-only`, or
    `pending`, using the memory contract.
@@ -109,7 +114,8 @@ This branch writes entity state.
 Use before consequential work when prior decisions or facts may matter, and
 whenever the user asks for remembered context.
 
-1. **Frame the question.** Set the query and `as_of` when time matters.
+1. **Frame the question.** Set the query and the appropriate valid/knowledge
+   boundary when time matters. Preserve a returned snapshot for any refinement.
 
    *Completion:* the retrieval boundary is explicit.
 
@@ -125,7 +131,8 @@ whenever the user asks for remembered context.
    *Completion:* every used claim has source provenance, and the answer is no
    stronger than its evidence.
 
-Recall is read-only. End the recall branch before starting any capture.
+Recall is a logical read: current assembly can durably update fact-access heat.
+It is not a guarantee of zero storage writes. End recall before starting capture.
 
 ## SOP: app session
 

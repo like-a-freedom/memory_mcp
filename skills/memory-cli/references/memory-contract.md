@@ -9,10 +9,11 @@ for accepted flags and values.
 - `source_id` is stable and round-trippable. Same ID and content is idempotent;
   same ID with different content is a conflict.
 - `content` is bounded, source-linked, verified, and safe to pass through the
-  current shell environment.
+  current shell environment. URL/path content is literal; only an explicitly
+  authorized `import` reads/fetches external source material.
 - `source_type` uses a value accepted by live command help.
-- `--t-ref` is the source's valid time in ISO 8601. Omit transaction-time
-  overrides unless the source supplies a justified value.
+- `--t-ref` is the source's valid time in ISO 8601. Omit `--t-ingested`: the public tool rejects caller transaction-time
+  overrides. Use `--t-ref` for the source/event date.
 - Changed evidence gets a new source identity. Superseded facts are invalidated,
   never deleted.
 
@@ -43,15 +44,26 @@ is eligible only when the server's configured policy explicitly permits it.
 
 ## Time and results
 
-`--as-of` asks what was both knowable and valid at the specified point.
-Invalidated facts remain in historical and diff views.
+Use `--valid-at` for world-valid time and either `--known-at` for committed
+knowledge by a timestamp or `--known-revision` for an exact server checkpoint.
+The knowledge flags are mutually exclusive. Legacy `--as-of` sets both axes and
+cannot accompany a new axis. Omitted axes capture a new request snapshot.
+To refine within one snapshot, copy `context.snapshot.valid_at` and
+`context.snapshot.known_revision` to the corresponding flags; omit `--as-of` and
+`--known-at`. Tokens belong to this namespace/history.
+
+Historical reads support `--view-mode current` only and may be partial. Inspect
+completeness, omitted channels, scan truncation and guidance: an empty partial
+result or refinement does not establish global absence. Current assembly is a
+logical read that can persist access heat.
 
 Classify capture as `verified` (facts inspected), `episode-only` (empty fact
 set), or `pending` (nonzero exit or unresolved failure). Classify recall as
 `assembled`, and as `cited` only after every used claim has provenance.
 
-Never treat exit zero, an episode ID, or an empty result as stronger evidence
-than the structured response provides.
+An empty extraction confirms no canonical fact capture; source fallback may
+still return the episode text. Never treat exit zero, an episode ID, or an empty
+result as stronger evidence than the structured response provides.
 
 ## Recovery
 

@@ -8,10 +8,11 @@ for accepted fields and enums.
 
 - `source_id` is stable and round-trippable. Same ID and content is idempotent;
   same ID with different content is a conflict.
-- `content` is bounded, source-linked, verified, and secret-free.
+- `content` is bounded, source-linked, verified, and secret-free. URL/path text
+  is literal; ingestion does not fetch URLs or open files.
 - `source_type` uses a value accepted by the live schema.
-- `t_ref` is the source's valid time in ISO 8601. The server normally owns
-  transaction time.
+- `t_ref` is the source's valid time in ISO 8601. The server owns
+  transaction time; omit `t_ingested`, even if the source has another date.
 - Changed evidence gets a new source identity. Superseded facts are invalidated,
   never deleted.
 
@@ -28,9 +29,18 @@ the server's configured policy explicitly permits it.
 
 ## Time
 
-Facts have valid time and transaction time. `as_of` asks what was both knowable
-and valid at the specified point. Invalidated facts remain in historical and
-diff views.
+Use `valid_at` for world-valid time and `known_at` for knowledge committed by
+a timestamp, or `known_revision` for an exact server checkpoint. `known_at` and
+`known_revision` are mutually exclusive; legacy `as_of` sets both axes and
+cannot accompany any new axis. Omitted axes capture a new request snapshot.
+For a same-snapshot refinement copy `context.snapshot.valid_at` and
+`context.snapshot.known_revision`; omit `as_of` and `known_at`. Revision tokens
+belong to this namespace/history, not arbitrary stores.
+
+Historical reads support `view_mode=current` only and may be partial: inspect
+completeness, omitted channels, candidate-scan truncation and guidance. An empty
+partial result is not global absence; one permitted refinement cannot make it
+complete. Current assembly is a logical read that can persist access heat.
 
 ## Result states
 
@@ -43,8 +53,9 @@ diff views.
 | `cited` | every used claim has source provenance |
 
 Never collapse `episode-only`, `pending`, and `verified` into “captured.”
-No matching durable fact means absence from memory at the requested boundary,
-not absence from reality.
+No extracted facts confirms no canonical fact capture, not loss of the episode:
+source fallback can still return stored source text. Empty recall is bounded
+retrieval evidence, not absence from reality.
 
 ## Recovery
 

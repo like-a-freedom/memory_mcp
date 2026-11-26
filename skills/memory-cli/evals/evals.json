@@ -18,6 +18,30 @@
       "prompt": "После смены embedding model запусти reembed; если процесс прервется, не называй работу завершенной.",
       "expected_output": "Agent selects the re-embed workflow, chooses failure controls deliberately, monitors the terminal state, and treats interrupted or failed as unfinished.",
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Запиши многострочный текст с URL и путем буквально через CLI. Можно поставить --t-ingested вчера? Не читай файл и не ходи в сеть.",
+      "expected_output": "Use ingest with source metadata and --content-stdin (UTF-8 up to 8 MiB) rather than fetching references; omit --t-ingested, extract returned episode and inspect actual outcome.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Я явно разрешаю импортировать doc.md из /work/notes и затем публичную страницу без токенов. Составь команды memory_mcp; не расширяй доступ.",
+      "expected_output": "Use import file --root /work/notes --path doc.md and import url --url with source-type/t-ref; generated source identity, separate extract. Explain confined paths, public destination/no redirects/credentials, 4 MiB cap; do not substitute literal ingest for external reads.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Нужно повторить исторический CLI recall на том же snapshot; первый результат partial. И получить продолжение источника из explain.",
+      "expected_output": "Use --valid-at and --known-revision copied from snapshot, omit --as-of/--known-at and preserve other selectors. Respect partial guidance; explain item/source/provenance offsets and <=8000 Unicode scalars, inspect verification flags. No capture/resolve, acknowledge possible access heat.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "После extract --episode-id facts есть, но evidence omitted. Хочу компактный результат дальше. А что если пусто на произвольном тексте?",
+      "expected_output": "Facts and evidence omission are separate, shared JSON evidence cap 4 KiB; --compact opts out. Free-form extraction is heuristic; empty canonical facts does not mean episode is unavailable to fallback. Preserve IDs and report verified/episode-only/error truthfully.",
+      "files": []
     }
   ]
 }
