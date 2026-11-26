@@ -1,0 +1,228 @@
+{
+  "schema_version": "memory-mcp-local-release-preflight/v1",
+  "release": "2.0.0",
+  "platform": "Darwin arm64",
+  "functional_source_commit": "436f6a5c48d0eef0d7ab273b2eb4152354cfc76e",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--test",
+        "ner_progress_channels",
+        "--features",
+        "eval-support",
+        "--locked",
+        "blocked_gliner_refresh_does_not_delay_initialize",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 0,
+      "seconds": 9.755993416998535,
+      "output_sha256": "c82f5227a5527f29ae90afab0009812794b5db59562e3d6d56c175264436334f",
+      "test_totals_including_existing_lints": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--lib",
+        "--bins",
+        "--tests",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 491.7737608750176,
+      "output_sha256": "fd80e42cd32bd5efe0a89e60739d6d923b3e6adbe563e377c639684386688732",
+      "test_totals_including_existing_lints": {
+        "passed": 4191,
+        "failed": 0,
+        "ignored": 84
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--lib",
+        "--bins",
+        "--tests",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 939.227008832997,
+      "output_sha256": "6987c53fbe1ccdbf5c39c26ad8c638426a68fb4f7c25ef79e6107d07e3095822",
+      "test_totals_including_existing_lints": {
+        "passed": 4224,
+        "failed": 0,
+        "ignored": 75
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 17.074088291992666,
+      "output_sha256": "fc1e603706719aa01c3d0247fe7d3192346d87b8a701e24f7fd1f824275c22c4"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "ui",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 32.30439925001701,
+      "output_sha256": "fe3cb7637f2107e93dee10dc125c57afd252e0d5b3067170df5a3cc3a99ced08"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-observability"
+      ],
+      "exit_code": 0,
+      "seconds": 1.309915291989455,
+      "output_sha256": "24e61acb3962b92a2d24cd8476f1a14f27be9cb38d9617a54dc591baab739ec7"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-toolchain-pin"
+      ],
+      "exit_code": 0,
+      "seconds": 0.314367041020887,
+      "output_sha256": "03396913a7488a946222cc693dda48bd1a752dd8153f90e0ed2207ce0547100f"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-dioxus-pin"
+      ],
+      "exit_code": 0,
+      "seconds": 0.32515679101925343,
+      "output_sha256": "f57736c4c52fb926dbf7d323a2840bbaeeb474c413d5ea053bcfbd3cd1db586a"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--no-default-features",
+        "--test",
+        "fs_watch_process_disabled",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 287.5677117080195,
+      "output_sha256": "f44eb70f7a0515b8188926640a166408ad9d8bacb18560cec5823d79c9e477ce",
+      "test_totals_including_existing_lints": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.7064637919829693,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "final_controls": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--test",
+        "ner_progress_channels",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures,eval-support",
+        "--locked",
+        "blocked_gliner_refresh_does_not_delay_initialize",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 0,
+      "seconds": 33.145522582984995,
+      "output_sha256": "03caf41e7100c2277e72b2e67e5083aaa755e4e8e0a721a9c5c09a74cc2c0673"
+    },
+    {
+      "command": [
+        "make",
+        "eval-response-size"
+      ],
+      "exit_code": 0,
+      "seconds": 13.944534417008981,
+      "output_sha256": "bc88a8ffc61c3db1c25dd444261ba3597a0cb64e7e40cecedd612a36fdd3541d"
+    },
+    {
+      "command": [
+        "make",
+        "perf-smoke"
+      ],
+      "exit_code": 0,
+      "seconds": 6.138778458989691,
+      "output_sha256": "aac479de3cabb5b0cfa0bbaba31a393dd6c165cfb0901eda8e8af933f386a863"
+    }
+  ],
+  "native_profile": "../../corpora/retrieval-quality-v1/native-quality-r28-release-final.json",
+  "scope": "Workspace suite passed before the final one-line facet-proof repair. Final feature suite, affected semantic/rerank controls and native release profile cover that repair. Version bump changes metadata only; post-bump public binary gate is recorded separately. Ignored tests and architecture lints are not production scenario coverage. Hosted CI, remote SurrealDB/Docker compatibility and non-native target evaluation are not claimed by this local receipt.",
+  "cleanup": {
+    "removed": "Regenerable Python/macOS caches, nested eval-harness target cache, downloaded raw upstream corpus caches and three superseded never-executed capture setups.",
+    "retained": "Frozen fixtures, raw successful and failed evaluation evidence, reproduction scripts and referenced historical artifacts."
+  }
+}

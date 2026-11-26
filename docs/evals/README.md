@@ -1,5 +1,7 @@
 # Evaluation profiles
 
+Latest release qualification: [2.0.0 native results and evidence limits](RELEASE_2_0_0.md).
+
 ## Fast deterministic development
 
 The current regression route uses one primary capture per registered case and
