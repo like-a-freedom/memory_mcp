@@ -1,0 +1,33 @@
+{
+  "schema": "evidence-file-manifest/v1",
+  "hash": "sha256",
+  "files": {
+    "README.md": "40c088b1270fc29e9575523dded3dd1cfa529cc4af36d36ca2adbe1f02f63fa8",
+    "build.jsonl": "4723089f2fb3898697bd56d998f116cdf50fbad1d9d9be216bdca96b2bf35d09",
+    "build.log": "80bfaabad31cface82f93f0d12e0ad84f1ca7c47294490072413b50485d33d85",
+    "calibration-green.log": "b16718a2faa4bace6dd0b3cff64dbcfbba0c65bae3944d56bfbbc8f6d53f506c",
+    "calibration-setup-failure.log": "4b835b79cdbf322ab6db39529b1dd87bf37660c8ab61d44b1131f8469302d279",
+    "candidate.patch": "e7867a1a8f465acc88ceaa9e3051c79ff94ce320876c67b6f614005b15a640e6",
+    "capture-identity.json": "1309ec5c8b68d92bdb194e5e78098f11d70b8b01f728ab2db614e25df55f1509",
+    "clippy-target.log": "3491a1e3c4b183c8aab535773e53ed8005d84e7ac29670041e22ab67e4689db5",
+    "clippy-workspace.log": "f3e8a495737f43b23f924643a1b11a2110dd9bb3205c62c5b806ab55ccbc7de6",
+    "final-target.log": "09c7ca951fe509e1fc9dd1afa16627ca0f9f3608643c8d9028b388c21f5bb0a5",
+    "first-record/build.jsonl": "c9ec524238da59c64efa5df07aa3d56e7619959ff4f1628b98e7b2f5fcd9b0d3",
+    "first-record/build.log": "2c5758fc9717a4de1b8d1942a81377e9fc64396e84e295e17583f28be85a06a5",
+    "first-record/candidate.patch": "c32de8238f5d1c2b39ba4ad337e63068c3f9951ec6caad9a62ee1bd89340da7a",
+    "first-record/capture-identity.json": "12c9d1106be22689842c74ee54c1d0f9dcb396b98dc890882a836535f8d4f108",
+    "first-record/inventory.log": "4da1d15b4cc6799bfe4b53bbce6786d4f5223305a6b1a1cdb6208b7b8ab9f649",
+    "first-record/process.json": "ae24c4cb06e29b4975e161101a5d2c30568a7281789c85c1fcdcf6d7a7ea0674",
+    "first-record/registration.json": "f088fdef791ee2253c17c656ff77265b8dea4a1cb6033dd4b4ad4979d515a0ea",
+    "first-record/snapshot-integrity.json": "c786db7196d94695999a9d3f65ca9bbe9f400905402104b4471a917e830cfdc9",
+    "first-record/summary.json": "16699de78cbb26550feef5233f277e30e36b0ca0bac247b19b03acf789953647",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory.log": "7ffb8d33537aa39db95ba933a0d6af3b6599809e868b4a99ec56f85697494f05",
+    "process.json": "5947ed1f83264b4a6b76c644bb692c34967bb942cad5586014b959be386a89ec",
+    "registration.json": "5cfbf567fce0366791b17582e69a1542865197402715bbede06894eaed8fe681",
+    "snapshot-integrity.json": "c786db7196d94695999a9d3f65ca9bbe9f400905402104b4471a917e830cfdc9",
+    "source-replay.json": "72b7777c3d361836a39f4334f8526177a92a93f620533500bbf20b810e546644",
+    "summary.json": "e012b17dd748828ead3b706b0c7052c19d7b89c8bf9d228ce2ad08fda43a5adb",
+    "verification.json": "236fd86f01a1b8f67129ce670a0aadd8600d40f8846708b679aed42497973540"
+  }
+}

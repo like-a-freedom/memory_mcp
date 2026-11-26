@@ -1,0 +1,32 @@
+{
+  "platform": "aarch64-apple-darwin",
+  "product_revision": "a74d509b",
+  "production_sources_unchanged": true,
+  "models": false,
+  "checks": [
+    {
+      "command": "cargo test --locked -p memory_mcp --features eval-support --test full_history_evidence",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 4
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --locked -p memory_mcp --features eval-support --test full_history_evidence -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    }
+  ],
+  "source_replay": "source-replay.json",
+  "full_history_quality_acceptance_closed": false,
+  "query_candidate_pool_inventory_complete": false,
+  "source_cleanup": "Removed failed full-table mapper diagnostic after preserving and hash-replaying both capture source patches. Useful first-record diagnostic and calibration bodies retained.",
+  "scope": "These new checks cover metadata diagnostics only. Production2817/0/45ignored,harness929/0/22ignored,public53/0/0 and native8/8 apply to the unchanged a74d509b product; they were not repeated for a test-only diagnostic addition."
+}

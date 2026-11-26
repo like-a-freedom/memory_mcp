@@ -243,6 +243,15 @@ See `evals/longmemeval_v2/results/2026-11-26-narrow-fts/README.md` and `summary.
    visibility against independent oracles, including index-only matches and ties.
    Keep all candidate caps, fallback terms and source limits. If measurements point
    elsewhere, ledger the evidence and change this mechanism before coding.
+   A bounded preliminary metadata diagnostic observed427 total facts, but the
+   full-table character/hash projection itself exceeded45s. A separate first-row
+   observation has66026 content characters and2193 distinct raw index keys
+   (37471 characters total). This is not actual query-pool telemetry or evidence
+   of duplicate raw keys. First establish a resource control for membership-only
+   index-key vocabulary reuse, preserving duplicate query hits, index-only
+   matching, wrapped values, anchor weighting and exact order. Do not infer its
+   latency benefit from that single row. Avoid high-overhead SQL per-key mappers
+   when collecting the still-missing actual-pool metadata.
 6. [ ] Re-register the final source/binary after the diagnosed repair; one bounded
    capture per case must yield complete receipts and both exact reviewed spans
    under the original30s acceptance, plus native8/8. Only then register the seven
@@ -250,6 +259,8 @@ See `evals/longmemeval_v2/results/2026-11-26-narrow-fts/README.md` and `summary.
 
 Additional follow-up evidence:
 `evals/longmemeval_v2/results/2026-11-26-stage-progress/README.md`.
+Preliminary metadata evidence:
+`evals/longmemeval_v2/results/2026-11-26-payload-inventory/README.md`.
 All five new process attempts retained: one partial120/150s diagnostic and two
 30/45s pairs, before/after streaming. Both pairs produce0/2 completed contexts;
 the final two are externally killed45.187/45.116s with no returned partial/final

@@ -1,0 +1,10 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.80s
+     Running tests/full_history_evidence.rs (target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f)
+
+running 2 tests
+test payload_inventory_accepts_an_episode_without_index_keys ... ok
+test payload_inventory_reports_characters_and_digests_without_source_text ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.03s
+

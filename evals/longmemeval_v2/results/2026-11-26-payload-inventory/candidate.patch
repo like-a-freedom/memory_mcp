@@ -1,0 +1,117 @@
+diff --git a/crates/memory-mcp/tests/full_history_evidence.rs b/crates/memory-mcp/tests/full_history_evidence.rs
+index 0b1ca329..8dc983fa 100644
+--- a/crates/memory-mcp/tests/full_history_evidence.rs
++++ b/crates/memory-mcp/tests/full_history_evidence.rs
+@@ -144,3 +144,112 @@ async fn full_history_schema_inventory() {
+         std::io::stdout().flush().unwrap();
+     }
+ }
++
++const PAYLOAD_FIELDS: &str = "fact_id, episode_id, source_episode, \
++    string::len(content) AS content_chars, crypto::sha256(content) AS content_sha256, \
++    array::map(index_keys ?? [], |$key| string::len($key)) AS index_key_chars, \
++    array::map(index_keys ?? [], |$key| crypto::sha256($key)) AS index_key_sha256";
++
++#[tokio::test]
++async fn payload_inventory_reports_characters_and_digests_without_source_text() {
++    use memory_mcp::storage::DbClient;
++    use serde_json::json;
++
++    let db = SurrealDbClient::connect_in_memory_with_dimension(
++        "payload_calibration",
++        "main",
++        "warn",
++        64,
++    )
++    .await
++    .unwrap();
++    let rows = db
++        .query(
++            &format!("SELECT {PAYLOAD_FIELDS} FROM $rows"),
++            Some(json!({"rows":[{"fact_id":"fact:calibration", "source_episode":"episode:calibration", "content":"éé", "index_keys":["α", "ab"]}]})),
++            "main",
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        rows,
++        json!([{
++            "fact_id":"fact:calibration", "episode_id":null, "source_episode":"episode:calibration",
++            "content_chars":2,
++            "content_sha256":"f13c007a1d8e6e1300b5957a143810cdd3555825466cf5d2617b1ac2fd8bd76b",
++            "index_key_chars":[1,2],
++            "index_key_sha256":["3e32da9648c78feedcc821d56e483c126dcd270e9fe49973c528e3a88912d557", "fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603"]
++        }])
++    );
++}
++
++#[tokio::test]
++async fn payload_inventory_accepts_an_episode_without_index_keys() {
++    use memory_mcp::storage::DbClient;
++    use serde_json::json;
++
++    let db = SurrealDbClient::connect_in_memory_with_dimension(
++        "payload_missing_keys",
++        "main",
++        "warn",
++        64,
++    )
++    .await
++    .unwrap();
++    let rows = db
++        .query(
++            &format!("SELECT {PAYLOAD_FIELDS} FROM $rows"),
++            Some(json!({"rows":[{"episode_id":"episode:calibration", "content":"éé"}]})),
++            "main",
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        rows,
++        json!([{
++            "fact_id":null,"episode_id":"episode:calibration","source_episode":null,
++            "content_chars":2,
++            "content_sha256":"f13c007a1d8e6e1300b5957a143810cdd3555825466cf5d2617b1ac2fd8bd76b",
++            "index_key_chars":[], "index_key_sha256":[]
++        }])
++    );
++}
++
++#[tokio::test]
++#[ignore = "requires a disposable full snapshot; metadata only, not retrieval or quality acceptance"]
++async fn full_history_payload_inventory() {
++    use memory_mcp::storage::DbClient;
++
++    let db = connect_snapshot().await;
++    for (kind, sql) in [
++        (
++            "fact_count",
++            "SELECT count() AS records FROM fact GROUP ALL".to_owned(),
++        ),
++        (
++            "fact_payload",
++            format!("SELECT {PAYLOAD_FIELDS} FROM fact LIMIT 10000"),
++        ),
++        (
++            "episode_count",
++            "SELECT count() AS records FROM episode GROUP ALL".to_owned(),
++        ),
++        (
++            "episode_payload",
++            format!("SELECT {PAYLOAD_FIELDS} FROM episode LIMIT 10000"),
++        ),
++    ] {
++        println!(
++            "FULL_HISTORY_INVENTORY_START {}",
++            serde_json::json!({"kind":kind,"sql":sql})
++        );
++        std::io::stdout().flush().unwrap();
++        let started = Instant::now();
++        let rows = db.query(&sql, None, "main").await.unwrap();
++        println!(
++            "FULL_HISTORY_INVENTORY {}",
++            serde_json::json!({"kind":kind,"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"rows":rows})
++        );
++        std::io::stdout().flush().unwrap();
++    }
++}

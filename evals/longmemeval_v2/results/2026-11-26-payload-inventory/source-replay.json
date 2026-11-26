@@ -1,0 +1,17 @@
+{
+  "base_revision": "a74d509b",
+  "patch_source_reconstruction": [
+    {
+      "variant": ".",
+      "source_sha256": "40f7c7c03eb515d5e09ad857d0b9b4adf5977094ec3f426a6b762b406aa5ee37",
+      "matches_pre_capture_registration": true
+    },
+    {
+      "variant": "first-record",
+      "source_sha256": "c47ceb271319c5f293337fd9e8e67f6dad17449165a84cf672b70d9d3f19d2c3",
+      "matches_pre_capture_registration": true
+    }
+  ],
+  "retained_first_record_function_body_unchanged_after_capture": true,
+  "final_source_sha256": "4c28ccf4a6d66c9df8a76fc62c33484cabad232105d074c927cbe09dfb5a7287"
+}

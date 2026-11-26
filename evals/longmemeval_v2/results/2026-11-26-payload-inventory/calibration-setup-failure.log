@@ -1,0 +1,24 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.27s
+     Running tests/full_history_evidence.rs (target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f)
+
+running 1 test
+test payload_inventory_reports_characters_and_digests_without_source_text ... FAILED
+
+failures:
+
+---- payload_inventory_reports_characters_and_digests_without_source_text stdout ----
+
+thread 'payload_inventory_reports_characters_and_digests_without_source_text' (6356350) panicked at crates/memory-mcp/tests/full_history_evidence.rs:174:5:
+assertion `left == right` failed
+  left: Array [Object {"content_chars": Number(2), "content_sha256": String("f13c007a1d8e6e1300b5957a143810cdd3555825466cf5d2617b1ac2fd8bd76b"), "episode_id": Null, "fact_id": String("fact:calibration"), "index_key_chars": Array [Number(1), Number(2)], "index_key_sha256": Array [String("3e32da9648c78feedcc821d56e483c126dcd270e9fe49973c528e3a88912d557"), String("fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603")], "source_episode": String("episode:calibration")}]
+ right: Array [Object {"content_chars": Number(2), "content_sha256": String("f13c007a1d8e6e1300b5957a143810cdd3555825466cf5d2617b1ac2fd8bd76b"), "fact_id": String("fact:calibration"), "index_key_chars": Array [Number(1), Number(2)], "index_key_sha256": Array [String("3e32da9648c78feedcc821d56e483c126dcd270e9fe49973c528e3a88912d557"), String("fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603")], "source_episode": String("episode:calibration")}]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    payload_inventory_reports_characters_and_digests_without_source_text
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p memory_mcp --test full_history_evidence`

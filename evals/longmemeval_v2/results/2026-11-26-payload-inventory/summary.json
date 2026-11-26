@@ -1,0 +1,36 @@
+{
+  "status": "resource_failure",
+  "process": {
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-payload-inventory-z3zxaibt/full_history_evidence",
+      "full_history_payload_inventory",
+      "--ignored",
+      "--nocapture"
+    ],
+    "pid": 97519,
+    "elapsed_seconds": 45.11141837501782,
+    "copy_seconds": 0.9955965830013156,
+    "exit_code": -9,
+    "external_timeout": true
+  },
+  "observed_queries": [
+    {
+      "elapsed_ms": 8.285582999999999,
+      "kind": "fact_count",
+      "rows": [
+        {
+          "records": 427
+        }
+      ]
+    }
+  ],
+  "unobserved": [
+    "fact_payload",
+    "episode_count",
+    "episode_payload"
+  ],
+  "whole_table_fact_count": 427,
+  "whole_payload_inventory_complete": false,
+  "query_candidate_pool_inventory_complete": false,
+  "limits": "All-row character/hash projection exceeded45s. This includes digest/projection work and is not an isolated storage latency or full read. No payload sizes, duplication rates or quality result inferred. A separate adaptive first-row-only diagnostic will be registered; it cannot establish whole-store or candidate-pool statistics."
+}

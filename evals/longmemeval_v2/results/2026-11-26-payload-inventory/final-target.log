@@ -1,0 +1,14 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.82s
+     Running tests/full_history_evidence.rs (target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f)
+
+running 6 tests
+test full_history_dropdown_retains_reviewed_source ... ignored, requires registered full snapshot clone and input; local diagnostic only
+test full_history_first_fact_payload ... ignored, requires a disposable full snapshot; first stored row only, not a representative sample
+test full_history_schema_inventory ... ignored, requires a disposable full snapshot clone; metadata observation, not quality acceptance
+test full_history_toolbar_retains_reviewed_source ... ignored, requires registered full snapshot clone and input; local diagnostic only
+test payload_inventory_reports_characters_and_digests_without_source_text ... ok
+test payload_inventory_accepts_an_episode_without_index_keys ... ok
+
+test result: ok. 2 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

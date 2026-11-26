@@ -1,0 +1,25 @@
+{
+  "scope": "first stored fact only, not representative or a query candidate pool",
+  "process": {
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-payload-inventory-l41tn0o5/full_history_evidence",
+      "full_history_first_fact_payload",
+      "--ignored",
+      "--nocapture"
+    ],
+    "pid": 98137,
+    "elapsed_seconds": 14.267702791985357,
+    "copy_seconds": 0.551993750006659,
+    "exit_code": 0,
+    "external_timeout": false
+  },
+  "projection_elapsed_ms": 407.035333,
+  "fact_id": "fact:00995bc1b210ed06c3a4ea7e",
+  "source_episode": "episode:88aae65596a1cd0c9703e401",
+  "content_chars": 66026,
+  "index_key_count": 2193,
+  "index_key_total_chars": 37471,
+  "max_index_key_chars": 215,
+  "distinct_index_key_sha256": 2193,
+  "limits": "Characters are not UTF8 bytes. No raw key repetition in this one row; normalization overlap is not measured. This query includes expensive per-key SQL functions and is not a production-read latency measurement. No table sizes/duplicates or actual query pool statistics are inferred."
+}

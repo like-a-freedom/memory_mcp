@@ -1,0 +1,5 @@
+
+running 1 test
+FULL_HISTORY_INVENTORY_START {"kind":"fact_count","sql":"SELECT count() AS records FROM fact GROUP ALL"}
+FULL_HISTORY_INVENTORY {"elapsed_ms":8.285582999999999,"kind":"fact_count","rows":[{"records":427}]}
+FULL_HISTORY_INVENTORY_START {"kind":"fact_payload","sql":"SELECT fact_id, episode_id, source_episode, string::len(content) AS content_chars, crypto::sha256(content) AS content_sha256, array::map(index_keys ?? [], |$key| string::len($key)) AS index_key_chars, array::map(index_keys ?? [], |$key| crypto::sha256($key)) AS index_key_sha256 FROM fact LIMIT 10000"}

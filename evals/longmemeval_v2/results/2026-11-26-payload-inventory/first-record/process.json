@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-payload-inventory-l41tn0o5/full_history_evidence",
+    "full_history_first_fact_payload",
+    "--ignored",
+    "--nocapture"
+  ],
+  "pid": 98137,
+  "elapsed_seconds": 14.267702791985357,
+  "copy_seconds": 0.551993750006659,
+  "exit_code": 0,
+  "external_timeout": false
+}
