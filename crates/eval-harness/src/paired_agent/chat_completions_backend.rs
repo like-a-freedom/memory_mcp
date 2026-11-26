@@ -38,6 +38,8 @@ pub struct ChatCompletionsArmRuntime {
 
 pub struct ChatCompletionsPairedBackend {
     shared: crate::paired::SharedRunIdentity,
+    plan_sha256: String,
+    public_synthetic_traces: Option<PathBuf>,
     incumbent: ArmRuntime,
     candidate: ArmRuntime,
 }
@@ -53,6 +55,7 @@ struct ArmRuntime {
 
 pub struct ChatCompletionsTrialState {
     _trial_directory: TrialDirectory,
+    key: crate::paired::CaseTrialKey,
     database_path: PathBuf,
     source_root: PathBuf,
     arm: RunArm,
@@ -61,6 +64,12 @@ pub struct ChatCompletionsTrialState {
 }
 
 impl ChatCompletionsPairedBackend {
+    /// Explicit assertion by the caller that every task input/output is public synthetic data.
+    pub fn with_public_synthetic_traces(mut self, directory: PathBuf) -> Self {
+        self.public_synthetic_traces = Some(directory);
+        self
+    }
+
     pub fn new(
         plan: &PairedEvaluationPlan,
         manifest: &AgentManagedTaskManifest,
@@ -282,6 +291,8 @@ impl ChatCompletionsPairedBackend {
         };
         Ok(Self {
             shared: shared.clone(),
+            plan_sha256: plan.sha256()?,
+            public_synthetic_traces: None,
             incumbent: make_arm(incumbent, &plan.incumbent_product)?,
             candidate: make_arm(candidate, &plan.candidate_product)?,
         })
@@ -336,40 +347,64 @@ impl ChatCompletionsPairedBackend {
             output_tokens: self.shared.output_token_budget,
             wall_time: Duration::from_millis(self.shared.wall_time_budget_ms),
         };
-        let (system_instructions, task_rules) = match profile {
-            ChatCompletionsToolProfile::SourceAuthorityFormation => (
-                prompts::FORMATION_SYSTEM_INSTRUCTIONS,
-                prompts::FORMATION_TASK_RULES,
-            ),
-            ChatCompletionsToolProfile::RecallOnly => (
-                prompts::RECALL_SYSTEM_INSTRUCTIONS,
-                prompts::RECALL_TASK_RULES,
-            ),
-        };
         let agent = &self.arm(state.arm).agent;
-        let observation = if let Some((mode, validate)) = diagnostic {
-            let mut memory = super::chat_completions::RecallMemorySession::new(session, mode)?
-                .with_reply_validator(validate);
-            agent.run_phase(
-                &mut memory,
-                prompt,
-                system_instructions,
-                task_rules,
-                profile,
-                budgets,
-            )
+        let observation = if let Some(directory) = &self.public_synthetic_traces {
+            let identity = super::public_trace::SyntheticTraceIdentity {
+                plan_sha256: self.plan_sha256.clone(),
+                product_binary_sha256: self.arm(state.arm).expected_product_sha256.clone(),
+                tool_schema_sha256: state.tool_schema_sha256.clone(),
+                key: state.key.clone(),
+                arm: state.arm,
+                phase: match profile {
+                    ChatCompletionsToolProfile::RecallOnly => "recall",
+                    ChatCompletionsToolProfile::SourceAuthorityFormation => "formation",
+                }
+                .into(),
+            };
+            fs::create_dir_all(directory).map_err(|source| EvalError::Io {
+                path: directory.clone(),
+                source,
+            })?;
+            let path = directory.join(format!("{}.json", sha256(&serde_json::to_vec(&identity)?)));
+            let mut traced = super::public_trace::PublicSyntheticSession::new(session, identity)?;
+            let result = run_agent_phase(agent, &mut traced, prompt, profile, budgets, diagnostic);
+            super::write_json_new(&path, &traced.finish())?;
+            result
         } else {
-            agent.run_phase(
-                session,
-                prompt,
-                system_instructions,
-                task_rules,
-                profile,
-                budgets,
-            )
+            run_agent_phase(agent, session, prompt, profile, budgets, diagnostic)
         }?;
         session.shutdown()?;
         Ok(observation)
+    }
+}
+
+fn run_agent_phase<M: super::chat_completions::MemoryToolSession>(
+    agent: &ChatCompletionsAgent,
+    session: &mut M,
+    prompt: &str,
+    profile: ChatCompletionsToolProfile,
+    budgets: ChatCompletionBudgets,
+    diagnostic: Option<(
+        super::chat_completions::RecallReadMode,
+        Option<&super::chat_completions::RecallReplyValidator<'_>>,
+    )>,
+) -> Result<AgentObservation, EvalError> {
+    let (system, rules) = match profile {
+        ChatCompletionsToolProfile::SourceAuthorityFormation => (
+            prompts::FORMATION_SYSTEM_INSTRUCTIONS,
+            prompts::FORMATION_TASK_RULES,
+        ),
+        ChatCompletionsToolProfile::RecallOnly => (
+            prompts::RECALL_SYSTEM_INSTRUCTIONS,
+            prompts::RECALL_TASK_RULES,
+        ),
+    };
+    if let Some((mode, validate)) = diagnostic {
+        let mut memory = super::chat_completions::RecallMemorySession::new(session, mode)?
+            .with_reply_validator(validate);
+        agent.run_phase(&mut memory, prompt, system, rules, profile, budgets)
+    } else {
+        agent.run_phase(session, prompt, system, rules, profile, budgets)
     }
 }
 
@@ -521,6 +556,11 @@ pub struct ChatCompletionsRecallBackend {
 }
 
 impl ChatCompletionsRecallBackend {
+    pub fn with_public_synthetic_traces(mut self, directory: PathBuf) -> Self {
+        self.runner = self.runner.with_public_synthetic_traces(directory);
+        self
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         plan: &PairedEvaluationPlan,
@@ -596,6 +636,7 @@ impl ChatCompletionsRecallBackend {
         let state = ChatCompletionsTrialState {
             source_root: directory.path.clone(),
             _trial_directory: directory,
+            key: task.key.clone(),
             database_path,
             arm,
             tool_schema_sha256: sha256(&serde_json::to_vec(&seeded.tool_schemas)?),
@@ -768,6 +809,7 @@ impl AgentManagedTrialBackend for ChatCompletionsPairedBackend {
         Ok((
             ChatCompletionsTrialState {
                 _trial_directory: trial_directory,
+                key: task.key.clone(),
                 database_path,
                 source_root,
                 arm,

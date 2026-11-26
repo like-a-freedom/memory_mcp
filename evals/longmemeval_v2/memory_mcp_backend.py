@@ -18,6 +18,7 @@ from bisect import bisect_right
 from contextlib import nullcontext
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -103,6 +104,12 @@ class MemoryMcpBackend(Memory):
         binary = memory_params.get("binary", binary)
         self.db_path = memory_params.get("db_path")
         self.binary = binary
+        self.cli_timeout_seconds = memory_params.get('cli_timeout_seconds', 1800.0)
+        if (isinstance(self.cli_timeout_seconds, bool)
+                or not isinstance(self.cli_timeout_seconds, (int, float))
+                or not math.isfinite(self.cli_timeout_seconds)
+                or self.cli_timeout_seconds <= 0):
+            raise ValueError('cli_timeout_seconds must be a positive finite number')
         self.formation_method = memory_params.get("formation_method", WHOLE_TRAJECTORY)
         if self.formation_method not in FORMATION_METHODS:
             raise ValueError("unknown LongMemEval-V2 formation method")
@@ -113,6 +120,8 @@ class MemoryMcpBackend(Memory):
         self._query_count = 0
         self._insert_time_secs = 0.0
         self._query_time_secs = 0.0
+        self._query_copy_time_secs = 0.0
+        self._query_cli_time_secs = 0.0
 
     def insert(self, trajectory: Any) -> None:
         """Insert a trajectory into memory via ingest + extract."""
@@ -198,6 +207,8 @@ class MemoryMcpBackend(Memory):
             "query_count": self._query_count,
             "insert_time_secs": round(self._insert_time_secs, 3),
             "query_time_secs": round(self._query_time_secs, 3),
+            "query_copy_time_secs": round(self._query_copy_time_secs, 3),
+            "query_cli_time_secs": round(self._query_cli_time_secs, 3),
         }
 
     def _save_backend(self, output_dir: Path) -> None:
@@ -246,8 +257,18 @@ class MemoryMcpBackend(Memory):
                 if directory is None:
                     return self._invoke_cli(self.db_path, subcommand, args)
                 copy = Path(directory) / "store"
-                shutil.copytree(self.db_path, copy)
-            return self._invoke_cli(str(copy), subcommand, args)
+                started = time.monotonic()
+                try:
+                    shutil.copytree(self.db_path, copy)
+                finally:
+                    self._query_copy_time_secs += time.monotonic() - started
+            started = time.monotonic()
+            try:
+                return self._invoke_cli(str(copy), subcommand, args)
+            finally:
+                elapsed = time.monotonic() - started
+                with self._store_lock:
+                    self._query_cli_time_secs += elapsed
 
     def _invoke_cli(self, store: str, subcommand: str, args: tuple[str, ...]) -> str:
         env = {
@@ -270,6 +291,7 @@ class MemoryMcpBackend(Memory):
         result = subprocess.run(
             [self.binary, subcommand, *argv],
             input=stdin_content, capture_output=True, check=True, env=env,
+            timeout=self.cli_timeout_seconds,
         )
         return result.stdout.decode("utf-8")
 

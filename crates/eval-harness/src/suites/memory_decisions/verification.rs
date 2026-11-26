@@ -37,7 +37,11 @@ pub fn load_verified_replay(path: &Path) -> Result<ReplayIndex, EvalError> {
         if sha256(&serde_json::to_vec_pretty(&raw)?) != case.receipt_sha256
             || !matches!(
                 receipt_schema,
-                Some("memory-decisions-receipt/v3" | "memory-decisions-receipt/v4")
+                Some(
+                    "memory-decisions-receipt/v3"
+                        | "memory-decisions-receipt/v4"
+                        | "memory-decisions-receipt/v5"
+                )
             )
             || raw["case_id"] != case.case_id
             || raw["product_revision"] != index.identity.product_revision
@@ -55,6 +59,21 @@ pub fn load_verified_replay(path: &Path) -> Result<ReplayIndex, EvalError> {
         {
             return Err(invalid("receipt public schema differs from replay"));
         }
+        if receipt_schema == Some("memory-decisions-receipt/v5") {
+            if raw["diagnostic_policy"] != "primary_only"
+                || !raw["verbose_diagnostic"].is_null()
+                || !raw["evidence_enabled_diagnostic"].is_null()
+                || case.evidence_enabled_temporal_observation.is_some()
+                || case.evidence_enabled_temporal_score.is_some()
+            {
+                return Err(invalid(
+                    "primary-only receipt has inconsistent diagnostic policy",
+                ));
+            }
+            verify_primary_launch(&raw, primary_stage)?;
+            verify_primary_score(&raw, case)?;
+            continue;
+        }
         let trace = &raw["evidence_enabled_diagnostic"];
         if trace["claim_rollout_stage"] != "evidence" {
             return Err(invalid("missing evidence-stage raw receipt"));
@@ -63,20 +82,7 @@ pub fn load_verified_replay(path: &Path) -> Result<ReplayIndex, EvalError> {
             if trace["launch_profile"]["MEMORY_CLAIM_ROLLOUT_STAGE"] != "evidence" {
                 return Err(invalid("evidence-stage launch override is not explicit"));
             }
-            let launch_profile = &raw["primary_launch_profile"];
-            match primary_stage {
-                "default" if launch_profile.get("MEMORY_CLAIM_ROLLOUT_STAGE").is_some() => {
-                    return Err(invalid(
-                        "product-default capture explicitly overrides its rollout stage",
-                    ));
-                }
-                "shadow" if launch_profile["MEMORY_CLAIM_ROLLOUT_STAGE"] != "shadow" => {
-                    return Err(invalid(
-                        "shadow control does not launch with the explicit rollback stage",
-                    ));
-                }
-                _ => {}
-            }
+            verify_primary_launch(&raw, primary_stage)?;
         }
         let bindings = serde_json::from_value(trace["episode_bindings"].clone())?;
         let observed = super::normalization::normalize_observation(
@@ -198,8 +204,10 @@ pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayI
             } else {
                 "primary"
             };
-            if raw["schema_version"] != "memory-decisions-receipt/v4"
-                || raw["primary_claim_rollout_stage"] != registered_stage
+            if !matches!(
+                raw["schema_version"].as_str(),
+                Some("memory-decisions-receipt/v4" | "memory-decisions-receipt/v5")
+            ) || raw["primary_claim_rollout_stage"] != registered_stage
                 || raw["score_observation_source"] != expected_source
                 || case.score_observation_source.as_deref() != Some(expected_source)
             {
@@ -224,7 +232,11 @@ pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayI
                 _ => {}
             }
         }
-        let trace = &raw["evidence_enabled_diagnostic"];
+        let trace = if raw["schema_version"] == "memory-decisions-receipt/v5" {
+            &raw
+        } else {
+            &raw["evidence_enabled_diagnostic"]
+        };
         let rows = |key: &str| {
             trace[key]
                 .as_array()
@@ -305,6 +317,19 @@ pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayI
     Ok(index)
 }
 
+fn verify_primary_launch(raw: &Value, primary_stage: &str) -> Result<(), EvalError> {
+    let launch = &raw["primary_launch_profile"];
+    if !launch.is_object()
+        || (primary_stage == "default" && launch.get("MEMORY_CLAIM_ROLLOUT_STAGE").is_some())
+        || (primary_stage == "shadow" && launch["MEMORY_CLAIM_ROLLOUT_STAGE"] != "shadow")
+    {
+        return Err(EvalError::InvalidInput(
+            "primary rollout launch differs from registration".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn verify_primary_score(raw: &Value, case: &super::receipts::ReplayCase) -> Result<(), EvalError> {
     let invalid = |s: &str| EvalError::InvalidInput(s.into());
     let requires_separate_cutoffs = raw["desired_goal"]["requires_separate_time_cutoffs"]
@@ -323,33 +348,45 @@ fn verify_primary_score(raw: &Value, case: &super::receipts::ReplayCase) -> Resu
     }
 
     let bindings = serde_json::from_value(raw["episode_bindings"].clone())?;
+    let temporal_observed = super::normalization::normalize_observation(
+        std::slice::from_ref(temporal_response),
+        &bindings,
+    )?;
+    let temporal_request = &raw["temporal_revision_request"];
+    let snapshot = temporal_response.pointer("/result/structuredContent/context/snapshot");
+    let parse_time = |value: &Value| {
+        value
+            .as_str()
+            .and_then(|text| chrono::DateTime::parse_from_rfc3339(text).ok())
+    };
+    let request_time = parse_time(&temporal_request["valid_at"]);
+    let temporal_valid = request_time.is_some()
+        && snapshot.is_some_and(|snapshot| {
+            parse_time(&snapshot["valid_at"]) == request_time
+                && snapshot["known_revision"].as_i64().is_some()
+                && snapshot["known_revision"] == temporal_request["known_revision"]
+        });
+    let temporal_oracle = serde_json::from_value(raw["desired_goal"]["oracle"].clone())?;
+    let temporal_budget = temporal_request["budget"]
+        .as_u64()
+        .ok_or_else(|| invalid("missing temporal scoring budget"))?;
+    let temporal_score = super::scoring::score_probe(
+        &temporal_oracle,
+        &temporal_observed,
+        usize::try_from(temporal_budget).map_err(|_| invalid("temporal budget overflow"))?,
+        temporal_valid,
+    );
+    if raw["temporal_revision_score"] != super::replay_score(&temporal_score)
+        || raw["temporal_revision_snapshot_valid"] != temporal_valid
+        || case.temporal_score.as_ref() != Some(&super::replay_score(&temporal_score))
+        || case.temporal_observation.as_ref()
+            != Some(&super::replay_observation(&temporal_observed))
+    {
+        return Err(invalid("temporal score is detached from raw observation"));
+    }
+
     let (observation, request, time_contract_supported) = match expected_source {
-        "temporal_revision" => {
-            let observed = super::normalization::normalize_observation(
-                std::slice::from_ref(temporal_response),
-                &bindings,
-            )?;
-            let request = &raw["temporal_revision_request"];
-            let snapshot = temporal_response.pointer("/result/structuredContent/context/snapshot");
-            let parse_time = |value: &Value| {
-                value
-                    .as_str()
-                    .and_then(|text| chrono::DateTime::parse_from_rfc3339(text).ok())
-            };
-            let request_time = parse_time(&request["valid_at"]);
-            let snapshot_valid = request_time.is_some()
-                && snapshot.is_some_and(|value| {
-                    parse_time(&value["valid_at"]) == request_time
-                        && value["known_revision"].as_i64().is_some()
-                        && value["known_revision"] == request["known_revision"]
-                });
-            if raw["temporal_revision_snapshot_valid"] != snapshot_valid {
-                return Err(invalid(
-                    "temporal snapshot validity differs from raw response",
-                ));
-            }
-            (observed, request, snapshot_valid)
-        }
+        "temporal_revision" => (temporal_observed, temporal_request, temporal_valid),
         _ => {
             let responses = raw["primary_compact_responses"]
                 .as_array()

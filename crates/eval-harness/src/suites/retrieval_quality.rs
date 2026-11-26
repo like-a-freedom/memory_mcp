@@ -1015,6 +1015,8 @@ mod reducer_tests {
             mode: None,
             corpus_root: Some(corpus_root.to_string_lossy().into_owned()),
             claim_rollout_stage: None,
+            case_ids: Vec::new(),
+            diagnostics: None,
             expected_coverage: Some(crate::profile::ExpectedCoverage { exact_cases: 37 }),
         })
         .expect("the pinned native retrieval corpus loads");

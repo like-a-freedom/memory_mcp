@@ -256,7 +256,7 @@ impl MemoryToolSession for crate::suites::memory_decisions::stdio::StdioSession 
     }
 
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
-        crate::suites::memory_decisions::stdio::StdioSession::call_tool(self, name, arguments)
+        self.call_method("tools/call", json!({"name":name,"arguments":arguments}))
     }
 }
 
@@ -839,7 +839,9 @@ impl ChatCompletionsAgent {
                 .map(|started| started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64);
             let tool_result = match call_result {
                 Ok(result)
-                    if result.pointer("/result/isError").and_then(Value::as_bool) != Some(true) =>
+                    if result.get("error").is_none()
+                        && result.pointer("/result/isError").and_then(Value::as_bool)
+                            != Some(true) =>
                 {
                     result
                 }

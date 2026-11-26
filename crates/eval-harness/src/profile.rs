@@ -29,6 +29,12 @@ pub struct SuiteDecl {
     pub claim_rollout_stage: Option<String>,
     #[serde(default)]
     pub expected_coverage: Option<ExpectedCoverage>,
+    /// Select memory-decision probes; empty means the complete corpus.
+    #[serde(default)]
+    pub case_ids: Vec<String>,
+    /// Full rollout diagnostics; omitted preserves the existing gate until its replacement is reviewed.
+    #[serde(default)]
+    pub diagnostics: Option<bool>,
 }
 
 impl SuiteDecl {
@@ -42,6 +48,14 @@ impl SuiteDecl {
 #[cfg(test)]
 mod claim_stage_tests {
     use super::ProfileManifest;
+
+    #[test]
+    fn memory_decision_execution_options_are_rejected_for_another_suite() {
+        assert!(ProfileManifest::parse(r#"{
+            "schema_version":"memory-mcp-eval-profile/v1", "profile":"nightly", "time_budget_seconds":60,
+            "suites":[{"id":"retrieval-quality","case_ids":["ordinary"],"diagnostics":false}],"gates":[]
+        }"#).is_err());
+    }
 
     #[test]
     fn omitted_memory_decision_stage_means_the_product_default() {
@@ -147,6 +161,13 @@ impl ProfileManifest {
 
         let mut seen_ids = std::collections::HashSet::new();
         for suite in &self.suites {
+            if suite.id != "memory-decisions"
+                && (!suite.case_ids.is_empty() || suite.diagnostics.is_some())
+            {
+                return Err(EvalError::InvalidConfig(
+                    "case_ids and diagnostics are supported only by memory-decisions".into(),
+                ));
+            }
             if !seen_ids.insert(suite.id.as_str()) {
                 return Err(EvalError::InvalidConfig(format!(
                     "duplicate suite ID: {}",

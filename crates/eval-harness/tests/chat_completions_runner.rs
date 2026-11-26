@@ -607,6 +607,13 @@ fn evidence_action_hint_on_an_empty_partial_read_does_not_claim_absence() {
 }
 
 #[test]
+fn jsonrpc_read_error_remains_a_failed_read() {
+    let captured =
+        capture_read_reply(json!({"error":{"code":-32603,"message":"public synthetic failure"}}));
+    assert_eq!(captured["memory_reads"][0]["outcome"], "failed");
+}
+
+#[test]
 fn read_error_does_not_become_empty_memory() {
     let captured = capture_read_reply(json!({"result":{"isError":true}}));
     let read = &captured["memory_reads"][0];

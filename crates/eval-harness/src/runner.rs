@@ -33,6 +33,39 @@ pub trait EvalSuite: Send + Sync {
         BTreeMap::new()
     }
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome>;
+
+    /// Blocking suites override this and stop/join owned work before returning.
+    async fn run_with_deadline(
+        &self,
+        context: &RunContext,
+        deadline: Instant,
+    ) -> Vec<EvalCaseOutcome> {
+        match tokio::time::timeout_at(deadline.into(), self.run(context)).await {
+            Ok(outcomes) => outcomes,
+            Err(_) => deadline_outcomes(self, 1),
+        }
+    }
+}
+
+fn deadline_outcomes<S: EvalSuite + ?Sized>(suite: &S, attempts: u32) -> Vec<EvalCaseOutcome> {
+    suite
+        .expected_case_ids()
+        .iter()
+        .map(|id| {
+            let mut outcome = EvalCaseOutcome::new(
+                suite.id(),
+                id.as_str(),
+                suite.mode(),
+                CorpusSplit::Test,
+                LabelTrust::Reviewed,
+                CaseStatus::Invalid,
+            );
+            outcome.invalid_reason =
+                Some("whole-run deadline exhausted; no quality verdict".into());
+            outcome.attempts = attempts;
+            outcome
+        })
+        .collect()
 }
 
 /// Receives operational progress updates while suites run.
@@ -97,6 +130,8 @@ impl Runner {
         progress: &dyn ProgressReporter,
     ) -> Result<crate::RunArtifact, EvalError> {
         let started = Instant::now();
+        let deadline = (request.manifest.time_budget_seconds > 0)
+            .then(|| started + Duration::from_secs(request.manifest.time_budget_seconds));
         let profile = request.manifest.profile;
         let context = RunContext { profile };
 
@@ -134,7 +169,11 @@ impl Runner {
             );
 
             let suite_started = Instant::now();
-            let outcomes = suite.run(&context).await;
+            let outcomes = match deadline {
+                Some(limit) if Instant::now() >= limit => deadline_outcomes(suite, 0),
+                Some(limit) => suite.run_with_deadline(&context, limit).await,
+                None => suite.run(&context).await,
+            };
             let fingerprint_metadata = suite.fingerprint_metadata();
             if !fingerprint_metadata.is_empty() {
                 suite_fingerprints.insert(suite.id().to_string(), fingerprint_metadata);
@@ -182,16 +221,17 @@ impl Runner {
         expected_cases.sort();
         expected_cases.dedup();
 
-        let duration_ms = started.elapsed().as_millis() as u64;
-        let mut fingerprint =
-            crate::RunFingerprint::capture_with_profile(Some(&request.manifest_path));
+        let mut fingerprint = crate::RunFingerprint::capture_with_profile_until(
+            Some(&request.manifest_path),
+            deadline.unwrap_or_else(|| Instant::now() + Duration::from_secs(5)),
+        );
         if !suite_fingerprints.is_empty() {
             fingerprint = fingerprint.with_suite_fingerprints(suite_fingerprints);
         }
 
+        let duration_ms = started.elapsed().as_millis() as u64;
         let budget_status = if request.manifest.time_budget_seconds > 0 {
-            let budget_ms = request.manifest.time_budget_seconds * 1000;
-            if duration_ms > budget_ms {
+            if deadline.is_some_and(|limit| Instant::now() >= limit) {
                 Some(GateStatus::Failed)
             } else {
                 Some(GateStatus::Passed)
@@ -276,6 +316,7 @@ mod tests {
         outcomes: Vec<EvalCaseOutcome>,
         reducer: CountReducer,
         fingerprint_metadata: BTreeMap<String, String>,
+        hangs: bool,
     }
 
     impl StaticSuite {
@@ -294,6 +335,7 @@ mod tests {
                 outcomes: vec![outcome],
                 reducer: CountReducer::new(id),
                 fingerprint_metadata: BTreeMap::new(),
+                hangs: false,
             }
         }
 
@@ -324,6 +366,7 @@ mod tests {
                 outcomes,
                 reducer: CountReducer::new(id),
                 fingerprint_metadata: BTreeMap::new(),
+                hangs: false,
             }
         }
     }
@@ -351,6 +394,9 @@ mod tests {
         }
 
         async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+            if self.hangs {
+                std::future::pending::<()>().await;
+            }
             self.outcomes.clone()
         }
     }
@@ -400,6 +446,8 @@ mod tests {
                         mode: None,
                         corpus_root: None,
                         claim_rollout_stage: None,
+                        case_ids: Vec::new(),
+                        diagnostics: None,
                         expected_coverage: None,
                     })
                     .collect(),
@@ -419,6 +467,29 @@ mod tests {
         request.manifest.suites[0].expected_coverage =
             Some(crate::profile::ExpectedCoverage { exact_cases });
         request
+    }
+
+    #[tokio::test]
+    async fn deadline_retains_completed_and_unstarted_cases() {
+        let mut hanging = StaticSuite::new("hanging", "pending");
+        hanging.hangs = true;
+        let runner = Runner::new(vec![
+            Box::new(StaticSuite::new("completed", "done")),
+            Box::new(hanging),
+            Box::new(StaticSuite::new("unstarted", "never")),
+        ]);
+        let mut request = request(&["completed", "hanging", "unstarted"], BTreeSet::new());
+        request.manifest.time_budget_seconds = 1;
+        let artifact = tokio::time::timeout(Duration::from_secs(3), runner.run(&request))
+            .await
+            .expect("runner must enforce its budget")
+            .unwrap();
+        assert_eq!(artifact.expected_cases.len(), 3);
+        assert_eq!(artifact.outcomes[0].status, CaseStatus::Passed);
+        assert_eq!(artifact.outcomes[1].status, CaseStatus::Invalid);
+        assert_eq!(artifact.outcomes[2].status, CaseStatus::Invalid);
+        assert_eq!(artifact.outcomes[2].attempts, 0);
+        assert_eq!(artifact.budget_status, Some(GateStatus::Failed));
     }
 
     #[tokio::test]

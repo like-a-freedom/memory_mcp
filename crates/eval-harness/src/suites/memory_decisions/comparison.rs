@@ -190,3 +190,119 @@ mod tests {
         assert!(compare_replays(&left, &right).is_err());
     }
 }
+
+/// A scoped regression result never hides failures already present in the baseline.
+#[derive(Debug, serde::Serialize)]
+pub struct CurrentRegressionReport {
+    pub schema_version: &'static str,
+    pub baseline_identity: serde_json::Value,
+    pub candidate_identity: serde_json::Value,
+    pub no_regressions: bool,
+    pub all_cases_pass: bool,
+    pub current_failures: Vec<String>,
+    pub regressions: Vec<String>,
+}
+
+pub fn compare_current_replays(
+    baseline: &ReplayIndex,
+    candidate: &ReplayIndex,
+) -> Result<CurrentRegressionReport, EvalError> {
+    compare_replays(baseline, baseline)?;
+    compare_replays(candidate, candidate)?;
+    let a = &baseline.identity;
+    let b = &candidate.identity;
+    if a.suite_id != b.suite_id
+        || a.corpus_sha256 != b.corpus_sha256
+        || a.config_sha256 != b.config_sha256
+        || a.input_schema_sha256 != b.input_schema_sha256
+        || baseline.cases.len() != candidate.cases.len()
+    {
+        return Err(EvalError::InvalidInput(
+            "current regression captures have incompatible identities or coverage".into(),
+        ));
+    }
+    let mut current_failures = Vec::new();
+    let mut regressions = Vec::new();
+    for (old, new) in baseline.cases.iter().zip(&candidate.cases) {
+        if old.case_id != new.case_id {
+            return Err(EvalError::InvalidInput(
+                "current regression case coverage differs".into(),
+            ));
+        }
+        let mut passed = true;
+        for (dimension, before, after) in [
+            (
+                "primary.evidence",
+                old.evidence_success,
+                new.evidence_success,
+            ),
+            (
+                "primary.decision",
+                old.decision_success,
+                new.decision_success,
+            ),
+            ("primary.probe", old.probe_success, new.probe_success),
+        ] {
+            let (Some(before), Some(after)) = (before, after) else {
+                return Err(EvalError::InvalidInput(
+                    "current regression requires complete scored observations".into(),
+                ));
+            };
+            passed &= after;
+            if before && !after {
+                regressions.push(format!("{}:{dimension}", new.case_id));
+            }
+        }
+        let old_temporal = old
+            .temporal_score
+            .as_ref()
+            .ok_or_else(|| EvalError::InvalidInput("missing baseline temporal score".into()))?;
+        let new_temporal = new
+            .temporal_score
+            .as_ref()
+            .ok_or_else(|| EvalError::InvalidInput("missing candidate temporal score".into()))?;
+        for dimension in ["evidence_success", "decision_success", "probe_success"] {
+            let before = old_temporal[dimension].as_bool().ok_or_else(|| {
+                EvalError::InvalidInput("incomplete baseline temporal score".into())
+            })?;
+            let after = new_temporal[dimension].as_bool().ok_or_else(|| {
+                EvalError::InvalidInput("incomplete candidate temporal score".into())
+            })?;
+            passed &= after;
+            if before && !after {
+                regressions.push(format!("{}:temporal.{dimension}", new.case_id));
+            }
+        }
+        let old_reasons = old_temporal["reason_codes"]
+            .as_array()
+            .ok_or_else(|| EvalError::InvalidInput("missing baseline temporal reasons".into()))?;
+        let new_reasons = new_temporal["reason_codes"]
+            .as_array()
+            .ok_or_else(|| EvalError::InvalidInput("missing candidate temporal reasons".into()))?;
+        for reason in new_reasons {
+            let reason_text = reason
+                .as_str()
+                .ok_or_else(|| EvalError::InvalidInput("invalid temporal reason".into()))?;
+            if !old_reasons.contains(reason) {
+                regressions.push(format!("{}:temporal.reason.{reason_text}", new.case_id));
+            }
+        }
+        for reason in &new.reason_codes {
+            if !old.reason_codes.contains(reason) {
+                regressions.push(format!("{}:reason.{reason}", new.case_id));
+            }
+        }
+        if !passed {
+            current_failures.push(new.case_id.clone());
+        }
+    }
+    Ok(CurrentRegressionReport {
+        schema_version: "memory-current-regression/v1",
+        baseline_identity: serde_json::to_value(&baseline.identity)?,
+        candidate_identity: serde_json::to_value(&candidate.identity)?,
+        no_regressions: regressions.is_empty(),
+        all_cases_pass: current_failures.is_empty(),
+        current_failures,
+        regressions,
+    })
+}

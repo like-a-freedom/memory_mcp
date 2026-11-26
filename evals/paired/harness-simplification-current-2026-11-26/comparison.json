@@ -1,0 +1,10 @@
+{
+  "no_regressions": true,
+  "all_cases_pass": false,
+  "current_failures": [
+    "similar-name",
+    "single-current",
+    "office-entry"
+  ],
+  "regressions": []
+}

@@ -89,6 +89,14 @@ context.
 
 ## Independent reads
 
+CLI calls have a finite `cli_timeout_seconds` configuration (default 1,800
+seconds; positive finite numeric values only). A timeout raises an execution
+error and kills/reaps the CLI child; it does not become an empty memory result.
+The conservative default exceeds the roughly 991-second maximum observed in
+the frozen seven-case capture. It is a per-command bound, not a whole-run
+deadline, and does not bound snapshot copying. Whole-run deadline propagation
+is tracked in the [simplification plan](../../docs/superpowers/plans/2026-11-26-eval-harness-simplification.md).
+
 Each query copies the configured store while the adapter holds its store lock.
 The product reads and updates access counters in the temporary copy, which is
 removed at the end of the query. This prevents one question's reads from
@@ -96,6 +104,13 @@ changing the next question's ranking inputs. The pinned upstream smoke tested
 two questions in both orders after restoring the same snapshot. A native
 retry smoke verified that restarting the adapter and replaying the same input
 preserves the retrieved context.
+
+`stats.query_copy_time_secs` and `stats.query_cli_time_secs` separately record
+snapshot copying and the complete CLI process lifetime, including startup,
+query and shutdown. These are cumulative stage sums across workers, not
+elapsed wall time; they must not be added to wall time or interpreted as
+query-only latency. Stage counters retain elapsed time on failures. The
+existing `query_time_secs` counts successful query calls and includes copy time.
 
 Snapshot copy time is included in query time. Budget the store size, extra
 disk space and copy throughput before official scoring. Snapshot isolation

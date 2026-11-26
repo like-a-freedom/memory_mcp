@@ -25,7 +25,7 @@ use crate::reducer::SuiteReducer;
 use crate::runner::{EvalSuite, RunContext};
 
 use self::cases::{DecisionCorpus, DecisionOracle, DecisionProbe, MemoryEvent};
-pub use self::comparison::compare_replays;
+pub use self::comparison::{CurrentRegressionReport, compare_current_replays, compare_replays};
 use self::normalization::normalize_observation;
 pub use self::receipts::ReplayIndex;
 use self::receipts::{
@@ -50,6 +50,7 @@ pub struct MemoryDecisionsSuite {
     artifact_root: PathBuf,
     configuration_error: Option<String>,
     primary_claim_rollout_stage: String,
+    diagnostics: bool,
     configuration: String,
     corpus_sha256: String,
     config_sha256: String,
@@ -62,7 +63,20 @@ impl MemoryDecisionsSuite {
             EvalError::InvalidConfig("memory-decisions requires corpus_root".into())
         })?;
         let corpus_root = PathBuf::from(root);
-        let corpus = DecisionCorpus::load(&corpus_root)?;
+        let mut corpus = DecisionCorpus::load(&corpus_root)?;
+        if !decl.case_ids.is_empty() {
+            let selected: std::collections::BTreeSet<_> = decl.case_ids.iter().collect();
+            if selected.len() != decl.case_ids.len()
+                || selected
+                    .iter()
+                    .any(|id| !corpus.probes.iter().any(|probe| &probe.id == *id))
+            {
+                return Err(EvalError::InvalidConfig(
+                    "case_ids must name distinct registered memory-decision probes".into(),
+                ));
+            }
+            corpus.probes.retain(|probe| selected.contains(&probe.id));
+        }
         let primary_claim_rollout_stage = decl
             .effective_memory_decision_claim_rollout_stage()
             .to_owned();
@@ -163,6 +177,7 @@ impl MemoryDecisionsSuite {
             artifact_root,
             configuration_error: (!errors.is_empty()).then(|| errors.join("; ")),
             primary_claim_rollout_stage,
+            diagnostics: decl.diagnostics.unwrap_or(true),
             configuration,
             corpus_sha256,
             config_sha256,
@@ -196,7 +211,25 @@ impl EvalSuite for MemoryDecisionsSuite {
             .unwrap_or_default()
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
+        self.run_until(context, None).await
+    }
+
+    async fn run_with_deadline(
+        &self,
+        context: &RunContext,
+        deadline: Instant,
+    ) -> Vec<EvalCaseOutcome> {
+        self.run_until(context, Some(deadline)).await
+    }
+}
+
+impl MemoryDecisionsSuite {
+    async fn run_until(
+        &self,
+        _context: &RunContext,
+        deadline: Option<Instant>,
+    ) -> Vec<EvalCaseOutcome> {
         let corpus = self.corpus.clone();
         let binary = self.binary.clone();
         let binary_sha256 = self.binary_sha256.clone();
@@ -205,6 +238,7 @@ impl EvalSuite for MemoryDecisionsSuite {
         let corpus_sha256 = self.corpus_sha256.clone();
         let config_sha256 = self.config_sha256.clone();
         let primary_claim_rollout_stage = self.primary_claim_rollout_stage.clone();
+        let diagnostics = self.diagnostics;
         let configuration = self.configuration.clone();
         let configuration_error = self.configuration_error.clone();
         let metadata = Arc::clone(&self.metadata);
@@ -222,6 +256,8 @@ impl EvalSuite for MemoryDecisionsSuite {
                 configuration,
                 configuration_error,
                 metadata,
+                deadline,
+                diagnostics,
             )
         })
         .await
@@ -325,6 +361,9 @@ impl SuiteReducer for MemoryDecisionsReducer {
         .enumerate()
         {
             let [numerator, denominator] = totals[index];
+            if index >= 3 && denominator == 0 {
+                continue;
+            }
             metrics.insert(
                 name.to_string(),
                 if denominator == 0 {
@@ -361,6 +400,8 @@ fn run_corpus(
     configuration: String,
     configuration_error: Option<String>,
     metadata: Arc<Mutex<BTreeMap<String, String>>>,
+    deadline: Option<Instant>,
+    diagnostics: bool,
 ) -> Vec<EvalCaseOutcome> {
     let run_started = Instant::now();
     let mut outcomes = Vec::with_capacity(corpus.probes.len());
@@ -372,6 +413,10 @@ fn run_corpus(
 
     for probe in &corpus.probes {
         let case_started = Instant::now();
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            preflight_failure = Some("whole-run deadline exhausted before this case".into());
+        }
+        let attempted = preflight_failure.is_none() && binary.is_some();
         let oracle = corpus.oracles.get(&probe.id);
         let mut temporal_score_for_outcome = None;
         let mut evidence_stage_temporal_score_for_outcome = None;
@@ -424,6 +469,7 @@ fn run_corpus(
                             false,
                             probe.as_of,
                             &primary_claim_rollout_stage,
+                            deadline,
                         ) {
                             Ok(primary) => {
                                 if schema_sha256.is_none() {
@@ -506,13 +552,20 @@ fn run_corpus(
                                     } else {
                                         CaseStatus::QualityFailed
                                     };
-                                let verbose =
-                                    execute_variant(&corpus, probe, binary, true, None, "shadow");
-                                let evidence_diagnostic = execute_variant(
-                                    &corpus, probe, binary, false, None, "evidence",
-                                );
-                                let evidence_temporal_score =
-                                    evidence_diagnostic.as_ref().ok().and_then(|trace| {
+                                let verbose = diagnostics.then(|| {
+                                    execute_variant(
+                                        &corpus, probe, binary, true, None, "shadow", deadline,
+                                    )
+                                });
+                                let evidence_diagnostic = diagnostics.then(|| {
+                                    execute_variant(
+                                        &corpus, probe, binary, false, None, "evidence", deadline,
+                                    )
+                                });
+                                let evidence_temporal_score = evidence_diagnostic
+                                    .as_ref()
+                                    .and_then(|run| run.as_ref().ok())
+                                    .and_then(|trace| {
                                         trace.temporal_observation.as_ref().and_then(|observed| {
                                             oracle.map(|oracle| {
                                                 score_probe(
@@ -529,15 +582,18 @@ fn run_corpus(
                                 evidence_stage_temporal_observation_for_replay =
                                     evidence_diagnostic
                                         .as_ref()
-                                        .ok()
+                                        .and_then(|run| run.as_ref().ok())
                                         .and_then(|trace| trace.temporal_observation.clone());
                                 let receipt = successful_receipt(SuccessfulReceipt {
                                     corpus: &corpus,
                                     probe,
                                     oracle,
                                     primary: &primary,
-                                    verbose: verbose.as_ref().ok(),
-                                    evidence_diagnostic: evidence_diagnostic.as_ref().ok(),
+                                    verbose: verbose.as_ref().and_then(|run| run.as_ref().ok()),
+                                    diagnostics_requested: diagnostics,
+                                    evidence_diagnostic: evidence_diagnostic
+                                        .as_ref()
+                                        .and_then(|run| run.as_ref().ok()),
                                     score_source,
                                     score: score.as_ref(),
                                     temporal_score: temporal_score.as_ref(),
@@ -550,14 +606,14 @@ fn run_corpus(
                                 });
                                 let mut failure = None;
                                 let final_status = primary_status;
-                                if let Err(error) = verbose {
+                                if let Some(Err(error)) = verbose {
                                     // The verbose arm is diagnostic and never changes the compact score.
                                     failure = Some(format!(
                                         "verbose diagnostic unavailable: {}",
                                         error.message
                                     ));
                                 }
-                                if let Err(error) = evidence_diagnostic {
+                                if let Some(Err(error)) = evidence_diagnostic {
                                     let detail = format!(
                                         "evidence-stage diagnostic unavailable: {}",
                                         error.message
@@ -629,6 +685,7 @@ fn run_corpus(
             failure,
             case_started.elapsed().as_millis() as u64,
         );
+        outcome.attempts = u32::from(attempted);
         if let Some(metrics) = scored_read_metrics {
             outcome
                 .metrics
@@ -724,6 +781,7 @@ fn run_corpus(
 }
 
 struct VariantTrace {
+    stage_timings_us: BTreeMap<String, u64>,
     claim_rollout_stage: String,
     launch_profile: BTreeMap<String, String>,
     tool_schemas: Value,
@@ -785,17 +843,29 @@ fn execute_variant(
     verbose: bool,
     as_of_override: Option<chrono::DateTime<chrono::Utc>>,
     claim_stage: &str,
+    deadline: Option<Instant>,
 ) -> Result<VariantTrace, VariantFailure> {
     let variant = match (verbose, claim_stage) {
         (true, _) => "verbose",
         (false, "evidence") => "evidence",
         (false, _) => "compact",
     };
-    let store = fresh_store(&probe.id, variant);
-    let session = if claim_stage == "default" {
-        StdioSession::spawn(binary, &store)
+    let started = Instant::now();
+    let owned_store = ScenarioStore(fresh_store(&probe.id, variant));
+    let store = &owned_store.0;
+    std::fs::create_dir_all(store).map_err(|error| VariantFailure {
+        preflight_passed: false,
+        invalid_evaluation: true,
+        stage: "store_preparation".into(),
+        message: error.to_string(),
+    })?;
+    let prepared = Instant::now();
+    let session = if let Some(limit) = deadline {
+        StdioSession::spawn_with_deadline(binary, store, claim_stage, limit)
+    } else if claim_stage == "default" {
+        StdioSession::spawn(binary, store)
     } else {
-        StdioSession::spawn_with_claim_stage(binary, &store, claim_stage)
+        StdioSession::spawn_with_claim_stage(binary, store, claim_stage)
     };
     let mut session = session.map_err(|error| VariantFailure {
         preflight_passed: false,
@@ -803,6 +873,7 @@ fn execute_variant(
         stage: "server_preflight".into(),
         message: error.to_string(),
     })?;
+    let ready = Instant::now();
     let initialize_response = session.initialized().clone();
     let tool_schemas = session.tool_schemas().clone();
     let launch_profile = session.launch_profile.clone();
@@ -887,6 +958,7 @@ fn execute_variant(
         }
     }
 
+    let formed = Instant::now();
     let mut temporal_read_measurement = None;
     let (temporal_request, temporal_response, temporal_observation, temporal_snapshot_valid) =
         if captures_revision_checkpoints {
@@ -951,6 +1023,7 @@ fn execute_variant(
         assemble_responses.push(response);
         observations.push(observation);
     }
+    let queried = Instant::now();
     let (explain_response, explain_error) =
         match explain_retrieved_items(&mut session, assemble_responses.first()) {
             Ok(response) => (response, None),
@@ -972,6 +1045,7 @@ fn execute_variant(
     } else {
         (None, None)
     };
+    let diagnosed = Instant::now();
     let stderr_excerpt = session.stderr_excerpt();
     session.shutdown().map_err(|error| VariantFailure {
         preflight_passed: true,
@@ -979,9 +1053,22 @@ fn execute_variant(
         stage: "server_shutdown".into(),
         message: error.to_string(),
     })?;
-    let _ = std::fs::remove_dir_all(&store);
 
+    let closed = Instant::now();
+    let micros = |from: Instant, to: Instant| {
+        u64::try_from(to.duration_since(from).as_micros()).unwrap_or(u64::MAX)
+    };
+    let stage_timings_us = BTreeMap::from([
+        ("preparation".into(), micros(started, prepared)),
+        ("startup".into(), micros(prepared, ready)),
+        ("formation".into(), micros(ready, formed)),
+        ("query".into(), micros(formed, queried)),
+        ("diagnostics".into(), micros(queried, diagnosed)),
+        ("shutdown".into(), micros(diagnosed, closed)),
+        ("wall".into(), micros(started, closed)),
+    ]);
     Ok(VariantTrace {
+        stage_timings_us,
         claim_rollout_stage: claim_stage.to_string(),
         launch_profile,
         tool_schemas,
@@ -1203,6 +1290,7 @@ struct SuccessfulReceipt<'a> {
     oracle: Option<&'a DecisionOracle>,
     primary: &'a VariantTrace,
     verbose: Option<&'a VariantTrace>,
+    diagnostics_requested: bool,
     evidence_diagnostic: Option<&'a VariantTrace>,
     score_source: Option<ScoringObservationSource>,
     score: Option<&'a ProbeScore>,
@@ -1222,6 +1310,7 @@ fn successful_receipt(input: SuccessfulReceipt<'_>) -> Value {
         oracle,
         primary,
         verbose,
+        diagnostics_requested,
         evidence_diagnostic,
         score_source,
         score,
@@ -1234,7 +1323,8 @@ fn successful_receipt(input: SuccessfulReceipt<'_>) -> Value {
         configuration,
     } = input;
     json!({
-        "schema_version":"memory-decisions-receipt/v4",
+        "schema_version":if diagnostics_requested { "memory-decisions-receipt/v4" } else { "memory-decisions-receipt/v5" },
+        "diagnostic_policy":if diagnostics_requested { "full" } else { "primary_only" },
         "case_id":probe.id,
         "product_revision":product_revision,
         "product_binary_sha256":binary_sha256,
@@ -1253,6 +1343,7 @@ fn successful_receipt(input: SuccessfulReceipt<'_>) -> Value {
         },
         "primary_claim_rollout_stage":primary.claim_rollout_stage,
         "primary_launch_profile":primary.launch_profile,
+        "primary_stage_timings_us":primary.stage_timings_us,
         "score_observation_source":score_source.map(ScoringObservationSource::as_str),
         "initialize":primary.initialize_response,
         "events":probe.event_ids.iter().filter_map(|id| corpus.events.iter().find(|event| event.id == *id)).collect::<Vec<_>>(),
@@ -1285,6 +1376,7 @@ fn successful_receipt(input: SuccessfulReceipt<'_>) -> Value {
 fn diagnostic_trace_receipt(trace: &VariantTrace, probe: &DecisionProbe, verbose: bool) -> Value {
     json!({
         "claim_rollout_stage":trace.claim_rollout_stage,
+        "stage_timings_us":trace.stage_timings_us,
         "launch_profile":trace.launch_profile,
         "request":assemble_arguments(probe, verbose, None),
         "ingest_receipts":trace.ingest_receipts,
@@ -1480,32 +1572,34 @@ fn make_outcome(
     for (key, value) in [
         (
             "temporal_evidence_success",
-            temporal_score.is_some_and(|score| score.evidence_success),
+            temporal_score.map(|score| score.evidence_success),
         ),
         (
             "temporal_decision_success",
-            temporal_score.is_some_and(|score| score.decision_success),
+            temporal_score.map(|score| score.decision_success),
         ),
         (
             "temporal_probe_success",
-            temporal_score.is_some_and(|score| score.probe_success),
+            temporal_score.map(|score| score.probe_success),
         ),
         (
             "evidence_stage_temporal_evidence_success",
-            evidence_stage_temporal_score.is_some_and(|score| score.evidence_success),
+            evidence_stage_temporal_score.map(|score| score.evidence_success),
         ),
         (
             "evidence_stage_temporal_decision_success",
-            evidence_stage_temporal_score.is_some_and(|score| score.decision_success),
+            evidence_stage_temporal_score.map(|score| score.decision_success),
         ),
         (
             "evidence_stage_temporal_probe_success",
-            evidence_stage_temporal_score.is_some_and(|score| score.probe_success),
+            evidence_stage_temporal_score.map(|score| score.probe_success),
         ),
     ] {
-        outcome
-            .evidence
-            .insert(key.into(), MetricEvidence::ratio(u64::from(value), 1));
+        if let Some(value) = value {
+            outcome
+                .evidence
+                .insert(key.into(), MetricEvidence::ratio(u64::from(value), 1));
+        }
     }
     if let Some(failure) = failure {
         outcome.failures.push(failure.clone());
@@ -1572,6 +1666,15 @@ fn fallback_artifact_root() -> PathBuf {
             .unwrap_or_default()
             .as_nanos()
     ))
+}
+
+/// Scoped ownership also cleans failed formation/startup paths after the session drops.
+struct ScenarioStore(PathBuf);
+
+impl Drop for ScenarioStore {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 fn fresh_store(case_id: &str, variant: &str) -> PathBuf {
@@ -1819,6 +1922,7 @@ mod diagnostic_helper_tests {
         }))
         .unwrap();
         let trace = VariantTrace {
+            stage_timings_us: BTreeMap::new(),
             claim_rollout_stage: "evidence".into(),
             launch_profile: BTreeMap::new(),
             tool_schemas: json!([]),

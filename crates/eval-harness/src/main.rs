@@ -253,6 +253,67 @@ async fn main() -> std::process::ExitCode {
             artifact,
             shards,
         } => cmd_merge(profile, artifact, shards),
+        Command::CompareCurrentMemory {
+            baseline,
+            candidate,
+            corpus,
+            output,
+        } => {
+            let mut destination = match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&output)
+            {
+                Ok(file) => file,
+                Err(error) => {
+                    eprintln!(
+                        "error: cannot reserve grading attempt {}: {error}",
+                        output.display()
+                    );
+                    return std::process::ExitCode::from(2);
+                }
+            };
+            let result = (|| -> Result<_, String> {
+                let baseline = eval_harness::suites::load_registered_replay(&baseline, &corpus)
+                    .map_err(|e| e.to_string())?;
+                let candidate = eval_harness::suites::load_registered_replay(&candidate, &corpus)
+                    .map_err(|e| e.to_string())?;
+                eval_harness::suites::compare_current_replays(&baseline, &candidate)
+                    .map_err(|e| e.to_string())
+            })();
+            let (record, code) = match result {
+                Ok(report) => {
+                    let code = u8::from(!report.no_regressions);
+                    eprintln!(
+                        "no_regressions={} all_cases_pass={} current_failures={} regressions={}",
+                        report.no_regressions,
+                        report.all_cases_pass,
+                        report.current_failures.len(),
+                        report.regressions.len()
+                    );
+                    let mut record =
+                        serde_json::to_value(report).expect("regression report is serializable");
+                    record["execution_status"] = "scored".into();
+                    (record, code)
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    (
+                        serde_json::json!({"schema_version":"memory-current-regression/v1", "execution_status":"invalid", "error":error, "baseline":baseline, "candidate":candidate, "corpus":corpus}),
+                        2,
+                    )
+                }
+            };
+            let saved = serde_json::to_vec_pretty(&record)
+                .map_err(std::io::Error::other)
+                .and_then(|bytes| destination.write_all(&bytes))
+                .and_then(|()| destination.sync_all());
+            if let Err(error) = saved {
+                eprintln!("error: cannot persist grading attempt: {error}");
+                return std::process::ExitCode::from(2);
+            }
+            std::process::ExitCode::from(code)
+        }
         Command::CompareDecisionReplays { left, right } => {
             use eval_harness::suites::{ReplayIndex, compare_replays};
 
@@ -547,6 +608,7 @@ async fn main() -> std::process::ExitCode {
             candidate_memory_server,
             output_directory,
             temp_root,
+            public_synthetic_traces,
         } => {
             cmd_run_paired_chat_completions(
                 recall_read_mode,
@@ -562,6 +624,7 @@ async fn main() -> std::process::ExitCode {
                 candidate_memory_server,
                 output_directory,
                 temp_root,
+                public_synthetic_traces,
             )
             .await
         }
@@ -1396,6 +1459,7 @@ async fn cmd_run_paired_chat_completions(
     candidate_memory_server: std::path::PathBuf,
     output_directory: std::path::PathBuf,
     temp_root: Option<std::path::PathBuf>,
+    public_synthetic_traces: Option<std::path::PathBuf>,
 ) -> std::process::ExitCode {
     let plan = match read_json_input::<eval_harness::paired::PairedEvaluationPlan>(
         &plan_path,
@@ -1519,6 +1583,9 @@ async fn cmd_run_paired_chat_completions(
                 response_format,
                 request_parameters,
             )?;
+            if let Some(directory) = public_synthetic_traces {
+                backend = backend.with_public_synthetic_traces(directory);
+            }
             if let Some(probes) = independent_probes {
                 let (incumbent, candidate) =
                     eval_harness::paired_agent::independent::run_with_public_probes(
@@ -1552,6 +1619,9 @@ async fn cmd_run_paired_chat_completions(
             response_format,
             request_parameters,
         )?;
+        if let Some(directory) = public_synthetic_traces {
+            backend = backend.with_public_synthetic_traces(directory);
+        }
         let (incumbent, candidate, _, _) =
             eval_harness::paired_agent::managed::run_agent_managed_paired_evaluation(
                 &plan,

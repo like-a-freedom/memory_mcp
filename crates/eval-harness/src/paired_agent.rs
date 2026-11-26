@@ -25,6 +25,7 @@ pub mod independent;
 pub mod managed;
 pub mod observations;
 pub(crate) mod prompts;
+pub mod public_trace;
 pub(crate) mod tool_results;
 
 pub const PAIRED_TASK_MANIFEST_SCHEMA_V1: &str = "memory-mcp-agent-tasks/v1";

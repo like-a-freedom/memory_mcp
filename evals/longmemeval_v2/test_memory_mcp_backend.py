@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 from threading import Barrier
 import unittest
@@ -12,6 +13,33 @@ from evals.longmemeval_v2.memory_mcp_backend import MemoryMcpBackend
 
 
 class MemoryMcpBackendTests(unittest.TestCase):
+    def test_cli_timeout_rejects_unbounded_or_invalid_configuration(self):
+        for value in (0, -1, float('inf'), float('nan'), True, '10'):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, 'positive finite'):
+                    MemoryMcpBackend({'cli_timeout_seconds': value})
+
+    def test_hung_cli_insert_times_out_and_reaps_the_child(self):
+        children = []
+        real_run, real_popen = subprocess.run, subprocess.Popen
+
+        def start(*args, **kwargs):
+            child = real_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        def invoke(_argv, **kwargs):
+            kwargs.setdefault('timeout', 1.0)  # Bound the regression even before the fix.
+            return real_run([sys.executable, '-c',
+                             'import threading; threading.Event().wait()'], **kwargs)
+
+        with patch('subprocess.Popen', side_effect=start), patch('subprocess.run', side_effect=invoke):
+            with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                MemoryMcpBackend({'db_path': '/unused', 'cli_timeout_seconds': 0.2}).insert({'content': 'synthetic'})
+        self.assertEqual(failure.exception.timeout, 0.2)
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].poll())
+
     def test_backend_exposes_upstream_memory_config(self):
         backend = MemoryMcpBackend({"db_path": "/tmp/test-memory-mcp"}, runner=lambda *_: "{}")
         self.assertEqual(backend.memory_type, "memory_mcp")
@@ -144,6 +172,30 @@ class MemoryMcpBackendTests(unittest.TestCase):
         self.assertEqual(options["env"]["SURREALDB_DATA_DIR"], "/tmp/test-memory-mcp")
         self.assertNotIn("SURREALDB_URL", options["env"])
         self.assertNotIn("EMBEDDINGS_PROVIDER", options["env"])
+        self.assertEqual(options['timeout'], 1800.0)
+
+    def test_query_statistics_separate_copy_and_process_time(self):
+        clock = [0.0]
+        import shutil
+        real_copy = shutil.copytree
+
+        def copy(*args, **kwargs):
+            result = real_copy(*args, **kwargs)
+            clock[0] += 2.0
+            return result
+
+        def read(*args, **kwargs):
+            clock[0] += 3.0
+            return subprocess.CompletedProcess([], 0, b'{"result":{"items":[]}}')
+
+        with TemporaryDirectory() as directory, patch("shutil.copytree", side_effect=copy), patch("subprocess.run", side_effect=read), patch("time.monotonic", side_effect=lambda: clock[0]):
+            Path(directory, "counter").write_text("0")
+            backend = MemoryMcpBackend({"db_path": directory})
+            self.assertEqual(backend.query("synthetic"), [])
+            self.assertEqual(backend.stats["query_copy_time_secs"], 2.0)
+            self.assertEqual(backend.stats["query_cli_time_secs"], 3.0)
+            self.assertEqual(backend.stats["query_time_secs"], 5.0)
+            self.assertEqual(Path(directory, "counter").read_text(), "0")
 
     def test_each_query_starts_from_the_same_store_in_either_order(self):
         used_stores = set()

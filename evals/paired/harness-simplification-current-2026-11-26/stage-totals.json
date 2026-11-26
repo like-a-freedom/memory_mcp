@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-stage-totals/v1",
+  "unit": "microseconds",
+  "semantics": "sum of 8 sequential primary scenario phases; excludes runner overhead",
+  "totals": {
+    "diagnostics": 116769,
+    "formation": 1301153,
+    "preparation": 1030,
+    "query": 382722,
+    "shutdown": 192818,
+    "startup": 52651333,
+    "wall": 54645844
+  }
+}

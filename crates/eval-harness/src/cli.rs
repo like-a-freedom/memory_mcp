@@ -134,6 +134,17 @@ pub enum Command {
         artifact: PathBuf,
         shards: Vec<PathBuf>,
     },
+    /// Regrade registered raw receipts and compare current memory without executing the product.
+    CompareCurrentMemory {
+        #[arg(long)]
+        baseline: PathBuf,
+        #[arg(long)]
+        candidate: PathBuf,
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Check repeatability of two deterministic memory-decision runs.
     CompareDecisionReplays {
         #[arg(long)]
@@ -324,6 +335,9 @@ pub enum Command {
         candidate_memory_server: PathBuf,
         #[arg(long)]
         output_directory: PathBuf,
+        /// Retain exact public MCP arguments/responses. Use only public synthetic task data.
+        #[arg(long)]
+        public_synthetic_traces: Option<PathBuf>,
         #[arg(long)]
         temp_root: Option<PathBuf>,
     },
@@ -1013,6 +1027,32 @@ mod tests {
             parsed.command,
             Command::RunPairedChatCompletions { .. }
         ));
+    }
+
+    #[test]
+    fn public_synthetic_trace_capture_requires_explicit_cli_opt_in() {
+        let parsed = Cli::try_parse_from([
+            "memory-eval",
+            "run-paired-chat-completions",
+            "--plan",
+            "plan.json",
+            "--tasks",
+            "tasks.json",
+            "--model-endpoint",
+            "http://127.0.0.1:1234/v1",
+            "--incumbent-memory-server",
+            "memory-incumbent",
+            "--candidate-memory-server",
+            "memory-candidate",
+            "--output-directory",
+            "runs",
+            "--public-synthetic-traces",
+            "public-traces",
+        ]);
+        assert!(
+            parsed.is_ok(),
+            "public synthetic capture must be explicitly selectable"
+        );
     }
 
     #[test]

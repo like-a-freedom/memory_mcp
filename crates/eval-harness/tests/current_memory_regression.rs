@@ -1,0 +1,123 @@
+use eval_harness::suites::{compare_current_replays, load_registered_replay};
+use std::path::Path;
+
+#[test]
+fn unchanged_capture_has_no_regression_and_keeps_known_failures_visible() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let baseline = load_registered_replay(
+        &root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json"),
+        &root.join("evals/corpora/memory-decisions-v9"),
+    )
+    .unwrap();
+    let report = compare_current_replays(&baseline, &baseline).unwrap();
+    assert!(report.no_regressions);
+    assert!(!report.all_cases_pass);
+    assert_eq!(report.current_failures.len(), 3);
+    assert!(report.regressions.is_empty());
+}
+
+fn frozen() -> eval_harness::suites::ReplayIndex {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    load_registered_replay(
+        &root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json"),
+        &root.join("evals/corpora/memory-decisions-v9"),
+    )
+    .unwrap()
+}
+
+#[test]
+fn new_safety_failure_in_already_failing_case_is_a_regression() {
+    let baseline = frozen();
+    let mut changed = serde_json::to_value(&baseline).unwrap();
+    changed["cases"][1]["reason_codes"] =
+        serde_json::json!(["decisionunobservable", "forbidden_source"]);
+    let candidate = serde_json::from_value(changed).unwrap();
+    let report = compare_current_replays(&baseline, &candidate).unwrap();
+    assert!(!report.no_regressions);
+    assert!(
+        report
+            .regressions
+            .iter()
+            .any(|reason| reason.ends_with(":reason.forbidden_source"))
+    );
+}
+
+#[test]
+fn a_new_temporal_failure_cannot_hide_behind_an_unchanged_primary_score() {
+    let baseline = frozen();
+    let mut changed = serde_json::to_value(&baseline).unwrap();
+    changed["cases"][1]["temporal_score"]["decision_success"] = false.into();
+    let candidate = serde_json::from_value(changed).unwrap();
+    let report = compare_current_replays(&baseline, &candidate).unwrap();
+    assert!(!report.no_regressions);
+    assert!(
+        report
+            .regressions
+            .iter()
+            .any(|reason| reason.ends_with(":temporal.decision_success"))
+    );
+}
+
+#[test]
+fn cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execution() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let index =
+        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+    let dir = tempfile::tempdir().unwrap();
+    let report = dir.path().join("comparison.json");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"))
+        .args(["compare-current-memory", "--baseline"])
+        .arg(&index)
+        .arg("--candidate")
+        .arg(&index)
+        .arg("--corpus")
+        .arg(root.join("evals/corpora/memory-decisions-v9"))
+        .arg("--output")
+        .arg(&report)
+        .env("MEMORY_DECISIONS_SERVER_BIN", "/no/product/may/be/executed")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(report).unwrap()).unwrap();
+    assert_eq!(result["no_regressions"], true);
+    assert_eq!(result["all_cases_pass"], false);
+    assert_eq!(result["current_failures"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn failed_offline_grading_is_preserved_when_the_stage_is_retried() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let baseline =
+        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+    let dir = tempfile::tempdir().unwrap();
+    let failed = dir.path().join("attempt-01.json");
+    let candidate = dir.path().join("candidate.json");
+    std::fs::write(&candidate, b"{}").unwrap();
+    let run = |output: &Path, candidate: &Path| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"))
+            .args(["compare-current-memory", "--baseline"])
+            .arg(&baseline)
+            .arg("--candidate")
+            .arg(candidate)
+            .arg("--corpus")
+            .arg(root.join("evals/corpora/memory-decisions-v9"))
+            .arg("--output")
+            .arg(output)
+            .output()
+            .unwrap()
+    };
+    assert_eq!(run(&failed, &candidate).status.code(), Some(2));
+    let failure_bytes = std::fs::read(&failed).expect("failed grading attempt must survive");
+    let receipt: serde_json::Value = serde_json::from_slice(&failure_bytes).unwrap();
+    assert_eq!(receipt["execution_status"], "invalid");
+    let successful = dir.path().join("attempt-02.json");
+    assert!(run(&successful, &baseline).status.success());
+    assert_eq!(std::fs::read(&failed).unwrap(), failure_bytes);
+    assert_eq!(run(&failed, &baseline).status.code(), Some(2));
+    assert_eq!(std::fs::read(&failed).unwrap(), failure_bytes);
+}

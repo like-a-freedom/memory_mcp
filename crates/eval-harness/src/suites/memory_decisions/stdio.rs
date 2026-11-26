@@ -23,7 +23,10 @@ enum ReaderMessage {
 
 pub struct StdioSession {
     pub(crate) launch_profile: BTreeMap<String, String>,
-    child: Child,
+    child: Arc<Mutex<Child>>,
+    deadline_stop: Option<mpsc::Sender<()>>,
+    deadline_worker: Option<JoinHandle<()>>,
+    deadline: Option<Instant>,
     stdin: Option<ChildStdin>,
     responses: Option<mpsc::Receiver<ReaderMessage>>,
     stdout_reader: Option<JoinHandle<()>>,
@@ -57,6 +60,32 @@ impl StdioSession {
         )
     }
 
+    /// All requests and owned process lifetime share this absolute run deadline.
+    pub fn spawn_with_deadline(
+        binary: &Path,
+        store: &Path,
+        claim_stage: &str,
+        deadline: Instant,
+    ) -> Result<Self, EvalError> {
+        let stage = match claim_stage {
+            "default" => None,
+            "disabled" | "shadow" | "relations" | "evidence" => Some(claim_stage),
+            _ => {
+                return Err(EvalError::InvalidConfig(
+                    "unsupported claim rollout stage".into(),
+                ));
+            }
+        };
+        Self::spawn_inner(
+            binary,
+            store,
+            stage,
+            None,
+            (STARTUP_TIMEOUT, CALL_TIMEOUT, SHUTDOWN_TIMEOUT),
+            Some(deadline),
+        )
+    }
+
     pub fn spawn_with_claim_stage(
         binary: &Path,
         store: &Path,
@@ -75,9 +104,8 @@ impl StdioSession {
             store,
             Some(claim_stage),
             None,
-            STARTUP_TIMEOUT,
-            CALL_TIMEOUT,
-            SHUTDOWN_TIMEOUT,
+            (STARTUP_TIMEOUT, CALL_TIMEOUT, SHUTDOWN_TIMEOUT),
+            None,
         )
     }
 
@@ -105,9 +133,8 @@ impl StdioSession {
             store,
             Some(claim_stage),
             Some(working_directory),
-            STARTUP_TIMEOUT,
-            CALL_TIMEOUT,
-            SHUTDOWN_TIMEOUT,
+            (STARTUP_TIMEOUT, CALL_TIMEOUT, SHUTDOWN_TIMEOUT),
+            None,
         )
     }
 
@@ -123,9 +150,8 @@ impl StdioSession {
             store,
             None,
             None,
-            startup_timeout,
-            call_timeout,
-            shutdown_timeout,
+            (startup_timeout, call_timeout, shutdown_timeout),
+            None,
         )
     }
 
@@ -134,10 +160,15 @@ impl StdioSession {
         store: &Path,
         claim_stage: Option<&str>,
         working_directory: Option<&Path>,
-        startup_timeout: Duration,
-        call_timeout: Duration,
-        shutdown_timeout: Duration,
+        timeouts: (Duration, Duration, Duration),
+        deadline: Option<Instant>,
     ) -> Result<Self, EvalError> {
+        let (startup_timeout, call_timeout, shutdown_timeout) = timeouts;
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            return Err(EvalError::Suite(
+                "evaluation deadline expired before server startup".into(),
+            ));
+        }
         std::fs::create_dir_all(store).map_err(|source| EvalError::Io {
             path: store.to_path_buf(),
             source,
@@ -177,9 +208,32 @@ impl StdioSession {
             let sample = Arc::clone(&stderr_sample);
             move || drain_stderr(stderr, sample)
         });
+        let child = Arc::new(Mutex::new(child));
+        let (deadline_stop, deadline_worker) = if let Some(limit) = deadline {
+            let (stop, stopped) = mpsc::channel();
+            let owned_child = Arc::clone(&child);
+            let worker = thread::spawn(move || {
+                if matches!(
+                    stopped.recv_timeout(limit.saturating_duration_since(Instant::now())),
+                    Err(mpsc::RecvTimeoutError::Timeout)
+                ) {
+                    let mut child = owned_child
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner());
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+            });
+            (Some(stop), Some(worker))
+        } else {
+            (None, None)
+        };
         let mut session = Self {
             launch_profile,
             child,
+            deadline_stop,
+            deadline_worker,
+            deadline,
             stdin: Some(stdin),
             responses: Some(responses),
             stdout_reader: Some(stdout_reader),
@@ -259,9 +313,18 @@ impl StdioSession {
 
     pub fn shutdown(&mut self) -> Result<(), EvalError> {
         self.stdin.take();
-        let deadline = Instant::now() + self.shutdown_timeout;
+        let deadline = self
+            .deadline
+            .map_or(Instant::now() + self.shutdown_timeout, |limit| {
+                limit.min(Instant::now() + self.shutdown_timeout)
+            });
         loop {
-            match self.child.try_wait() {
+            let status = self
+                .child
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .try_wait();
+            match status {
                 Ok(Some(status)) => {
                     self.child_reaped = true;
                     self.join_readers();
@@ -339,6 +402,11 @@ impl StdioSession {
         params: Value,
         timeout: Duration,
     ) -> Result<Value, EvalError> {
+        if self.deadline.is_some_and(|limit| Instant::now() >= limit) {
+            return Err(EvalError::Suite(
+                "whole-run deadline exhausted before MCP request".into(),
+            ));
+        }
         let id = self.next_id;
         self.next_id += 1;
         let message = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
@@ -346,7 +414,9 @@ impl StdioSession {
         if let Some(response) = self.pending.remove(&id) {
             return Ok(response);
         }
-        let deadline = Instant::now() + timeout;
+        let deadline = self.deadline.map_or(Instant::now() + timeout, |limit| {
+            limit.min(Instant::now() + timeout)
+        });
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -407,8 +477,9 @@ impl StdioSession {
         if self.child_reaped {
             return;
         }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let mut child = self.child.lock().unwrap_or_else(|error| error.into_inner());
+        let _ = child.kill();
+        let _ = child.wait();
         self.child_reaped = true;
     }
 
@@ -451,6 +522,12 @@ impl Drop for StdioSession {
         self.stdin.take();
         self.kill_and_reap();
         self.join_readers();
+        if let Some(stop) = self.deadline_stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(worker) = self.deadline_worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 

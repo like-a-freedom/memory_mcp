@@ -125,6 +125,8 @@ mod tests {
             mode: None,
             corpus_root: (id == "memory-decisions").then(memory_decisions_corpus_root),
             claim_rollout_stage: None,
+            case_ids: Vec::new(),
+            diagnostics: None,
             expected_coverage: None,
         }
     }
@@ -174,6 +176,8 @@ mod tests {
             mode: None,
             corpus_root: Some(memory_decisions_corpus_root()),
             claim_rollout_stage: None,
+            case_ids: Vec::new(),
+            diagnostics: None,
             expected_coverage: Some(crate::profile::ExpectedCoverage { exact_cases: 10 }),
         };
         assert!(build_suite(&memory_decl).unwrap().is_some());

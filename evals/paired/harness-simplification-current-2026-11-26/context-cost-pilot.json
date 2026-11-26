@@ -1,0 +1,20 @@
+{
+  "schema_version": "memory-context-cost-pilot/v1",
+  "purpose": "bounded stage characterization only; no answer-quality claim",
+  "source_snapshot": "target/c4-native/build/memory_state/store",
+  "cli_timeout_seconds": 15,
+  "status": "cli_timeout",
+  "item_count": null,
+  "wall_seconds": 16.327,
+  "stats": {
+    "insert_count": 0,
+    "query_count": 0,
+    "insert_time_secs": 0.0,
+    "query_time_secs": 0.0,
+    "query_copy_time_secs": 1.169,
+    "query_cli_time_secs": 15.101
+  },
+  "snapshot_size_observed": "5.1 GiB (du -sh; not a full content identity)",
+  "query": "What time range filters are available?",
+  "snapshot_identity_verified": false
+}

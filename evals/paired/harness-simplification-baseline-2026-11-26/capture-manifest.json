@@ -1,0 +1,29 @@
+{
+  "purpose": "pre-simplification product-default baseline; primary scoring and diagnostic execution unchanged",
+  "source_revision": "ece2b831f678c1ea62f46b1488da7d9165151593",
+  "machine": "arm64",
+  "system": "Darwin",
+  "build_command": "cargo build -p memory_mcp --bin memory_mcp --locked",
+  "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+  "harness_binary_sha256": "188db566a1865ea6768d1ba30dbfc5a552befde6dc5961d1d9716993f7922e31",
+  "profile": "evals/profiles/memory_decisions_v9_default.json",
+  "scoring_files_sha256": {
+    "crates/eval-harness/src/suites/memory_decisions/scoring.rs": "fad6db5668f8035f925290324ad1fe77ced4e8e0af61554132d49fd6d6420609",
+    "crates/eval-harness/src/suites/memory_decisions/normalization.rs": "9a87982dde02730ae6839515df78297687ea5a4469537fec3bf04b31619c5caf",
+    "crates/eval-harness/src/suites/memory_decisions/cases.rs": "137ebdccbc545e54f8514714140c0fa4c8cd23a88d3067ec891042b0503e2e68"
+  },
+  "replay_identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "ece2b831f678c1ea62f46b1488da7d9165151593",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f"
+  },
+  "result": {
+    "passed": 5,
+    "quality_failed": 3,
+    "invalid": 0,
+    "duration_ms": 172603
+  }
+}

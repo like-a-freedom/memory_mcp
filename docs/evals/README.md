@@ -1,5 +1,70 @@
 # Evaluation profiles
 
+## Fast deterministic development
+
+The current regression route uses one primary capture per registered case and
+needs no agent, model host, or API key. It is opt-in while the frozen baseline
+awaits independent review; the existing rollout gate remains active during that review.
+
+```sh
+cargo build --locked -p memory_mcp --bin memory_mcp
+cargo build --locked -p eval-harness --bin memory-eval
+# Use a fresh destination for every capture and grading attempt.
+export MEMORY_DECISIONS_SERVER_BIN="$PWD/target/debug/memory_mcp"
+export MEMORY_DECISIONS_PRODUCT_REVISION="$(git rev-parse HEAD)"
+export MEMORY_DECISIONS_ARTIFACT_ROOT="$PWD/target/evals/current-01/receipts"
+mkdir -p target/evals/current-01
+# Exit 1 records quality failures; exit 2 is an invalid execution.
+target/debug/memory-eval run --profile evals/profiles/memory_decisions_current.json \
+  --artifact target/evals/current-01/run.json
+# Regrade saved raw evidence; this command never starts memory or an agent.
+target/debug/memory-eval compare-current-memory \
+  --baseline evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json \
+  --candidate target/evals/current-01/receipts/index.json \
+  --corpus evals/corpora/memory-decisions-v9 \
+  --output target/evals/current-01/grade-01.json
+```
+
+A scoped no-regression result can pass with existing failures. Always inspect
+`all_cases_pass`, `current_failures` and `regressions` separately. The reviewed
+corpus, configuration and public schema must match; product identity may change.
+The command rederives scores from raw receipts and registered inputs, including
+primary and temporal dimensions and new failure reasons. It refuses incomplete
+coverage, missing evidence and incompatible stages. It never refreshes the baseline.
+
+For an inner-loop reproduction, copy the current profile under `target/evals/`
+and set its memory-decisions `case_ids` to the named registered cases; adjust
+`expected_coverage.exact_cases` accordingly. A subset cannot replace the full gate.
+Set `diagnostics: true` explicitly to capture verbose/shadow and evidence-stage
+contrasts. Omitted diagnostics currently preserves the previous behavior until
+the reviewed gate switch. Primary-only receipts use v5; v3/v4 loaders remain
+necessary to regrade archived evidence. Skipped diagnostics are unmeasured,
+not a zero success rate.
+
+Resume at the failed stage using immutable inputs and a fresh attempt path.
+A failed `compare-current-memory` produces an invalid grading receipt. Retry as
+`grade-02.json`; `grade-01.json` cannot be overwritten, and all attempts must be
+retained. No capture is repeated for a scorer failure. For paired agent evidence,
+use the existing `score-paired-observations` command with its original plan,
+tasks, observations and a fresh `--output-directory`. Changed upstream identities
+require a new upstream capture; an old context is never a candidate execution.
+There is no automatic best-attempt selection or reliability claim from a retry.
+Partial memory captures retain all scheduled outcomes; diagnose selected failed
+cases in a fresh directory, then run the full gate for acceptance.
+
+Explicitly public synthetic Chat Completions tasks may opt into
+`--public-synthetic-traces <fresh-directory>`. Sidecars retain the actual tool
+arguments and replies, including omitted versus null selectors, and bind the
+plan/product/schema/case/arm/phase. Private runs do not enable this flag.
+`PublicSyntheticTrace::replay_for` executes exact requests only against a
+caller-supplied isolated session with the registered identity. It does not
+reconstruct a lost store or establish fresh quality/latency evidence.
+
+See the [matched simplification capture](../../evals/paired/harness-simplification-current-2026-11-26/README.md)
+for timings, retained failures and limitations. Routine development does not
+repeat the seven LongMemEval questions or a model experiment unless a named
+empirical question requires it.
+
 ## Current memory-quality evidence
 
 The registered [deterministic candidate gate](DETERMINISTIC_MEMORY_QUALITY.md)

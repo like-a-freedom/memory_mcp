@@ -131,3 +131,63 @@ fn changed_seed_payload_cannot_attest_the_registered_history() {
         "seed order or inputs differ",
     );
 }
+
+#[test]
+fn primary_only_receipts_regrade_without_requiring_rollout_diagnostics() {
+    use sha2::{Digest, Sha256};
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let baseline = root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts");
+    let dir = tempfile::tempdir().unwrap();
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(baseline.join("index.json")).unwrap()).unwrap();
+    for case in index["cases"].as_array_mut().unwrap() {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(baseline.join(case["receipt_path"].as_str().unwrap())).unwrap(),
+        )
+        .unwrap();
+        raw["schema_version"] = "memory-decisions-receipt/v5".into();
+        raw["diagnostic_policy"] = "primary_only".into();
+        raw["verbose_diagnostic"] = serde_json::Value::Null;
+        raw["evidence_enabled_diagnostic"] = serde_json::Value::Null;
+        raw["evidence_enabled_temporal_revision_score"] = serde_json::Value::Null;
+        case["evidence_enabled_temporal_observation"] = serde_json::Value::Null;
+        case["evidence_enabled_temporal_score"] = serde_json::Value::Null;
+        let bytes = serde_json::to_vec_pretty(&raw).unwrap();
+        case["receipt_sha256"] = hex::encode(Sha256::digest(&bytes)).into();
+        std::fs::write(
+            dir.path().join(case["receipt_path"].as_str().unwrap()),
+            bytes,
+        )
+        .unwrap();
+    }
+    let path = dir.path().join("index.json");
+    std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
+    eval_harness::suites::load_registered_replay(&path, &root.join("evals/corpora/memory-decisions-v9"))
+        .expect("primary scores retain independent request/history/oracle verification without diagnostic captures");
+    assert_eq!(
+        index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|case| case["probe_success"] == true)
+            .count(),
+        5
+    );
+}
+
+#[test]
+fn detached_primary_temporal_score_is_rejected() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source = root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts");
+    let dir = tempfile::tempdir().unwrap();
+    for entry in std::fs::read_dir(&source).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::copy(entry.path(), dir.path().join(entry.file_name())).unwrap();
+    }
+    let path = dir.path().join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    index["cases"][1]["temporal_score"]["decision_success"] = false.into();
+    std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
+    assert!(load_verified_replay(&path).is_err());
+}
