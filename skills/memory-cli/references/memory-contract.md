@@ -36,8 +36,8 @@ is eligible only when the server's configured policy explicitly permits it.
   policy tags.
 - Each distinct set of bytes at a path is one immutable revision; renaming a
   file starts a new lineage; deleting a file never invalidates memory.
-- A revision is `processed` only after `ingest → extract` succeeds. Failures are
-  retried once per startup; a failed file never stops MCP.
+- A revision is `processed` only after `ingest → extract` succeeds. Failed revisions are
+  eligible for processing again at startup; processing uses up to three attempts; a failed file never stops MCP.
 - Supported formats: PDF, DOCX, XLSX, PPTX, Markdown, plain text, and EML.
   Symlinks and unsupported files are skipped silently.
 - The `fs-watch` feature is required; official release binaries include it.
@@ -57,11 +57,14 @@ completeness, omitted channels, scan truncation and guidance: an empty partial
 result or refinement does not establish global absence. Current assembly is a
 logical read that can persist access heat.
 
-Classify capture as `verified` (facts inspected), `episode-only` (empty fact
-set), or `pending` (nonzero exit or unresolved failure). Classify recall as
+Read structured `status` and `guidance` before classifying facts. Classify capture
+as `verified` (completed extraction and facts inspected), `episode-only`
+(completed successful extraction with no facts), or `pending` (partial/pending
+extraction, nonzero exit, or unresolved failure). Exit zero can contain pending
+extraction; preserve its `episode_id` and follow retry guidance. Classify recall as
 `assembled`, and as `cited` only after every used claim has provenance.
 
-An empty extraction confirms no canonical fact capture; source fallback may
+After completed successful extraction, an empty fact set confirms no canonical fact capture; source fallback may
 still return the episode text. Never treat exit zero, an episode ID, or an empty
 result as stronger evidence than the structured response provides.
 
@@ -70,7 +73,9 @@ result as stronger evidence than the structured response provides.
 - Invalid time: correct it to the source's actual ISO 8601 time.
 - Source conflict: retain the original and use a new identity for changed
   evidence.
-- Empty extraction: report `episode-only`.
+- Completed successful extraction with no facts: report `episode-only`.
+- Partial/pending extraction: preserve `episode_id`, report `pending`, and follow
+  retry guidance even when the CLI exits zero.
 - Nonzero exit or invalid structured output: preserve identifiers and report
   `pending`.
 - Empty recall: reframe terms within the same authorized boundary.

@@ -40,7 +40,13 @@
     {
       "id": 7,
       "prompt": "Разговорный источник после extract дал один note, а другой текст — пустой facts. Можно ли сказать, что free-form всегда не поддерживается и источник не recallable?",
-      "expected_output": "No universal free-form claim: source-dependent heuristics may yield facts/note/none. Classify actual result; empty means no canonical facts confirmed, while episode source fallback can still return text. Recall may update access heat, not capture new facts.",
+      "expected_output": "No universal free-form claim: source-dependent heuristics may yield facts/note/none. Classify actual result; only completed successful extraction with empty facts means episode-only; partial/pending remains pending, while episode source fallback can still return text. Recall may update access heat, not capture new facts.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Extraction returned status=partial, an episode_id, empty facts, and guidance saying extraction is pending and retry is safe. The CLI exited 0. Is capture finished? What should you report and do next?",
+      "expected_output": "Report pending, preserve episode_id, follow retry guidance. Do not classify episode-only or verified from empty facts or exit zero; episode-only requires completed successful extraction with no facts.",
       "files": []
     }
   ]

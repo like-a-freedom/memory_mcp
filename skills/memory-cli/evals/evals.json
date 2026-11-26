@@ -40,7 +40,13 @@
     {
       "id": 7,
       "prompt": "После extract --episode-id facts есть, но evidence omitted. Хочу компактный результат дальше. А что если пусто на произвольном тексте?",
-      "expected_output": "Facts and evidence omission are separate, shared JSON evidence cap 4 KiB; --compact opts out. Free-form extraction is heuristic; empty canonical facts does not mean episode is unavailable to fallback. Preserve IDs and report verified/episode-only/error truthfully.",
+      "expected_output": "Facts and evidence omission are separate, shared JSON evidence cap 4 KiB; --compact opts out. Free-form extraction is heuristic; empty canonical facts does not mean episode is unavailable to fallback. Preserve IDs and report verified/episode-only/pending according to structured status and guidance.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Extraction returned status=partial, an episode_id, empty facts, and guidance saying extraction is pending and retry is safe. The CLI exited 0. Is capture finished? What should you report and do next?",
+      "expected_output": "Report pending, preserve episode_id, follow retry guidance. Do not classify episode-only or verified from empty facts or exit zero; episode-only requires completed successful extraction with no facts.",
       "files": []
     }
   ]

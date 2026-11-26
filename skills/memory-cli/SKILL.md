@@ -10,7 +10,7 @@ Use the CLI for shell scripts, one-shot automation, hooks, server operation,
 filesystem ingestion, and re-embedding. Do not route an MCP-connected agent
 through the shell merely because the CLI exposes equivalent memory operations.
 
-Choose one branch — capture, canonicalize, recall, serve, or re-embed —
+Choose one branch — capture/import, canonicalize, recall, serve, or re-embed —
 before running a command.
 
 ## Principles
@@ -55,9 +55,12 @@ Exact flags remain behind that pointer; this file owns behavior and order.
 
 3. **Extract and inspect.** Run `memory_mcp extract --episode-id ...`. Inspect
    facts and warnings rather than treating exit zero as fact capture. Free-form
-   extraction is heuristic, not guaranteed empty or guaranteed successful.
-   Prefer verified structured summaries for explicit decisions. Evidence pairs
-   default on, with a shared 4 KiB JSON budget; `--compact` omits them.
+   extraction is heuristic. Read structured `status` and `guidance`: partial or
+   pending extraction remains `pending` even with exit zero. Only completed
+   successful extraction with no facts is `episode-only`; source fallback may
+   still return the episode. Read the
+   [evidence rules](references/commands.md#evidence-and-bounded-provenance)
+   before interpreting omitted evidence or requesting compact output.
 
    *Completion:* classify the result as `verified`, `episode-only`, or
    `pending`.
@@ -109,8 +112,8 @@ or startup is reported failed with the process status and diagnostic.
    feature is required; official release binaries include it).
 3. Observe per-file results through the episode/fact store; distinguish
    successful revision processing, skipped files, and failures.
-4. Report revision outcomes; failures are retried once per startup and never
-   stop MCP.
+4. Report revision outcomes; failed revisions become eligible again at startup, with up to three
+   processing attempts. A failed file never stops MCP.
 
 *Completion:* the inbox boundary and processed-revision counts are known;
 failures remain actionable and no directory outside the intended boundary was

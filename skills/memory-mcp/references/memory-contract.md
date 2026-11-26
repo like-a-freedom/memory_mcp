@@ -47,13 +47,13 @@ complete. Current assembly is a logical read that can persist access heat.
 | State | Meaning |
 |---|---|
 | `verified` | episode stored and returned facts inspected |
-| `episode-only` | episode stored and extraction returned no durable facts |
-| `pending` | the call failed or timed out; known handles preserved |
+| `episode-only` | episode stored and completed successful extraction returned no durable facts |
+| `pending` | extraction is partial/pending, or the call failed/timed out; known handles preserved |
 | `assembled` | returned context inspected within the stated boundary |
 | `cited` | every used claim has source provenance |
 
 Never collapse `episode-only`, `pending`, and `verified` into “captured.”
-No extracted facts confirms no canonical fact capture, not loss of the episode:
+After completed successful extraction, no facts confirms no canonical fact capture, not loss of the episode:
 source fallback can still return stored source text. Empty recall is bounded
 retrieval evidence, not absence from reality.
 
@@ -62,7 +62,9 @@ retrieval evidence, not absence from reality.
 - Invalid time: correct it to the source's actual ISO 8601 time.
 - Source conflict: retain the original, use a new identity for changed evidence,
   then reconcile superseded facts.
-- Empty extraction: report `episode-only`.
+- Completed successful extraction with no facts: report `episode-only`.
+- Partial/pending extraction: preserve `episode_id`, report `pending`, and follow
+  retry guidance even when the CLI exits zero.
 - Failure or timeout: preserve identifiers, report `pending`, and retry only
   according to returned guidance and idempotency guarantees.
 - Empty recall: reframe terms within the same authorized boundary.

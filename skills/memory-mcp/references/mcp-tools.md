@@ -25,7 +25,9 @@ operations, not literal callable names. Tool schemas remain authoritative.
 new episode (default `source_type` `ad-hoc`) before extracting, so it is not a
 way to re-extract stored content — pass `episode_id` for that. Free-form extraction uses source-type-dependent heuristics and can produce
 facts, a fallback note or no durable facts. Inspect the actual result; do not
-classify by input format alone. An empty fact set is `episode-only`. Structured
+classify by input format alone. Check `status` and `guidance` first: partial or
+pending extraction stays `pending`, preserving `episode_id` for retry. Only a
+completed successful extraction with no facts is `episode-only`. Structured
 summaries and `ingestion_review` are recovery options, not guaranteed outcomes.
 
 Arguments use flat `snake_case` fields. Do not wrap them in `payload`. Inspect
