@@ -1,0 +1,188 @@
+{
+  "schema": "memory-mcp-long-history-diagnosis/v1",
+  "answer_contract": "strict normalized phrase-set equality against independently reviewed accepted answers; unlisted valid paraphrases may be false negatives",
+  "stage_contract": "full-span absence is conservative; marker presence alone never establishes semantic sufficiency; missing intermediate receipts stay unknown",
+  "selected": 7,
+  "correct": 2,
+  "complete_reviewed_spans": 2,
+  "reader_failures_with_complete_evidence": 1,
+  "latency_seconds": {
+    "observed": 7,
+    "median": 423.7366930839926,
+    "max": 991.3283737919992
+  },
+  "cases": {
+    "0c6b0c60": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "Past 24 hours": true,
+        "Past week": false,
+        "Past month": false,
+        "Past year": false,
+        "All time": false
+      },
+      "context_nonempty": true,
+      "context_tokens": 3463,
+      "context_was_truncated": false,
+      "answer_kind": "closed_list",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Past hour, Past 24 hours, Past week, Past month, Past year, All time",
+      "reader_verdict": "incorrect",
+      "failure_localization": "end_to_end_failure_stage_unknown",
+      "query_seconds": 283.93214641600207
+    },
+    "6d975a08": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "delivered_support_markers": {
+        "link 'Forums'": true,
+        "link 'Tags'": true,
+        "link 'Alphabetical'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3564,
+      "context_was_truncated": false,
+      "answer_kind": "closed_list",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Forums, Tags, Alphabetical",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 423.7366930839926
+    },
+    "89a20f48": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "link 'All time'": false,
+        "image 'A tense emoji'": false
+      },
+      "context_nonempty": true,
+      "context_tokens": 3543,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Past year",
+      "reader_verdict": "incorrect",
+      "failure_localization": "end_to_end_failure_stage_unknown",
+      "query_seconds": 293.99168966599973
+    },
+    "922a0c56": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "button 'Reset'": false,
+        "button 'Create Order'": false
+      },
+      "context_nonempty": true,
+      "context_tokens": 3532,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Send Email",
+      "reader_verdict": "incorrect",
+      "failure_localization": "end_to_end_failure_stage_unknown",
+      "query_seconds": 932.6596997919987
+    },
+    "d6da3938": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "button 'Create Order'": true,
+        "button 'Reset Password'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 1473,
+      "context_was_truncated": false,
+      "answer_kind": "single_value",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Reset Password",
+      "reader_verdict": "correct",
+      "failure_localization": "no_failure_under_registered_answer_contract",
+      "query_seconds": 991.3283737919992
+    },
+    "f43926d9": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": true,
+      "delivered_support_markers": {
+        "link 'Tags'": true,
+        "link 'Alphabetical'": true
+      },
+      "context_nonempty": true,
+      "context_tokens": 3598,
+      "context_was_truncated": false,
+      "answer_kind": "false_premise",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "Forums",
+      "reader_verdict": "incorrect",
+      "failure_localization": "reader_use_with_complete_reviewed_evidence",
+      "query_seconds": 404.02128499999526
+    },
+    "f61a096f": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "source_input": "verified_reviewed_span",
+      "formation": "unknown_no_intermediate_receipt",
+      "evidence_selection": "unknown_no_intermediate_receipt",
+      "packaging": "unknown_no_prepackaging_receipt",
+      "delivered_complete_reviewed_span": false,
+      "delivered_support_markers": {
+        "button '\\ue626 Back'": false,
+        "button 'Login as Customer'": false,
+        "button 'Delete Customer'": false,
+        "button 'Reset'": false,
+        "button 'Create Order'": false,
+        "button 'Reset Password'": false,
+        "button 'Force Sign-In'": false,
+        "button 'Save and Continue Edit'": false,
+        "button 'Save Customer'": false
+      },
+      "context_nonempty": true,
+      "context_tokens": 2939,
+      "context_was_truncated": false,
+      "answer_kind": "count",
+      "reader_context_link": "verified_context_digest",
+      "reader_answer": "two",
+      "reader_verdict": "incorrect",
+      "failure_localization": "end_to_end_failure_stage_unknown",
+      "query_seconds": 786.4954090829997
+    }
+  },
+  "input_sha256": {
+    "cohort": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+    "trajectories": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+    "truth": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+    "prompts": "e9196e34c5dba3c77596b6b151f376ab23427c926dec7fd6a581164bdc837ea3",
+    "readers": "c1a2c673d4f77cf543e78179046482e79ac97b75246716205aa0ecb98b9a989c"
+  },
+  "input_paths": {
+    "cohort": "evals/longmemeval_v2/small-web-text-cohort.json",
+    "trajectories": "target/c4-native/cohort/trajectories.json",
+    "truth": "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json",
+    "prompts": "evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/prompt_rows.jsonl",
+    "readers": "evals/longmemeval_v2/results/2026-11-26-current-master-repeat/run-01/scoring-replay-concise-v1/reader_outputs.jsonl"
+  }
+}

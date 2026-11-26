@@ -459,7 +459,12 @@ fn verify_primary_score(raw: &Value, case: &super::receipts::ReplayCase) -> Resu
             super::normalization::normalize_observation(std::slice::from_ref(response), &bindings)
         })
         .collect::<Result<Vec<_>, _>>()?;
-    super::enforce_repeatability(&mut score, &observations);
+    super::enforce_primary_reads(
+        &mut score,
+        &observations,
+        (expected_source == "primary").then_some(&oracle),
+        usize::try_from(budget).map_err(|_| invalid("scoring budget overflow"))?,
+    );
     if raw["score"] != super::replay_score(&score)
         || case.evidence_success != Some(score.evidence_success)
         || case.decision_success != Some(score.decision_success)

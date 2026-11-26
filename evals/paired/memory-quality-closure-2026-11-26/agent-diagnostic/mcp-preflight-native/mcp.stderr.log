@@ -1,0 +1,3 @@
+2026-11-26T07:45:01.988063Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-26T07:45:01.988163Z  WARN surrealdb::core::kvs::ds: [redacted]
+{"error":"config invalid: MEMORY_INGESTION_INBOX must be a non-empty absolute directory path","exit_code":1,"hint":"Check the environment values or run `memory_mcp init` to print a known-good configuration.","kind":"ConfigInvalid"}

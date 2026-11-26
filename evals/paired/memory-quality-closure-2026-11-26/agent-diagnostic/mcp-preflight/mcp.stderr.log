@@ -1,0 +1,2 @@
+2026-11-26T07:44:38.988417Z ERROR  op=main.startup_failed  error=[redacted]
+{"error":"storage error: SurrealDB embedded init failed: There was a problem with the datastore: IO error: Operation not permitted (os error 1)","exit_code":1,"kind":"Storage"}

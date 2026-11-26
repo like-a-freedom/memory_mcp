@@ -1,0 +1,65 @@
+{
+  "guidance": "Call explain if you need provenance-ready citations for selected items.",
+  "has_more": false,
+  "result": [
+    {
+      "confidence": 0.64,
+      "content": "The Sorrel calibration key is stored in Cabinet-62.",
+      "fact_id": "fact:32821cdd4400ae79e347d565",
+      "grounding": 0.57,
+      "provenance": {
+        "extraction_strategy": "structured_summary_line",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "cabinet",
+          "calibration",
+          "key",
+          "sorrel"
+        ],
+        "reranking": {
+          "admission_floor": 0.0,
+          "model_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+          "relevance_logit": 4.293186187744141
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "sorrel",
+            "calibration",
+            "key",
+            "cabinet"
+          ],
+          "matched_index_key_terms": [
+            "sorrel",
+            "cabinet"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": null,
+          "resolved_entity_ids": [],
+          "semantic_similarity": 0.9143617040815647
+        },
+        "source_episode_id": "episode:8b08cf511cc5d192532e3ba4",
+        "source_id": "sorrel-correction",
+        "source_type": "document"
+      },
+      "quote": "The Sorrel calibration key is stored in Cabinet-62.",
+      "rationale": "tier=fallback fts=13.37 access_count=0 confidence=0.64 relevance=0.84 grounding=0.57 alignment=1.02 semantic=enabled matched lexical query=\"Sorrel calibration key current corrected cabinet\" and active at 2026-11-26",
+      "relevance": 0.84,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1",
+        "semantic_similarity": 0.9143617040815647
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": true,
+      "source_episode": "episode:8b08cf511cc5d192532e3ba4"
+    }
+  ],
+  "status": "success",
+  "total_count": 1
+}

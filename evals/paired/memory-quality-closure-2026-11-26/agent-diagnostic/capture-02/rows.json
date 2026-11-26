@@ -1,0 +1,251 @@
+[
+  {
+    "case": "ordinary",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "query": "Larch transfer approved retry cap",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "ordinary",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "query": "Larch transfer approved retry cap",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "ordinary",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "47",
+      "source_ids": [
+        "episode:da7fe6b896b3261d55b37490"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "correction-selector",
+    "arm": "registered_query",
+    "expected": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "query": "Sorrel calibration key current corrected cabinet",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "correction-selector",
+    "arm": "selected_query",
+    "expected": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "query": "Sorrel calibration key cabinet location after correction",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "correction-selector",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "actual": {
+      "answer": "Cabinet-62",
+      "source_ids": [
+        "episode:8b08cf511cc5d192532e3ba4"
+      ],
+      "abstain": false
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "registered_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "status": "completed",
+    "query": "Quartz release key approved vault allocation status",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "selected_query",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "status": "completed",
+    "query": "Quartz release key approved vault",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "actual": {
+      "answer": null,
+      "source_ids": [
+        "episode:f1261d1b1a04909136a64ca0"
+      ],
+      "abstain": true
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "abstention_correct": true,
+      "passed": true
+    }
+  }
+]

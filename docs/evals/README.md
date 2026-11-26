@@ -85,6 +85,16 @@ empirical question requires it.
 
 ## Current memory-quality evidence
 
+The [November 26 quality audit closure](MEMORY_QUALITY_CLOSURE_2026-11-26.md)
+is the current consolidated interpretation. Stronger public CLI controls reject
+wrong numeric assertions and changed repeated reads; the eight-case native gate
+still passes. Closed extraction expectations now honestly report 4/9 cases
+passed (entity precision .60, recall 1.00, F1 .75), rather than accepting extras.
+The seven frozen long-history answers are 2/7 under strict reviewed truth;
+earlier 3/7 replay scoring accepted an unsupported extra list member. This is a
+diagnostic slice, not an official aggregate score. See the report for stage
+unknowns, the fresh bounded query/reader diagnostic and prioritized repair criteria.
+
 The registered [deterministic candidate gate](DETERMINISTIC_MEMORY_QUALITY.md)
 passed the development and separate confirmation histories. The
 [v10 default comparison](../../evals/paired/memory-decisions-v10-baseline-2026-11-23/README.md)

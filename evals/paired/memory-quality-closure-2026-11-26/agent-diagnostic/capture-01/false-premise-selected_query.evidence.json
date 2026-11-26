@@ -1,0 +1,63 @@
+{
+  "guidance": "Call explain if you need provenance-ready citations for selected items.",
+  "has_more": false,
+  "result": [
+    {
+      "confidence": 0.64,
+      "content": "The Quartz release key vault allocation is pending. No vault has been approved for the Quartz release key.",
+      "fact_id": "fact:604c9e08f6787f2267effe3d",
+      "grounding": 0.75,
+      "provenance": {
+        "extraction_strategy": "structured_summary_line",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "approved",
+          "key",
+          "quartz",
+          "release",
+          "vault"
+        ],
+        "reranking": {
+          "admission_floor": 0.0,
+          "model_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+          "relevance_logit": 10.272984504699707
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "release",
+            "key",
+            "approved",
+            "vault"
+          ],
+          "matched_index_key_terms": [],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": null,
+          "resolved_entity_ids": [],
+          "semantic_similarity": 0.9061018994100061
+        },
+        "source_episode_id": "episode:f1261d1b1a04909136a64ca0",
+        "source_id": "quartz-pending",
+        "source_type": "document"
+      },
+      "quote": "The Quartz release key vault allocation is pending. No vault has been approved for the Quartz release key.",
+      "rationale": "tier=direct fts=13.88 access_count=1 confidence=0.64 relevance=0.92 grounding=0.75 alignment=1.07 semantic=enabled matched lexical query=\"Quartz release key approved vault\" and active at 2026-11-26",
+      "relevance": 0.92,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1",
+        "semantic_similarity": 0.9061018994100061
+      },
+      "retrieval_tier": "direct",
+      "semantic_available": true,
+      "source_episode": "episode:f1261d1b1a04909136a64ca0"
+    }
+  ],
+  "status": "success",
+  "total_count": 1
+}

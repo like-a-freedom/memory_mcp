@@ -34,6 +34,8 @@ struct SetupEpisode {
 }
 
 #[derive(Debug, Deserialize)]
+// Entity names and contradiction warnings are complete (closed-world) labels:
+// missing labels AND additional predictions fail. Fact types are required coverage.
 struct ExtractionExpectation {
     #[serde(default)]
     fact_types: Vec<String>,
@@ -54,9 +56,9 @@ fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/extraction_cases.json")
 }
 
-fn load_cases() -> Result<Vec<ExtractionEvalCase>, EvalError> {
-    let raw = std::fs::read_to_string(fixture_path()).map_err(|source| EvalError::Io {
-        path: fixture_path(),
+fn load_cases(path: &std::path::Path) -> Result<Vec<ExtractionEvalCase>, EvalError> {
+    let raw = std::fs::read_to_string(path).map_err(|source| EvalError::Io {
+        path: path.to_path_buf(),
         source,
     })?;
     serde_json::from_str(&raw).map_err(EvalError::Artifact)
@@ -117,9 +119,9 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         {
             return EvalCaseOutcome {
                 case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
-                mode: EvalMode::RetrievalOnly,
-                split: CorpusSplit::Test,
-                label_trust: LabelTrust::Official,
+                mode: EvalMode::EndToEnd,
+                split: CorpusSplit::Development,
+                label_trust: LabelTrust::Reviewed,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
                 evidence: std::collections::BTreeMap::new(),
@@ -140,7 +142,7 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
                     case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: CorpusSplit::Development,
-                    label_trust: LabelTrust::Official,
+                    label_trust: LabelTrust::Reviewed,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
                     evidence: std::collections::BTreeMap::new(),
@@ -175,17 +177,18 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
     let matched_entities = expected_entities
         .intersection(&result.predicted_entities)
         .count();
-    let matched_warnings = case
-        .expected
-        .warnings
-        .iter()
-        .filter(|expected| {
-            result
-                .warnings
-                .iter()
-                .any(|actual| warning_matches(expected, actual))
-        })
-        .count();
+    // Match each warning at most once: duplicate or unrelated warnings are extras.
+    let mut unmatched_warnings = result.warnings.iter().collect::<Vec<_>>();
+    let mut matched_warnings = 0;
+    for expected in &case.expected.warnings {
+        if let Some(index) = unmatched_warnings
+            .iter()
+            .position(|actual| warning_matches(expected, actual))
+        {
+            unmatched_warnings.remove(index);
+            matched_warnings += 1;
+        }
+    }
 
     let entity_tp = matched_entities as u64;
     let entity_fp = (result.predicted_entities.len() as u64).saturating_sub(entity_tp);
@@ -223,14 +226,11 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         evidence_map.insert("classification".to_string(), classification);
     }
 
-    let warnings_passed = if case.expected.warnings.is_empty() {
-        result.warnings.is_empty()
-    } else {
-        matched_warnings == case.expected.warnings.len()
-    };
+    let warnings_passed =
+        matched_warnings == case.expected.warnings.len() && unmatched_warnings.is_empty();
 
     let case_passed = matched_fact_types == expected_fact_types.len()
-        && matched_entities == expected_entities.len()
+        && result.predicted_entities == expected_entities
         && warnings_passed;
 
     let status = if case_passed {
@@ -246,11 +246,25 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
             expected_fact_types.len()
         ));
     }
+    if entity_fp > 0 {
+        failures.push(format!(
+            "unexpected entities: {}",
+            result
+                .predicted_entities
+                .difference(&expected_entities)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     if matched_entities != expected_entities.len() {
         failures.push(format!(
             "entities: {matched_entities}/{}",
             expected_entities.len()
         ));
+    }
+    if !unmatched_warnings.is_empty() {
+        failures.push(format!("unexpected warnings: {}", unmatched_warnings.len()));
     }
     if !warnings_passed {
         failures.push(format!(
@@ -263,7 +277,7 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
         mode: EvalMode::EndToEnd,
         split: CorpusSplit::Development,
-        label_trust: LabelTrust::Official,
+        label_trust: LabelTrust::Reviewed,
         status,
         metrics,
         evidence: evidence_map,
@@ -275,18 +289,25 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
 }
 
 pub struct ExtractionSuite {
+    fixture_path: PathBuf,
     expected_ids: Vec<EvalCaseId>,
     reducer: crate::reducer::ClassificationReducer,
 }
 
 impl ExtractionSuite {
     pub fn new() -> Result<Self, EvalError> {
-        let cases = load_cases()?;
+        Self::from_fixture_path(fixture_path())
+    }
+
+    /// Load project-reviewed development cases from an explicit input file.
+    pub fn from_fixture_path(fixture_path: PathBuf) -> Result<Self, EvalError> {
+        let cases = load_cases(&fixture_path)?;
         let expected_ids = cases
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
+            fixture_path,
             expected_ids,
             reducer: crate::reducer::ClassificationReducer::new("extraction", "entity"),
         })
@@ -311,15 +332,60 @@ impl EvalSuite for ExtractionSuite {
         &self.reducer
     }
 
+    fn fingerprint_metadata(&self) -> std::collections::BTreeMap<String, String> {
+        use sha2::Digest;
+        let mut metadata = std::collections::BTreeMap::from([
+            (
+                "metric_version".into(),
+                "extraction-v2-closed-expectations".into(),
+            ),
+            ("label_trust".into(), "reviewed".into()),
+            (
+                "expectation_policy".into(),
+                "entities=closed;warnings=closed;fact_types=required".into(),
+            ),
+            (
+                "grader_source_sha256".into(),
+                hex::encode(sha2::Sha256::digest(include_bytes!("extraction.rs"))),
+            ),
+        ]);
+        if let Ok(bytes) = std::fs::read(&self.fixture_path) {
+            metadata.insert(
+                "fixture_sha256".into(),
+                hex::encode(sha2::Sha256::digest(bytes)),
+            );
+        }
+        metadata
+    }
+
+    async fn run_with_deadline(
+        &self,
+        context: &RunContext,
+        deadline: std::time::Instant,
+    ) -> Vec<EvalCaseOutcome> {
+        match tokio::time::timeout_at(deadline.into(), self.run(context)).await {
+            Ok(outcomes) => outcomes,
+            Err(_) => context
+                .interrupted_outcomes(self)
+                .into_iter()
+                .map(|mut outcome| {
+                    outcome.split = CorpusSplit::Development;
+                    outcome.label_trust = LabelTrust::Reviewed;
+                    outcome
+                })
+                .collect(),
+        }
+    }
+
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
-        let cases = match load_cases() {
+        let cases = match load_cases(&self.fixture_path) {
             Ok(cases) => cases,
             Err(err) => {
                 return vec![EvalCaseOutcome {
                     case_key: CaseKey::parse("extraction", "fixture-load-error").unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: CorpusSplit::Development,
-                    label_trust: LabelTrust::Official,
+                    label_trust: LabelTrust::Reviewed,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
                     evidence: std::collections::BTreeMap::new(),
@@ -346,13 +412,13 @@ mod tests {
 
     #[test]
     fn fixture_loads() {
-        let cases = load_cases().unwrap();
+        let cases = load_cases(&fixture_path()).unwrap();
         assert!(!cases.is_empty());
     }
 
     #[tokio::test]
     async fn single_extraction_case_produces_valid_outcome() {
-        let cases = load_cases().unwrap();
+        let cases = load_cases(&fixture_path()).unwrap();
         let case = &cases[0];
         let outcome = run_case(case).await;
         assert_eq!(outcome.suite_id(), "extraction");

@@ -1,0 +1,176 @@
+{
+  "all_cases_pass": true,
+  "baseline_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "product_revision": "1e56a992",
+    "suite_id": "memory-decisions"
+  },
+  "candidate_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "product_revision": "ci-current",
+    "suite_id": "memory-decisions"
+  },
+  "cases": [
+    {
+      "case_id": "v10-absent-target",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-similar-name",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-current-snapshot",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-peer-conflict",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-unverified-correction",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-prior-knowledge",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-valid-boundary",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "v10-ordinary-location",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    }
+  ],
+  "counts": {
+    "failed": 0,
+    "invalid": 0,
+    "passed": 8,
+    "unobserved": 0
+  },
+  "current_failures": [],
+  "execution_status": "scored",
+  "grader_identity": {
+    "binary_sha256": "4da38c77e9e97a692138170c9e33c3b49f188cf34aa4870aabfeef69f0324fe8",
+    "comparison_sha256": "a02149e8e7e4dd32ec102f57473c21e8b2e1818a535f0a13e3816c18835a3055",
+    "normalizer_sha256": "9a87982dde02730ae6839515df78297687ea5a4469537fec3bf04b31619c5caf",
+    "protocol": "memory-current-regression/v1",
+    "registration_sha256": "43e47143a979285bf68777ba20837e8c03b8b7f4192e15548ed5a42dcef7ed01",
+    "scorer_sha256": "3e051e3313a98b28109a228967d810c0dbce7bea542021fc2b8dc1d197752502",
+    "verification_sha256": "ca4496eb42c4eabf6854e42c261e6cad4af68802f5c1460ae3f3ba3b8027ba35"
+  },
+  "inputs": {
+    "baseline": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+    "baseline_index_sha256": "665c7a9799df8b95d4e3728ad4b2497abfe60b20f3deb97b2b2aef770028e903",
+    "candidate": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/memory-quality-closure-2026-11-26/native-gate/current/index.json",
+    "candidate_index_sha256": "76b758a0eec181ddbebcb6895ac7a5dd345685303b6b685e1786b13ae6310094",
+    "corpus": "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/memory-decisions-v10"
+  },
+  "no_regressions": true,
+  "regressions": [],
+  "schema_version": "memory-current-regression/v1"
+}

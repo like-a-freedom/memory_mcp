@@ -522,7 +522,13 @@ fn run_corpus(
                                             probe.budget,
                                             selected.time_contract_supported,
                                         );
-                                        enforce_repeatability(&mut score, &primary.observations);
+                                        enforce_primary_reads(
+                                            &mut score,
+                                            &primary.observations,
+                                            (selected.source == ScoringObservationSource::Primary)
+                                                .then_some(oracle),
+                                            probe.budget,
+                                        );
                                         score
                                     })
                                 });
@@ -1257,40 +1263,59 @@ fn supports_temporal_revision(schemas: &Value) -> bool {
     properties.get("valid_at").is_some() && properties.get("known_revision").is_some()
 }
 
-fn enforce_repeatability(score: &mut ProbeScore, observations: &[Observed]) {
+fn enforce_primary_reads(
+    score: &mut ProbeScore,
+    observations: &[Observed],
+    oracle: Option<&DecisionOracle>,
+    budget: usize,
+) {
+    for observation in observations {
+        // Only apply the oracle to its registered request axes. An ordinary
+        // latest read cannot be scored against a historical snapshot value.
+        let Some(oracle) = oracle else {
+            continue;
+        };
+        let read_score = score_probe(oracle, observation, budget, true);
+        if !read_score.evidence_success {
+            score.evidence_success = false;
+            score.probe_success = false;
+            score
+                .reason_codes
+                .extend(read_score.reason_codes.into_iter().filter(|reason| {
+                    matches!(
+                        reason,
+                        ScoreReason::MissingEvidence
+                            | ScoreReason::WrongAssertion
+                            | ScoreReason::ForbiddenSource
+                            | ScoreReason::UnboundSource
+                            | ScoreReason::BudgetExceeded
+                    )
+                }));
+        }
+    }
     if observations.len() > 1 && !observations_repeat(observations) {
         score.evidence_success = false;
         score.decision_success = false;
         score.probe_success = false;
         score.reason_codes.push(ScoreReason::Nonrepeatable);
     }
+    score
+        .reason_codes
+        .sort_by_key(|reason| serde_json::to_string(reason).unwrap_or_default());
+    score.reason_codes.dedup();
 }
 
 fn observations_repeat(observations: &[Observed]) -> bool {
     let Some(first) = observations.first() else {
         return false;
     };
-    let key = observation_key(first);
-    observations
-        .iter()
-        .skip(1)
-        .all(|observed| observation_key(observed) == key)
-}
-
-fn observation_key(observed: &Observed) -> (Vec<Option<String>>, Vec<String>, String) {
-    (
-        observed
-            .sources
-            .iter()
-            .map(|source| source.event_id.clone())
-            .collect(),
-        observed
-            .sources
-            .iter()
-            .map(|source| source.role.as_str().to_string())
-            .collect(),
-        format!("{:?}", observed.disposition),
-    )
+    observations.iter().skip(1).all(|observed| {
+        observed.sources == first.sources
+            && observed.disposition == first.disposition
+            && observed.item_count == first.item_count
+            && observed.budget_used == first.budget_used
+            && observed.relation_outcomes == first.relation_outcomes
+    })
 }
 
 struct SuccessfulReceipt<'a> {

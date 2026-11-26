@@ -1,0 +1,102 @@
+{
+  "schema": "memory-mcp-long-history-truth/v1",
+  "provenance": "Independent reviewed-source rules based on pinned source states and complete menus/toolbars; accepted answers are independent of archived reader/scorer outputs. Development diagnostic only. No exhaustive semantic paraphrase claim.",
+  "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+  "cases": {
+    "0c6b0c60": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "answer_kind": "closed_list",
+      "accepted_answers": [
+        "Past 24 hours, Past week, Past month, Past year, All time"
+      ],
+      "support_markers": [
+        "Past 24 hours",
+        "Past week",
+        "Past month",
+        "Past year",
+        "All time"
+      ]
+    },
+    "6d975a08": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "answer_kind": "closed_list",
+      "accepted_answers": [
+        "Forums, Tags, Alphabetical"
+      ],
+      "support_markers": [
+        "link 'Forums'",
+        "link 'Tags'",
+        "link 'Alphabetical'"
+      ]
+    },
+    "89a20f48": {
+      "reviewed_span_sha256": "a4f1d9bbe14362704ceb31c6847a0e8e84be126b3f5ac8cb056503604411b226",
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "There is no such option. All time is the last time-range entry.",
+        "None",
+        "No such option"
+      ],
+      "support_markers": [
+        "link 'All time'",
+        "image 'A tense emoji'"
+      ]
+    },
+    "922a0c56": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "there is no such button because Reset and Create Order are next to each other",
+        "None",
+        "No such button"
+      ],
+      "support_markers": [
+        "button 'Reset'",
+        "button 'Create Order'"
+      ]
+    },
+    "d6da3938": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Reset Password"
+      ],
+      "support_markers": [
+        "button 'Create Order'",
+        "button 'Reset Password'"
+      ]
+    },
+    "f43926d9": {
+      "reviewed_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "There is no browse tab between Tags and Alphabetical there.",
+        "None",
+        "No such tab"
+      ],
+      "support_markers": [
+        "link 'Tags'",
+        "link 'Alphabetical'"
+      ]
+    },
+    "f61a096f": {
+      "reviewed_span_sha256": "4d6ebc9eddee4bfad9cbe5f406aa3319100e321c808ed5923de1eb77a333d844",
+      "answer_kind": "count",
+      "accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "support_markers": [
+        "button '\\ue626 Back'",
+        "button 'Login as Customer'",
+        "button 'Delete Customer'",
+        "button 'Reset'",
+        "button 'Create Order'",
+        "button 'Reset Password'",
+        "button 'Force Sign-In'",
+        "button 'Save and Continue Edit'",
+        "button 'Save Customer'"
+      ]
+    }
+  }
+}

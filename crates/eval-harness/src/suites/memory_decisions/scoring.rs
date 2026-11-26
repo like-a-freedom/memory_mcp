@@ -273,7 +273,51 @@ pub(super) fn score_probe(
 }
 
 fn contains_assertion(content: &str, assertion: &str) -> bool {
-    content.to_lowercase().contains(&assertion.to_lowercase())
+    let content = content
+        .to_lowercase()
+        .replace("n't", " not")
+        .replace("n’t", " not");
+    let assertion = assertion.to_lowercase();
+    if assertion.is_empty() {
+        return false;
+    }
+    // The corpus declares literal assertions, not semantic paraphrases. Match a
+    // complete literal at token boundaries; a digit prefix changes its value.
+    content.match_indices(&assertion).any(|(start, matched)| {
+        let end = start + matched.len();
+        let before = &content[..start];
+        let after = &content[end..];
+        let numeric = assertion.starts_with(|c: char| c.is_ascii_digit());
+        let joins = |c: char| {
+            c.is_alphanumeric() || c == '_' || (numeric && matches!(c, '.' | ',' | '-' | '+'))
+        };
+        let suffix_word = after
+            .split(|c: char| !c.is_alphanumeric())
+            .find(|word| !word.is_empty());
+        if before.chars().next_back().is_some_and(joins)
+            || after
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_alphanumeric() || c == '_')
+            || (numeric
+                && (after.trim_start().starts_with(['/', '*', '^'])
+                    || matches!(suffix_word, Some("per" | "each"))))
+        {
+            return false;
+        }
+        // Conservative polarity for the closed literal fixtures. This does not
+        // claim general natural-language entailment or calibrated NLU quality.
+        let clause_start = before
+            .rfind(['\n', ';', '.', '!', '?'])
+            .map_or(0, |i| i + 1);
+        let clause_end = after
+            .find(['\n', ';', '.', '!', '?'])
+            .unwrap_or(after.len());
+        let clause = &content[clause_start..end + clause_end];
+        !clause
+            .split(|c: char| !c.is_alphanumeric())
+            .any(|word| matches!(word, "not" | "never" | "no" | "cannot" | "не" | "ни"))
+    })
 }
 
 #[cfg(test)]

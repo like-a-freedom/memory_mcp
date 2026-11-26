@@ -1,0 +1,112 @@
+{
+  "schema": "memory-mcp-bounded-public-long-history-comparator/v1",
+  "host": {
+    "architecture": "arm64",
+    "os": "Darwin"
+  },
+  "binary_source_revision": "9b13b9782b1e050c2cdfcacf26732119b1338f0c",
+  "binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+  "source_span_sha256": "a3adb2388df80b78bf9f4a315d0329165fcac4a5aaccf077dc2b06fe284bfdff",
+  "history": [
+    {
+      "id": "reviewed-directory-miniature",
+      "states": [
+        {
+          "state_index": 0,
+          "accessibility_tree": "\t[107] main '', visible\n\t\t[108] list '', visible\n\t\t\t[109] listitem '', visible\n\t\t\t\t[110] link 'Forums', clickable, visible\n\t\t\t[111] listitem '', visible\n\t\t\t\t[112] link 'Tags', clickable, visible\n\t\t\t[113] listitem '', visible\n\t\t\t\t[114] link 'Alphabetical', clickable, visible\n\t\t[115] heading 'All forums', visible"
+        }
+      ]
+    },
+    {
+      "id": "unrelated-shipping",
+      "states": [
+        {
+          "state_index": 0,
+          "accessibility_tree": "Shipping dashboard: parcel delivery takes five business days. Warehouse contact: Robin."
+        }
+      ]
+    },
+    {
+      "id": "unrelated-weather",
+      "states": [
+        {
+          "state_index": 0,
+          "accessibility_tree": "Weather dashboard: Oslo forecast is cloudy. Temperature: seven degrees."
+        }
+      ]
+    }
+  ],
+  "history_sha256": "ca72ec073b34adb8df6485c98fbc39a8564e9c9a5d490ec6ff1c4d3c931babc8",
+  "limits": {
+    "cli_timeout_seconds": 15,
+    "maximum_cli_calls": 8,
+    "remote_calls": 0,
+    "reader_model_calls": 0
+  },
+  "operations": [
+    {
+      "operation": "insert_required",
+      "status": "completed",
+      "output": null,
+      "elapsed_seconds": 6.347
+    },
+    {
+      "operation": "query_required_alone",
+      "status": "completed",
+      "output": [
+        {
+          "type": "text",
+          "value": "{\"id\": \"reviewed-directory-miniature\", \"states\": [{\"accessibility_tree\": \"\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\", \"state_index\": 0}]}"
+        }
+      ],
+      "complete_reviewed_span": true,
+      "marker_presence": {
+        "Forums": true,
+        "Tags": true,
+        "Alphabetical": true
+      },
+      "elapsed_seconds": 0.262
+    },
+    {
+      "operation": "insert_distractor_shipping",
+      "status": "completed",
+      "output": null,
+      "elapsed_seconds": 0.464
+    },
+    {
+      "operation": "insert_distractor_weather",
+      "status": "completed",
+      "output": null,
+      "elapsed_seconds": 0.521
+    },
+    {
+      "operation": "query_with_distractors",
+      "status": "completed",
+      "output": [
+        {
+          "type": "text",
+          "value": "{\"id\": \"reviewed-directory-miniature\", \"states\": [{\"accessibility_tree\": \"\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\", \"state_index\": 0}]}"
+        }
+      ],
+      "complete_reviewed_span": true,
+      "marker_presence": {
+        "Forums": true,
+        "Tags": true,
+        "Alphabetical": true
+      },
+      "elapsed_seconds": 0.303
+    }
+  ],
+  "interpretation": "Miniature feasibility diagnostic only, not a seven-case rerun or representative long-history benchmark.",
+  "query": "On the All forums directory page, what are the three browse tabs shown above the forum list?",
+  "elapsed_seconds": 7.901,
+  "adapter_stats": {
+    "insert_count": 3,
+    "query_count": 2,
+    "insert_time_secs": 7.333,
+    "query_time_secs": 0.565,
+    "query_copy_time_secs": 0.017,
+    "query_cli_time_secs": 0.542
+  },
+  "result": "completed; compare required-alone and distractor contexts without inferring unobserved internal stages"
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "memory-quality-evidence-closure/v1",
+  "created_at": "2026-11-26T07:56:08.414202+00:00",
+  "precommit_head": "9b13b9782b1e050c2cdfcacf26732119b1338f0c",
+  "source_identity": "Modified worktree; per-file hashes below bind actual final sources. HEAD alone does not identify these changes.",
+  "host_arch": "arm64",
+  "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+  "production_source_modified": false,
+  "checks": [
+    {
+      "command": "cargo test -p eval-harness --locked",
+      "exit_code": 0,
+      "log_sha256": "82f8a04d658de9c164a496808f29a9d72a8148a081c259db8f42bf9359279500",
+      "passed": 920,
+      "failed": 0,
+      "ignored": 22,
+      "completed_test_targets": 42
+    },
+    {
+      "command": "MEMORY_DECISIONS_SERVER_BIN=target/debug/memory_mcp MEMORY_QUALITY_GATE_OUTPUT=<fresh-output> cargo test -p eval-harness --test deterministic_quality_gate candidate_meets_frozen_deterministic_memory_quality_gate -- --ignored --nocapture",
+      "exit_code": 0,
+      "log_sha256": "643681d265b90603e7242bac45c017be054c73ddb7282fe5ce1c9866f7ecba28",
+      "passed": 1,
+      "case_probes_passed": 8,
+      "case_probes_scheduled": 8,
+      "observed_test_seconds": 54.9
+    },
+    {
+      "command": "cargo run --locked -p eval-harness --bin memory-eval -- compare-current-memory --baseline <frozen-v10-index> --candidate <new-native-index> --corpus evals/corpora/memory-decisions-v10 --output <fresh-final-grade>",
+      "exit_code": 0,
+      "log_sha256": "bcd37ad688a7c76b9174305689287d91ad0b1957fbdf31b2311ee8abc84a751e",
+      "all_cases_pass": true,
+      "no_regressions": true
+    },
+    {
+      "command": "python3 -m unittest discover -s evals/longmemeval_v2 -p 'test_*.py'",
+      "exit_code": 0,
+      "log_sha256": "35acf85cdf44e6a9829c83fdb8f4385c7f2753a7c1fbfaa9ca0d003cec110a46",
+      "passed": 45,
+      "skipped": 5
+    },
+    {
+      "command": "python3 -m unittest evals.paired.test_memory_quality_diagnostic",
+      "exit_code": 0,
+      "log_sha256": "d1ddf86e2061379245afc6aa54c0ccc21a16e5b01157e11d7815084c73eb6fdf",
+      "passed": 8
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "7c54087ac8664ab48f36bdb8bf540e5835c80ed845c94ce336f6aa7d989a1618"
+    },
+    {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "quality_measurements": {
+    "extraction": {
+      "scheduled": 9,
+      "passed": 4,
+      "quality_failed": 5,
+      "invalid": 0,
+      "true_positives": 12,
+      "false_positives": 8,
+      "false_negatives": 0,
+      "precision": 0.6,
+      "recall": 1.0,
+      "f1": 0.75,
+      "expected_quality_run_exit_code": 1
+    },
+    "frozen_long_history": {
+      "scheduled": 7,
+      "strict_answers_correct": 2,
+      "complete_reviewed_spans": 2,
+      "false_premise_correct": 0,
+      "false_premise_scheduled": 3,
+      "earlier_stage_localization": "unknown_no_intermediate_receipts"
+    },
+    "fresh_reader_diagnostic": {
+      "captures": 2,
+      "scheduled_per_capture": 9,
+      "passed_per_capture": [
+        9,
+        9
+      ],
+      "invalid": 0,
+      "model_timeouts_observed": 0,
+      "model_reader_calls": 18,
+      "model_selector_calls": 6,
+      "observed_total_seconds": 117.06,
+      "c2_eligible": false,
+      "scope": "Fixed source formation and correction; model-selected query plus exact-JSON reader, not autonomous memory treatment qualification."
+    }
+  },
+  "review": {
+    "independent_final_review": "No remaining Important/Critical findings after literal unit/negation corrections and truthful timeout wording.",
+    "additional_root_regression": "Capture result overwrite observed RED, now rejected with prior bytes preserved."
+  },
+  "files_sha256": {
+    "crates/eval-harness/src/suites/extraction.rs": "5f16d11fa7afae26a03bab3872883bb64cfb13db91d6a8b92736e0b47ddac728",
+    "crates/eval-harness/src/suites/memory_decisions.rs": "64ee2b1a3ddd92f15863ee07c6a493284f788d2ab02323e80f4bf416c4718285",
+    "crates/eval-harness/src/suites/memory_decisions/scoring.rs": "1f08b96f8b79fc26ac88c76402b3ce06d3b57c8400629bf3c447ff76a326752f",
+    "crates/eval-harness/src/suites/memory_decisions/verification.rs": "8eaf1070074e49adbed5fdc439e19b58730d6b16304d989c77dae29131671878",
+    "crates/eval-harness/tests/current_memory_regression.rs": "a9c8d0423f2d7e92c2b26e5a8e387f146b74c7965034f5bbbc8a140e584a41cb",
+    "crates/eval-harness/tests/extraction_suite_contract.rs": "0faeedce1fe97b6a4e1dbfbc155f4f7d339d8fb277babf8e7cb434934b8e16b0",
+    "evals/longmemeval_v2/long_history_diagnosis.py": "0363a51bf67129885dde2ce093077bf437f743001038db2e530a7bde4659f698",
+    "evals/longmemeval_v2/test_long_history_diagnosis.py": "372260e7f7a46e0e5c9852957cf814c0a0551b9959727e6e34fba6ef926fec18",
+    "evals/paired/memory_quality_diagnostic.py": "b1c18058cc603ac7211454d5df9d4b8cc043f0760271deb868f8d3495a5eab9a",
+    "evals/paired/test_memory_quality_diagnostic.py": "6d0c3821644d17e166f04c9abe60dac1e228d6b6366d770a40f8a306494232f3",
+    "docs/evals/MEMORY_QUALITY_CLOSURE_2026-11-26.md": "5be7280df1966b40278e235bf98e4e36da36502a4a1666d0b447a47a939e22b1",
+    "docs/evals/EXTRACTION_CLOSED_WORLD_2026-11-26.md": "5ea11ec3e6b2f09099d77e0a8c1cafe75790fc2df1cae82f0ab6f27261d6ba6a",
+    "docs/evals/README.md": "5815dc58611a2eea7ac9e14a8c6d83df062e38f8452ae42f1750afae11d4c698",
+    "docs/superpowers/plans/2026-11-26-memory-quality-evidence-closure.md": "a714373cb13b4a8d46474e184538d1f23a881be91d4afe62e9f8c02530405453"
+  },
+  "evidence_sha256": {
+    "evals/results/extraction-closed-world-2026-11-26.json": "1ee3f9bf796865db5371760f001dfb0c8e6e5877f8bc24275d98c0a1751aa769",
+    "evals/results/extraction-closed-world-2026-11-26.identity.json": "3a542a64c4381eee1fa4d3863a604a71fee8be4c7a0cffa3a9600323a4c225cb",
+    "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/archived-report.json": "8aa1b7908e20c5c2d95a966e8a072a2191082fb8b09825d9646bcc8b79edc6e7",
+    "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/public-comparator-current.json": "7b249c49ab69a1577a3b3cfe26a6514f4f1e4e1984b6c061ebb6b5bceb3fde50",
+    "evals/paired/memory-quality-closure-2026-11-26/native-gate/current-regression-final.json": "8745d66c9132b5c656e339080b9ae7a7f912552f09719b07b14fcd5c19b95e23",
+    "evals/paired/memory-quality-closure-2026-11-26/agent-diagnostic/SHA256SUMS": "486d6ab77a0acfbee3d45ce04fc4da7d184f3a904bec3a1cb2fe3f7f087ae2c6",
+    "evals/paired/memory-quality-closure-2026-11-26/agent-diagnostic/result.json": "f78ab3fa37c46f21bdfc6af288e0212f94425f6cc675fae09b716de46e373cbe"
+  }
+}

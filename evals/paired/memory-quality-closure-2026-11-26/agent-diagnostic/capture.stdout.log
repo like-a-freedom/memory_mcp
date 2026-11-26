@@ -1,0 +1,7 @@
+{
+  "plan_sha256": "4b20dab95779a34415525dcc89b17a80ed9c42e7484d1c9e277d5998321fcb7f",
+  "c2_eligible": false,
+  "c2_reason": "Diagnostic fixed requests and sufficient replies do not establish independently qualified autonomous memory treatment; original C1 stop rule is unchanged.",
+  "second_capture_eligible": true,
+  "elapsed_seconds": 117.06
+}
