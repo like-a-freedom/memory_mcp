@@ -1,5 +1,11 @@
 # Product-default baseline before harness simplification
 
+> **Scope correction, 2026-11-26:** This v9 archive remains historical evidence.
+> Its three ordinary-read role expectations violate ADR-0083, as already resolved
+> in v10. It is no longer the active regression baseline. See the
+> [compatible current baseline](../current-contract-baseline-2026-11-26/README.md).
+
+
 Captured locally on Darwin arm64 on 2026-11-26, using the unchanged production
 source at `ece2b831f678c1ea62f46b1488da7d9165151593`. The build command, binary
 hashes, grader hashes and complete replay identity are in `capture-manifest.json`.

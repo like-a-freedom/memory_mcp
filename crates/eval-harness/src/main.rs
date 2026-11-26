@@ -282,10 +282,12 @@ async fn main() -> std::process::ExitCode {
             let baseline_digest = input_digest(&baseline);
             let candidate_digest = input_digest(&candidate);
             let result = (|| -> Result<_, String> {
-                let baseline = eval_harness::suites::load_registered_replay(&baseline, &corpus)
-                    .map_err(|e| e.to_string())?;
-                let candidate = eval_harness::suites::load_registered_replay(&candidate, &corpus)
-                    .map_err(|e| e.to_string())?;
+                let baseline =
+                    eval_harness::suites::load_current_regression_replay(&baseline, &corpus)
+                        .map_err(|e| e.to_string())?;
+                let candidate =
+                    eval_harness::suites::load_current_regression_replay(&candidate, &corpus)
+                        .map_err(|e| e.to_string())?;
                 eval_harness::suites::compare_current_replays(&baseline, &candidate)
                     .map_err(|e| e.to_string())
             })();

@@ -1,5 +1,5 @@
 //! Native regression gate: one primary capture against a reviewed immutable baseline.
-use eval_harness::suites::{DeterministicAcceptancePlan, load_registered_replay};
+use eval_harness::suites::DeterministicAcceptancePlan;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -297,6 +297,11 @@ fn candidate_meets_frozen_deterministic_memory_quality_gate() {
         .map(PathBuf::from)
         .unwrap_or_else(|| scratch.path().join("quality"));
     std::fs::create_dir(&output).expect("fresh gate output directory");
+    let baseline =
+        root.join("evals/paired/current-contract-baseline-2026-11-26/receipts/index.json");
+    let corpus = root.join("evals/corpora/memory-decisions-v10");
+    eval_harness::suites::load_current_regression_replay(&baseline, &corpus)
+        .expect("reviewed baseline must satisfy current oracle contract before product execution");
     let candidate = run_profile(
         &root,
         &binary,
@@ -304,17 +309,14 @@ fn candidate_meets_frozen_deterministic_memory_quality_gate() {
         "current",
         "evals/profiles/memory_decisions_current.json",
     );
-    let corpus = root.join("evals/corpora/memory-decisions-v9");
     let index_path = candidate.join("index.json");
-    let replay =
-        load_registered_replay(&index_path, &corpus).expect("complete registered current capture");
+    let replay = eval_harness::suites::load_current_regression_replay(&index_path, &corpus)
+        .expect("complete registered current capture");
     assert_eq!(
         serde_json::to_value(&replay).unwrap()["identity"]["product_binary_sha256"],
         sha256(&std::fs::read(&binary).unwrap()),
         "capture must use the invoked binary"
     );
-    let baseline =
-        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"));
     command
         .current_dir(&root)
@@ -336,4 +338,5 @@ fn candidate_meets_frozen_deterministic_memory_quality_gate() {
     assert_eq!(report["counts"]["unobserved"], 0);
     assert_eq!(report["cases"].as_array().unwrap().len(), 8);
     assert_eq!(report["no_regressions"], true);
+    assert_eq!(report["all_cases_pass"], true);
 }

@@ -63,3 +63,13 @@ Timer and replay boundaries are explicit in the spec/runbook: Runner budget excl
 CLI preparation; Python timeout excludes copying; public sidecars persist per phase;
 replay requires caller-supplied isolated state. These are declared limits rather than
 claims of total-CLI deadlines, arbitrary-descendant cancellation or crash-safe logs.
+
+## Acceptance correction — oracle scope
+
+The original final record misclassified three archived v9 oracle-scope failures as
+product-quality failures. ADR-0083 and the previously reviewed v10 corpus already
+established that ordinary retrieval must not manufacture temporal roles. The v9
+baseline was therefore unsuitable for the active gate despite raw-score equivalence.
+The follow-up [current-contract implementation plan](2026-11-26-current-oracle-contract.md)
+records the correction. Historical scores are preserved; the active gate uses v10,
+validates its contract before product execution, and rejects legacy scope errors.

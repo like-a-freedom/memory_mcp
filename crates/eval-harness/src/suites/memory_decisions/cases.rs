@@ -150,6 +150,10 @@ impl DecisionCorpus {
         Ok(corpus)
     }
 
+    pub(super) fn validate_current_contract(&self) -> Result<(), crate::EvalError> {
+        self.validate(true)
+    }
+
     fn validate(&self, role_expectations_require_snapshot: bool) -> Result<(), crate::EvalError> {
         let mut event_ids = BTreeSet::new();
         for event in &self.events {
@@ -320,7 +324,7 @@ impl DecisionCorpus {
                 && !probe.requires_separate_time_cutoffs
             {
                 return Err(crate::EvalError::InvalidInput(format!(
-                    "oracle v2 roles for `{}` require a probe with separate time cutoffs",
+                    "oracle roles for `{}` require a probe with separate time cutoffs",
                     probe.id
                 )));
             }

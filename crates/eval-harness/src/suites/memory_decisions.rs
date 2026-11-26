@@ -34,7 +34,9 @@ use self::receipts::{
     REPLAY_SCHEMA_V1, ReplayCase, ReplayIdentity, hash_corpus, hash_file, sha256, write_index,
     write_receipt,
 };
-pub use self::verification::{load_registered_replay, load_verified_replay};
+pub use self::verification::{
+    load_current_regression_replay, load_registered_replay, load_verified_replay,
+};
 mod verification;
 use self::scoring::{
     Observed, ProbeScore, ScoreReason, ScoringObservationSource, score_probe,

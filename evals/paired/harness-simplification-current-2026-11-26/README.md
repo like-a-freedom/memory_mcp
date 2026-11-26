@@ -1,5 +1,12 @@
 # Primary-only development capture — 2026-11-26
 
+> **Scope correction, 2026-11-26:** The three v9 failures below are preserved
+> historical evaluator results, not established product defects. V9 incorrectly
+> requires temporal `current` roles from ordinary reads. ADR-0083 and v10 already
+> prohibit that requirement. The active gate now uses v10 and explicitly rejects
+> the incompatible contract; see [current evidence](../current-contract-baseline-2026-11-26/README.md).
+
+
 Local native Apple Silicon; no model host or remote runner. Product source and
 binary are identical to the frozen baseline; every raw receipt pins that identity.
 The baseline ran 24 scenario variants; this capture ran 8. The independent review accepted the baseline; the final repaired gate is now active.

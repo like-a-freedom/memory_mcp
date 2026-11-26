@@ -19,9 +19,9 @@ target/debug/memory-eval run --profile evals/profiles/memory_decisions_current.j
   --artifact target/evals/current-01/run.json
 # Regrade saved raw evidence; this command never starts memory or an agent.
 target/debug/memory-eval compare-current-memory \
-  --baseline evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json \
+  --baseline evals/paired/current-contract-baseline-2026-11-26/receipts/index.json \
   --candidate target/evals/current-01/receipts/index.json \
-  --corpus evals/corpora/memory-decisions-v9 \
+  --corpus evals/corpora/memory-decisions-v10 \
   --output target/evals/current-01/grade-01.json
 ```
 
@@ -30,6 +30,12 @@ A scoped no-regression result can pass with existing failures. Always inspect
 `regressions` separately. Grade receipts bind exact input-index hashes, the compiled
 scorer/normalizer/verification sources and the grader executable. The reviewed
 corpus, configuration and public schema must match; product identity may change.
+The active v10 corpus separates ordinary retrieval from explicit temporal snapshots.
+Current grading rejects expected temporal roles on ordinary reads, including legacy
+v1 oracles. Historical v9 replay remains available through the archived loader;
+its three `decision_unobservable` results are oracle-scope errors, not memory bugs.
+See [scope correction and native evidence](../../evals/paired/current-contract-baseline-2026-11-26/README.md).
+
 The command rederives scores from raw receipts and registered inputs, including
 primary and temporal dimensions and new failure reasons. It refuses incomplete
 coverage, missing evidence and incompatible stages. It never refreshes the baseline.

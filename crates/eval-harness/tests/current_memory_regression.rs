@@ -2,7 +2,7 @@ use eval_harness::suites::{compare_current_replays, load_registered_replay};
 use std::path::Path;
 
 #[test]
-fn unchanged_capture_has_no_regression_and_keeps_known_failures_visible() {
+fn historical_capture_preserves_all_three_oracle_scope_failures() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let baseline = load_registered_replay(
         &root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json"),
@@ -30,7 +30,7 @@ fn new_safety_failure_in_already_failing_case_is_a_regression() {
     let baseline = frozen();
     let mut changed = serde_json::to_value(&baseline).unwrap();
     changed["cases"][1]["reason_codes"] =
-        serde_json::json!(["decisionunobservable", "forbidden_source"]);
+        serde_json::json!(["decision_unobservable", "forbidden_source"]);
     let candidate = serde_json::from_value(changed).unwrap();
     let report = compare_current_replays(&baseline, &candidate).unwrap();
     assert!(!report.no_regressions);
@@ -61,8 +61,7 @@ fn a_new_temporal_failure_cannot_hide_behind_an_unchanged_primary_score() {
 #[test]
 fn cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execution() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let index =
-        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+    let index = root.join("evals/paired/current-contract-baseline-2026-11-26/receipts/index.json");
     let dir = tempfile::tempdir().unwrap();
     let report = dir.path().join("comparison.json");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"))
@@ -71,7 +70,7 @@ fn cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execu
         .arg("--candidate")
         .arg(&index)
         .arg("--corpus")
-        .arg(root.join("evals/corpora/memory-decisions-v9"))
+        .arg(root.join("evals/corpora/memory-decisions-v10"))
         .arg("--output")
         .arg(&report)
         .env("MEMORY_DECISIONS_SERVER_BIN", "/no/product/may/be/executed")
@@ -109,33 +108,21 @@ fn cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execu
             .len(),
         64
     );
-    assert_eq!(result["counts"]["passed"], 5);
-    assert_eq!(result["counts"]["failed"], 3);
+    assert_eq!(result["counts"]["passed"], 8);
+    assert_eq!(result["counts"]["failed"], 0);
     assert_eq!(result["counts"]["invalid"], 0);
     assert_eq!(result["counts"]["unobserved"], 0);
     assert_eq!(result["cases"].as_array().unwrap().len(), 8);
-    let office = result["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["case_id"] == "office-entry")
-        .unwrap();
-    assert_eq!(
-        office["reason_codes"],
-        serde_json::json!(["decision_unobservable"])
-    );
-    assert_eq!(office["primary"]["evidence_success"], true);
-    assert_eq!(office["primary"]["decision_success"], false);
     assert_eq!(result["no_regressions"], true);
-    assert_eq!(result["all_cases_pass"], false);
-    assert_eq!(result["current_failures"].as_array().unwrap().len(), 3);
+    assert_eq!(result["all_cases_pass"], true);
+    assert_eq!(result["current_failures"].as_array().unwrap().len(), 0);
 }
 
 #[test]
 fn failed_offline_grading_is_preserved_when_the_stage_is_retried() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let baseline =
-        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+        root.join("evals/paired/current-contract-baseline-2026-11-26/receipts/index.json");
     let dir = tempfile::tempdir().unwrap();
     let failed = dir.path().join("attempt-01.json");
     let candidate = dir.path().join("candidate.json");
@@ -147,7 +134,7 @@ fn failed_offline_grading_is_preserved_when_the_stage_is_retried() {
             .arg("--candidate")
             .arg(candidate)
             .arg("--corpus")
-            .arg(root.join("evals/corpora/memory-decisions-v9"))
+            .arg(root.join("evals/corpora/memory-decisions-v10"))
             .arg("--output")
             .arg(output)
             .output()
@@ -163,3 +150,62 @@ fn failed_offline_grading_is_preserved_when_the_stage_is_retried() {
     assert_eq!(run(&failed, &baseline).status.code(), Some(2));
     assert_eq!(std::fs::read(&failed).unwrap(), failure_bytes);
 }
+
+#[test]
+fn current_gate_rejects_legacy_roles_without_snapshot_cutoffs() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let index =
+        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+    let dir = tempfile::tempdir().unwrap();
+    let report = dir.path().join("invalid.json");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"))
+        .args(["compare-current-memory", "--baseline"])
+        .arg(&index)
+        .arg("--candidate")
+        .arg(&index)
+        .arg("--corpus")
+        .arg(root.join("evals/corpora/memory-decisions-v9"))
+        .arg("--output")
+        .arg(&report)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let result: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(report).unwrap()).unwrap();
+    assert_eq!(result["execution_status"], "invalid");
+    assert!(result.to_string().contains("separate time cutoffs"));
+}
+
+macro_rules! archived_scope_control {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            let replay = serde_json::to_value(frozen()).unwrap();
+            let case = replay["cases"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|case| case["case_id"] == $case)
+                .unwrap();
+            assert_eq!(case["evidence_success"], true);
+            assert_eq!(case["decision_success"], false);
+            assert_eq!(case["temporal_score"]["probe_success"], true);
+            assert_eq!(
+                case["reason_codes"],
+                serde_json::json!(["decision_unobservable"])
+            );
+        }
+    };
+}
+archived_scope_control!(
+    office_entry_preserves_correct_evidence_and_explicit_snapshot,
+    "office-entry"
+);
+archived_scope_control!(
+    similar_name_preserves_correct_evidence_and_explicit_snapshot,
+    "similar-name"
+);
+archived_scope_control!(
+    single_current_preserves_correct_evidence_and_explicit_snapshot,
+    "single-current"
+);

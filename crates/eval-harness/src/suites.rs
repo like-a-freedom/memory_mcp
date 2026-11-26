@@ -24,8 +24,8 @@ pub use lifecycle::LifecycleReleaseSuite;
 pub use memory_decisions::{
     AcceptanceScoreChannel, CrossBuildBinaryPins, CurrentRegressionReport,
     DeterministicAcceptancePlan, DeterministicAcceptanceReport, ReplayIndex, accept_candidate,
-    compare_current_replays, compare_replays, grader_identity, load_registered_replay,
-    load_verified_replay,
+    compare_current_replays, compare_replays, grader_identity, load_current_regression_replay,
+    load_registered_replay, load_verified_replay,
 };
 pub use ner_quality::NerQualitySuite;
 pub use poisoning::PoisoningSuite;

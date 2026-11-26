@@ -130,11 +130,31 @@ pub fn load_verified_replay(path: &Path) -> Result<ReplayIndex, EvalError> {
     Ok(index)
 }
 
+/// Regrade a current regression capture without accepting historical oracle-scope errors.
+/// Archived replay remains available through `load_registered_replay`.
+pub fn load_current_regression_replay(
+    path: &Path,
+    corpus_root: &Path,
+) -> Result<ReplayIndex, EvalError> {
+    load_registered_replay_with_contract(path, corpus_root, true)
+}
+
 pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayIndex, EvalError> {
+    load_registered_replay_with_contract(path, corpus_root, false)
+}
+
+fn load_registered_replay_with_contract(
+    path: &Path,
+    corpus_root: &Path,
+    current: bool,
+) -> Result<ReplayIndex, EvalError> {
     use std::collections::{BTreeMap, BTreeSet};
     let invalid = |s: &str| EvalError::InvalidInput(s.into());
-    let index = load_verified_replay(path)?;
     let corpus = super::cases::DecisionCorpus::load(corpus_root)?;
+    if current {
+        corpus.validate_current_contract()?;
+    }
+    let index = load_verified_replay(path)?;
     let Some((registered_stage, configuration)) =
         super::registered_configuration(&index.identity.config_sha256)
     else {

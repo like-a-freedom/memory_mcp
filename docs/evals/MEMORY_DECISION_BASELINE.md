@@ -281,3 +281,16 @@ Execution identity:
 
 Reports, normalized indexes and per-case raw public-MCP receipts are archived
 under [`evals/paired/memory-decisions-v10-baseline-2026-11-23`](../../evals/paired/memory-decisions-v10-baseline-2026-11-23/).
+
+## Current gate scope correction — 2026-11-26
+
+The harness simplification gate inadvertently selected archived v9, reintroducing
+its already documented oracle-scope error. `office-entry`, `similar-name` and
+`single-current` returned correct evidence and passed their explicit temporal
+checks; ordinary reads correctly omitted temporal status. They are not three
+established memory defects. Current grading now validates role/cutoff compatibility
+even for v1 oracles. V9 remains immutable and replayable for historical analysis.
+
+A fresh current-schema v10 baseline on the unchanged native product passes all
+8 primary and temporal cases. This is evaluation correction, not a measured product
+quality improvement. See [raw evidence and reproduction](../../evals/paired/current-contract-baseline-2026-11-26/README.md).
