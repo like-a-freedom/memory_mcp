@@ -50,7 +50,8 @@ async fn community_burst_keeps_edge_neighbor_selects_bounded_per_extract() {
             IngestRequest {
                 source_type: "email".to_string(),
                 source_id: format!("MSG-BURST-{i}"),
-                content: "ARR grew to $3M. I will send the update by Friday.".to_string(),
+                // Use genuine identities: metric names and currency values are not entities.
+                content: "Alice Smith and Bob Jones will send the project update.".to_string(),
                 t_ref: Utc::now() - chrono::Duration::days(1),
                 t_ingested: None,
                 source_context: None,
