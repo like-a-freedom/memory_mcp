@@ -618,8 +618,11 @@ impl ServerHandler for MemoryMcp {
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
         let client_supports_tasks = context
-            .client_capabilities()
-            .is_some_and(|caps| caps.supports_tasks());
+            .protocol_version()
+            .is_some_and(|version| version >= PROTOCOL_VERSION_2026_07_28)
+            && context
+                .client_capabilities()
+                .is_some_and(|caps| caps.supports_tasks());
 
         #[cfg(feature = "streamable-http")]
         if request.name == "extract" && !client_supports_tasks {

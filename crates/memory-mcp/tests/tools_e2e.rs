@@ -18,6 +18,7 @@ struct StdioMcpProcess {
     child: Child,
     stdin: ChildStdin,
     responses: Receiver<serde_json::Value>,
+    modern: bool,
     _temp_dir: TempDir,
 }
 
@@ -68,11 +69,23 @@ impl StdioMcpProcess {
             child,
             stdin,
             responses,
+            modern: false,
             _temp_dir: temp_dir,
         }
     }
 
-    fn request(&mut self, id: i64, method: &str, params: serde_json::Value) -> serde_json::Value {
+    fn request(
+        &mut self,
+        id: i64,
+        method: &str,
+        mut params: serde_json::Value,
+    ) -> serde_json::Value {
+        if self.modern {
+            params.as_object_mut().expect("object params").insert("_meta".into(), serde_json::json!({
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {"extensions": {"io.modelcontextprotocol/tasks": {}}}
+            }));
+        }
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -103,21 +116,22 @@ impl StdioMcpProcess {
     }
 
     fn initialize(&mut self, task_capable: bool) {
-        let client_capabilities = if task_capable {
-            serde_json::json!({
-                "extensions": {
-                    "io.modelcontextprotocol/tasks": {}
-                }
-            })
-        } else {
-            serde_json::json!({})
-        };
+        if task_capable {
+            self.modern = true;
+            let response = self.request(1, "server/discover", serde_json::json!({}));
+            assert!(
+                response["result"]["capabilities"]["extensions"]["io.modelcontextprotocol/tasks"]
+                    .is_object(),
+                "modern discovery: {response}"
+            );
+            return;
+        }
         let response = self.request(
             1,
             "initialize",
             serde_json::json!({
                 "protocolVersion": "2025-11-25",
-                "capabilities": client_capabilities,
+                "capabilities": {},
                 "clientInfo": {"name": "memory-mcp-e2e", "version": "1.0.0"}
             }),
         );
@@ -292,6 +306,33 @@ async fn test_mcp_tools_flow() {
             .expect("explain ids");
     assert_eq!(explanation_ids[0].source_episode, episode_id);
     assert_eq!(explanation_ids[1].source_episode, episode_id2);
+}
+
+#[test]
+fn test_legacy_session_does_not_enable_modern_tasks() {
+    let mut client = StdioMcpProcess::start();
+    let init = client.request(
+        1,
+        "initialize",
+        serde_json::json!({
+            "protocolVersion": "2025-11-25",
+            "capabilities": {"extensions": {"io.modelcontextprotocol/tasks": {}}},
+            "clientInfo": {"name": "legacy-client", "version": "1"}
+        }),
+    );
+    assert_eq!(init["result"]["protocolVersion"], "2025-11-25");
+    client.notify("notifications/initialized", serde_json::json!({}));
+    let response = client.request(
+        2,
+        "tools/call",
+        serde_json::json!({
+            "name": "extract", "arguments": {"episode_id": "episode:missing-task-e2e"}
+        }),
+    );
+    assert!(
+        response["error"].is_object(),
+        "legacy session must not receive modern task: {response}"
+    );
 }
 
 #[test]
