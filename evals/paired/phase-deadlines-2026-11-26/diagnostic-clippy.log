@@ -1,0 +1,8 @@
+    Checking tokenizers v0.23.2
+    Checking proptest v1.12.0
+    Checking candle-core v0.11.1
+    Checking anno v0.14.0
+    Checking candle-nn v0.11.1
+    Checking candle-transformers v0.11.1
+    Checking memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.65s

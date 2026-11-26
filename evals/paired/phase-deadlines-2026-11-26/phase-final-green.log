@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/build/eval-harness/094cc5dcdb91f098/out/eval_harness-094cc5dcdb91f098)
+
+running 2 tests
+DEADLINE_RECEIPT {"block_on_read":1,"completed_reads_retained":0,"failed_reads":1,"owned_child_reaped":true,"phase_budget_ms":500,"phase_elapsed_ms":506.265792,"status":"timed_out","tool_timeout_ms":2000}
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server ... ok
+DEADLINE_RECEIPT {"block_on_read":2,"completed_reads_retained":1,"failed_reads":1,"owned_child_reaped":true,"phase_budget_ms":500,"phase_elapsed_ms":506.265333,"status":"timed_out","tool_timeout_ms":2000}
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 572 filtered out; finished in 12.66s
+

@@ -1,0 +1,7 @@
+{
+  "binary_sha256": "caa00c077c568b75347341cc8303213daecbe0284c7047210c6958040ec6adf1",
+  "test_source_sha256": "79b482db7e5b24f8a89e2f4dcbeb947e74595a18b539c0a6ee6172e38361a5a7",
+  "registration_sha256": "3e439180870870748b0a0f62b7b8ce6030665ae93130bc0b62e5fda622ec7ae5",
+  "machine": "arm64",
+  "system": "Darwin"
+}

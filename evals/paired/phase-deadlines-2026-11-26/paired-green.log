@@ -1,0 +1,10 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.10s
+     Running tests/recall_session_reuse.rs (target/debug/build/eval-harness/b1504aeff1e0a9c0/out/recall_session_reuse-b1504aeff1e0a9c0)
+
+running 2 tests
+test checkpoint_recall_reuses_seed_session_but_isolates_each_arm ... ok
+test paired_phase_deadline_returns_observation_after_killing_the_server ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+

@@ -1,0 +1,29 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.16s
+     Running unittests src/lib.rs (target/debug/build/eval-harness/094cc5dcdb91f098/out/eval_harness-094cc5dcdb91f098)
+
+running 2 tests
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read ... FAILED
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server ... FAILED
+
+failures:
+
+---- paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read stdout ----
+
+thread 'paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read' (5973692) panicked at crates/eval-harness/src/paired_agent/chat_completions/deadline_integration_tests.rs:207:76:
+timeout receipt must pass the real artifact contract: InvalidInput("trial recall::alder-ordinary::alder-ordinary#1 status and timeout trace events disagree")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server stdout ----
+
+thread 'paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server' (5973691) panicked at crates/eval-harness/src/paired_agent/chat_completions/deadline_integration_tests.rs:207:76:
+timeout receipt must pass the real artifact contract: InvalidInput("trial recall::alder-ordinary::alder-ordinary#1 status and timeout trace events disagree")
+
+
+failures:
+    paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server
+    paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 572 filtered out; finished in 0.78s
+
+error: test failed, to rerun pass `-p eval-harness --lib`

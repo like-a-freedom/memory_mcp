@@ -11,6 +11,30 @@ use eval_harness::paired_agent::chat_completions::{
 };
 use serde_json::{Value, json};
 
+#[test]
+fn phase_rejects_an_unrepresentable_deadline_before_any_model_request() {
+    let agent = ChatCompletionsAgent::new(ChatCompletionsConfig::new(
+        "http://127.0.0.1:9/v1",
+        "test-model",
+    ))
+    .unwrap();
+    let mut memory = FakeMemorySession::read_only();
+    let mut limits = budgets();
+    limits.wall_time = std::time::Duration::MAX;
+    let result = agent.run_phase(
+        &mut memory,
+        "Where is Cedar?",
+        "Use memory.",
+        "Return JSON.",
+        ChatCompletionsToolProfile::RecallOnly,
+        limits,
+    );
+    assert!(
+        matches!(result, Err(EvalError::InvalidConfig(message)) if message.contains("clock range"))
+    );
+    assert!(memory.calls.is_empty());
+}
+
 struct FakeMemorySession {
     calls: Vec<(String, Value)>,
     schemas: Value,
@@ -44,6 +68,8 @@ impl FakeMemorySession {
 }
 
 impl MemoryToolSession for FakeMemorySession {
+    fn limit_deadline(&mut self, _: Instant) {}
+
     fn tool_schemas(&self) -> &Value {
         &self.schemas
     }
@@ -230,6 +256,8 @@ fn capture_read_reply(reply: Value) -> Value {
     struct ReplySession(FakeMemorySession, Option<Value>);
 
     impl MemoryToolSession for ReplySession {
+        fn limit_deadline(&mut self, _: Instant) {}
+
         fn tool_schemas(&self) -> &Value {
             self.0.tool_schemas()
         }

@@ -9,6 +9,8 @@ struct Memory {
     schemas: Value,
 }
 impl MemoryToolSession for Memory {
+    fn limit_deadline(&mut self, _: std::time::Instant) {}
+
     fn tool_schemas(&self) -> &Value {
         &self.schemas
     }

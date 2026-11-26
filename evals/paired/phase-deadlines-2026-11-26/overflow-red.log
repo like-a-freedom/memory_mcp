@@ -1,0 +1,22 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.24s
+     Running tests/chat_completions_runner.rs (target/debug/build/eval-harness/ac226a7def86e621/out/chat_completions_runner-ac226a7def86e621)
+
+running 1 test
+test phase_rejects_an_unrepresentable_deadline_before_any_model_request ... FAILED
+
+failures:
+
+---- phase_rejects_an_unrepresentable_deadline_before_any_model_request stdout ----
+
+thread 'phase_rejects_an_unrepresentable_deadline_before_any_model_request' (5971482) panicked at crates/eval-harness/src/paired_agent/chat_completions.rs:500:24:
+overflow when adding duration to instant
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    phase_rejects_an_unrepresentable_deadline_before_any_model_request
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p eval-harness --test chat_completions_runner`

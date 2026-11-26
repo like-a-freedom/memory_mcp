@@ -209,31 +209,12 @@ impl StdioSession {
             move || drain_stderr(stderr, sample)
         });
         let child = Arc::new(Mutex::new(child));
-        let (deadline_stop, deadline_worker) = if let Some(limit) = deadline {
-            let (stop, stopped) = mpsc::channel();
-            let owned_child = Arc::clone(&child);
-            let worker = thread::spawn(move || {
-                if matches!(
-                    stopped.recv_timeout(limit.saturating_duration_since(Instant::now())),
-                    Err(mpsc::RecvTimeoutError::Timeout)
-                ) {
-                    let mut child = owned_child
-                        .lock()
-                        .unwrap_or_else(|error| error.into_inner());
-                    let _ = child.kill();
-                    let _ = child.wait();
-                }
-            });
-            (Some(stop), Some(worker))
-        } else {
-            (None, None)
-        };
         let mut session = Self {
             launch_profile,
             child,
-            deadline_stop,
-            deadline_worker,
-            deadline,
+            deadline_stop: None,
+            deadline_worker: None,
+            deadline: None,
             stdin: Some(stdin),
             responses: Some(responses),
             stdout_reader: Some(stdout_reader),
@@ -248,8 +229,41 @@ impl StdioSession {
             tool_schemas: Value::Null,
             child_reaped: false,
         };
+        if let Some(deadline) = deadline {
+            session.limit_deadline(deadline);
+        }
         session.initialize_and_validate()?;
         Ok(session)
+    }
+
+    /// Tighten the lifetime of this owned process; an existing run bound cannot
+    /// be extended by a later phase or caller.
+    pub(crate) fn limit_deadline(&mut self, deadline: Instant) {
+        if self.deadline.is_some_and(|current| current <= deadline) {
+            return;
+        }
+        if let Some(stop) = self.deadline_stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(worker) = self.deadline_worker.take() {
+            let _ = worker.join();
+        }
+        self.deadline = Some(deadline);
+        let (stop, stopped) = mpsc::channel();
+        let owned_child = Arc::clone(&self.child);
+        self.deadline_worker = Some(thread::spawn(move || {
+            if matches!(
+                stopped.recv_timeout(deadline.saturating_duration_since(Instant::now())),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ) {
+                let mut child = owned_child
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }));
+        self.deadline_stop = Some(stop);
     }
 
     pub fn initialized(&self) -> &Value {
@@ -411,6 +425,8 @@ impl StdioSession {
             && (started.elapsed() >= effective
                 || self.deadline.is_some_and(|limit| Instant::now() >= limit))
         {
+            self.kill_and_reap();
+            self.join_readers();
             return Err(EvalError::Timeout {
                 operation: format!("MCP method `{method}`"),
                 timeout_ms: u64::try_from(effective.as_millis()).unwrap_or(u64::MAX),

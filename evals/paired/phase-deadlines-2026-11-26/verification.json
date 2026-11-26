@@ -1,0 +1,116 @@
+{
+  "schema": "phase-deadline-verification/v1",
+  "base_revision": "e58e03fd31524fc8619278a6fff1ad720738a37c",
+  "checks": {
+    "harness": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "eval-harness",
+        "--",
+        "--test-threads=1"
+      ],
+      "log": "harness.log",
+      "passed": 929,
+      "failed": 0,
+      "ignored": 22,
+      "test_result_blocks": 43,
+      "exit_code": 0
+    },
+    "production": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "memory_mcp"
+      ],
+      "log": "production.log",
+      "passed": 2807,
+      "failed": 0,
+      "ignored": 45,
+      "test_result_blocks": 168,
+      "exit_code": 0
+    },
+    "workspace-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "workspace-clippy.log",
+      "passed": null,
+      "failed": null,
+      "ignored": null,
+      "test_result_blocks": null,
+      "exit_code": 0
+    },
+    "diagnostic-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--test",
+        "full_history_evidence",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "diagnostic-clippy.log",
+      "passed": null,
+      "failed": null,
+      "ignored": null,
+      "test_result_blocks": null,
+      "exit_code": 0
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    "source-and-doc-whitespace": {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        ".",
+        ":(exclude)evals/**/*.log"
+      ],
+      "exit_code": 0,
+      "policy": "Preserve byte-exact raw command logs; inspect source/docs separately."
+    }
+  },
+  "source_sha256": {
+    "crates/eval-harness/src/paired_agent/chat_completions.rs": "dffd1a81712ba6887445aa545c6c7707a618b4e9818057dee652fbd2281e2e04",
+    "crates/eval-harness/src/paired_agent/chat_completions_backend.rs": "52904b1e5dc65cfd750054b88442e3c7c51923936d8e27d98dc9d557f206f6c4",
+    "crates/eval-harness/src/paired_agent/public_trace.rs": "9c22f9da639bed77f2dba73c3a901b09a9425635e442f2c0feecb8d1f6654e5b",
+    "crates/eval-harness/src/suites/memory_decisions/stdio.rs": "d7c5a21f145be0e7d2c7fa6fd14dd11d9943b411a562badba01d314e80d80a0e",
+    "crates/eval-harness/tests/chat_completions_runner.rs": "1d6f1fb6b9bfca64da39128a6b055202be39ba4e1a7c4c2a85e57138dbe8a935",
+    "crates/eval-harness/tests/public_synthetic_trace.rs": "8fb16526a4607ff1e22f1224fe7626c06daa8b3e22e89aeaa2d473eff6b46812",
+    "crates/eval-harness/tests/recall_session_reuse.rs": "5f9b210771099f1ed318ef17629bac0e9e9f514dd7c0ec462f31bb50601d08bd",
+    "crates/eval-harness/src/paired_agent/chat_completions/deadline_integration_tests.rs": "f313cab50aab43d199e49b02b86b0d8fc4af33ec34b8846099f3a5027accc5e0",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f"
+  },
+  "native_only": true,
+  "models_called": false,
+  "untracked_skills_preserved": true,
+  "scope": "No production memory algorithm changes; full-history read/answer acceptance still pending"
+}

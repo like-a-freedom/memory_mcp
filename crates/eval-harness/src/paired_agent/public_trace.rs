@@ -67,6 +67,10 @@ impl<M: MemoryToolSession> MemoryToolSession for PublicSyntheticSession<'_, M> {
         self.memory.tool_schemas()
     }
 
+    fn limit_deadline(&mut self, deadline: std::time::Instant) {
+        self.memory.limit_deadline(deadline);
+    }
+
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
         let arguments_sha256 = hash(&arguments)?;
         let result = self.memory.call_tool(name, arguments.clone());

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'full_history_toolbar_retains_reviewed_source' (5927041) panicked at crates/memory-mcp/tests/full_history_evidence.rs:13:18:
+called `Result::unwrap()` on an `Err` value: ConfigMissing("username")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test full_history_toolbar_retains_reviewed_source ... FAILED
+
+failures:
+
+failures:
+    full_history_toolbar_retains_reviewed_source
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

@@ -1,0 +1,64 @@
+{
+  "schema": "deadline-regression-capture/v1",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "eval-harness",
+    "--lib",
+    "deadline_integration_tests",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 13.655188457982149,
+  "host": "arm64",
+  "toolchain": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: aarch64-apple-darwin\nrelease: 1.100.0\nLLVM version: 23.1.5\n",
+  "source_sha256_before": {
+    "crates/eval-harness/src/paired_agent/chat_completions.rs": "dffd1a81712ba6887445aa545c6c7707a618b4e9818057dee652fbd2281e2e04",
+    "crates/eval-harness/src/paired_agent/chat_completions_backend.rs": "52904b1e5dc65cfd750054b88442e3c7c51923936d8e27d98dc9d557f206f6c4",
+    "crates/eval-harness/src/paired_agent/public_trace.rs": "9c22f9da639bed77f2dba73c3a901b09a9425635e442f2c0feecb8d1f6654e5b",
+    "crates/eval-harness/src/suites/memory_decisions/stdio.rs": "d7c5a21f145be0e7d2c7fa6fd14dd11d9943b411a562badba01d314e80d80a0e",
+    "crates/eval-harness/tests/chat_completions_runner.rs": "1d6f1fb6b9bfca64da39128a6b055202be39ba4e1a7c4c2a85e57138dbe8a935",
+    "crates/eval-harness/tests/public_synthetic_trace.rs": "8fb16526a4607ff1e22f1224fe7626c06daa8b3e22e89aeaa2d473eff6b46812",
+    "crates/eval-harness/tests/recall_session_reuse.rs": "5f9b210771099f1ed318ef17629bac0e9e9f514dd7c0ec462f31bb50601d08bd",
+    "crates/eval-harness/src/paired_agent/chat_completions/deadline_integration_tests.rs": "f313cab50aab43d199e49b02b86b0d8fc4af33ec34b8846099f3a5027accc5e0",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f"
+  },
+  "source_sha256_after": {
+    "crates/eval-harness/src/paired_agent/chat_completions.rs": "dffd1a81712ba6887445aa545c6c7707a618b4e9818057dee652fbd2281e2e04",
+    "crates/eval-harness/src/paired_agent/chat_completions_backend.rs": "52904b1e5dc65cfd750054b88442e3c7c51923936d8e27d98dc9d557f206f6c4",
+    "crates/eval-harness/src/paired_agent/public_trace.rs": "9c22f9da639bed77f2dba73c3a901b09a9425635e442f2c0feecb8d1f6654e5b",
+    "crates/eval-harness/src/suites/memory_decisions/stdio.rs": "d7c5a21f145be0e7d2c7fa6fd14dd11d9943b411a562badba01d314e80d80a0e",
+    "crates/eval-harness/tests/chat_completions_runner.rs": "1d6f1fb6b9bfca64da39128a6b055202be39ba4e1a7c4c2a85e57138dbe8a935",
+    "crates/eval-harness/tests/public_synthetic_trace.rs": "8fb16526a4607ff1e22f1224fe7626c06daa8b3e22e89aeaa2d473eff6b46812",
+    "crates/eval-harness/tests/recall_session_reuse.rs": "5f9b210771099f1ed318ef17629bac0e9e9f514dd7c0ec462f31bb50601d08bd",
+    "crates/eval-harness/src/paired_agent/chat_completions/deadline_integration_tests.rs": "f313cab50aab43d199e49b02b86b0d8fc4af33ec34b8846099f3a5027accc5e0",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "9fe3675a75aa2b7ba8ac877cb362fbb51097d00872498c3434942bf4c4b08e9f"
+  },
+  "receipts": [
+    {
+      "block_on_read": 1,
+      "completed_reads_retained": 0,
+      "failed_reads": 1,
+      "owned_child_reaped": true,
+      "phase_budget_ms": 500,
+      "phase_elapsed_ms": 506.265792,
+      "status": "timed_out",
+      "tool_timeout_ms": 2000
+    },
+    {
+      "block_on_read": 2,
+      "completed_reads_retained": 1,
+      "failed_reads": 1,
+      "owned_child_reaped": true,
+      "phase_budget_ms": 500,
+      "phase_elapsed_ms": 506.265333,
+      "status": "timed_out",
+      "tool_timeout_ms": 2000
+    }
+  ],
+  "models_called": false,
+  "test_executable_sha256": "e5609b18acff29d6f95553a4ad61927c35a4805953de3e40f1bc04c41761d618"
+}

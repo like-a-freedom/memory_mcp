@@ -1,0 +1,25 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+error[E0308]: mismatched types
+   --> crates/eval-harness/tests/recall_session_reuse.rs:113:14
+    |
+113 |         Some(trace_directory.clone()),
+    |         ---- ^^^^^^^^^^^^^^^^^^^^^^^ expected `Value`, found `PathBuf`
+    |         |
+    |         arguments to this enum variant are incorrect
+    |
+help: the type constructed contains `PathBuf` due to the type of the argument passed
+   --> crates/eval-harness/tests/recall_session_reuse.rs:113:9
+    |
+113 |         Some(trace_directory.clone()),
+    |         ^^^^^-----------------------^
+    |              |
+    |              this argument influences the type of `Some`
+note: tuple variant defined here
+   --> /Users/solovey/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/option.rs:606:5
+    |
+606 |     Some(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^^^
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `eval-harness` (test "recall_session_reuse") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

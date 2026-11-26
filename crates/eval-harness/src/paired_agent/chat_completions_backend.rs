@@ -383,7 +383,12 @@ impl ChatCompletionsPairedBackend {
         } else {
             run_agent_phase(agent, session, prompt, profile, budgets, diagnostic)
         }?;
-        session.shutdown()?;
+        let shutdown = session.shutdown();
+        // A deadline kills and reaps the owned server. Its expected exit status
+        // must not erase the timed-out observation or its already recorded calls.
+        if observation.status != crate::paired::TrialStatus::TimedOut {
+            shutdown?;
+        }
         Ok(observation)
     }
 }

@@ -1,0 +1,22 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.50s
+     Running tests/recall_session_reuse.rs (target/debug/build/eval-harness/b1504aeff1e0a9c0/out/recall_session_reuse-b1504aeff1e0a9c0)
+
+running 1 test
+test paired_phase_deadline_returns_observation_after_killing_the_server ... FAILED
+
+failures:
+
+---- paired_phase_deadline_returns_observation_after_killing_the_server stdout ----
+
+thread 'paired_phase_deadline_returns_observation_after_killing_the_server' (5961746) panicked at crates/eval-harness/tests/recall_session_reuse.rs:175:63:
+called `Result::unwrap()` on an `Err` value: Suite("stdio server exited with status signal: 9 (SIGKILL)")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    paired_phase_deadline_returns_observation_after_killing_the_server
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.86s
+
+error: test failed, to rerun pass `-p eval-harness --test recall_session_reuse`

@@ -1,0 +1,69 @@
+{
+  "schema": "full-history-diagnostic-summary/v1",
+  "claims": "Local resource diagnosis, no new answer or official benchmark score",
+  "cases": {
+    "0c6b0c60": {
+      "formation_complete": true,
+      "episode_count": 151,
+      "completed_sql_observations": 7,
+      "completed_sql_total_seconds": 4.559669,
+      "completed_sql_after_start": 5,
+      "completed_sql_after_start_seconds": 4.547808,
+      "process": {
+        "case_id": "0c6b0c60",
+        "command": [
+          "/Users/solovey/Documents/dev/memory_mcp/target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f",
+          "full_history_dropdown_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "external_timeout": true,
+        "elapsed_seconds": 45.175159916019766
+      },
+      "returned_stage_receipt": false,
+      "answer_accuracy": null,
+      "candidate_coverage": null,
+      "selection_coverage": null,
+      "packing_coverage": null
+    },
+    "f61a096f": {
+      "formation_complete": true,
+      "episode_count": 151,
+      "completed_sql_observations": 15,
+      "completed_sql_total_seconds": 27.611514,
+      "completed_sql_after_start": 13,
+      "completed_sql_after_start_seconds": 27.607112,
+      "process": {
+        "case_id": "f61a096f",
+        "command": [
+          "/Users/solovey/Documents/dev/memory_mcp/target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f",
+          "full_history_toolbar_retains_reviewed_source",
+          "--ignored",
+          "--nocapture"
+        ],
+        "external_timeout": true,
+        "elapsed_seconds": 45.10477816601633
+      },
+      "returned_stage_receipt": false,
+      "answer_accuracy": null,
+      "candidate_coverage": null,
+      "selection_coverage": null,
+      "packing_coverage": null
+    }
+  },
+  "cpu_sample": {
+    "case_id": "f61a096f",
+    "pid": 53354,
+    "command": [
+      "/usr/bin/sample",
+      "53354",
+      "2",
+      "-file",
+      "/tmp/full-history-cpu-sample.txt"
+    ],
+    "capture_start_seconds_after_launch": 18.096,
+    "physical_footprint_reported": "7.5G",
+    "scope": "one two-second sample, not whole-run peak or controlled before/after comparison",
+    "observed_stack": "lexical fallback -> select_facts_for_lexical_terms -> SurrealDB pipeline sort/spill"
+  }
+}

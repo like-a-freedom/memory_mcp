@@ -95,6 +95,14 @@ incomplete/extra sets and ungrounded quotes. The eight-case native memory gate
 passes. Reader and autonomous selector workflow outcomes, retained failed
 registrations, resource limits and next actions are recorded in that report.
 
+The [phase-deadline follow-up](../../evals/paired/phase-deadlines-2026-11-26/README.md)
+adds real stdio cancellation, retained failed/completed reads and valid persisted
+timeout artifacts without a model. This bounds the agent phase, not store setup.
+The [full-snapshot diagnosis](../../evals/longmemeval_v2/results/2026-11-26-full-history/README.md)
+confirms both reviewed source carriers exist (2/2), but both reads exceeded the
+external resource limit. A native sample localizes expensive lexical FTS sorting;
+no completed full-history contexts or new answer scores were obtained.
+
 The [preceding audit](MEMORY_QUALITY_CLOSURE_2026-11-26.md) retains the historical
 v1 extraction score of 4/9 (precision .60, recall 1.00, F1 .75). Its v1 and the
 new v2 denominator are not interchangeable. The seven frozen long-history

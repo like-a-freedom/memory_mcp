@@ -1,0 +1,28 @@
+   Compiling memory_mcp v1.41.0 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+error[E0603]: module `memory_decisions` is private
+  --> crates/eval-harness/tests/chat_completions_runner.rs:33:31
+   |
+33 |     use eval_harness::suites::memory_decisions::stdio::StdioSession;
+   |                               ^^^^^^^^^^^^^^^^         ------------ struct `StdioSession` is not publicly re-exported
+   |                               |
+   |                               private module
+   |
+note: the module `memory_decisions` is defined here
+  --> crates/eval-harness/src/suites.rs:8:1
+   |
+ 8 | pub(crate) mod memory_decisions;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0560]: struct `CaseTrialKey` has no field named `trial`
+  --> crates/eval-harness/tests/chat_completions_runner.rs:63:288
+   |
+63 | ...id:"blocked".into(),case_id:"read".into(),trial:0},arm:RunArm::Candidate,phase:"recall".into() };
+   |                                              ^^^^^ `CaseTrialKey` does not have this field
+   |
+   = note: available fields are: `repetition`, `incumbent_first`
+
+Some errors have detailed explanations: E0560, E0603.
+For more information about an error, try `rustc --explain E0560`.
+error: could not compile `eval-harness` (test "chat_completions_runner") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

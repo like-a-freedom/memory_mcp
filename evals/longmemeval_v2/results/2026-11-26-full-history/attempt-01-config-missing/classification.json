@@ -1,0 +1,4 @@
+{
+  "status": "invalid_execution",
+  "reason": "test configuration omitted required embedded credentials; retrieval never ran"
+}

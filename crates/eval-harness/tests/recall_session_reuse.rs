@@ -23,6 +23,15 @@ fn digest(bytes: &[u8]) -> String {
 
 #[test]
 fn checkpoint_recall_reuses_seed_session_but_isolates_each_arm() {
+    checkpoint_recall_scenario(false);
+}
+
+#[test]
+fn paired_phase_deadline_returns_observation_after_killing_the_server() {
+    checkpoint_recall_scenario(true);
+}
+
+fn checkpoint_recall_scenario(blocking: bool) {
     let directory = tempfile::tempdir().unwrap();
     let binary = directory.path().join("memory-fixture");
     let tools = json!([
@@ -42,12 +51,12 @@ while IFS= read -r line; do
  *'"method":"tools/list"'*) result='{"tools":__TOOLS__}' ;;
  *'"name":"ingest"'*) n=$((n+1)); result="{\"structuredContent\":{\"result\":\"episode:$n\"}}" ;;
  *'"name":"extract"'*) result='{"structuredContent":{"result":{}}}' ;;
- *'"name":"assemble_context"'*) result='{"structuredContent":{"result":[{"source_episode":"episode:1","content":"Cabinet-16"}],"context":{"snapshot":{"valid_at":"2026-05-01T10:00:00Z","known_revision":3}}}}' ;;
+ *'"name":"assemble_context"'*) __BLOCK__ result='{"structuredContent":{"result":[{"source_episode":"episode:1","content":"Cabinet-16"}],"context":{"snapshot":{"valid_at":"2026-05-01T10:00:00Z","known_revision":3}}}}' ;;
  *) exit 2 ;;
  esac
  printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$id" "$result"
 done
-"##.replace("__TOOLS__", &tools.to_string());
+"##.replace("__TOOLS__", &tools.to_string()).replace("__BLOCK__", if blocking { r#"case "$line" in *'"query":""'*) ;; *) continue ;; esac;"# } else { "" });
     fs::write(&binary, source).unwrap();
     fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -60,6 +69,9 @@ done
         "../../../evals/paired/recall-read-local-screen-2026-11-24/live-plan.json"
     ))
     .unwrap();
+    if blocking {
+        plan.shared_identity.wall_time_budget_ms = 500;
+    }
     plan.shared_identity.provider_fingerprints.insert(
         "memory_eval_cli".into(),
         digest(&fs::read(std::env::current_exe().unwrap()).unwrap()),
@@ -89,6 +101,7 @@ done
         temp_root: Some(directory.path().into()),
         claim_rollout_stage: stage.into(),
     };
+    let trace_directory = directory.path().join("traces");
     let mut backend = ChatCompletionsRecallBackend::new(
         &plan,
         &manifest,
@@ -99,12 +112,13 @@ done
         None,
         None,
     )
-    .unwrap();
+    .unwrap()
+    .with_public_synthetic_traces(trace_directory.clone());
     listener.set_nonblocking(true).unwrap();
     let model = plan.shared_identity.model.clone();
     let worker = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(15);
-        for turn in 0..4 {
+        for turn in 0..if blocking { 2 } else { 4 } {
             let mut stream = loop {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
@@ -138,7 +152,7 @@ done
                 .unwrap();
             let mut body = vec![0; length];
             stream.read_exact(&mut body).unwrap();
-            let message = if turn % 2 == 0 {
+            let message = if blocking || turn % 2 == 0 {
                 json!({"role":"assistant","content":null,"tool_calls":[{"id":"read-1","type":"function","function":{"name":"assemble_context","arguments":"{\"query\":\"Cedar calibration key\",\"valid_at\":\"2026-05-01T10:00:00Z\",\"known_revision\":3,\"budget\":1}"}}]})
             } else {
                 json!({"role":"assistant","content":"{\"answer\":\"Cabinet-16\",\"citations\":[\"episode:1\"],\"needs_clarification\":false}"})
@@ -193,12 +207,49 @@ done
             == 1),
         "each fresh recall store must use its seeded process, not reopen another process"
     );
-    assert_eq!(
-        events
-            .lines()
-            .filter(|line| line.starts_with("exit "))
-            .count(),
-        3,
-        "all owned sessions must exit before trial completion"
-    );
+    if blocking {
+        use eval_harness::paired::{NormalizedErrorClass, TrialStatus};
+        assert_eq!(first.observation.status, TrialStatus::TimedOut);
+        assert_eq!(second.observation.status, TrialStatus::TimedOut);
+        assert_eq!(
+            first.observation.trace.last().unwrap().error_class,
+            Some(NormalizedErrorClass::Timeout)
+        );
+        assert_eq!(
+            second.observation.trace.last().unwrap().error_class,
+            Some(NormalizedErrorClass::Timeout)
+        );
+        assert!(first.observation.wall_time_ms < 1500);
+        assert!(second.observation.wall_time_ms < 1500);
+        let traces: Vec<Value> = fs::read_dir(trace_directory)
+            .unwrap()
+            .map(|entry| serde_json::from_slice(&fs::read(entry.unwrap().path()).unwrap()).unwrap())
+            .collect();
+        assert_eq!(traces.len(), 2);
+        assert!(
+            traces
+                .iter()
+                .all(|trace| trace["calls"][0]["call_failed"] == true)
+        );
+        assert!(
+            stores
+                .values()
+                .all(|calls| !std::process::Command::new("/bin/kill")
+                    .args(["-0", calls[0].0])
+                    .output()
+                    .unwrap()
+                    .status
+                    .success()),
+            "all owned processes must be reaped"
+        );
+    } else {
+        assert_eq!(
+            events
+                .lines()
+                .filter(|line| line.starts_with("exit "))
+                .count(),
+            3,
+            "all owned sessions must exit before trial completion"
+        );
+    }
 }

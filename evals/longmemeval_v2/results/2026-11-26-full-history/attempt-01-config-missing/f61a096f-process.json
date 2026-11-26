@@ -1,0 +1,11 @@
+{
+  "case_id": "f61a096f",
+  "command": [
+    "/Users/solovey/Documents/dev/memory_mcp/target/debug/build/memory_mcp/b82b0c54891da21f/out/full_history_evidence-b82b0c54891da21f",
+    "full_history_toolbar_retains_reviewed_source",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 0.008796417008852586
+}

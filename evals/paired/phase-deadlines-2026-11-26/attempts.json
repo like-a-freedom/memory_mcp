@@ -1,0 +1,13 @@
+{
+  "schema": "deadline-regression-attempts/v1",
+  "base_revision": "e58e03fd",
+  "policy": "Controlled fixed HTTP responses, real loopback, real owned MCP children; no inference or model-performance experiment. All final suites are fresh native runs.",
+  "red": {
+    "phase-red.log": "Two real blocking reads exceed phase budget without transport cancellation; early fixture unused-import warning retained.",
+    "paired-red.log": "SIGKILL cleanup erases the already captured timed-out observation.",
+    "receipt-red.log": "Timed-out status without terminal timeout trace fails artifact validation. This initial assertion used private helpers; final public-artifact test replaces it.",
+    "overflow-red.log": "Unrepresentable deadline panics rather than returning InvalidConfig."
+  },
+  "invalid_test_setup": "Compilation errors and one invalid one-family plan; these are not behavioral RED evidence.",
+  "green_scope": "Final public-artifact test replays an actually captured timed-out execution across the fixture plan solely to check persistence/validation; no independent arm or model quality claim."
+}

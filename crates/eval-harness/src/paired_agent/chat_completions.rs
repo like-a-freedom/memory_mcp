@@ -62,6 +62,8 @@ struct CompletionError {
 /// `tools/call` requests; the model never receives direct storage access.
 pub trait MemoryToolSession {
     fn tool_schemas(&self) -> &Value;
+    /// Bound blocking calls and owned resources to the phase's absolute deadline.
+    fn limit_deadline(&mut self, deadline: Instant);
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError>;
 }
 
@@ -121,6 +123,10 @@ impl<'a, M: MemoryToolSession> RecallMemorySession<'a, M> {
 impl<M: MemoryToolSession> MemoryToolSession for RecallMemorySession<'_, M> {
     fn tool_schemas(&self) -> &Value {
         self.memory.tool_schemas()
+    }
+
+    fn limit_deadline(&mut self, deadline: Instant) {
+        self.memory.limit_deadline(deadline);
     }
 
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
@@ -253,6 +259,10 @@ fn structured_content_mut(reply: &mut Value) -> Option<&mut serde_json::Map<Stri
 impl MemoryToolSession for crate::suites::memory_decisions::stdio::StdioSession {
     fn tool_schemas(&self) -> &Value {
         crate::suites::memory_decisions::stdio::StdioSession::tool_schemas(self)
+    }
+
+    fn limit_deadline(&mut self, deadline: Instant) {
+        self.limit_deadline(deadline);
     }
 
     fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, EvalError> {
@@ -487,6 +497,12 @@ impl ChatCompletionsAgent {
             json!({"role":"user","content":prompt}),
         ];
         let started = Instant::now();
+        let deadline = started.checked_add(budgets.wall_time).ok_or_else(|| {
+            EvalError::InvalidConfig(
+                "Chat Completions phase deadline exceeds the clock range".into(),
+            )
+        })?;
+        memory.limit_deadline(deadline);
         let mut observation = AgentObservation {
             trace: Vec::new(),
             final_answer: None,
@@ -845,15 +861,24 @@ impl ChatCompletionsAgent {
                 {
                     result
                 }
-                Ok(_) | Err(_) => {
-                    observation.status = TrialStatus::ToolFailure;
+                failure => {
+                    let timed_out = matches!(failure, Err(EvalError::Timeout { .. }));
+                    observation.status = if timed_out {
+                        TrialStatus::TimedOut
+                    } else {
+                        TrialStatus::ToolFailure
+                    };
                     let response_sequence = push_event(
                         &mut observation.trace,
                         observation.turns_used,
                         TraceEventKind::ToolError,
                         Some(call_id.clone()),
                         Some(tool_name.to_owned()),
-                        Some(NormalizedErrorClass::Unknown),
+                        Some(if timed_out {
+                            NormalizedErrorClass::Timeout
+                        } else {
+                            NormalizedErrorClass::Unknown
+                        }),
                         None,
                         None,
                     )?;
@@ -886,6 +911,19 @@ impl ChatCompletionsAgent {
                             response_guidance_sha256: None,
                             evidence: None,
                         });
+                    }
+                    if timed_out {
+                        push_event(
+                            &mut observation.trace,
+                            observation.turns_used,
+                            TraceEventKind::Timeout,
+                            None,
+                            None,
+                            Some(NormalizedErrorClass::Timeout),
+                            None,
+                            None,
+                        )?;
+                        break 'turns;
                     }
                     messages.push(json!({
                         "role":"tool",
@@ -1591,3 +1629,6 @@ mod tests {
         assert!(error.to_string().contains("loopback"));
     }
 }
+
+#[cfg(all(test, unix))]
+mod deadline_integration_tests;

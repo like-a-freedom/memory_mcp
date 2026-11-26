@@ -1,0 +1,7 @@
+{
+  "binary_sha256": "61246c897d31fc5cbbcadd07fd1ab310548892bbc2903c542872d57f33d39569",
+  "test_source_sha256": "05fa50772dae1c9f9da49b1f748b274f99380cfbb02728caf7c6728981c34b38",
+  "registration_sha256": "306e80093260d8bba4f0b16a30c6edbe309c73785a1e141af289e8ae67999bf7",
+  "profile": "debug",
+  "machine": "arm64"
+}

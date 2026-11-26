@@ -1,0 +1,10 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.56s
+     Running unittests src/lib.rs (target/debug/build/eval-harness/094cc5dcdb91f098/out/eval_harness-094cc5dcdb91f098)
+
+running 2 tests
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_interrupts_fixed_recall_and_reaps_owned_server ... ok
+test paired_agent::chat_completions::deadline_integration_tests::phase_deadline_retains_a_completed_read_before_the_blocked_read ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 572 filtered out; finished in 0.73s
+
