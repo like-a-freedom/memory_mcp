@@ -146,9 +146,7 @@ async fn harness_retrieval_suite() {
 
     let suite = RetrievalSuite::new().expect("load retrieval suite");
     let expected_cases = suite.expected_case_ids().len();
-    let context = RunContext {
-        profile: EvalProfile::Pr,
-    };
+    let context = RunContext::new(EvalProfile::Pr);
     let outcomes = suite.run(&context).await;
 
     let passed = outcomes

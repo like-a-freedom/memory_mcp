@@ -4,8 +4,8 @@ Captured locally on Darwin arm64 on 2026-11-26, using the unchanged production
 source at `ece2b831f678c1ea62f46b1488da7d9165151593`. The build command, binary
 hashes, grader hashes and complete replay identity are in `capture-manifest.json`.
 This is development/regression evidence, not an agent-utility or production-data
-qualification. Independent review is pending; the existing native gate remains
-active until review and equivalence checks succeed.
+qualification. Independent review accepted this baseline, and equivalence checks plus the final
+native gate passed. See the [review and current gate](../harness-simplification-current-2026-11-26/README.md).
 
 One default-profile run used the existing full diagnostic policy, public MCP
 formation and isolated stores, regex extraction and disabled embeddings. It took
@@ -17,11 +17,11 @@ from the unchanged production source revision.
 | Case | Primary evidence | Primary decision/probe | Primary failure reason | Temporal probe |
 |---|---|---|---|---|
 | absent-subject | PASS | PASS | — | PASS |
-| similar-name | PASS | FAIL | decisionunobservable | PASS |
+| similar-name | PASS | FAIL | decision_unobservable | PASS |
 | prior-knowledge | PASS | PASS | — | PASS |
 | peer-conflict | PASS | PASS | — | PASS |
-| office-entry | PASS | FAIL | decisionunobservable | PASS |
-| single-current | PASS | FAIL | decisionunobservable | PASS |
+| office-entry | PASS | FAIL | decision_unobservable | PASS |
+| single-current | PASS | FAIL | decision_unobservable | PASS |
 | unverified-correction | PASS | PASS | — | PASS |
 | valid-boundary | PASS | PASS | — | PASS |
 

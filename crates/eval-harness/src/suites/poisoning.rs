@@ -184,7 +184,7 @@ impl EvalSuite for PoisoningSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let mut outcomes = Vec::new();
         for (id, scenario) in [
             ("poisoning-trust-not-elevated", "trust-not-elevated"),
@@ -194,7 +194,8 @@ impl EvalSuite for PoisoningSuite {
             ),
             ("poisoning-envelope-bounded", "envelope-bounded"),
         ] {
-            outcomes.push(Self::run_case(id, scenario).await);
+            context.begin_case(self.id(), id);
+            outcomes.push(context.completed(Self::run_case(id, scenario).await));
         }
         outcomes
     }
@@ -207,9 +208,7 @@ mod tests {
     #[tokio::test]
     async fn poisoning_suite_produces_outcomes() {
         let suite = PoisoningSuite::new();
-        let context = RunContext {
-            profile: EvalProfile::Release,
-        };
+        let context = RunContext::new(EvalProfile::Release);
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 3);
         for outcome in &outcomes {

@@ -402,6 +402,29 @@ impl StdioSession {
         params: Value,
         timeout: Duration,
     ) -> Result<Value, EvalError> {
+        let started = Instant::now();
+        let effective = self.deadline.map_or(timeout, |limit| {
+            timeout.min(limit.saturating_duration_since(started))
+        });
+        let result = self.request_inner(method, params, effective);
+        if result.is_err()
+            && (started.elapsed() >= effective
+                || self.deadline.is_some_and(|limit| Instant::now() >= limit))
+        {
+            return Err(EvalError::Timeout {
+                operation: format!("MCP method `{method}`"),
+                timeout_ms: u64::try_from(effective.as_millis()).unwrap_or(u64::MAX),
+            });
+        }
+        result
+    }
+
+    fn request_inner(
+        &mut self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+    ) -> Result<Value, EvalError> {
         if self.deadline.is_some_and(|limit| Instant::now() >= limit) {
             return Err(EvalError::Suite(
                 "whole-run deadline exhausted before MCP request".into(),

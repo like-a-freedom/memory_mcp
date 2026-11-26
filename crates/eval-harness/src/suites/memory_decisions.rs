@@ -25,7 +25,9 @@ use crate::reducer::SuiteReducer;
 use crate::runner::{EvalSuite, RunContext};
 
 use self::cases::{DecisionCorpus, DecisionOracle, DecisionProbe, MemoryEvent};
-pub use self::comparison::{CurrentRegressionReport, compare_current_replays, compare_replays};
+pub use self::comparison::{
+    CurrentRegressionReport, compare_current_replays, compare_replays, grader_identity,
+};
 use self::normalization::normalize_observation;
 pub use self::receipts::ReplayIndex;
 use self::receipts::{
@@ -177,7 +179,7 @@ impl MemoryDecisionsSuite {
             artifact_root,
             configuration_error: (!errors.is_empty()).then(|| errors.join("; ")),
             primary_claim_rollout_stage,
-            diagnostics: decl.diagnostics.unwrap_or(true),
+            diagnostics: decl.diagnostics.unwrap_or(false),
             configuration,
             corpus_sha256,
             config_sha256,
@@ -518,14 +520,7 @@ fn run_corpus(
                                             probe.budget,
                                             selected.time_contract_supported,
                                         );
-                                        if probe.repeat_read > 1
-                                            && !observations_repeat(&primary.observations)
-                                        {
-                                            score.evidence_success = false;
-                                            score.decision_success = false;
-                                            score.probe_success = false;
-                                            score.reason_codes.push(ScoreReason::Nonrepeatable);
-                                        }
+                                        enforce_repeatability(&mut score, &primary.observations);
                                         score
                                     })
                                 });
@@ -1143,7 +1138,10 @@ fn temporal_revision_for_probe(
 }
 
 fn product_failure(stage: &str, error: EvalError) -> VariantFailure {
-    let invalid_evaluation = matches!(error, EvalError::InvalidInput(_) | EvalError::Artifact(_));
+    let invalid_evaluation = matches!(
+        error,
+        EvalError::InvalidInput(_) | EvalError::Artifact(_) | EvalError::Timeout { .. }
+    );
     VariantFailure {
         preflight_passed: true,
         invalid_evaluation,
@@ -1255,6 +1253,15 @@ fn supports_temporal_revision(schemas: &Value) -> bool {
         return false;
     };
     properties.get("valid_at").is_some() && properties.get("known_revision").is_some()
+}
+
+fn enforce_repeatability(score: &mut ProbeScore, observations: &[Observed]) {
+    if observations.len() > 1 && !observations_repeat(observations) {
+        score.evidence_success = false;
+        score.decision_success = false;
+        score.probe_success = false;
+        score.reason_codes.push(ScoreReason::Nonrepeatable);
+    }
 }
 
 fn observations_repeat(observations: &[Observed]) -> bool {

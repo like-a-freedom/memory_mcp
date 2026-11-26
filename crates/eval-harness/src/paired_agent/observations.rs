@@ -564,26 +564,53 @@ impl RecordedTrial {
     }
 }
 
-/// Validate both arms before reserving a fresh destination for the receipts.
+/// Reserve a fresh attempt before reading inputs; retain invalid grades and partial outputs.
 pub fn score_recorded_pair(
-    plan: &PairedEvaluationPlan,
-    manifest: &PairedTaskManifest,
-    observations: &RecordedPair,
+    plan_path: &Path,
+    manifest_path: &Path,
+    observations_path: &Path,
     output_directory: &Path,
 ) -> Result<(), EvalError> {
-    let (incumbent, candidate) = observations.score(plan, manifest)?;
     std::fs::create_dir(output_directory).map_err(|source| EvalError::Io {
         path: output_directory.to_path_buf(),
         source,
     })?;
-    let incumbent_path = output_directory.join("incumbent.json");
-    let candidate_path = output_directory.join("candidate.json");
-    let result = write_json_new(&incumbent_path, &incumbent)
-        .and_then(|()| write_json_new(&candidate_path, &candidate));
-    if result.is_err() {
-        let _ = std::fs::remove_file(incumbent_path);
-        let _ = std::fs::remove_file(candidate_path);
-        let _ = std::fs::remove_dir(output_directory);
-    }
+    let read = |path: &Path| {
+        std::fs::read(path).map_err(|source| EvalError::Io {
+            path: path.to_path_buf(),
+            source,
+        })
+    };
+    // Reserve the attempt before parsing or validating inputs. Failed grades survive retries.
+    let plan_bytes = read(plan_path);
+    let manifest_bytes = read(manifest_path);
+    let observation_bytes = read(observations_path);
+    let digest = |bytes: &Result<Vec<u8>, EvalError>| bytes.as_ref().ok().map(|b| sha256(b));
+    let inputs = serde_json::json!({
+        "plan_sha256":digest(&plan_bytes), "tasks_sha256":digest(&manifest_bytes),
+        "observations_sha256":digest(&observation_bytes)
+    });
+    let result = (|| -> Result<(), EvalError> {
+        let plan: PairedEvaluationPlan = serde_json::from_slice(&plan_bytes?)?;
+        let manifest: PairedTaskManifest = serde_json::from_slice(&manifest_bytes?)?;
+        let observations: RecordedPair = serde_json::from_slice(&observation_bytes?)?;
+        let (incumbent, candidate) = observations.score(&plan, &manifest)?;
+        write_json_new(&output_directory.join("incumbent.json"), &incumbent)?;
+        write_json_new(&output_directory.join("candidate.json"), &candidate)
+    })();
+    let binary_sha256 = std::env::current_exe()
+        .ok()
+        .and_then(|path| std::fs::read(path).ok())
+        .map(|b| sha256(&b));
+    write_json_new(
+        &output_directory.join("attempt.json"),
+        &serde_json::json!({
+            "schema_version":"memory-paired-grade-attempt/v1",
+            "execution_status":if result.is_ok() {"scored"} else {"invalid"},
+            "inputs":inputs, "grader_sha256":sha256(include_bytes!("observations.rs")),
+            "grader_binary_sha256":binary_sha256,
+            "error":result.as_ref().err().map(ToString::to_string)
+        }),
+    )?;
     result
 }

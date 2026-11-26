@@ -120,9 +120,7 @@ async fn harness_extraction_suite() {
     use eval_harness::{EvalProfile, EvalSuite, ExtractionSuite, RunContext};
 
     let suite = ExtractionSuite::new().expect("load extraction suite");
-    let context = RunContext {
-        profile: EvalProfile::Pr,
-    };
+    let context = RunContext::new(EvalProfile::Pr);
     let outcomes = suite.run(&context).await;
 
     let passed = outcomes

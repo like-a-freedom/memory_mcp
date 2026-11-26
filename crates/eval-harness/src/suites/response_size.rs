@@ -54,7 +54,7 @@ impl EvalSuite for ResponseSizeSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let cases = match load_cases() {
             Ok(c) => c,
             Err(_) => return vec![],
@@ -64,6 +64,7 @@ impl EvalSuite for ResponseSizeSuite {
 
         for case in &cases {
             let case_id = EvalCaseId::parse(&case.id).unwrap();
+            context.begin_case(self.id(), case_id.as_str());
             let start = std::time::Instant::now();
 
             let (service, db_client) = test_support::make_service_with_client().await;
@@ -228,7 +229,7 @@ impl EvalSuite for ResponseSizeSuite {
                 || compact_bytes == 0
                 || explain_verbose_bytes == 0
                 || explain_compact_bytes == 0;
-            outcomes.push(EvalCaseOutcome {
+            outcomes.push(context.completed(EvalCaseOutcome {
                 case_key: CaseKey::parse("response-size", case_id.as_str()).unwrap(),
                 mode: EvalMode::RetrievalOnly,
                 split: CorpusSplit::Development,
@@ -250,10 +251,11 @@ impl EvalSuite for ResponseSizeSuite {
                 failures: vec![],
                 duration_ms: start.elapsed().as_millis() as u64,
                 attempts: 1,
-            });
+            }));
         }
 
-        outcomes.push(reconstruction_outcome().await);
+        context.begin_case(self.id(), RECONSTRUCTION_CASE);
+        outcomes.push(context.completed(reconstruction_outcome().await));
         outcomes
     }
 }

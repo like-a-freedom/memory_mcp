@@ -202,14 +202,15 @@ impl EvalSuite for ActionGroundingSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let mut outcomes = Vec::new();
         for (id, mode_name) in [
             ("grounding-always-recall", "always_recall"),
             ("grounding-selective-shadow", "selective_shadow"),
             ("grounding-selective-enforced", "selective_enforced"),
         ] {
-            outcomes.push(Self::run_case(id, mode_name).await);
+            context.begin_case(self.id(), id);
+            outcomes.push(context.completed(Self::run_case(id, mode_name).await));
         }
         outcomes
     }
@@ -258,9 +259,7 @@ mod tests {
     #[tokio::test]
     async fn action_grounding_produces_outcomes() {
         let suite = ActionGroundingSuite::new();
-        let context = RunContext {
-            profile: EvalProfile::Release,
-        };
+        let context = RunContext::new(EvalProfile::Release);
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 3);
         for outcome in &outcomes {

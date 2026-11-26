@@ -131,7 +131,7 @@ impl EvalSuite for EndToEndSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let cases = match load_cases() {
             Ok(cases) => cases,
             Err(err) => {
@@ -153,7 +153,8 @@ impl EvalSuite for EndToEndSuite {
 
         let mut outcomes = Vec::with_capacity(cases.len());
         for case in &cases {
-            outcomes.push(run_e2e_case(case).await);
+            context.begin_case(self.id(), &case.id);
+            outcomes.push(context.completed(run_e2e_case(case).await));
         }
         outcomes
     }
@@ -382,9 +383,7 @@ mod tests {
     #[tokio::test]
     async fn e2e_pipeline_completes() {
         let suite = EndToEndSuite::new();
-        let context = RunContext {
-            profile: EvalProfile::Nightly,
-        };
+        let context = RunContext::new(EvalProfile::Nightly);
         let outcomes = suite.run(&context).await;
         assert!(!outcomes.is_empty());
         assert!(outcomes.iter().all(|o| o.duration_ms > 0));

@@ -197,7 +197,7 @@ jobs:
           make eval-response-size
       - name: Build public memory executable for deterministic decisions
         run: cargo build -p memory_mcp --bin memory_mcp --features streamable-http --locked
-      - name: Deterministic memory decision acceptance
+      - name: Current deterministic memory regression
         env:
           MEMORY_DECISIONS_SERVER_BIN: ${{ github.workspace }}/target/debug/memory_mcp
           MEMORY_QUALITY_GATE_OUTPUT: ${{ github.workspace }}/target/evals/deterministic-memory

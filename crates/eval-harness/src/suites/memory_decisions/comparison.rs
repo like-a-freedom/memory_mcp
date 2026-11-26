@@ -200,6 +200,9 @@ pub struct CurrentRegressionReport {
     pub no_regressions: bool,
     pub all_cases_pass: bool,
     pub current_failures: Vec<String>,
+    pub counts: serde_json::Value,
+    pub cases: Vec<serde_json::Value>,
+    pub grader_identity: serde_json::Value,
     pub regressions: Vec<String>,
 }
 
@@ -222,6 +225,7 @@ pub fn compare_current_replays(
         ));
     }
     let mut current_failures = Vec::new();
+    let mut cases = Vec::new();
     let mut regressions = Vec::new();
     for (old, new) in baseline.cases.iter().zip(&candidate.cases) {
         if old.case_id != new.case_id {
@@ -295,6 +299,11 @@ pub fn compare_current_replays(
         if !passed {
             current_failures.push(new.case_id.clone());
         }
+        cases.push(serde_json::json!({
+            "case_id":new.case_id, "status":if passed {"passed"} else {"quality_failed"},
+            "primary":{"evidence_success":new.evidence_success,"decision_success":new.decision_success,"probe_success":new.probe_success},
+            "temporal":new.temporal_score,"reason_codes":new.reason_codes
+        }));
     }
     Ok(CurrentRegressionReport {
         schema_version: "memory-current-regression/v1",
@@ -302,7 +311,24 @@ pub fn compare_current_replays(
         candidate_identity: serde_json::to_value(&candidate.identity)?,
         no_regressions: regressions.is_empty(),
         all_cases_pass: current_failures.is_empty(),
+        counts: serde_json::json!({"passed":candidate.cases.len()-current_failures.len(),"failed":current_failures.len(),"invalid":0,"unobserved":0}),
         current_failures,
+        cases,
+        grader_identity: grader_identity(),
         regressions,
+    })
+}
+
+/// Digests describe the source compiled into this grader, independent of the working tree.
+pub fn grader_identity() -> serde_json::Value {
+    use sha2::{Digest, Sha256};
+    let hash = |source: &[u8]| hex::encode(Sha256::digest(source));
+    serde_json::json!({
+        "protocol":"memory-current-regression/v1",
+        "scorer_sha256":hash(include_bytes!("scoring.rs")),
+        "normalizer_sha256":hash(include_bytes!("normalization.rs")),
+        "registration_sha256":hash(include_bytes!("cases.rs")),
+        "verification_sha256":hash(include_bytes!("verification.rs")),
+        "comparison_sha256":hash(include_bytes!("comparison.rs"))
     })
 }

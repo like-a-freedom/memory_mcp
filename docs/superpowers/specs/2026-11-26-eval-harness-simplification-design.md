@@ -1,6 +1,6 @@
 # Eval harness simplification: faster evidence without weaker oracles
 
-**Status:** Approved by the user on 2026-11-26; implementation in progress.
+**Status:** Approved by the user on 2026-11-26; implemented and independently reviewed; final native gate passed.
 **Date:** 2026-11-26. **Required runtime target:** local native Apple Silicon.
 Portable deterministic tasks must not require a model host, vendor account, or platform-specific filesystem primitive.
 
@@ -12,7 +12,7 @@ Change the existing harness incrementally. Retain corpora, independently reviewe
 
 This proposal changes future execution policy after approval. It does not revise frozen historical plans, turn old NO-GO results into passes, or close outstanding production-data prerequisites.
 
-## Observed causes and limits
+## Pre-change observations and limits
 
 1. `MemoryDecisionsSuite` runs the primary variant and, on primary execution success, two additional variants: verbose/shadow and evidence diagnostic. Each variant starts a new server/store and repeats public ingest/extract. See [variant calls](../../../crates/eval-harness/src/suites/memory_decisions.rs#L509) and [setup](../../../crates/eval-harness/src/suites/memory_decisions.rs#L781). The current native gate calls four complete profiles: default twice and shadow twice ([gate](../../../crates/eval-harness/tests/deterministic_quality_gate.rs#L352)). Eight cases therefore nominally execute **4 × 8 × 3 = 96 scenario variants**, before counting their individual tool calls. This is work count, not measured time attribution; execution failures may prevent later diagnostics.
 2. The generic runner awaits a suite without a global deadline and only evaluates `time_budget_seconds` afterward ([execution](../../../crates/eval-harness/src/runner.rs#L136), [budget verdict](../../../crates/eval-harness/src/runner.rs#L192)). Existing stdio startup/call/shutdown timeouts are useful but do not impose a whole-run deadline. A simple timeout around `spawn_blocking` would leave its running work alive.
@@ -123,3 +123,35 @@ No new dependencies or MCP tools are proposed. This is a targeted simplification
 ## Primary reference checked
 
 Read through `/keenable-cli` on 2026-11-26: [Anthropic, Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents), published 2026-01-09. Its recommendations support deterministic graders where possible, checking transcripts and actual outcomes, and avoiding unnecessarily rigid action sequences. They do not establish that this proposed refactor will produce a particular speedup; the repository findings and later matched measurements must establish that.
+
+## Implemented boundaries and evidence (2026-11-26)
+
+The active gate runs one complete primary capture; all existing historical diagnostic profiles
+explicitly enable diagnostics. Saved v3 diagnostic evidence retains its historical
+contract; v4/v5 additionally require successful formation envelopes and registered
+repeat counts. Every v4/v5 primary repeat is independently normalized and scored.
+Removed optional diagnostics are unobserved, not measured zeros.
+
+The Runner budget includes suite execution and fingerprint subprocesses. CLI profile
+loading, corpus preparation and binary hashing precede it. Python bounds/reaps each
+CLI invocation, excluding snapshot copying. Per-case receipts preserve completed
+memory scenarios; a generic suite deadline retains completed/started/unstarted cases.
+External workers are owned, bounded, aborted and drained before return. There is no
+promise to terminate arbitrary descendants created by an external program.
+
+Public synthetic sidecars persist at phase completion. They preserve actual calls
+and replies but are not crash-safe per-call logs. `call_failed` specifically denotes
+transport failure; operation errors remain in raw envelopes. Replay requires the
+caller to provide compatible isolated state; it does not reconstruct private state.
+
+Offline stages use existing immutable inputs and fresh attempt paths, without a new
+orchestrator. Invalid paired grades preserve `attempt.json` and any partial outputs;
+only a scored attempt is complete. Current grades retain index/source/executable
+hashes, individual dimensions/reasons and passed/failed/invalid/unobserved counts.
+
+The [independent review and measured captures](../../../evals/paired/harness-simplification-current-2026-11-26/README.md)
+justify the switch. The final native capture took 54,470 ms (gate wall 58.17 s), with
+5 passing cases, 3 retained primary decision failures and no new regression. This is
+finite-cohort evidence, not an agent-utility, unseen benchmark or general speed claim.
+The bounded context-cost pilot did not justify sharing mutable stores or adding a
+snapshot-copy dependency; isolation is preserved.

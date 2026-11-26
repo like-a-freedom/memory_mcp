@@ -10,7 +10,8 @@
       "claim_rollout_stage": "shadow",
       "expected_coverage": {
         "exact_cases": 8
-      }
+      },
+      "diagnostics": true
     }
   ],
   "gates": []

@@ -66,6 +66,7 @@ impl EvalSuite for LifecycleReleaseSuite {
         let mut outcomes = Vec::new();
         let suite_start = std::time::Instant::now();
 
+        context.begin_case(self.id(), "lifecycle-action-grounding");
         let grounding_suite = ActionGroundingSuite::new();
         let grounding_outcomes = grounding_suite.run(context).await;
         let grounding_invalid = grounding_outcomes
@@ -91,7 +92,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             MetricEvidence::ratio(grounding_passed as u64, grounding_total as u64),
         );
 
-        outcomes.push(EvalCaseOutcome {
+        outcomes.push(context.completed(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-action-grounding").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
@@ -111,8 +112,9 @@ impl EvalSuite for LifecycleReleaseSuite {
             },
             duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
-        });
+        }));
 
+        context.begin_case(self.id(), "lifecycle-capacity");
         let capacity_suite = CapacitySuite::new();
         let capacity_outcomes = capacity_suite.run(context).await;
         let capacity_invalid = capacity_outcomes
@@ -129,7 +131,7 @@ impl EvalSuite for LifecycleReleaseSuite {
         } else {
             CaseStatus::QualityFailed
         };
-        outcomes.push(EvalCaseOutcome {
+        outcomes.push(context.completed(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-capacity").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
@@ -149,8 +151,9 @@ impl EvalSuite for LifecycleReleaseSuite {
             },
             duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
-        });
+        }));
 
+        context.begin_case(self.id(), "lifecycle-poisoning");
         let poisoning_suite = PoisoningSuite::new();
         let poisoning_outcomes = poisoning_suite.run(context).await;
         let poisoning_invalid = poisoning_outcomes
@@ -176,7 +179,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             MetricEvidence::ratio(poisoning_passed as u64, poisoning_total as u64),
         );
 
-        outcomes.push(EvalCaseOutcome {
+        outcomes.push(context.completed(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-poisoning").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
@@ -196,8 +199,9 @@ impl EvalSuite for LifecycleReleaseSuite {
             },
             duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
-        });
+        }));
 
+        context.begin_case(self.id(), "lifecycle-public-surface");
         let expected_tools = [
             "ingest",
             "extract",
@@ -218,7 +222,7 @@ impl EvalSuite for LifecycleReleaseSuite {
                 expected_tools.len()
             )
         };
-        outcomes.push(EvalCaseOutcome {
+        outcomes.push(context.completed(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-public-surface").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
@@ -238,7 +242,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             },
             duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
-        });
+        }));
 
         outcomes
     }
@@ -251,9 +255,7 @@ mod tests {
     #[tokio::test]
     async fn lifecycle_gate_produces_outcomes() {
         let suite = LifecycleReleaseSuite::new();
-        let context = RunContext {
-            profile: EvalProfile::Release,
-        };
+        let context = RunContext::new(EvalProfile::Release);
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 4);
         for outcome in &outcomes {

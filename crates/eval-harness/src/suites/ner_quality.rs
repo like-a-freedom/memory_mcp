@@ -149,7 +149,7 @@ impl EvalSuite for NerQualitySuite {
         self.reducer.as_ref()
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let fixture_present = ner_fixtures::fixture_present(self.kind);
         if !fixture_present {
             return self
@@ -167,7 +167,8 @@ impl EvalSuite for NerQualitySuite {
         };
         let mut outcomes = Vec::with_capacity(self.cases.len());
         for case in &self.cases {
-            outcomes.push(run_case(&self.id, extractor.as_ref(), case).await);
+            context.begin_case(self.id(), &case.id);
+            outcomes.push(context.completed(run_case(&self.id, extractor.as_ref(), case).await));
         }
         outcomes
     }

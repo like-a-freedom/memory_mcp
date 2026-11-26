@@ -43,29 +43,39 @@ fn answer_proxy(items: &[String], answers: &[String]) -> Result<MetricEvidence, 
 
 pub struct WorkerPolicy {
     pub context_workers: NonZeroUsize,
-    pub query_workers_per_context: NonZeroUsize,
 }
 
 impl Default for WorkerPolicy {
     fn default() -> Self {
         Self {
             context_workers: NonZeroUsize::new(3).unwrap(),
-            query_workers_per_context: NonZeroUsize::new(4).unwrap(),
         }
+    }
+}
+
+#[async_trait]
+pub trait ExternalCaseEvaluator: Send + Sync {
+    async fn evaluate(&self, case: &ExternalCase) -> EvalCaseOutcome;
+}
+
+struct ProductCaseEvaluator;
+#[async_trait]
+impl ExternalCaseEvaluator for ProductCaseEvaluator {
+    async fn evaluate(&self, case: &ExternalCase) -> EvalCaseOutcome {
+        ExternalRetrievalSuite::run_case(case).await
     }
 }
 
 pub struct ExternalRetrievalSuite {
     cases: Vec<ExternalCase>,
     expected_ids: Vec<EvalCaseId>,
-    #[allow(dead_code)]
-    dataset: String,
+    evaluator: std::sync::Arc<dyn ExternalCaseEvaluator>,
     worker_policy: WorkerPolicy,
     reducer: crate::reducer::RatioReducer,
 }
 
 impl ExternalRetrievalSuite {
-    pub fn new(dataset: crate::corpus::adapters::DatasetKind, cases: Vec<ExternalCase>) -> Self {
+    pub fn new(cases: Vec<ExternalCase>) -> Self {
         let expected_ids: Vec<EvalCaseId> = cases
             .iter()
             .map(|c| {
@@ -76,7 +86,7 @@ impl ExternalRetrievalSuite {
         Self {
             cases,
             expected_ids,
-            dataset: dataset.dataset_name().to_string(),
+            evaluator: std::sync::Arc::new(ProductCaseEvaluator),
             worker_policy: WorkerPolicy::default(),
             reducer: crate::reducer::RatioReducer::new("external-retrieval", ANSWER_PROXY_SPECS),
         }
@@ -84,6 +94,14 @@ impl ExternalRetrievalSuite {
 
     pub fn with_worker_policy(mut self, policy: WorkerPolicy) -> Self {
         self.worker_policy = policy;
+        self
+    }
+
+    pub fn with_case_evaluator(
+        mut self,
+        evaluator: std::sync::Arc<dyn ExternalCaseEvaluator>,
+    ) -> Self {
+        self.evaluator = evaluator;
         self
     }
 
@@ -241,48 +259,79 @@ impl EvalSuite for ExternalRetrievalSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
-        let mut outcomes = Vec::with_capacity(self.cases.len());
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
+        self.run_until(context, None).await
+    }
 
-        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(
-            self.worker_policy.context_workers.get(),
-        ));
+    async fn run_with_deadline(
+        &self,
+        context: &RunContext,
+        deadline: std::time::Instant,
+    ) -> Vec<EvalCaseOutcome> {
+        self.run_until(context, Some(deadline)).await
+    }
+}
 
-        let mut handles = Vec::new();
-        for case in &self.cases {
-            let case = case.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
-            handles.push(tokio::spawn(async move {
-                let result = Self::run_case(&case).await;
-                drop(permit);
-                result
-            }));
-        }
-
-        for handle in handles {
-            match handle.await {
-                Ok(outcome) => outcomes.push(outcome),
-                Err(join_err) => {
-                    let case_key = CaseKey::parse("external-retrieval", "join-error").unwrap();
-                    outcomes.push(EvalCaseOutcome {
-                        case_key,
-                        mode: EvalMode::RetrievalOnly,
-                        split: CorpusSplit::Test,
-                        label_trust: LabelTrust::Weak,
-                        status: CaseStatus::Invalid,
-                        metrics: BTreeMap::new(),
-                        evidence: std::collections::BTreeMap::new(),
-                        invalid_reason: Some(format!("task panicked: {join_err}")),
-                        failures: vec![],
-                        duration_ms: 0,
-                        attempts: 1,
-                    });
+impl ExternalRetrievalSuite {
+    async fn run_until(
+        &self,
+        context: &RunContext,
+        deadline: Option<std::time::Instant>,
+    ) -> Vec<EvalCaseOutcome> {
+        let mut tasks = tokio::task::JoinSet::new();
+        let mut cases_by_task = std::collections::HashMap::new();
+        let mut remaining = self.cases.iter();
+        loop {
+            while tasks.len() < self.worker_policy.context_workers.get()
+                && !deadline.is_some_and(|limit| std::time::Instant::now() >= limit)
+            {
+                let Some(case) = remaining.next() else {
+                    break;
+                };
+                let case = case.clone();
+                let case_id = case.id.clone();
+                let evaluator = self.evaluator.clone();
+                let context = context.clone();
+                context.begin_case(self.id(), &case_id);
+                let handle =
+                    tasks.spawn(async move { context.completed(evaluator.evaluate(&case).await) });
+                cases_by_task.insert(handle.id(), case_id);
+            }
+            let next = if let Some(deadline) = deadline {
+                match tokio::time::timeout_at(deadline.into(), tasks.join_next_with_id()).await {
+                    Ok(next) => next,
+                    Err(_) => {
+                        tasks.abort_all();
+                        // Aborting alone is insufficient: wait until every owned future is dropped.
+                        while tasks.join_next().await.is_some() {}
+                        break;
+                    }
+                }
+            } else {
+                tasks.join_next_with_id().await
+            };
+            match next {
+                None => break,
+                Some(Ok((id, _))) => {
+                    cases_by_task.remove(&id);
+                }
+                Some(Err(error)) => {
+                    if let Some(case_id) = cases_by_task.remove(&error.id()) {
+                        let mut outcome = EvalCaseOutcome::new(
+                            self.id(),
+                            case_id,
+                            self.mode(),
+                            CorpusSplit::Test,
+                            LabelTrust::Weak,
+                            CaseStatus::Invalid,
+                        );
+                        outcome.invalid_reason = Some(format!("case task failed: {error}"));
+                        context.completed(outcome);
+                    }
                 }
             }
         }
-
-        outcomes.sort_by(|a, b| a.case_id().cmp(b.case_id()));
-        outcomes
+        context.interrupted_outcomes(self)
     }
 }
 
@@ -300,13 +349,6 @@ mod tests {
         );
         assert!(answer_proxy(&[], &[]).is_err());
         assert!(answer_proxy(&[], &[" ".into()]).is_err());
-    }
-
-    #[test]
-    fn worker_policy_default_values() {
-        let policy = WorkerPolicy::default();
-        assert_eq!(policy.context_workers.get(), 3);
-        assert_eq!(policy.query_workers_per_context.get(), 4);
     }
 
     #[test]
@@ -347,10 +389,7 @@ mod tests {
                 metadata: serde_json::json!({}),
             },
         ];
-        let suite = ExternalRetrievalSuite::new(
-            crate::corpus::adapters::DatasetKind::LongMemEvalCleaned,
-            cases,
-        );
+        let suite = ExternalRetrievalSuite::new(cases);
         assert_eq!(suite.expected_case_ids().len(), 2);
     }
 

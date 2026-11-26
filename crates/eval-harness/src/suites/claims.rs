@@ -480,7 +480,7 @@ impl EvalSuite for ClaimReconciliationSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let cases = match load_cases() {
             Ok(cases) => cases,
             Err(err) => {
@@ -503,6 +503,7 @@ impl EvalSuite for ClaimReconciliationSuite {
         let mut outcomes = Vec::with_capacity(cases.len());
         for case in &cases {
             let case_id = EvalCaseId::parse(&case.id).unwrap();
+            context.begin_case(self.id(), case_id.as_str());
             let start = std::time::Instant::now();
 
             let corpus_split = match case.split {
@@ -547,7 +548,7 @@ impl EvalSuite for ClaimReconciliationSuite {
             }
 
             if setup_failed {
-                outcomes.push(EvalCaseOutcome {
+                outcomes.push(context.completed(EvalCaseOutcome {
                     case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: corpus_split,
@@ -559,7 +560,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                     failures: vec![],
                     duration_ms: start.elapsed().as_millis() as u64,
                     attempts: 1,
-                });
+                }));
                 continue;
             }
 
@@ -577,7 +578,7 @@ impl EvalSuite for ClaimReconciliationSuite {
             {
                 Ok(result) => result,
                 Err(err) => {
-                    outcomes.push(EvalCaseOutcome {
+                    outcomes.push(context.completed(EvalCaseOutcome {
                         case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                         mode: EvalMode::EndToEnd,
                         split: corpus_split,
@@ -589,7 +590,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
                         attempts: 1,
-                    });
+                    }));
                     continue;
                 }
             };
@@ -644,7 +645,7 @@ impl EvalSuite for ClaimReconciliationSuite {
             let persisted_relations = match persisted {
                 Ok(evidence) => evidence.relations,
                 Err(err) => {
-                    outcomes.push(EvalCaseOutcome {
+                    outcomes.push(context.completed(EvalCaseOutcome {
                         case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                         mode: EvalMode::EndToEnd,
                         split: corpus_split,
@@ -658,7 +659,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
                         attempts: 1,
-                    });
+                    }));
                     continue;
                 }
             };
@@ -787,7 +788,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                 evidence_map.insert("classification".to_string(), classification);
             }
 
-            outcomes.push(EvalCaseOutcome {
+            outcomes.push(context.completed(EvalCaseOutcome {
                 case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                 mode: EvalMode::EndToEnd,
                 split: corpus_split,
@@ -826,7 +827,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                 },
                 duration_ms: start.elapsed().as_millis() as u64,
                 attempts: 1,
-            });
+            }));
         }
 
         outcomes

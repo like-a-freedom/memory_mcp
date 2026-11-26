@@ -191,3 +191,109 @@ fn detached_primary_temporal_score_is_rejected() {
     std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
     assert!(load_verified_replay(&path).is_err());
 }
+
+fn reject_current_capture_mutation(
+    primary_only: bool,
+    change: impl FnOnce(&mut serde_json::Value),
+) {
+    use sha2::{Digest, Sha256};
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source = root.join(if primary_only {
+        "evals/paired/harness-simplification-current-2026-11-26/receipts"
+    } else {
+        "evals/paired/harness-simplification-baseline-2026-11-26/receipts"
+    });
+    let dir = tempfile::tempdir().unwrap();
+    for entry in std::fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::copy(entry.path(), dir.path().join(entry.file_name())).unwrap();
+    }
+    let path = dir.path().join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let case = index["cases"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|case| case["case_id"] == "office-entry")
+        .unwrap();
+    let file = dir.path().join(case["receipt_path"].as_str().unwrap());
+    let mut raw: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    change(&mut raw);
+    let bytes = serde_json::to_vec_pretty(&raw).unwrap();
+    std::fs::write(file, &bytes).unwrap();
+    case["receipt_sha256"] = hex::encode(Sha256::digest(&bytes)).into();
+    std::fs::write(&path, serde_json::to_vec(&index).unwrap()).unwrap();
+    assert!(
+        eval_harness::suites::load_registered_replay(
+            &path,
+            &root.join("evals/corpora/memory-decisions-v9")
+        )
+        .is_err(),
+        "every registered repeat must be present and independently regraded"
+    );
+}
+
+#[test]
+fn archived_capture_cannot_omit_the_registered_second_read() {
+    reject_current_capture_mutation(false, |raw| {
+        raw["primary_compact_responses"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+    });
+}
+#[test]
+fn primary_only_capture_cannot_omit_the_registered_second_read() {
+    reject_current_capture_mutation(true, |raw| {
+        raw["primary_compact_responses"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+    });
+}
+#[test]
+fn archived_capture_cannot_hide_a_changed_second_read() {
+    reject_current_capture_mutation(false, change_second_read);
+}
+#[test]
+fn primary_only_capture_cannot_hide_a_changed_second_read() {
+    reject_current_capture_mutation(true, change_second_read);
+}
+
+fn change_second_read(raw: &mut serde_json::Value) {
+    raw["primary_compact_responses"][1] =
+        serde_json::json!({"result":{"structuredContent":{"result":[]}}});
+}
+
+#[test]
+fn diagnostic_formation_cannot_substitute_for_missing_primary_formation() {
+    reject_current_capture_mutation(false, |raw| {
+        raw["ingest_receipts"] = serde_json::json!([]);
+    });
+}
+
+#[test]
+fn extraction_without_a_successful_response_cannot_attest_formation() {
+    reject_current_capture_mutation(true, |raw| {
+        raw["extract_receipts"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("response");
+    });
+}
+
+#[test]
+fn changed_extractor_cannot_reuse_the_registered_configuration() {
+    reject_current_capture_mutation(true, |raw| {
+        raw["primary_launch_profile"]["NER_EXTRACTOR"] = "unregistered".into();
+    });
+}
+
+#[test]
+fn diagnostic_extractor_cannot_differ_from_registered_configuration() {
+    reject_current_capture_mutation(false, |raw| {
+        raw["evidence_enabled_diagnostic"]["launch_profile"]["NER_EXTRACTOR"] = "other".into();
+    });
+}

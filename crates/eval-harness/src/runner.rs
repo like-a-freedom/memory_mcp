@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -10,8 +11,56 @@ use crate::error::EvalError;
 use crate::profile::ProfileManifest;
 use crate::reducer::SuiteReducer;
 
+type CaseProgress = BTreeMap<(String, String), Option<EvalCaseOutcome>>;
+
+#[derive(Clone)]
 pub struct RunContext {
     pub profile: EvalProfile,
+    cases: Arc<Mutex<CaseProgress>>,
+}
+
+impl RunContext {
+    pub fn new(profile: EvalProfile) -> Self {
+        Self {
+            profile,
+            cases: Arc::default(),
+        }
+    }
+
+    pub fn begin_case(&self, suite: &str, case: &str) {
+        self.cases
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert((suite.into(), case.into()), None);
+    }
+
+    pub fn completed(&self, outcome: EvalCaseOutcome) -> EvalCaseOutcome {
+        self.cases.lock().unwrap_or_else(|e| e.into_inner()).insert(
+            (
+                outcome.suite_id().to_string(),
+                outcome.case_id().as_str().to_string(),
+            ),
+            Some(outcome.clone()),
+        );
+        outcome
+    }
+
+    pub fn interrupted_outcomes<S: EvalSuite + ?Sized>(&self, suite: &S) -> Vec<EvalCaseOutcome> {
+        let cases = self.cases.lock().unwrap_or_else(|e| e.into_inner());
+        deadline_outcomes(suite, 0)
+            .into_iter()
+            .map(|mut outcome| {
+                match cases.get(&(suite.id().into(), outcome.case_id().as_str().to_string())) {
+                    Some(Some(completed)) => completed.clone(),
+                    Some(None) => {
+                        outcome.attempts = 1;
+                        outcome
+                    }
+                    None => outcome,
+                }
+            })
+            .collect()
+    }
 }
 
 pub struct RunRequest {
@@ -42,7 +91,7 @@ pub trait EvalSuite: Send + Sync {
     ) -> Vec<EvalCaseOutcome> {
         match tokio::time::timeout_at(deadline.into(), self.run(context)).await {
             Ok(outcomes) => outcomes,
-            Err(_) => deadline_outcomes(self, 1),
+            Err(_) => context.interrupted_outcomes(self),
         }
     }
 }
@@ -57,7 +106,7 @@ fn deadline_outcomes<S: EvalSuite + ?Sized>(suite: &S, attempts: u32) -> Vec<Eva
                 id.as_str(),
                 suite.mode(),
                 CorpusSplit::Test,
-                LabelTrust::Reviewed,
+                LabelTrust::Weak,
                 CaseStatus::Invalid,
             );
             outcome.invalid_reason =
@@ -133,7 +182,7 @@ impl Runner {
         let deadline = (request.manifest.time_budget_seconds > 0)
             .then(|| started + Duration::from_secs(request.manifest.time_budget_seconds));
         let profile = request.manifest.profile;
-        let context = RunContext { profile };
+        let context = RunContext::new(profile);
 
         let mut selected_suites: Vec<&dyn EvalSuite> = Vec::new();
         for suite in &self.suites {
@@ -393,8 +442,9 @@ mod tests {
             self.fingerprint_metadata.clone()
         }
 
-        async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+        async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
             if self.hangs {
+                context.begin_case(self.id(), self.expected_ids[0].as_str());
                 std::future::pending::<()>().await;
             }
             self.outcomes.clone()

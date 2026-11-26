@@ -111,7 +111,7 @@ fn build_external_retrieval(decl: &SuiteDecl) -> Result<Box<dyn EvalSuite>, Eval
     let cases = crate::corpus::adapters::load_and_normalize(kind, &prepared)?;
     manifest.validate_case_count(cases.len())?;
     Ok(Box::new(
-        crate::suites::external_retrieval::ExternalRetrievalSuite::new(kind, cases),
+        crate::suites::external_retrieval::ExternalRetrievalSuite::new(cases),
     ))
 }
 

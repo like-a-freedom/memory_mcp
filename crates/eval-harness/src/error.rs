@@ -18,6 +18,9 @@ pub enum EvalError {
     #[error("evaluation artifact serialization failed: {0}")]
     Artifact(#[from] serde_json::Error),
 
+    #[error("execution timed out after {timeout_ms} ms during {operation}")]
+    Timeout { operation: String, timeout_ms: u64 },
+
     #[error("evaluation suite failed: {0}")]
     Suite(String),
 }

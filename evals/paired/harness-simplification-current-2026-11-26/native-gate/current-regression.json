@@ -1,0 +1,186 @@
+{
+  "all_cases_pass": false,
+  "baseline_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "product_revision": "ece2b831f678c1ea62f46b1488da7d9165151593",
+    "suite_id": "memory-decisions"
+  },
+  "candidate_identity": {
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "corpus_sha256": "40fdef00b8201de03df680d2ad9185038ead358372d5b5b3fedac66e55044ee3",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f",
+    "product_binary_sha256": "4b1d1e878874e246a239a4900a04f54d2c00bcec3c319f910fbe8de53af84d3c",
+    "product_revision": "ci-current",
+    "suite_id": "memory-decisions"
+  },
+  "cases": [
+    {
+      "case_id": "absent-subject",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "similar-name",
+      "primary": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "status": "quality_failed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "single-current",
+      "primary": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "status": "quality_failed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "peer-conflict",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "unverified-correction",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "prior-knowledge",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "valid-boundary",
+      "primary": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true
+      },
+      "reason_codes": [],
+      "status": "passed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "office-entry",
+      "primary": {
+        "decision_success": false,
+        "evidence_success": true,
+        "probe_success": false
+      },
+      "reason_codes": [
+        "decision_unobservable"
+      ],
+      "status": "quality_failed",
+      "temporal": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      }
+    }
+  ],
+  "counts": {
+    "failed": 3,
+    "invalid": 0,
+    "passed": 5,
+    "unobserved": 0
+  },
+  "current_failures": [
+    "similar-name",
+    "single-current",
+    "office-entry"
+  ],
+  "execution_status": "scored",
+  "grader_identity": {
+    "binary_sha256": "a2153495faec88afef4e3a4d33fb8855cfc59a4996a5c06bbc9698706662f02b",
+    "comparison_sha256": "a02149e8e7e4dd32ec102f57473c21e8b2e1818a535f0a13e3816c18835a3055",
+    "normalizer_sha256": "9a87982dde02730ae6839515df78297687ea5a4469537fec3bf04b31619c5caf",
+    "protocol": "memory-current-regression/v1",
+    "registration_sha256": "137ebdccbc545e54f8514714140c0fa4c8cd23a88d3067ec891042b0503e2e68",
+    "scorer_sha256": "fad6db5668f8035f925290324ad1fe77ced4e8e0af61554132d49fd6d6420609",
+    "verification_sha256": "1887ac31c9052705d0475df24c7a0efd8c1dad23c16fcebf786cf3a659152c5b"
+  },
+  "inputs": {
+    "baseline": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json",
+    "baseline_index_sha256": "fd47c4830f0991d35ccd39ec6e8a70f4c3d55dbda4a9dc1132353336e5eab3cd",
+    "candidate": "/Users/solovey/Documents/dev/memory_mcp/target/evals/harness-simplification-final-2026-11-26/current/index.json",
+    "candidate_index_sha256": "a646c5592cc54b0c5b308eb7502802b058951bef62eba7f549d840cb3bdba3a2",
+    "corpus": "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/memory-decisions-v9"
+  },
+  "no_regressions": true,
+  "regressions": [],
+  "schema_version": "memory-current-regression/v1"
+}

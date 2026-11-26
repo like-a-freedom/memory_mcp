@@ -311,7 +311,7 @@ impl EvalSuite for ExtractionSuite {
         &self.reducer
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let cases = match load_cases() {
             Ok(cases) => cases,
             Err(err) => {
@@ -333,7 +333,8 @@ impl EvalSuite for ExtractionSuite {
 
         let mut outcomes = Vec::with_capacity(cases.len());
         for case in &cases {
-            outcomes.push(run_case(case).await);
+            context.begin_case(self.id(), &case.id);
+            outcomes.push(context.completed(run_case(case).await));
         }
         outcomes
     }

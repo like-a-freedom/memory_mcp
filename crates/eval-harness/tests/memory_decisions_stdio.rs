@@ -124,8 +124,17 @@ fn whole_run_deadline_also_bounds_a_tool_call_after_initialization() {
 
 #[test]
 fn cli_deadline_persists_all_cases_and_leaves_unstarted_attempts_at_zero() {
+    assert_cli_deadline("init_hang");
+}
+
+#[test]
+fn cli_tool_deadline_is_invalid_execution_and_reports_the_effective_limit() {
+    assert_cli_deadline("call_hang");
+}
+
+fn assert_cli_deadline(mode: &str) {
     let temp = TempDir::new().unwrap();
-    let binary = fake_server(&temp, "init_hang");
+    let binary = fake_server(&temp, mode);
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -179,6 +188,14 @@ fn cli_deadline_persists_all_cases_and_leaves_unstarted_attempts_at_zero() {
     assert_eq!(report["budget_status"], "failed");
     let outcomes = report["outcomes"].as_array().unwrap();
     assert_eq!(outcomes.len(), 8);
+    assert!(
+        outcomes.iter().all(|case| case["status"] == "invalid"),
+        "timeouts cannot become quality failures: {outcomes:?}"
+    );
+    assert!(
+        !report.to_string().contains("120000"),
+        "report the enforced run bound, not the unconstrained call timeout"
+    );
     assert_eq!(
         outcomes.iter().filter(|case| case["attempts"] == 0).count(),
         7
@@ -198,16 +215,31 @@ fn cli_deadline_persists_all_cases_and_leaves_unstarted_attempts_at_zero() {
 
 #[test]
 fn cli_receipt_separates_scenario_stages_from_total_wall_time() {
+    assert_primary_only_capture(Some(false));
+}
+
+#[test]
+fn cli_default_executes_one_primary_variant_without_diagnostics() {
+    assert_primary_only_capture(None);
+}
+
+fn capture_selected_case(
+    diagnostics: Option<bool>,
+) -> (TempDir, serde_json::Value, serde_json::Value) {
     let temp = TempDir::new().unwrap();
     let binary = fake_server(&temp, "empty");
     let corpus =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../evals/corpora/memory-decisions-v9");
     let profile = temp.path().join("profile.json");
     let receipts = temp.path().join("receipts");
-    std::fs::write(&profile, serde_json::to_vec(&json!({
+    let mut input = json!({
         "schema_version":"memory-mcp-eval-profile/v1", "profile":"nightly", "time_budget_seconds":5,
-        "suites":[{"id":"memory-decisions","corpus_root":corpus,"case_ids":["absent-subject"],"diagnostics":false}], "gates":[]
-    })).unwrap()).unwrap();
+        "suites":[{"id":"memory-decisions","corpus_root":corpus,"case_ids":["absent-subject"]}], "gates":[]
+    });
+    if let Some(value) = diagnostics {
+        input["suites"][0]["diagnostics"] = value.into();
+    }
+    std::fs::write(&profile, serde_json::to_vec(&input).unwrap()).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_memory-eval"))
         .args(["run", "--profile"])
         .arg(profile)
@@ -225,6 +257,31 @@ fn cli_receipt_separates_scenario_stages_from_total_wall_time() {
     );
     let report: serde_json::Value =
         serde_json::from_slice(&std::fs::read(temp.path().join("run.json")).unwrap()).unwrap();
+    let receipt: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(receipts.join("receipt-absent-subject.json")).unwrap(),
+    )
+    .unwrap();
+    (temp, report, receipt)
+}
+
+#[test]
+fn cli_explicit_diagnostics_preserve_all_three_isolated_variants() {
+    let (temp, report, receipt) = capture_selected_case(Some(true));
+    assert_eq!(report["outcomes"].as_array().unwrap().len(), 1);
+    assert_eq!(receipt["schema_version"], "memory-decisions-receipt/v4");
+    assert!(receipt["verbose_diagnostic"].is_object());
+    assert!(receipt["evidence_enabled_diagnostic"].is_object());
+    assert_eq!(
+        std::fs::read_to_string(temp.path().join("fake-memory-server.sh.starts"))
+            .unwrap()
+            .lines()
+            .count(),
+        3
+    );
+}
+
+fn assert_primary_only_capture(diagnostics: Option<bool>) {
+    let (temp, report, receipt) = capture_selected_case(diagnostics);
     assert_eq!(report["expected_cases"].as_array().unwrap().len(), 1);
     assert_eq!(report["outcomes"].as_array().unwrap().len(), 1);
     assert!(
@@ -238,10 +295,6 @@ fn cli_receipt_separates_scenario_stages_from_total_wall_time() {
             .get("evidence_stage_temporal_probe_success_rate")
             .is_none()
     );
-    let receipt: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(receipts.join("receipt-absent-subject.json")).unwrap(),
-    )
-    .unwrap();
     assert_eq!(receipt["schema_version"], "memory-decisions-receipt/v5");
     assert_eq!(
         std::fs::read_to_string(temp.path().join("fake-memory-server.sh.starts"))
@@ -408,23 +461,28 @@ fn separate_sessions_receive_distinct_store_paths() {
 
 #[test]
 fn stdio_process_uses_the_explicit_claim_rollout_stage() {
+    assert_explicit_claim_stage("evidence");
+}
+
+#[test]
+fn stdio_process_uses_the_explicit_shadow_rollback_stage() {
+    assert_explicit_claim_stage("shadow");
+}
+
+fn assert_explicit_claim_stage(stage: &str) {
     let temp = TempDir::new().unwrap();
     let binary = fake_server(&temp, "normal");
-    let store_path = store(&temp, "evidence-store");
+    let store_path = store(&temp, stage);
 
-    let mut session =
-        StdioSession::spawn_with_claim_stage(&binary, &store_path, "evidence").unwrap();
+    let mut session = StdioSession::spawn_with_claim_stage(&binary, &store_path, stage).unwrap();
 
     assert_eq!(
         std::fs::read_to_string(store_path.join("claim-stage.txt"))
             .unwrap()
             .trim(),
-        "evidence"
+        stage
     );
-    assert_eq!(
-        session.launch_profile["MEMORY_CLAIM_ROLLOUT_STAGE"],
-        "evidence"
-    );
+    assert_eq!(session.launch_profile["MEMORY_CLAIM_ROLLOUT_STAGE"], stage);
     session.shutdown().unwrap();
 }
 

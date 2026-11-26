@@ -1,5 +1,12 @@
 # Deterministic memory quality — 2026-11-21
 
+> **Current gate, 2026-11-26:** The historical rollout evidence below remains
+> archived. Routine acceptance now runs one full primary capture and compares
+> each case/dimension/reason with an independently reviewed immutable baseline.
+> The final Apple Silicon run had 0 regressions, 5 passed, 3 known quality failures
+> and 0 invalid/unobserved cases. See the [current runbook](README.md#fast-deterministic-development)
+> and [verified capture and review](../../evals/paired/harness-simplification-current-2026-11-26/README.md).
+
 Status: development and frozen-candidate confirmation both accepted. This report concerns deterministic public-MCP memory behavior in explicitly selected temporal/evidence mode. It does not claim improved agent productivity or an official external-benchmark score.
 
 > **Evaluator and C3 update (2026-11-25):** A TDD review found that the
@@ -176,7 +183,7 @@ Latest local verification (2026-11-23): `cargo test -p memory_mcp --locked` pass
 
 Strict workspace clippy passed with `fs-watch,mcp-apps,streamable-http,test-fixtures` and `-D warnings`; format checking passed. Real integrated independent probes were executed separately against the public product; changing agent read count cannot change their fixed-probe score. Standalone stdio and HTTP transport captures are archived in [independent-probe evidence](INDEPENDENT_MEMORY_PROBES.md).
 
-The `evaluation` job now builds the public executable, explicitly runs `deterministic_quality_gate` with a fresh output directory, and uploads both raw repeated captures and its acceptance report even on failure. The exact gate has been proven locally on this laptop. A hosted Linux CI run has not been triggered or claimed.
+The `evaluation` job now builds the public executable, explicitly runs `deterministic_quality_gate` with a fresh output directory, and uploads the current raw capture and its scoped regression report even on failure. Historical repeated rollout captures are opt-in. The exact gate has been proven locally on this laptop. A hosted Linux CI run has not been triggered or claimed.
 
 After ADR-0084 changed the public `explain` schema, the native gate
 replayed all 32 registered v9 trials and retained the same acceptance
@@ -192,7 +199,7 @@ MEMORY_QUALITY_GATE_OUTPUT="$PWD/target/new-deterministic-memory-run" \
 cargo test -p eval-harness --test deterministic_quality_gate --locked -- --ignored
 ```
 
-The output path must be fresh. For an existing pair of captures use `memory-eval accept-memory-candidate --corpus-root <registered-directory> --plan <frozen-plan> --incumbent-first <index> --incumbent-second <index> --candidate-first <index> --candidate-second <index> --output <new-report>`. Successful standalone diagnostic execution is distinct from promotion; legacy/default channels may fail while the registered rich channel passes. Invalid execution never qualifies.
+The output path must be fresh. For a historical promotion experiment with existing repeated captures use `memory-eval accept-memory-candidate --corpus-root <registered-directory> --plan <frozen-plan> --incumbent-first <index> --incumbent-second <index> --candidate-first <index> --candidate-second <index> --output <new-report>`. Successful standalone diagnostic execution is distinct from promotion; legacy/default channels may fail while the registered rich channel passes. Invalid execution never qualifies.
 
 For a new two-build temporal comparison, freeze
 `"cross_build_binary_sha256": {"incumbent": "<sha256>", "candidate": "<sha256>"}`

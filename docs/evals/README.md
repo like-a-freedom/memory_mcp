@@ -3,8 +3,8 @@
 ## Fast deterministic development
 
 The current regression route uses one primary capture per registered case and
-needs no agent, model host, or API key. It is opt-in while the frozen baseline
-awaits independent review; the existing rollout gate remains active during that review.
+needs no agent, model host, or API key. The independently reviewed baseline is frozen; this route is the active
+`deterministic_quality_gate` used by CI. Historical rollout profiles remain explicit diagnostics.
 
 ```sh
 cargo build --locked -p memory_mcp --bin memory_mcp
@@ -26,7 +26,9 @@ target/debug/memory-eval compare-current-memory \
 ```
 
 A scoped no-regression result can pass with existing failures. Always inspect
-`all_cases_pass`, `current_failures` and `regressions` separately. The reviewed
+`all_cases_pass`, per-case dimensions/reasons, `counts`, `current_failures` and
+`regressions` separately. Grade receipts bind exact input-index hashes, the compiled
+scorer/normalizer/verification sources and the grader executable. The reviewed
 corpus, configuration and public schema must match; product identity may change.
 The command rederives scores from raw receipts and registered inputs, including
 primary and temporal dimensions and new failure reasons. It refuses incomplete
@@ -36,8 +38,8 @@ For an inner-loop reproduction, copy the current profile under `target/evals/`
 and set its memory-decisions `case_ids` to the named registered cases; adjust
 `expected_coverage.exact_cases` accordingly. A subset cannot replace the full gate.
 Set `diagnostics: true` explicitly to capture verbose/shadow and evidence-stage
-contrasts. Omitted diagnostics currently preserves the previous behavior until
-the reviewed gate switch. Primary-only receipts use v5; v3/v4 loaders remain
+contrasts. Omitted diagnostics means primary-only; historical diagnostic
+profiles explicitly retain their original diagnostics. Primary-only receipts use v5; v3/v4 loaders remain
 necessary to regrade archived evidence. Skipped diagnostics are unmeasured,
 not a zero success rate.
 
@@ -46,7 +48,9 @@ A failed `compare-current-memory` produces an invalid grading receipt. Retry as
 `grade-02.json`; `grade-01.json` cannot be overwritten, and all attempts must be
 retained. No capture is repeated for a scorer failure. For paired agent evidence,
 use the existing `score-paired-observations` command with its original plan,
-tasks, observations and a fresh `--output-directory`. Changed upstream identities
+tasks, observations and a fresh `--output-directory`. Its `attempt.json` retains
+input hashes, grader identity and scored/invalid status even when validation fails;
+partial outputs are never deleted or accepted as a complete pair. Changed upstream identities
 require a new upstream capture; an old context is never a candidate execution.
 There is no automatic best-attempt selection or reliability claim from a retry.
 Partial memory captures retain all scheduled outcomes; diagnose selected failed
@@ -55,13 +59,21 @@ cases in a fresh directory, then run the full gate for acceptance.
 Explicitly public synthetic Chat Completions tasks may opt into
 `--public-synthetic-traces <fresh-directory>`. Sidecars retain the actual tool
 arguments and replies, including omitted versus null selectors, and bind the
-plan/product/schema/case/arm/phase. Private runs do not enable this flag.
+plan/product/schema/case/arm/phase. Sidecars are committed after each phase
+returns, not after every call: a process crash can lose the unfinished phase.
+`call_failed` means no transport response; MCP/JSON-RPC operation errors remain
+in the raw reply and must be inspected there. Private runs do not enable this flag.
 `PublicSyntheticTrace::replay_for` executes exact requests only against a
 caller-supplied isolated session with the registered identity. It does not
 reconstruct a lost store or establish fresh quality/latency evidence.
 
 See the [matched simplification capture](../../evals/paired/harness-simplification-current-2026-11-26/README.md)
-for timings, retained failures and limitations. Routine development does not
+for timings, independent review, final native-gate evidence, retained failures and limitations. The Rust budget starts at `Runner::run`: CLI profile loading, corpus preparation
+and binary hashing precede that timer. It is not a bound on total CLI wall time.
+Python bounds each child invocation; copying is measured separately and is outside
+that bound.
+
+Routine development does not
 repeat the seven LongMemEval questions or a model experiment unless a named
 empirical question requires it.
 

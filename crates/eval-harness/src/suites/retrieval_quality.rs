@@ -506,7 +506,7 @@ impl EvalSuite for RetrievalQualitySuite {
             .clone()
     }
 
-    async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
+    async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let runtime = match RetrievalRuntime::from_environment().await {
             Ok(runtime) => runtime,
             Err(reason) => {
@@ -534,7 +534,8 @@ impl EvalSuite for RetrievalQualitySuite {
 
         let mut outcomes = Vec::with_capacity(self.cases.len());
         for (index, case) in self.cases.iter().enumerate() {
-            outcomes.push(run_native_case(case, &runtime, index).await);
+            context.begin_case(self.id(), &case.id);
+            outcomes.push(context.completed(run_native_case(case, &runtime, index).await));
         }
         outcomes
     }

@@ -84,6 +84,48 @@ fn cli_regrades_raw_receipts_and_reports_scoped_acceptance_without_product_execu
     );
     let result: serde_json::Value =
         serde_json::from_slice(&std::fs::read(report).unwrap()).unwrap();
+    assert_eq!(
+        result["inputs"]["baseline_index_sha256"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert_eq!(
+        result["inputs"]["baseline_index_sha256"],
+        result["inputs"]["candidate_index_sha256"]
+    );
+    assert_eq!(
+        result["grader_identity"]["scorer_sha256"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert_eq!(
+        result["grader_identity"]["normalizer_sha256"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert_eq!(result["counts"]["passed"], 5);
+    assert_eq!(result["counts"]["failed"], 3);
+    assert_eq!(result["counts"]["invalid"], 0);
+    assert_eq!(result["counts"]["unobserved"], 0);
+    assert_eq!(result["cases"].as_array().unwrap().len(), 8);
+    let office = result["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["case_id"] == "office-entry")
+        .unwrap();
+    assert_eq!(
+        office["reason_codes"],
+        serde_json::json!(["decision_unobservable"])
+    );
+    assert_eq!(office["primary"]["evidence_success"], true);
+    assert_eq!(office["primary"]["decision_success"], false);
     assert_eq!(result["no_regressions"], true);
     assert_eq!(result["all_cases_pass"], false);
     assert_eq!(result["current_failures"].as_array().unwrap().len(), 3);

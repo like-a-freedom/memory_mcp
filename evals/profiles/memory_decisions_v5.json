@@ -9,7 +9,8 @@
       "corpus_root": "evals/corpora/memory-decisions-v5",
       "expected_coverage": {
         "exact_cases": 8
-      }
+      },
+      "diagnostics": true
     }
   ],
   "gates": []

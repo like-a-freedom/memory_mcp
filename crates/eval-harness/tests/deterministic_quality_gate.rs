@@ -1,10 +1,7 @@
-//! Native CI gate: public MCP replay, two distinct captures and frozen acceptance.
-use eval_harness::suites::{
-    DeterministicAcceptancePlan, accept_candidate, compare_replays, load_registered_replay,
-};
+//! Native regression gate: one primary capture against a reviewed immutable baseline.
+use eval_harness::suites::{DeterministicAcceptancePlan, load_registered_replay};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 fn read<T: serde::de::DeserializeOwned>(path: &Path) -> T {
@@ -17,7 +14,7 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn ci_rollout_plan_keeps_frozen_rules_and_pairs_the_current_binary() {
+fn historical_rollout_plan_preserves_frozen_rules_when_pairing_builds() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
@@ -49,7 +46,7 @@ fn rollout_plan_for_current_binary(
 }
 
 #[test]
-fn current_rollout_gate_validates_frozen_corpus_and_acceptance_rules() {
+fn historical_rollout_validates_frozen_corpus_and_acceptance_rules() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
@@ -284,48 +281,6 @@ fn run_profile(root: &Path, binary: &Path, output: &Path, name: &str, profile: &
     receipt_root
 }
 
-fn primary_scores(receipt_root: &Path) -> BTreeMap<String, (bool, bool)> {
-    let index: Value = read(&receipt_root.join("index.json"));
-    index["cases"]
-        .as_array()
-        .expect("case list")
-        .iter()
-        .map(|case| {
-            let id = case["case_id"].as_str().expect("case id").to_string();
-            let receipt: Value =
-                read(&receipt_root.join(case["receipt_path"].as_str().expect("receipt path")));
-            (
-                id,
-                (
-                    receipt["score"]["evidence_success"]
-                        .as_bool()
-                        .expect("primary evidence score"),
-                    receipt["score"]["probe_success"]
-                        .as_bool()
-                        .expect("primary decision score"),
-                ),
-            )
-        })
-        .collect()
-}
-
-fn primary_rollout_stages(receipt_root: &Path) -> Vec<String> {
-    let index: Value = read(&receipt_root.join("index.json"));
-    index["cases"]
-        .as_array()
-        .expect("case list")
-        .iter()
-        .map(|case| {
-            let receipt: Value =
-                read(&receipt_root.join(case["receipt_path"].as_str().expect("receipt path")));
-            receipt["primary_claim_rollout_stage"]
-                .as_str()
-                .expect("primary rollout stage")
-                .to_string()
-        })
-        .collect()
-}
-
 #[test]
 #[ignore = "requires MEMORY_DECISIONS_SERVER_BIN; CI explicitly executes this real-product gate"]
 fn candidate_meets_frozen_deterministic_memory_quality_gate() {
@@ -337,155 +292,48 @@ fn candidate_meets_frozen_deterministic_memory_quality_gate() {
         std::env::var_os("MEMORY_DECISIONS_SERVER_BIN").expect("compiled product executable"),
     );
     assert!(binary.is_absolute() && binary.is_file());
-    let rollout_plan = verify_frozen_rollout(&root);
     let scratch = tempfile::tempdir().unwrap();
     let output = std::env::var_os("MEMORY_QUALITY_GATE_OUTPUT")
         .map(PathBuf::from)
         .unwrap_or_else(|| scratch.path().join("quality"));
     std::fs::create_dir(&output).expect("fresh gate output directory");
-    // The historical v4 fixture predates the reviewed additive
-    // `extract.include_fact_evidence` schema change and is intentionally pinned
-    // to the old public-schema fingerprint. `accept_candidate` must reject
-    // those cross-schema artifacts. Legacy request/compact-response behavior
-    // is covered at the public extract boundary; memory quality is gated below
-    // by current-schema, same-binary v9 default/shadow captures.
-    let default_first = run_profile(
+    let candidate = run_profile(
         &root,
         &binary,
         &output,
-        "rollout-v9-default-first",
-        "evals/profiles/memory_decisions_v9_default.json",
-    );
-    let default_second = run_profile(
-        &root,
-        &binary,
-        &output,
-        "rollout-v9-default-second",
-        "evals/profiles/memory_decisions_v9_default.json",
-    );
-    let shadow_first = run_profile(
-        &root,
-        &binary,
-        &output,
-        "rollout-v9-shadow-first",
-        "evals/profiles/memory_decisions_v9_shadow.json",
-    );
-    let shadow_second = run_profile(
-        &root,
-        &binary,
-        &output,
-        "rollout-v9-shadow-second",
-        "evals/profiles/memory_decisions_v9_shadow.json",
+        "current",
+        "evals/profiles/memory_decisions_current.json",
     );
     let corpus = root.join("evals/corpora/memory-decisions-v9");
-    let default_a = load_registered_replay(&default_first.join("index.json"), &corpus).unwrap();
-    let default_b = load_registered_replay(&default_second.join("index.json"), &corpus).unwrap();
-    let shadow_a = load_registered_replay(&shadow_first.join("index.json"), &corpus).unwrap();
-    let shadow_b = load_registered_replay(&shadow_second.join("index.json"), &corpus).unwrap();
-    compare_replays(&default_a, &default_b).expect("default captures must replay identically");
-    compare_replays(&shadow_a, &shadow_b).expect("shadow controls must replay identically");
-
-    let default_index: Value = read(&default_first.join("index.json"));
-    let shadow_index: Value = read(&shadow_first.join("index.json"));
-    for key in [
-        "product_revision",
-        "product_binary_sha256",
-        "corpus_sha256",
-        "input_schema_sha256",
-    ] {
-        assert_eq!(
-            default_index["identity"][key], shadow_index["identity"][key],
-            "default and shadow controls must use the same product and public contract: {key}"
-        );
-    }
-    assert_ne!(
-        default_index["identity"]["config_sha256"], shadow_index["identity"]["config_sha256"],
-        "the rollout stages must have distinct configuration fingerprints"
+    let index_path = candidate.join("index.json");
+    let replay =
+        load_registered_replay(&index_path, &corpus).expect("complete registered current capture");
+    assert_eq!(
+        serde_json::to_value(&replay).unwrap()["identity"]["product_binary_sha256"],
+        sha256(&std::fs::read(&binary).unwrap()),
+        "capture must use the invoked binary"
     );
-
-    let default_scores = primary_scores(&default_first);
-    let shadow_scores = primary_scores(&shadow_first);
+    let baseline =
+        root.join("evals/paired/harness-simplification-baseline-2026-11-26/receipts/index.json");
+    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_memory-eval"));
+    command
+        .current_dir(&root)
+        .args(["compare-current-memory", "--baseline"])
+        .arg(baseline)
+        .arg("--candidate")
+        .arg(index_path)
+        .arg("--corpus")
+        .arg(corpus)
+        .arg("--output")
+        .arg(output.join("current-regression.json"));
+    let status = command.status().expect("offline current regression grade");
+    let report: Value = read(&output.join("current-regression.json"));
     assert!(
-        primary_rollout_stages(&default_first)
-            .iter()
-            .all(|stage| stage == "default"),
-        "default receipts must name the product-default stage"
+        status.success(),
+        "registered regression gate rejected capture: {report}"
     );
-    assert!(
-        primary_rollout_stages(&shadow_first)
-            .iter()
-            .all(|stage| stage == "shadow"),
-        "rollback receipts must name the explicit shadow stage"
-    );
-    assert_eq!(default_scores.len(), 8, "all default cases must be scored");
-    assert_eq!(shadow_scores.len(), 8, "all rollback cases must be scored");
-    let default_evidence = default_scores
-        .values()
-        .filter(|(evidence, _)| *evidence)
-        .count();
-    let default_decisions = default_scores
-        .values()
-        .filter(|(_, decision)| *decision)
-        .count();
-    let shadow_evidence = shadow_scores
-        .values()
-        .filter(|(evidence, _)| *evidence)
-        .count();
-    let shadow_decisions = shadow_scores
-        .values()
-        .filter(|(_, decision)| *decision)
-        .count();
-    let acceptance = accept_candidate(
-        &rollout_plan,
-        [&shadow_a, &shadow_b],
-        [&default_a, &default_b],
-    )
-    .expect("frozen primary-channel rollout plan accepts compatible repeated captures");
-    let gains = default_scores
-        .iter()
-        .filter(|(case, (_, passed))| {
-            *passed && shadow_scores.get(*case).is_some_and(|(_, old)| !old)
-        })
-        .map(|(case, _)| case.clone())
-        .collect::<Vec<_>>();
-    let losses = shadow_scores
-        .iter()
-        .filter(|(case, (_, passed))| {
-            *passed && default_scores.get(*case).is_some_and(|(_, new)| !new)
-        })
-        .map(|(case, _)| case.clone())
-        .collect::<Vec<_>>();
-    let evidence_regressions = shadow_scores
-        .iter()
-        .filter(|(case, (evidence, _))| {
-            *evidence && default_scores.get(*case).is_some_and(|(new, _)| !new)
-        })
-        .map(|(case, _)| case.clone())
-        .collect::<Vec<_>>();
-    let accepted = acceptance.accepted;
-    let report = serde_json::json!({
-        "schema_version": "memory-mcp-claim-rollout-acceptance/v1",
-        "product_revision": default_index["identity"]["product_revision"],
-        "product_binary_sha256": default_index["identity"]["product_binary_sha256"],
-        "corpus_sha256": default_index["identity"]["corpus_sha256"],
-        "input_schema_sha256": default_index["identity"]["input_schema_sha256"],
-        "default_config_sha256": default_index["identity"]["config_sha256"],
-        "shadow_config_sha256": shadow_index["identity"]["config_sha256"],
-        "default_replays": ["rollout-v9-default-first/index.json", "rollout-v9-default-second/index.json"],
-        "shadow_replays": ["rollout-v9-shadow-first/index.json", "rollout-v9-shadow-second/index.json"],
-        "default_metrics": {"evidence_success": default_evidence, "decision_success": default_decisions, "cases": default_scores.len()},
-        "shadow_metrics": {"evidence_success": shadow_evidence, "decision_success": shadow_decisions, "cases": shadow_scores.len()},
-        "decision_gains": gains,
-        "decision_losses": losses,
-        "evidence_regressions": evidence_regressions,
-        "acceptance": acceptance,
-        "repeat_captures_match": true,
-        "accepted": accepted
-    });
-    std::fs::write(
-        output.join("claim-rollout-default-acceptance.json"),
-        serde_json::to_vec_pretty(&report).expect("serialize rollout report"),
-    )
-    .expect("write rollout report");
-    assert!(accepted, "default rollout rejected: {report}");
+    assert_eq!(report["counts"]["invalid"], 0);
+    assert_eq!(report["counts"]["unobserved"], 0);
+    assert_eq!(report["cases"].as_array().unwrap().len(), 8);
+    assert_eq!(report["no_regressions"], true);
 }

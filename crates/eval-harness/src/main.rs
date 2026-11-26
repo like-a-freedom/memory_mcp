@@ -273,6 +273,14 @@ async fn main() -> std::process::ExitCode {
                     return std::process::ExitCode::from(2);
                 }
             };
+            let input_digest = |path: &std::path::Path| -> Option<String> {
+                use sha2::{Digest, Sha256};
+                std::fs::read(path)
+                    .ok()
+                    .map(|bytes| hex::encode(Sha256::digest(bytes)))
+            };
+            let baseline_digest = input_digest(&baseline);
+            let candidate_digest = input_digest(&candidate);
             let result = (|| -> Result<_, String> {
                 let baseline = eval_harness::suites::load_registered_replay(&baseline, &corpus)
                     .map_err(|e| e.to_string())?;
@@ -281,7 +289,14 @@ async fn main() -> std::process::ExitCode {
                 eval_harness::suites::compare_current_replays(&baseline, &candidate)
                     .map_err(|e| e.to_string())
             })();
-            let (record, code) = match result {
+            let result = if baseline_digest != input_digest(&baseline)
+                || candidate_digest != input_digest(&candidate)
+            {
+                Err("capture index changed during grading".to_string())
+            } else {
+                result
+            };
+            let (mut record, code) = match result {
                 Ok(report) => {
                     let code = u8::from(!report.no_regressions);
                     eprintln!(
@@ -304,6 +319,12 @@ async fn main() -> std::process::ExitCode {
                     )
                 }
             };
+            record["grader_identity"] = eval_harness::suites::grader_identity();
+            record["grader_identity"]["binary_sha256"] = std::env::current_exe()
+                .ok()
+                .and_then(|path| input_digest(&path))
+                .into();
+            record["inputs"] = serde_json::json!({"baseline":baseline,"candidate":candidate,"corpus":corpus,"baseline_index_sha256":baseline_digest,"candidate_index_sha256":candidate_digest});
             let saved = serde_json::to_vec_pretty(&record)
                 .map_err(std::io::Error::other)
                 .and_then(|bytes| destination.write_all(&bytes))
@@ -541,13 +562,8 @@ async fn main() -> std::process::ExitCode {
         } => {
             use eval_harness::paired_agent::observations::score_recorded_pair;
 
-            let result = (|| {
-                let plan = read_json_input(&plan, "paired plan")?;
-                let tasks = read_json_input(&tasks, "paired tasks")?;
-                let observations = read_json_input(&observations, "recorded observations")?;
-                score_recorded_pair(&plan, &tasks, &observations, &output_directory)
-                    .map_err(|error| error.to_string())
-            })();
+            let result = score_recorded_pair(&plan, &tasks, &observations, &output_directory)
+                .map_err(|error| error.to_string());
             match result {
                 Ok(()) => std::process::ExitCode::SUCCESS,
                 Err(error) => {

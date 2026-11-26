@@ -79,9 +79,10 @@ pub fn load_verified_replay(path: &Path) -> Result<ReplayIndex, EvalError> {
             return Err(invalid("missing evidence-stage raw receipt"));
         }
         if receipt_schema == Some("memory-decisions-receipt/v4") {
-            if trace["launch_profile"]["MEMORY_CLAIM_ROLLOUT_STAGE"] != "evidence" {
-                return Err(invalid("evidence-stage launch override is not explicit"));
-            }
+            verify_primary_launch(
+                &serde_json::json!({"primary_launch_profile":trace["launch_profile"]}),
+                "evidence",
+            )?;
             verify_primary_launch(&raw, primary_stage)?;
         }
         let bindings = serde_json::from_value(trace["episode_bindings"].clone())?;
@@ -215,103 +216,113 @@ pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayI
                     "score source differs from registered temporal request semantics",
                 ));
             }
-            let primary_launch_profile = &raw["primary_launch_profile"];
-            match registered_stage {
-                "default"
-                    if primary_launch_profile
-                        .get("MEMORY_CLAIM_ROLLOUT_STAGE")
-                        .is_some() =>
+        }
+        let traces = match raw["schema_version"].as_str() {
+            Some("memory-decisions-receipt/v5") => vec![&raw],
+            Some("memory-decisions-receipt/v4") => vec![&raw, &raw["evidence_enabled_diagnostic"]],
+            _ => vec![&raw["evidence_enabled_diagnostic"]],
+        };
+        for trace in traces {
+            let rows = |key: &str| {
+                trace[key]
+                    .as_array()
+                    .filter(|v| v.len() == events.len())
+                    .ok_or_else(|| invalid("incomplete seed/checkpoint receipts"))
+            };
+            let ingests = rows("ingest_receipts")?;
+            let extracts = rows("extract_receipts")?;
+            let checkpoints = rows("revision_checkpoint_receipts")?;
+            let mut bindings = BTreeMap::new();
+            let mut revisions = BTreeMap::new();
+            let mut previous = 0;
+            for (i, event) in events.iter().enumerate() {
+                let ingest = &ingests[i];
+                let extract = &extracts[i];
+                let checkpoint = &checkpoints[i];
+                // v3 did not record successful extract envelopes or primary reads.
+                // Preserve its historical diagnostic contract without claiming v4/v5 attestation.
+                for response in [
+                    &ingest["response"],
+                    &extract["response"],
+                    &checkpoint["response"],
+                ] {
+                    if raw["schema_version"] != "memory-decisions-receipt/v3"
+                        && (!response.is_object()
+                            || response.get("error").is_some()
+                            || !response["result"].is_object()
+                            || response["result"]["isError"] != false
+                            || response["result"]["structuredContent"]["status"] != "success")
+                    {
+                        return Err(invalid(
+                            "formation operation lacks a successful public response",
+                        ));
+                    }
+                }
+                let episode = super::structured_result(&ingest["response"])
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| invalid("unbound seed receipt"))?;
+                if ingest["event_id"] != event.id
+                    || ingest["episode_id"] != episode
+                    || ingest["request"] != super::ingest_arguments(event)
+                    || extract["event_id"] != event.id
+                    || extract["request"] != serde_json::json!({"episode_id":episode})
+                    || checkpoint["after_event_id"] != event.id
+                    || checkpoint["request"]
+                        != serde_json::json!({"query":"","valid_at":event.t_ref.to_rfc3339(),"budget":1,"compact":true})
                 {
-                    return Err(invalid(
-                        "default replay contains an explicit rollout override",
-                    ));
+                    return Err(invalid("seed order or inputs differ from registration"));
                 }
-                "shadow" if primary_launch_profile["MEMORY_CLAIM_ROLLOUT_STAGE"] != "shadow" => {
-                    return Err(invalid("shadow replay is missing its rollback override"));
+                let snapshot = checkpoint["response"]
+                    .pointer("/result/structuredContent/context/snapshot")
+                    .ok_or_else(|| invalid("missing checkpoint snapshot"))?;
+                let revision = snapshot["known_revision"]
+                    .as_i64()
+                    .filter(|r| *r > previous)
+                    .ok_or_else(|| invalid("nonmonotone checkpoint"))?;
+                let valid = snapshot["valid_at"]
+                    .as_str()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok());
+                if checkpoint["known_revision"] != revision
+                    || valid.is_none_or(|v| v.with_timezone(&chrono::Utc) != event.t_ref)
+                    || bindings
+                        .insert(episode.to_string(), event.id.clone())
+                        .is_some()
+                {
+                    return Err(invalid("checkpoint or seed identity mismatch"));
                 }
-                _ => {}
+                previous = revision;
+                revisions.insert(event.id.clone(), revision);
             }
-        }
-        let trace = if raw["schema_version"] == "memory-decisions-receipt/v5" {
-            &raw
-        } else {
-            &raw["evidence_enabled_diagnostic"]
-        };
-        let rows = |key: &str| {
-            trace[key]
-                .as_array()
-                .filter(|v| v.len() == events.len())
-                .ok_or_else(|| invalid("incomplete seed/checkpoint receipts"))
-        };
-        let ingests = rows("ingest_receipts")?;
-        let extracts = rows("extract_receipts")?;
-        let checkpoints = rows("revision_checkpoint_receipts")?;
-        let mut bindings = BTreeMap::new();
-        let mut revisions = BTreeMap::new();
-        let mut previous = 0;
-        for (i, event) in events.iter().enumerate() {
-            let ingest = &ingests[i];
-            let extract = &extracts[i];
-            let checkpoint = &checkpoints[i];
-            let episode = super::structured_result(&ingest["response"])
-                .and_then(Value::as_str)
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| invalid("unbound seed receipt"))?;
-            if ingest["event_id"] != event.id
-                || ingest["episode_id"] != episode
-                || ingest["request"] != super::ingest_arguments(event)
-                || extract["event_id"] != event.id
-                || extract["request"] != serde_json::json!({"episode_id":episode})
-                || checkpoint["after_event_id"] != event.id
-                || checkpoint["request"]
-                    != serde_json::json!({"query":"","valid_at":event.t_ref.to_rfc3339(),"budget":1,"compact":true})
-            {
-                return Err(invalid("seed order or inputs differ from registration"));
+            if trace["episode_bindings"] != serde_json::to_value(bindings)? {
+                return Err(invalid("event bindings differ from public seed receipts"));
             }
-            let snapshot = checkpoint["response"]
-                .pointer("/result/structuredContent/context/snapshot")
-                .ok_or_else(|| invalid("missing checkpoint snapshot"))?;
-            let revision = snapshot["known_revision"]
-                .as_i64()
-                .filter(|r| *r > previous)
-                .ok_or_else(|| invalid("nonmonotone checkpoint"))?;
-            let valid = snapshot["valid_at"]
-                .as_str()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok());
-            if checkpoint["known_revision"] != revision
-                || valid.is_none_or(|v| v.with_timezone(&chrono::Utc) != event.t_ref)
-                || bindings
-                    .insert(episode.to_string(), event.id.clone())
-                    .is_some()
-            {
-                return Err(invalid("checkpoint or seed identity mismatch"));
-            }
-            previous = revision;
-            revisions.insert(event.id.clone(), revision);
-        }
-        if trace["episode_bindings"] != serde_json::to_value(bindings)? {
-            return Err(invalid("event bindings differ from public seed receipts"));
-        }
-        let revision = super::temporal_revision_for_probe(probe, &revisions)
-            .map_err(|e| invalid(&e.message))?;
-        if trace["temporal_revision_request"]
-            != serde_json::json!({"query":probe.query,"valid_at":probe.valid_at.to_rfc3339(),"known_revision":revision,"budget":probe.budget,"compact":true})
-        {
-            return Err(invalid(
-                "actual probe differs from registered question, budget or checkpoint",
-            ));
-        }
-        if configuration.contains("scoring_protocol=temporal-cutoff-v2") {
-            let expected_current_request = super::assemble_arguments(probe, false, probe.as_of);
-            if raw["temporal_revision_request"]
+            let revision = super::temporal_revision_for_probe(probe, &revisions)
+                .map_err(|e| invalid(&e.message))?;
+            if trace["temporal_revision_request"]
                 != serde_json::json!({"query":probe.query,"valid_at":probe.valid_at.to_rfc3339(),"known_revision":revision,"budget":probe.budget,"compact":true})
-                || (!probe.requires_separate_time_cutoffs
-                    && raw["primary_request"] != expected_current_request)
             {
                 return Err(invalid(
-                    "scored request differs from the registered case semantics",
+                    "actual probe differs from registered question, budget or checkpoint",
                 ));
             }
+        }
+        if raw["schema_version"] != "memory-decisions-receipt/v3" {
+            let responses = raw["primary_compact_responses"]
+                .as_array()
+                .ok_or_else(|| invalid("missing registered repeat responses"))?;
+            if responses.len() != probe.repeat_read {
+                return Err(invalid(
+                    "raw response count differs from registered repeat count",
+                ));
+            }
+        }
+        if configuration.contains("scoring_protocol=temporal-cutoff-v2")
+            && raw["primary_request"] != super::assemble_arguments(probe, false, probe.as_of)
+        {
+            return Err(invalid(
+                "scored request differs from the registered case semantics",
+            ));
         }
     }
     Ok(index)
@@ -319,10 +330,14 @@ pub fn load_registered_replay(path: &Path, corpus_root: &Path) -> Result<ReplayI
 
 fn verify_primary_launch(raw: &Value, primary_stage: &str) -> Result<(), EvalError> {
     let launch = &raw["primary_launch_profile"];
-    if !launch.is_object()
-        || (primary_stage == "default" && launch.get("MEMORY_CLAIM_ROLLOUT_STAGE").is_some())
-        || (primary_stage == "shadow" && launch["MEMORY_CLAIM_ROLLOUT_STAGE"] != "shadow")
-    {
+    let mut expected = serde_json::json!({
+        "EMBEDDINGS_ENABLED":"false", "NER_EXTRACTOR":"regex",
+        "SURREALDB_DB_NAME":"memory_decisions", "SURREALDB_EMBEDDED":"true", "SURREALDB_NAMESPACE":"main"
+    });
+    if primary_stage != "default" {
+        expected["MEMORY_CLAIM_ROLLOUT_STAGE"] = primary_stage.into();
+    }
+    if launch != &expected {
         return Err(EvalError::InvalidInput(
             "primary rollout launch differs from registration".into(),
         ));
@@ -409,12 +424,22 @@ fn verify_primary_score(raw: &Value, case: &super::receipts::ReplayCase) -> Resu
     let budget = request["budget"]
         .as_u64()
         .ok_or_else(|| invalid("missing raw scoring budget"))?;
-    let score = super::scoring::score_probe(
+    let mut score = super::scoring::score_probe(
         &oracle,
         &observation,
         usize::try_from(budget).map_err(|_| invalid("scoring budget overflow"))?,
         time_contract_supported,
     );
+    let responses = raw["primary_compact_responses"]
+        .as_array()
+        .ok_or_else(|| invalid("missing raw primary responses"))?;
+    let observations = responses
+        .iter()
+        .map(|response| {
+            super::normalization::normalize_observation(std::slice::from_ref(response), &bindings)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    super::enforce_repeatability(&mut score, &observations);
     if raw["score"] != super::replay_score(&score)
         || case.evidence_success != Some(score.evidence_success)
         || case.decision_success != Some(score.decision_success)

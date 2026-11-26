@@ -2,8 +2,8 @@
 
 Local native Apple Silicon; no model host or remote runner. Product source and
 binary are identical to the frozen baseline; every raw receipt pins that identity.
-The baseline ran 24 scenario variants; this capture ran 8. Independent baseline
-review and the active gate switch are still pending.
+The baseline ran 24 scenario variants; this capture ran 8. The independent review accepted the baseline; the final repaired gate is now active.
+The original development capture below is preserved unchanged.
 
 | Observation | Baseline with diagnostics | Primary only |
 | --- | ---: | ---: |
@@ -15,7 +15,7 @@ review and the active gate switch are still pending.
 
 Offline raw-receipt regrading finds no per-case/per-dimension regressions and
 keeps all three failures: `office-entry`, `similar-name`, `single-current`, each
-with `decisionunobservable`. All-cases-pass is false. These are finite exposed
+with `decision_unobservable`. All-cases-pass is false. These are finite exposed
 synthetic fixtures, not agent utility, semantic extraction, or benchmark claims.
 
 Primary phase sums: startup 52.651s, formation 1.301s, query 0.383s, diagnostics
@@ -46,3 +46,35 @@ full content identity or replace a benchmark run. It supplies no reason to
 sacrifice isolation or add filesystem-specific clone logic: copying was a small
 part of this bounded attempt, while the product process remained the bottleneck.
 The untouched source snapshot was read through a disposable private copy.
+
+## Final gate and review
+
+The [independent review](independent-review.md) accepted the frozen baseline and
+identified five Important findings. All five were fixed with deterministic controls:
+missing/changed repeated reads; primary and diagnostic formation/runtime binding;
+owned deadline cancellation and partial outcomes; typed execution timeouts; exact
+grade provenance and preservation of failed paired grading attempts. No Critical
+finding was reported. Phase-sidecar granularity and the scope of time budgets are
+explicitly documented; no crash-safe per-call or total-CLI deadline claim is made.
+
+The normal native gate passed on Apple Silicon on 2026-11-26 in 58.17 seconds.
+Its [current regression report](native-gate/current-regression.json) binds the
+actual capture and grader. The [raw index](native-gate/current/index.json) and all
+raw receipts are retained. Capture duration: 54,470 ms; 8 primary scenario variants;
+5 passed, 3 quality_failed, 0 invalid/unobserved; 0 new regressions. The existing
+product executable has the baseline SHA-256. Absolute input paths in the original
+grade report describe the observed local run; use the archived index for offline
+regrading with a fresh output file. No fresh agent or external-benchmark run was needed.
+
+Retained contract coverage includes repeated reads and raw-negative controls,
+source order, compact/verbose public evidence, temporal exclusions, isolated stdio
+stores, Python forward/reverse reads, default configuration and explicit rollout
+selection, and real public disclosure/withholding behavior. These checks replace
+routine redundant capture arms; they do not establish cross-run reliability.
+
+The final [offline grade attempt 02](native-gate/current-regression-02.json) regrades
+the same raw native capture with the final compiled verifier after removing its
+redundant launch check. Its scorer/normalizer/registration/verification/comparison
+digests were matched to the committed source. The original gate grade remains
+unchanged; no memory process was executed for this additional grading attempt.
+Both reports retain the same 3 failures and 0 regressions.

@@ -955,7 +955,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         String::from_utf8_lossy(&output.stderr)
             .contains("observations v2 cannot contain v3 final-answer diagnostics")
     );
-    assert!(!invalid_v2.exists());
+    assert!(invalid_v2.join("attempt.json").is_file());
 
     let mut v4 = valid_observations.clone();
     v4["schema_version"] = json!("memory-mcp-agent-observations/v4");
@@ -996,7 +996,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
         String::from_utf8_lossy(&output.stderr)
             .contains("observations v4 cannot contain valid-time read fingerprints")
     );
-    assert!(!invalid_v4_run.exists());
+    assert!(invalid_v4_run.join("attempt.json").is_file());
 
     let mut invalid_v4_selectors = v4.clone();
     invalid_v4_selectors["incumbent"]["trials"][0]["observation"]["memory_reads"][0]["selector_arguments_sha256"] = json!({
@@ -1018,7 +1018,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     assert!(String::from_utf8_lossy(&output.stderr).contains(
         "observations v4 cannot contain valid-time read fingerprints or selector fingerprints"
     ));
-    assert!(!invalid_v4_selector_run.exists());
+    assert!(invalid_v4_selector_run.join("attempt.json").is_file());
 
     let mut v8_observations = v4.clone();
     for arm in ["incumbent", "candidate"] {
@@ -1124,7 +1124,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     write_json(&observations_path, &incomplete_timing);
     let output = score(&missing_timing);
     assert_eq!(output.status.code(), Some(2));
-    assert!(!missing_timing.exists());
+    assert!(missing_timing.join("attempt.json").is_file());
     write_json(&observations_path, &timed_observations);
     let timed_replay = directory.path().join("v12-replay");
     let output = score(&timed_replay);
@@ -1236,7 +1236,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     write_json(&observations_path, &missing);
     let missing_run = directory.path().join("v4-missing-read");
     assert_eq!(score(&missing_run).status.code(), Some(2));
-    assert!(!missing_run.exists());
+    assert!(missing_run.join("attempt.json").is_file());
 
     missing["incumbent"]["trials"][0]["observation"]["read_capture_status"] = json!("unavailable");
     write_json(&observations_path, &missing);
@@ -1292,7 +1292,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     let output = score(&swapped_run);
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("read/reply association"));
-    assert!(!swapped_run.exists());
+    assert!(swapped_run.join("attempt.json").is_file());
 
     v4["incumbent"]["trials"][0]["observation"]["trace"][2]["call_id"] = json!("different-read");
     write_json(&observations_path, &v4);
@@ -1300,7 +1300,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     let output = score(&mismatch);
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("read/reply association"));
-    assert!(!mismatch.exists());
+    assert!(mismatch.join("attempt.json").is_file());
 
     observations = valid_observations;
     observations["schema_version"] = json!("memory-mcp-agent-observations/v1");
@@ -1329,7 +1329,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
     let output = score(&rejected);
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("final answer fingerprint"));
-    assert!(!rejected.exists());
+    assert!(rejected.join("attempt.json").is_file());
 
     observations["incumbent"]["trials"][0]["observation"]["trace"][0]["error_class"] =
         json!("invalid_final_answer");
@@ -1342,7 +1342,7 @@ fn scores_external_observations_offline_using_the_private_oracle() {
             "observations v1 cannot contain model-response diagnostics from newer schemas"
         )
     );
-    assert!(!invalid_legacy.exists());
+    assert!(invalid_legacy.join("attempt.json").is_file());
 }
 
 fn run_valid_time_observation_fixture(
@@ -1579,7 +1579,13 @@ fn registered_valid_time_without_request_fingerprints_fails_offline_cli() {
         ),
         "unexpected scorer error: {stderr}"
     );
-    assert!(!output_directory.exists());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(
+            &std::fs::read(output_directory.join("attempt.json")).unwrap()
+        )
+        .unwrap()["execution_status"],
+        "invalid"
+    );
 }
 
 #[test]
@@ -2130,7 +2136,18 @@ fn registered_selector_read_without_selector_fingerprints_fails_offline_cli() {
         stderr.contains("observations v6 require selector fingerprints for every read"),
         "unexpected scorer error: {stderr}"
     );
-    assert!(!output_directory.exists());
+    let invalid_bytes = std::fs::read(output_directory.join("attempt.json"))
+        .expect("failed grading attempt is retained");
+    let attempt: Value = serde_json::from_slice(&invalid_bytes).unwrap();
+    assert_eq!(attempt["execution_status"], "invalid");
+    assert_eq!(
+        attempt["inputs"]["observations_sha256"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert_eq!(attempt["grader_sha256"].as_str().unwrap().len(), 64);
 }
 
 fn selector_fingerprints_for_fixture(arguments: &serde_json::Value) -> serde_json::Value {

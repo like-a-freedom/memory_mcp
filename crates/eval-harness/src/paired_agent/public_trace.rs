@@ -36,6 +36,7 @@ struct PublicCall {
     arguments_sha256: String,
     response: Option<Value>,
     response_sha256: Option<String>,
+    /// True only when the transport returned no response; inspect raw envelopes for MCP errors.
     call_failed: bool,
 }
 
