@@ -50,14 +50,21 @@ jobs:
     name: Validate manual release ref
     runs-on: ubuntu-24.04
     steps:
-      - name: Require master for manual release preflight
+      - name: Require the exact manual release ref
         env:
           EVENT: ${{ github.event_name }}
           RELEASE: ${{ inputs.release }}
           REF: ${{ github.ref }}
+          TAG: ${{ github.event.inputs.tag || '' }}
         run: |
           if test "$EVENT" = workflow_dispatch && test "$RELEASE" = true; then
-            test "$REF" = refs/heads/master
+            if test -n "$TAG"; then
+              # release.yml already requires the exact tag for manual recovery.
+              test "$REF" = "refs/tags/$TAG"
+            else
+              # Direct CI preflight retains its master-only contract.
+              test "$REF" = refs/heads/master
+            fi
           fi
 
   quality:
