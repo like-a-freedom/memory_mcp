@@ -135,6 +135,30 @@ def freeze(destination, binary, config):
         json.dump(plan,target,indent=2)
     return plan
 
+def project_tool_result(response):
+    """Decode product data without treating transport faults as bad arguments."""
+    try:
+        if not isinstance(response, dict):
+            raise TypeError('tool result must be an object')
+        if 'structuredContent' in response:
+            result = response['structuredContent']
+        else:
+            result = json.loads(next(c['text'] for c in response['content'] if c['type'] == 'text'))
+        if not isinstance(result, dict):
+            raise TypeError('product response must be an object')
+        return result
+    except (KeyError, TypeError, ValueError, StopIteration) as error:
+        raise RuntimeError('Malformed MCP tool result') from error
+
+
+class MCPToolError(RuntimeError):
+    """An observed, correlated tools/call JSON-RPC error, not transport loss."""
+
+    def __init__(self, response):
+        super().__init__(str(response['error']))
+        self.response = response
+
+
 class MCP:
     def __init__(self, plan, directory):
         self.counter = 0
@@ -176,22 +200,33 @@ class MCP:
             try:line = self.lines.get(timeout=max(0,deadline-time.monotonic()))
             except queue.Empty:break
             if line is None:raise RuntimeError('MCP process exited')
-            response = json.loads(line)
+            try:
+                response = json.loads(line)
+            except (ValueError, UnicodeError) as error:
+                raise RuntimeError('Malformed MCP response JSON') from error
+            if not isinstance(response, dict):
+                raise RuntimeError('Malformed MCP response envelope')
             if response.get('id') != self.counter:
                 continue
             self.receipts.write(json.dumps({'request':request,'response':response,'duration_ms':round(1000*(time.monotonic()-started))})+'\n'); self.receipts.flush()
+            if (response.get('jsonrpc') != '2.0' or type(response.get('id')) is not int
+                    or ('result' in response) == ('error' in response)):
+                raise RuntimeError('Malformed MCP response envelope')
             if 'error' in response:
+                error = response['error']
+                if (method == 'tools/call' and response.get('jsonrpc') == '2.0'
+                        and type(response.get('id')) is int and 'result' not in response
+                        and isinstance(error, dict) and type(error.get('code')) is int
+                        and isinstance(error.get('message'), str)):
+                    raise MCPToolError(response)
                 raise RuntimeError(response['error'])
             return response['result']
         raise TimeoutError('MCP call deadline')
     def tool(self, name, arguments):
         response = self.request('tools/call',{'name':name,'arguments':arguments})
+        result = project_tool_result(response)
         if response.get('isError'):
             raise RuntimeError(response)
-        if 'structuredContent' in response:
-            result = response['structuredContent']
-        else:
-            result = json.loads(next(c['text'] for c in response['content'] if c.get('type')=='text'))
         if result.get('status') == 'error':
             raise RuntimeError(result)
         return result
@@ -201,6 +236,8 @@ class MCP:
         except subprocess.TimeoutExpired:
             self.process.kill();self.process.wait(timeout=3)
         self.reader.join(timeout=3)
+        self.process.stdin.close()
+        self.process.stdout.close()
         self.receipts.close();self.err.close()
 
 _HTTP_WORKER = '''import json,sys,urllib.request,urllib.error

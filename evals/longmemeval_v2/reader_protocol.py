@@ -12,6 +12,7 @@ import re
 import time
 
 from .exact_answer_quality import exact_phrase_set_match
+from . import source_references
 from .inference_attempts import AttemptRecorder, local_async_client
 from .scored_coverage import loopback_endpoint
 
@@ -20,7 +21,7 @@ STRUCTURED_VARIANT = 'structured-final-first'
 RELATIONS_VARIANT = 'ordered-relations-final-first'
 SOURCE_LEDGER_VARIANT = 'source-ledger-final-first'
 SOURCE_GRAPH_VARIANT = 'source-graph-final-first'
-VARIANTS = (*DEFAULT_VARIANTS, STRUCTURED_VARIANT, RELATIONS_VARIANT, SOURCE_LEDGER_VARIANT, SOURCE_GRAPH_VARIANT)
+VARIANTS = (*DEFAULT_VARIANTS, STRUCTURED_VARIANT, RELATIONS_VARIANT, SOURCE_LEDGER_VARIANT, SOURCE_GRAPH_VARIANT, *source_references.VARIANTS)
 TREE_NODE = re.compile(r"^([ \t]*)(?:(?:\[\d+\] )([A-Za-z][A-Za-z0-9]*)|(RootWebArea|StaticText))(?= )")
 NODE_NAME = re.compile(r"^(?:\[\d+\] )?[A-Za-z][A-Za-z0-9]* '(.*?)'(?:,|$)")
 ESCAPED_SURROGATE_PAIR = re.compile(r"\\u[dD][89aAbB][0-9a-fA-F]{2}\\u[dD][c-fC-F][0-9a-fA-F]{2}")
@@ -229,6 +230,9 @@ def _delivered_texts(items, variant):
 def protocol_messages(row, variant):
     if variant not in VARIANTS:
         raise ValueError('unregistered protocol variant')
+    if variant in source_references.VARIANTS:
+        return source_references.messages(row, project_sources(row['memory_context'],source_graph=True),
+                                          whole_items=variant == source_references.ITEM_VARIANT)
     if variant == SOURCE_GRAPH_VARIANT:
         sources = project_sources(row['memory_context'], source_graph=True)
         graphs = [{'source_item_index':s['source_item_index'], 'raw_sha256':s['raw_sha256'],
@@ -318,6 +322,9 @@ def protocol_messages(row, variant):
 def classify(row, truth, output, variant='source-first'):
     if variant not in VARIANTS:
         raise ValueError('unregistered protocol variant')
+    if variant in source_references.VARIANTS:
+        return source_references.classify(row, truth, output, project_sources(row['memory_context']),
+                                          whole_items=variant == source_references.ITEM_VARIANT)
     raw = output.get('response_raw') if output else None
     finish = output.get('finish_reason') if output else None
     boxes = re.findall(r'\\boxed\{([^{}]*)\}', raw or '')
@@ -342,7 +349,7 @@ def summarize(rows, truth, outputs, variant='source-first'):
     if not ids or len(set(ids)) != len(ids) or set(truth) != set(ids) or not set(outputs) <= set(ids):
         raise ValueError('unique complete cohort and matching truth required')
     cases = {row['question_id']:classify(row, truth[row['question_id']], outputs.get(row['question_id']), variant) for row in rows}
-    return {'selected':len(ids), 'completed_correct':sum(c['completed_correct'] for c in cases.values()),
+    result = {'selected':len(ids), 'completed_correct':sum(c['completed_correct'] for c in cases.values()),
             'value_correct':sum(c['value_correct'] for c in cases.values()),
             'format_valid':sum(c['format_valid'] for c in cases.values()),
             'quote_exact':sum(c['quote_exact'] is True for c in cases.values()),
@@ -350,6 +357,10 @@ def summarize(rows, truth, outputs, variant='source-first'):
             'false_premise_correct':sum(c['refusal_correct'] is True for c in cases.values()),
             'unobserved':sum(not c['observed'] for c in cases.values()),
             'errors':sum(bool(c['error']) for c in cases.values()), 'cases':cases}
+    if variant in source_references.VARIANTS:
+        result.update(source_bound=sum(c['source_bound'] for c in cases.values()),
+                      proof_covered=sum(c['proof_covered'] for c in cases.values()))
+    return result
 
 
 def read_rows(path):
@@ -361,8 +372,14 @@ def freeze(path, rows_path, truth_path, model, endpoint, *, variants=None):
     variants = tuple(DEFAULT_VARIANTS if variants is None else variants)
     if not variants or len(set(variants)) != len(variants) or not set(variants) <= set(VARIANTS):
         raise ValueError('choose unique registered protocol variants')
-    rows, truth = read_rows(rows_path), json.loads(truth_path.read_text())['cases']
-    summarize(rows, truth, {})
+    referenced = any(v in source_references.VARIANTS for v in variants)
+    truth = json.loads(truth_path.read_text(), object_pairs_hook=
+                       source_references.unique_object if referenced else dict)['cases']
+    rows = read_rows(rows_path)
+    for variant in (v for v in variants if v in source_references.VARIANTS):
+        summarize(rows, truth, {}, variant)
+    if not referenced:
+        summarize(rows, truth, {}, 'source-first')
     path.mkdir(exist_ok=False, parents=True)
     plan = {'schema':'memory-mcp-reader-protocol/v1',
             'rows_path':str(rows_path.resolve()),'rows_sha256':digest(rows_path.read_text()),
@@ -379,6 +396,11 @@ def freeze(path, rows_path, truth_path, model, endpoint, *, variants=None):
                   SOURCE_LEDGER_VARIANT:['evidence_structure','ordered_peer_relations','anchor_occurrences',
                                          'quote_channel_separation','reasoning_instruction'],
                   SOURCE_GRAPH_VARIANT:['source_graph','typed_source_locations','quote_channel_separation','reasoning_instruction']}
+    treatments[source_references.ITEM_VARIANT] = ['whole_item_response_contract','source_identity','reviewed_support_coverage','whole_delivered_source','source_graph']
+    if referenced:
+        treatments[source_references.VARIANT] = ['source_range_response_contract','source_identity','reviewed_support_coverage','numbered_source_text','source_graph']
+        plan['source_reference_sha256'] = hashlib.sha256(Path(source_references.__file__).read_bytes()).hexdigest()
+        plan['answer_matcher_sha256'] = hashlib.sha256(Path(__file__).with_name('exact_answer_quality.py').read_bytes()).hexdigest()
     if any(v in treatments for v in variants):
         plan['variant_treatments'] = {v:treatments[v] for v in variants if v in treatments}
     prompts = {row['question_id']:{variant:protocol_messages(row, variant) for variant in variants} for row in rows}
@@ -387,9 +409,17 @@ def freeze(path, rows_path, truth_path, model, endpoint, *, variants=None):
     projection = {r['question_id']:project_sources(r['memory_context'], structured=STRUCTURED_VARIANT in variants,
                                                    ordered_relations=RELATIONS_VARIANT in variants,
                                                    anchor_ledger=SOURCE_LEDGER_VARIANT in variants,
-                                                   source_graph=SOURCE_GRAPH_VARIANT in variants)
+                                                   source_graph=SOURCE_GRAPH_VARIANT in variants or referenced)
                   for r in rows}
     (path / 'projection.json').write_text(json.dumps(projection))
+    if source_references.VARIANT in variants:
+        (path/'reference-catalog.json').write_text(json.dumps(
+            {r['question_id']:source_references.source_catalog(projection[r['question_id']]) for r in rows}))
+    if source_references.ITEM_VARIANT in variants:
+        catalog = json.dumps({r['question_id']:source_references.item_catalog(projection[r['question_id']],r['question_id']) for r in rows})
+        (path/'item-reference-catalog.json').write_text(catalog)
+        plan['item_reference_catalog_sha256'] = digest(catalog)
+        (path/'registration.json').write_text(json.dumps(plan,ensure_ascii=True,indent=2)+'\n')
 
 
 async def capture(path):
@@ -399,11 +429,24 @@ async def capture(path):
             or hashlib.sha256(Path(__file__).read_bytes()).hexdigest() != plan['runner_sha256']
             or hashlib.sha256(Path(__file__).with_name('inference_attempts.py').read_bytes()).hexdigest() != plan['attempt_recorder_sha256']):
         raise ValueError('frozen input or runner identity changed')
+    referenced = any(v in source_references.VARIANTS for v in plan['variants'])
+    if referenced:
+        scorers = {'source_reference_sha256':Path(source_references.__file__),
+                   'answer_matcher_sha256':Path(__file__).with_name('exact_answer_quality.py')}
+        if any(plan.get(key) != hashlib.sha256(file.read_bytes()).hexdigest()
+               for key,file in scorers.items()):
+            raise ValueError('frozen scorer identity is missing or changed')
+    if source_references.ITEM_VARIANT in plan['variants']:
+        if (not plan.get('item_reference_catalog_sha256')
+                or digest((path/'item-reference-catalog.json').read_text()) != plan['item_reference_catalog_sha256']):
+            raise ValueError('frozen item reference catalog is missing or changed')
     loopback_endpoint(plan['endpoint'])
     # Exclusive claim prevents accidental retries of an exposed capture.
     with (path/'capture-started.json').open('x') as claim:
         claim.write(json.dumps({'monotonic_started':time.monotonic()}))
-    rows, truth = read_rows(rows_path), json.loads(truth_path.read_text())['cases']
+    rows = read_rows(rows_path)
+    truth = json.loads(truth_path.read_text(), object_pairs_hook=source_references.unique_object
+                       if referenced else dict)['cases']
     registered_prompts = json.loads((path/'prompts.json').read_text())
     expected_prompts = {row['question_id']:{variant:protocol_messages(row, variant) for variant in plan['variants']} for row in rows}
     if registered_prompts != expected_prompts:

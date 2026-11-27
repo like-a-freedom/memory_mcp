@@ -65,15 +65,19 @@ use `explain` for the evidence you need. Claim rollout defaults to `evidence`,
 but an operator can configure another stage; unknown role/coverage is not proof
 that a claim is current, contradicted or absent.
 
-Read the memory contract before using temporal selectors. Historical metadata is
-under `context`: preserve snapshot fields and inspect partial completeness and
-omissions. Assembly can persist fact-access heat; logical recall is not a
+Read the memory contract before using temporal selectors. Temporal selectors
+belong to `assemble_context`, not `explain`; explain accepts only its advertised
+item/window fields. Source `t_ref` is an event date, not the retrieval snapshot.
+Historical metadata is under `context`: preserve snapshot fields and inspect
+partial completeness and omissions. Assembly can persist fact-access heat; logical recall is not a
 zero-write storage operation.
 
 ## Bounded explain
 
-`context_items` is a JSON-array **string**, containing returned item objects or
-canonical source-ID strings. The envelope is capped at 32 KiB; inspect `status`,
+`context_items` is a JSON-array **string**. Forward each selected returned item
+whole, including its top-level `source_episode`, `fact_id` and provenance; wrap
+it in the array and JSON-encode once. A fact ID alone can omit the required
+source episode. Canonical source-ID strings are also accepted. The envelope is capped at 32 KiB; inspect `status`,
 `partial_reasons`, `next_offset` and item-level metadata even with `compact=false`.
 Use `item_offset` to select one submitted item. Source/provenance continuations
 require exactly one selected item. For an explicit source window pass
@@ -86,6 +90,10 @@ quote is not automatically verified: inspect `quote_verified`,
 `quote_contained_in_window`, `quote_complete` and
 `citation_context_covers_entire_source`. Do not claim an exact citation from an
 unverified or truncated excerpt. Preserve the source and fact IDs exactly.
+Keep fact identity separate from quote verification: `quote_verified=false`
+does not turn a `fact:…` into an episode fallback. Report fallback only when
+the returned item identifies it. In a historical final answer include the
+actual `context.snapshot` boundary; source `t_ref` cannot substitute for it.
 
 `resolve` is not a lookup. It calls resolve-or-create and can persist a new
 canonical entity or aliases. Keep it out of the recall SOP.

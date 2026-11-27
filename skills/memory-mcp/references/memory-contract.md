@@ -52,6 +52,8 @@ complete. Current assembly is a logical read that can persist access heat.
 | `assembled` | returned context inspected within the stated boundary |
 | `cited` | every used claim has source provenance |
 
+A successfully extracted `note` is a nonempty canonical fact: inspect it, then
+classify the capture as `verified`. Its note type does not imply an empty fact set.
 Never collapse `episode-only`, `pending`, and `verified` into “captured.”
 After completed successful extraction, no facts confirms no canonical fact capture, not loss of the episode:
 source fallback can still return stored source text. Empty recall is bounded

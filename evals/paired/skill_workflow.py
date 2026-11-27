@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 from contextlib import contextmanager
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -15,7 +16,8 @@ import time
 
 from evals.longmemeval_v2.inference_attempts import AttemptRecorder, completion_body, local_async_client
 from evals.longmemeval_v2.scored_coverage import loopback_endpoint
-from evals.paired.memory_quality_diagnostic import MCP
+from evals.paired.memory_quality_diagnostic import MCP, MCPToolError, project_tool_result
+from evals.paired import skill_source_actions
 
 
 CLI_COMMANDS = frozenset({'ingest', 'extract', 'assemble-context', 'explain', 'resolve',
@@ -25,11 +27,14 @@ CLI_COMMANDS = frozenset({'ingest', 'extract', 'assemble-context', 'explain', 'r
 class SkillHost:
     """The only file and tool boundary available to a skill participant."""
 
-    def __init__(self, skill, references, tools, cli=None):
+    def __init__(self, skill, references, tools, cli=None, *, tool_schemas=None):
         self.skill = skill
         self.references = references
         self.tools = tools
         self.cli = cli
+        if tool_schemas is not None and set(tool_schemas) != set(tools):
+            raise ValueError('schema catalog must contain every live tool and no others')
+        self.tool_schemas = {} if tool_schemas is None else tool_schemas
         self.trace = []
 
     def dispatch(self, request):
@@ -37,6 +42,8 @@ class SkillHost:
         self.trace.append(record)
         try:
             response = self.execute(request)
+        except MCPToolError as error:
+            response = {'error': str(error), 'denied': True, 'mcp_response': error.response}
         except (KeyError, TypeError, ValueError) as error:
             response = {'error': str(error), 'denied': True}
         except Exception as error:
@@ -47,6 +54,8 @@ class SkillHost:
 
     def execute(self, request):
         match request:
+            case {'action': 'describe_tool', 'name': str(name)} if len(request) == 2:
+                return {'name': name, 'inputSchema': self.tool_schemas[name]}
             case {'action': 'read_reference', 'path': str(path)} if len(request) == 2:
                 return {'text': self.references[path]}
             case {'action': 'call', 'name': str(name), 'arguments': dict(arguments)} if len(request) == 3:
@@ -384,6 +393,7 @@ def sha256(data):
 
 def load_registration():
     registration = read_json(REGISTRATION / 'registration.json')
+    historical = captured_skills()
     cases = []
     skills = {}
     for skill in ('memory-mcp', 'memory-cli'):
@@ -405,7 +415,8 @@ def load_registration():
             files = {}
             for entry in identity['files']:
                 path = entry['path']
-                data = ((ROOT / path).read_bytes() if arm == 'current' else
+                # These arms name the original registration, never mutable live skills.
+                data = (historical[skill][arm][path.removeprefix(f'skills/{skill}/')].encode() if arm == 'current' else
                         subprocess.check_output(['git', 'show', f"{identity['previous_revision']}:{path}"], cwd=ROOT))
                 if sha256(data) != entry[f'{arm}_sha256']:
                     raise ValueError(f'{arm} {path} identity changed')
@@ -415,6 +426,84 @@ def load_registration():
     if len(cases) != registration['denominator'] or len({(c['skill'], c['id']) for c in cases}) != len(cases):
         raise ValueError('case coverage differs from pre-registration')
     return cases, skills
+
+
+SOURCE_ACTION_PROTOCOLS = {'source-actions-native/v1':skill_source_actions.PROTOCOL,
+                           'source-actions-native/v2':skill_source_actions.SELECTION_PROTOCOL}
+CASE_COHORTS = ('legacy', 'fresh-native/v1', *SOURCE_ACTION_PROTOCOLS)
+
+
+def captured_skills():
+    root = ROOT/'evals/paired/skill-completion-qualification-2026-11-27'
+    acceptance = read_json(root/'acceptance.json')
+    entry = next(row for row in acceptance['plans'] if row['directory']=='fresh-native')
+    path = root/'fresh-native/frozen-plan.json'
+    if sha256(path.read_bytes()) != entry['sha256']:
+        raise ValueError('captured skill baseline hash differs')
+    return read_json(path)['skills']
+
+
+def source_action_skills():
+    return {skill:{'previous':versions['current'],
+                  'current':{name:(ROOT/'skills'/skill/name).read_text() for name in versions['current']}}
+            for skill,versions in captured_skills().items()}
+
+
+def source_action_cases(protocol=skill_source_actions.PROTOCOL):
+    cases = []
+    examples = [('Alder',1,'Decision: Alder retains diagnostic logs for 23 days.',False),
+                ('Birch',2,'Decision: Birch deployment requires approval from two owners.',False),
+                ('Larch',2,'Decision: Larch schedules recovery drills every Monday.',True)]
+    for skill in ('memory-mcp','memory-cli'):
+        for offset,(name,objective,content,timed) in enumerate(examples,1):
+            source = {'source_type':'conversation','source_id':f'{name.lower()}-operating-decision-2026-11-14',
+                      't_ref':'2026-11-14T10:30:00Z','content':content}
+            selectors = {'valid_at':'2026-11-15T12:00:00Z','known_at':'2099-11-27T18:00:00Z'} if timed else {}
+            inputs = {'confirmed_source_message':source} if objective==1 else {
+                'topic_name':name,**({'required_time_boundary':selectors} if timed else {})}
+            prompt = ('Store this exact confirmed source and perform extraction. Report the observed episode and '
+                      'extraction status. A bound readback is allowed but not required.' if objective==1 else
+                      f'Recall the operating decision for {name}, then use explain to inspect its actual source. '
+                      + ('Use exactly the supplied valid and known time selectors for recall. ' if timed else '')
+                      + 'Report the decision, source ID, episode and limitations. Source-bound episode fallback '
+                      'is acceptable when labeled; do not claim a canonical fact or verified quote without its receipt.')
+            cases.append({'skill':skill,'id':200+offset,'objective_id':objective,'binding':'native',
+                          'operation_protocol':protocol,'source':source,'fixture':inputs,
+                          'prompt':prompt,'required_selectors':selectors,
+                          'expected_behavior':('Perform exact-source ingest then extract; report actual status/episode.'
+                            if objective==1 else 'Perform source-bound recall then explain; report exact decision, '
+                            'source/episode, canonical-fact versus fallback and actual time/coverage limitations.')})
+    return cases
+
+
+def fresh_native_cases():
+    """New authored inputs, registered before outputs; no held-out benefit claim."""
+    cases = []
+    for skill in ('memory-mcp', 'memory-cli'):
+        for offset, (name, objective, timed) in enumerate((('Maple', 1, False),
+                                                        ('Willow', 2, False),
+                                                        ('Juniper', 2, True)), 1):
+            source = {'source_type':'conversation',
+                      'source_id':f'{name.lower()}-schedule-reviewed-2026-11-12',
+                      't_ref':'2026-11-12T09:15:00Z',
+                      'content':f'Decision: {name} Index publishes incremental updates every Thursday.'}
+            selectors = {'valid_at':'2026-11-13T12:00:00Z',
+                         'known_at':'2099-11-27T18:00:00Z'} if timed else {}
+            inputs = ({'confirmed_source_message':source} if objective == 1
+                      else {'topic_name':f'{name} Index', **({'required_time_boundary':selectors} if timed else {})})
+            prompt = (f'Capture this confirmed source into memory, extract it, and report the observed outcome.'
+                      if objective == 1 else
+                      f'Recall the indexing decision for {name} Index and verify its original source using explain. '
+                      + ('Use exactly the provided valid and known time boundary. ' if timed else '')
+                      + 'Report the decision, its actual source ID and any limitations.')
+            cases.append({'skill':skill,'id':100+offset,'objective_id':objective,'binding':'native',
+                          'source':source,'fixture':inputs,'prompt':prompt,
+                          'required_selectors':selectors,
+                          'expected_behavior':('Observed ingest then extract of the exact confirmed source; '
+                              'report real episode/status and never turn pending into verified.' if objective == 1
+                              else 'Observed recall then explain of a fact from the seeded source; report the exact '
+                              'Thursday decision with real source binding and preserve every requested time selector.')})
+    return cases
 
 
 def remaining(deadline, maximum):
@@ -462,8 +551,8 @@ def cli_ingest_args(source, stdin=False):
     return argv + (['--content-stdin'] if stdin else ['--content', source['content']])
 
 
-def seed(store, binary, deadline):
-    first = native_cli(binary, store, cli_ingest_args(RECALL_SOURCE, stdin=True), RECALL_SOURCE['content'],
+def seed(store, binary, deadline, source=RECALL_SOURCE):
+    first = native_cli(binary, store, cli_ingest_args(source, stdin=True), source['content'],
                        deadline=deadline)
     receipt = json.loads(first['stdout'])
     episode = receipt['result']
@@ -474,14 +563,10 @@ def seed(store, binary, deadline):
     return [first, second]
 
 
-def project_mcp(data):
-    return data['structuredContent'] if 'structuredContent' in data else json.loads(
-        next(item['text'] for item in data['content'] if item['type'] == 'text'))
-
-
 @contextmanager
 def trial_host(plan, case, arm, directory, work, deadline=None):
-    skill, case_id = case['skill'], case['id']
+    skill, case_id = case['skill'], case.get('objective_id',case['id'])
+    recall_source = case.get('source', RECALL_SOURCE)
     native = case['binding'] == 'native'
     binary = plan['binary']
     case_files = plan['skills'][skill][arm]
@@ -499,7 +584,7 @@ def trial_host(plan, case, arm, directory, work, deadline=None):
                 if not native:
                     return controlled.mcp(name, args)
                 raw = product.request('tools/call', {'name': name, 'arguments': args})
-                delivered = project_mcp(raw)
+                delivered = project_tool_result(raw)
                 if raw.get('isError'):
                     return {'status': 'error', 'result': delivered, 'guidance': 'MCP tool returned an error.'}
                 return delivered
@@ -507,15 +592,16 @@ def trial_host(plan, case, arm, directory, work, deadline=None):
             handlers = {name: (lambda args, name=name: observed_call(name.removeprefix(MCP_HOST), args))
                         for name in schema}
             if case_id == 2:
-                ingested = product.tool('ingest', RECALL_SOURCE)
+                ingested = product.tool('ingest', recall_source)
                 extracted = product.tool('extract', {'episode_id': ingested['result']})
                 if capture_status(extracted, expected_episode=ingested['result']) != 'verified':
                     raise ValueError('native recall seed did not produce a verified fact')
-            host = SkillHost(skill, references, handlers)
+            host = SkillHost(skill, references, handlers, tool_schemas=
+                             schema if plan.get('workflow_protocol') == 'progressive-completion/v1' else None)
         else:
             store = work / 'data'
             if case_id == 2:
-                write_json(directory / 'native-seed.json', seed(store, binary, deadline))
+                write_json(directory / 'native-seed.json', seed(store, binary, deadline, recall_source))
 
             def run(argv, stdin):
                 if len(argv) in (3, 4) and argv[-1] in ('-h', '--help') and (
@@ -554,7 +640,20 @@ No shell parsing or external commands. The response contains stdout, stderr and 
 '''
 
 
-def create_messages(case, skill_text, schema):
+WORKFLOW_PROTOCOLS = ('legacy', 'progressive-completion/v1')
+COMPLETION_RULES = '''\nFinish as soon as the requested operation and sufficient evidence are observed.\nKeep the final answer concise (at most 60 words), including observed IDs/source, status and time boundary when relevant.\nDo not restate instructions or reread already sufficient evidence. A pending/partial result is not verified completion.\nIf evidence is insufficient, state that limitation; never invent facts or a successful operation.\n'''
+DISCLOSURE_ACTION = '''\nLive tool names are listed below; every listed tool remains available.\n{"action":"describe_tool","name":"mcp__memory__operation"} returns its exact live input schema.\nRead the exact schema when arguments are not known; do not invent fields. This is host metadata, not a memory operation.\n'''
+
+
+def create_messages(case, skill_text, schema, *, workflow_protocol='legacy'):
+    if workflow_protocol not in WORKFLOW_PROTOCOLS:
+        raise ValueError('unregistered workflow protocol')
+    if workflow_protocol == 'progressive-completion/v1':
+        host = '\nLive MCP tool names:\n' + json.dumps(list(schema),ensure_ascii=False) if schema else ''
+        actions = MCP_ACTION + DISCLOSURE_ACTION if schema else CLI_ACTION
+        return [{'role':'system','content':TRANSPORT_RULES + actions + COMPLETION_RULES + host + '\nSkill:\n' + skill_text},
+                {'role':'user','content':case['prompt'] + '\n\nAvailable scenario inputs:\n'
+                 + json.dumps(case['fixture'],ensure_ascii=False,sort_keys=True)}]
     host = '\nLive MCP tools:\n' + json.dumps(schema, ensure_ascii=False) if schema else ''
     actions = MCP_ACTION if schema else CLI_ACTION
     return [{'role': 'system', 'content': TRANSPORT_RULES + actions + host + '\nSkill:\n' + skill_text},
@@ -651,20 +750,35 @@ def ingest_matches(args, source, *, allow_stdin=False, require_stdin=False):
             and {key: value for key, value in args.items() if key != 'content_stdin'} == source)
 
 
-def explained_fact(args, result, recalled):
+def explained_fact(args, result, recalled, source=RECALL_SOURCE):
     try:
         returned = next(item for item in recalled['result']
-                        if item.get('provenance', {}).get('source_id') == RECALL_SOURCE['source_id'])
+                        if item.get('provenance', {}).get('source_id') == source['source_id'])
         ids = json.loads(args['context_items'])
         select = any(item == returned['source_episode'] or isinstance(item, dict)
                      and (item.get('fact_id') == returned['fact_id']
                           or item.get('source_episode') == returned['source_episode']) for item in ids)
-        return select and any(item.get('provenance', {}).get('source_id') == RECALL_SOURCE['source_id']
-                              and RECALL_SOURCE['content'] in item.get('citation_context', '')
+        return select and any(item.get('provenance', {}).get('source_id') == source['source_id']
+                              and source['content'] in item.get('citation_context', '')
                               for item in result['result'])
     except (KeyError, TypeError, ValueError, StopIteration):
         return False
 
+
+
+def fresh_explained_fact(args, result, recalled, source):
+    if (result.get('status') not in {'success','partial'}
+            or recalled.get('status') not in {'success','partial'}
+            or not explained_fact(args,result,recalled,source)):
+        return False
+    returned = next(item for item in recalled['result']
+                    if item.get('provenance',{}).get('source_id') == source['source_id'])
+    return any(item.get('fact_id') == returned.get('fact_id')
+               and canonical_id(item.get('fact_id'),'fact')
+               and item.get('source_episode') == returned.get('source_episode')
+               and canonical_id(item.get('source_episode'),'episode')
+               and item.get('provenance',{}).get('source_id') == source['source_id']
+               and source['content'] in item.get('citation_context','') for item in result['result'])
 
 def capture_readback_matches(extracted, recalled, episode, source_id):
     items = recalled.get('result')
@@ -683,8 +797,57 @@ def capture_readback_matches(extracted, recalled, episode, source_id):
     return False
 
 
+def grade_source_capture(case, calls, observations):
+    observations.update(source_sufficient=False,canonical_fact_verified=False,source_binding_observed=False)
+    names = [name for name,_,_ in calls]
+    if (names not in (['ingest','extract'],['ingest','extract','assemble_context'],
+                      ['ingest','extract','assemble_context','explain'])
+            or observations['process_faults']):
+        return observations
+    (_, arguments, ingested),(_, extraction, extracted) = calls[:2]
+    source = case['source']
+    episode = result_id(ingested,'episode_id')
+    if (not ingest_matches(arguments,source,allow_stdin=case['skill']=='memory-cli')
+            or ingested.get('status') != 'success' or not canonical_id(episode,'episode')
+            or extraction != {'episode_id':episode}):
+        return observations
+    status = capture_status(extracted,expected_episode=episode)
+    observations['pending_vs_completed_oracle'] = status
+    receipt = extracted.get('result')
+    if (extracted.get('status') not in {'success','partial'} or not isinstance(receipt,dict)
+            or receipt.get('episode_id') != episode or not isinstance(receipt.get('facts'),list)
+            or any(not isinstance(fact,dict) or not canonical_id(fact.get('fact_id'),'fact')
+                   for fact in receipt['facts'])):
+        return observations
+    bound = True
+    if len(calls) > 2:
+        _, query, recalled = calls[2]
+        fallback = (recalled.get('status') in {'success','partial'}
+                    and isinstance(recalled.get('result'),list)
+                    and any(isinstance(item,dict) and item.get('source_episode') == episode
+                            and item.get('fact_id') == 'episode_fallback:'+episode
+                            and isinstance(item.get('provenance'),dict)
+                            and item['provenance'].get('episode_fallback') is True
+                            and item['provenance'].get('source_id') == source['source_id']
+                            and item['provenance'].get('source_episode',episode) == episode
+                            and source['content'] in item.get('content','') for item in recalled['result']))
+        bound = (status in {'verified','episode-only'} and isinstance(query.get('query'),str)
+                 and bool(query['query'].strip()) and (fallback
+                     or capture_readback_matches(extracted,recalled,episode,source['source_id'])))
+        if bound and len(calls) == 4:
+            recall_grade = skill_source_actions.grade_recall(
+                case,calls[2:],{**observations,'operation_and_exact_arguments':False})
+            bound = recall_grade['operation_and_exact_arguments']
+    observations.update(operation_and_exact_arguments=bool(bound),source_binding_observed=bool(bound),
+                        source_sufficient=bool(bound),canonical_fact_verified=bool(bound and status=='verified'),
+                        pending_vs_completed_oracle=status)
+    return observations
+
+
 def grade_observed(case, trial, trace):
-    skill, case_id = case['skill'], case['id']
+    if case.get('operation_protocol',OPERATION_PROTOCOL) not in (OPERATION_PROTOCOL,*skill_source_actions.PROTOCOLS):
+        raise ValueError('unregistered operation protocol')
+    skill, case_id = case['skill'], case.get('objective_id',case['id'])
     cli = skill == 'memory-cli'
     reads = [row['request'].get('path') for row in trace if row['request'].get('action') == 'read_reference']
     allowed_reads = {'references/memory-contract.md', 'references/commands.md' if cli else 'references/mcp-tools.md'}
@@ -706,6 +869,10 @@ def grade_observed(case, trial, trace):
         calls = [parsed for row in trace if (parsed := operation(row)) is not None]
     except (IndexError, KeyError, TypeError, ValueError):
         return observations
+    if case.get('operation_protocol') in skill_source_actions.PROTOCOLS:
+        if case.get('objective_id') == 1:
+            return grade_source_capture(case,calls,observations)
+        return skill_source_actions.grade_recall(case,calls,observations)
     if trial['terminal'] != 'answered' and not calls:
         return observations
     names = [name for name, _, _ in calls]
@@ -721,7 +888,7 @@ def grade_observed(case, trial, trace):
         if names == expected or readback:
             process_faults = observations['process_faults']
             episode = result_id(results[0], 'episode_id')
-            source = (ingest_matches(args[0], LITERAL if literal else SOURCE, allow_stdin=cli,
+            source = (ingest_matches(args[0], LITERAL if literal else case.get('source', SOURCE), allow_stdin=cli,
                                      require_stdin=literal and cli)
                       and results[0].get('status') == 'success' and canonical_id(episode, 'episode')
                       and not any(fault['operation'] == 'ingest' for fault in process_faults))
@@ -734,11 +901,25 @@ def grade_observed(case, trial, trace):
             if readback:
                 source = (passed and status == 'verified' and bool(args[2].get('query', '').strip())
                           and not any(fault['operation'] == 'assemble-context' for fault in process_faults)
-                          and capture_readback_matches(results[1], results[2], episode, SOURCE['source_id']))
+                          and capture_readback_matches(results[1], results[2], episode, case.get('source', SOURCE)['source_id']))
                 passed = source
     elif case_id == 2 and names == ['assemble_context', 'explain']:
-        source = explained_fact(args[1], results[1], results[0])
-        passed = bool(args[0].get('query', '').strip()) and source
+        source = explained_fact(args[1], results[1], results[0],case.get('source',RECALL_SOURCE))
+        if case.get('objective_id') is not None:
+            source = (not observations['process_faults']
+                      and fresh_explained_fact(args[1],results[1],results[0],case['source']))
+        required = case.get('required_selectors',{})
+        snapshot_matches = True
+        if required:
+            try:
+                snapshot = results[0]['context']['snapshot']
+                snapshot_matches = all(datetime.fromisoformat(snapshot[key]) == datetime.fromisoformat(value)
+                                       for key,value in required.items())
+            except (KeyError,TypeError,ValueError):
+                snapshot_matches = False
+            observations['returned_snapshot_matches'] = snapshot_matches
+        passed = (bool(args[0].get('query', '').strip()) and source and snapshot_matches
+                  and all(args[0].get(key)==value for key,value in required.items()))
     elif (skill, case_id) == ('memory-mcp', 3) and names == ['resolve']:
         passed = (args[0] == {'canonical_name': 'Alice Smith', 'entity_type': 'person', 'aliases': ['A. Smith']}
                   and results[0].get('status') == 'success' and bool(result_id(results[0], 'entity_id')))
@@ -821,10 +1002,28 @@ def verify_profile(profile, binary):
 def verify_plan(plan):
     if plan.get('schema') != 'memory-mcp-bounded-skill-workflow/v2':
         raise ValueError('execution requires a frozen v2 workflow plan')
+    if plan.get('workflow_protocol','legacy') not in WORKFLOW_PROTOCOLS:
+        raise ValueError('unregistered workflow protocol')
+    progressive = plan.get('workflow_protocol','legacy') == 'progressive-completion/v1'
+    if (plan.get('action_protocol') != TRANSPORT_RULES + (COMPLETION_RULES if progressive else '')
+            or plan.get('mcp_action') != MCP_ACTION + (DISCLOSURE_ACTION if progressive else '')
+            or plan.get('cli_action') != CLI_ACTION):
+        raise ValueError('protocol registration differs from selected workflow mode')
+    cohort = plan.get('case_cohort','legacy')
+    if cohort not in CASE_COHORTS:
+        raise ValueError('case cohort registration differs')
+    expected_cases = (source_action_cases(SOURCE_ACTION_PROTOCOLS[cohort]) if cohort in SOURCE_ACTION_PROTOCOLS else
+                      fresh_native_cases() if cohort == 'fresh-native/v1' else load_registration()[0])
+    if plan['cases'] != expected_cases:
+        raise ValueError('case cohort registration differs')
+    if cohort in SOURCE_ACTION_PROTOCOLS and plan['skills'] != source_action_skills():
+        raise ValueError('candidate skill registration differs')
     sources = {'source_sha256': (Path(__file__), 'workflow implementation'),
                'attempt_observer_sha256': (OBSERVER_SOURCE, 'inference observer'),
                'mcp_binding_sha256': (MCP_BINDING_SOURCE, 'MCP binding'),
                'binary_sha256': (Path(plan['binary']), 'product binary')}
+    if cohort in SOURCE_ACTION_PROTOCOLS:
+        sources['source_action_scorer_sha256'] = (Path(skill_source_actions.__file__),'source-action scorer')
     for key, (source, label) in sources.items():
         if sha256(source.read_bytes()) != plan[key]:
             raise ValueError(f'{label} differs from frozen plan')
@@ -832,17 +1031,28 @@ def verify_plan(plan):
     verify_profile(plan['profile'], Path(plan['binary']))
     if plan['budget'] != BUDGET or tuple(plan['arms']) != ARMS:
         raise ValueError('budget or arms differ from the frozen protocol')
-    if plan.get('operation_protocol') != OPERATION_PROTOCOL:
+    expected_operation = SOURCE_ACTION_PROTOCOLS[cohort] if cohort in SOURCE_ACTION_PROTOCOLS else OPERATION_PROTOCOL
+    if plan.get('operation_protocol') != expected_operation:
         raise ValueError('operation protocol differs from the frozen evaluator')
 
 
-def freeze(path, binary, endpoint, model, *, profile='portable'):
+def freeze(path, binary, endpoint, model, *, profile='portable', workflow_protocol='legacy', case_cohort='legacy'):
+    if workflow_protocol not in WORKFLOW_PROTOCOLS:
+        raise ValueError('unregistered workflow protocol')
+    if case_cohort not in CASE_COHORTS:
+        raise ValueError('unregistered case cohort')
     loopback_endpoint(endpoint)
     binary = binary.resolve(strict=True)
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise ValueError('a runnable product binary is required')
     architecture = verify_profile(profile, binary)
-    cases, skills = load_registration()
+    if case_cohort in SOURCE_ACTION_PROTOCOLS:
+        skills = source_action_skills()
+        cases = source_action_cases(SOURCE_ACTION_PROTOCOLS[case_cohort])
+    else:
+        cases, skills = load_registration()
+        if case_cohort == 'fresh-native/v1':
+            cases = fresh_native_cases()
     path.mkdir(parents=True, exist_ok=False)
     plan = {
         'schema': 'memory-mcp-bounded-skill-workflow/v2', 'cases': cases, 'skills': skills,
@@ -859,6 +1069,16 @@ def freeze(path, binary, endpoint, model, *, profile='portable'):
         'controlled_scope': 'Synthetic scenario responses. Import does not touch external filesystem or network. Reembed does not mutate any actual store. MCP discovery and CLI help still use the native binary.',
         'review': 'Operation/evidence observations are automatic. Review final answers against frozen expected_behavior before counting complete passes.',
     }
+    if workflow_protocol != 'legacy':
+        plan['workflow_protocol'] = workflow_protocol
+        plan['action_protocol'] += COMPLETION_RULES
+        plan['mcp_action'] += DISCLOSURE_ACTION
+    if case_cohort != 'legacy':
+        plan['case_cohort'] = case_cohort
+    if case_cohort in SOURCE_ACTION_PROTOCOLS:
+        plan['operation_protocol'] = SOURCE_ACTION_PROTOCOLS[case_cohort]
+        plan['source_action_scorer_sha256'] = sha256(Path(skill_source_actions.__file__).read_bytes())
+        plan['skill_scope'] = 'previous is the captured44 current version; current is frozen live candidate; development qualification only'
     write_json(path / 'frozen-plan.json', plan)
     return plan
 
@@ -884,7 +1104,8 @@ async def run_trial(plan, case, arm, identity, directory, recorder):
                             max_tokens=budget['max_tokens'], timeout=seconds))
 
                     phase = 'play'
-                    result = await play(create_messages(case, skill_text, schema), host, request,
+                    result = await play(create_messages(case, skill_text, schema,
+                                        workflow_protocol=plan.get('workflow_protocol','legacy')), host, request,
                                         budget=budget, started=started, deadline=deadline)
                     phase = 'cleanup'
     except Exception as error:
@@ -922,7 +1143,7 @@ async def capture_trials(plan, output):
             rows.append(row)
             print(f"  {row['terminal']} operations={row['grade']['operation_and_exact_arguments']}", flush=True)
     write_json(output / 'summary.json', {'scheduled': len(plan['cases']) * len(ARMS), 'rows': rows,
-                                        'operation_protocol': OPERATION_PROTOCOL})
+                                        'operation_protocol': plan.get('operation_protocol',OPERATION_PROTOCOL)})
 
 
 async def capture(path):
@@ -942,11 +1163,14 @@ def main():
     prepare.add_argument('--endpoint', required=True)
     prepare.add_argument('--model', required=True)
     prepare.add_argument('--profile', choices=('portable', 'apple-silicon'), default='portable')
+    prepare.add_argument('--workflow-protocol',choices=WORKFLOW_PROTOCOLS,default='legacy')
+    prepare.add_argument('--case-cohort',choices=CASE_COHORTS,default='legacy')
     execute = commands.add_parser('capture')
     execute.add_argument('output', type=Path)
     args = parser.parse_args()
     if args.action == 'freeze':
-        freeze(args.output, args.binary, args.endpoint, args.model, profile=args.profile)
+        freeze(args.output, args.binary, args.endpoint, args.model, profile=args.profile,
+               workflow_protocol=args.workflow_protocol,case_cohort=args.case_cohort)
     else:
         asyncio.run(capture(args.output))
 

@@ -64,6 +64,9 @@ extraction, nonzero exit, or unresolved failure). Exit zero can contain pending
 extraction; preserve its `episode_id` and follow retry guidance. Classify recall as
 `assembled`, and as `cited` only after every used claim has provenance.
 
+A successfully extracted `note` is a nonempty canonical fact: after inspection
+classify the capture as `verified`. Its note type does not imply an empty fact set.
+
 After completed successful extraction, an empty fact set confirms no canonical fact capture; source fallback may
 still return the episode text. Never treat exit zero, an episode ID, or an empty
 result as stronger evidence than the structured response provides.

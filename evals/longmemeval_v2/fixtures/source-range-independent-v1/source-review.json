@@ -1,0 +1,132 @@
+{
+  "schema": "source-range-source-review/v1",
+  "cases": 40,
+  "new": 16,
+  "previously_exposed": 24,
+  "reviewed_before_inference": true,
+  "policy": "Source-only sufficient line witnesses, including scope/closure/ambiguity as needed. No expected answer in prompts. Full source is not required when a local witness is sufficient.",
+  "case_source_indices": {
+    "middle-positive": 0,
+    "adjacent-negative": 1,
+    "terminal-negative": 2,
+    "button-count-mixed": 3,
+    "missing-anchor-unknown": 0,
+    "duplicate-anchor-unknown": 1,
+    "clipped-terminal-unknown": 2,
+    "heterogeneous-positive": 3,
+    "named-scope-positive": 0,
+    "complete-list-positive": 1,
+    "ledger-conflicting-repeat": 0,
+    "ledger-consistent-repeat": 1,
+    "ledger-named-scope-repeat": 2,
+    "ledger-role-selected-repeat": 3,
+    "ledger-opaque-intervening": 0,
+    "ledger-clipped-repeat": 1,
+    "graph-equal-links": 0,
+    "graph-conflicting-links": 0,
+    "graph-opaque-repeat": 0,
+    "graph-scope-count": 0,
+    "graph-role-selection": 0,
+    "graph-virtualized-last": 0,
+    "graph-escaped-name": 0,
+    "graph-single-closed-end": 0
+  },
+  "new_line_witnesses": {
+    "range-middle": [
+      [
+        1,
+        4
+      ]
+    ],
+    "range-adjacent": [
+      [
+        1,
+        4
+      ]
+    ],
+    "range-terminal": [
+      [
+        1,
+        4
+      ]
+    ],
+    "range-count": [
+      [
+        1,
+        2
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        7,
+        7
+      ]
+    ],
+    "range-missing": [
+      [
+        1,
+        4
+      ]
+    ],
+    "range-conflict": [
+      [
+        1,
+        5
+      ]
+    ],
+    "range-consistent": [
+      [
+        1,
+        6
+      ]
+    ],
+    "range-opaque": [
+      [
+        1,
+        5
+      ]
+    ],
+    "range-clipped": [
+      [
+        1,
+        4
+      ]
+    ],
+    "range-virtualized": [
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        3
+      ]
+    ],
+    "range-scope": [
+      [
+        4,
+        7
+      ]
+    ],
+    "range-role": [
+      [
+        1,
+        6
+      ]
+    ],
+    "range-list": [
+      [
+        1,
+        5
+      ]
+    ],
+    "range-unicode": [
+      [
+        1,
+        4
+      ]
+    ]
+  }
+}

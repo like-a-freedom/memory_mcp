@@ -1,0 +1,317 @@
+{
+  "schema": "source-range-reviewed-controls/v1",
+  "cases": {
+    "range-middle": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Slate"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "4db8bd3b452a7d647440796301958e096c7bde88811025519113f6e771dabf97",
+            "raw_range": [
+              0,
+              82
+            ]
+          }
+        ]
+      ]
+    },
+    "range-adjacent": {
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "None"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+            "raw_range": [
+              0,
+              76
+            ]
+          }
+        ]
+      ]
+    },
+    "range-terminal": {
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "None"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+            "raw_range": [
+              0,
+              76
+            ]
+          }
+        ]
+      ]
+    },
+    "range-count": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "2"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "43d880dc63466edf02156c6b93a9d41cec056e30ba65ff91dd9bef8d8e95f001",
+            "raw_range": [
+              0,
+              40
+            ]
+          },
+          {
+            "source_item_index": 0,
+            "raw_sha256": "43d880dc63466edf02156c6b93a9d41cec056e30ba65ff91dd9bef8d8e95f001",
+            "raw_range": [
+              60,
+              95
+            ]
+          },
+          {
+            "source_item_index": 0,
+            "raw_sha256": "43d880dc63466edf02156c6b93a9d41cec056e30ba65ff91dd9bef8d8e95f001",
+            "raw_range": [
+              114,
+              132
+            ]
+          }
+        ]
+      ]
+    },
+    "range-missing": {
+      "answer_kind": "unknown",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+            "raw_range": [
+              0,
+              76
+            ]
+          }
+        ]
+      ]
+    },
+    "range-conflict": {
+      "answer_kind": "unknown",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "253e9cd2e6562b3b2e22919b8940f4f4c1cb63a37d8161af6e5a6908e90cc71b",
+            "raw_range": [
+              0,
+              106
+            ]
+          }
+        ]
+      ]
+    },
+    "range-consistent": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Granite"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "e41628ecfe6bfd891433feed52d862208298bbf884d49ec38eb728f97578ed5b",
+            "raw_range": [
+              0,
+              125
+            ]
+          }
+        ]
+      ]
+    },
+    "range-opaque": {
+      "answer_kind": "unknown",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "f302a8ea4007cbe2f37f696e14268eb7bd1df7749fdb0a814c331aa6fe56a9ce",
+            "raw_range": [
+              0,
+              113
+            ]
+          }
+        ]
+      ]
+    },
+    "range-clipped": {
+      "answer_kind": "unknown",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "2f47732dd923b7eb470f4a1f61a03f160d15afb2bc7f6612042bcfaf494e9685",
+            "raw_range": [
+              0,
+              84
+            ]
+          }
+        ]
+      ]
+    },
+    "range-virtualized": {
+      "answer_kind": "unknown",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "19bb9c7d0bd5e5ae09d26e348d24d466a115eb33dc3ab315ab56bb9f0553cb14",
+            "raw_range": [
+              0,
+              51
+            ]
+          },
+          {
+            "source_item_index": 0,
+            "raw_sha256": "19bb9c7d0bd5e5ae09d26e348d24d466a115eb33dc3ab315ab56bb9f0553cb14",
+            "raw_range": [
+              84,
+              118
+            ]
+          }
+        ]
+      ]
+    },
+    "range-scope": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Marble"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "41e99e4c72fc0be667bf16b896200c8115a3d8de2682367df9917d6b4cb0d2be",
+            "raw_range": [
+              61,
+              142
+            ]
+          }
+        ]
+      ]
+    },
+    "range-role": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Granite"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "2b5bfe49a3e42fd3e5e48040f9ecb56b17b37b1392adc7be04f8d5d50e255b98",
+            "raw_range": [
+              0,
+              122
+            ]
+          }
+        ]
+      ]
+    },
+    "range-list": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Lime, Plum, Pear"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "80ec7b60d1e4d0884d42f19dfd3871eb4db62e231c41f8c8ec775906b08e86dd",
+            "raw_range": [
+              0,
+              96
+            ]
+          }
+        ]
+      ]
+    },
+    "range-unicode": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Crème"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "674f6a0a08fb5ab4ae8a7a28b3a4bafcc9c2b17ecf272bc96e881e68a82ef870",
+            "raw_range": [
+              0,
+              78
+            ]
+          }
+        ]
+      ]
+    },
+    "range-numeric": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "72 hours"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "5118a4fb498d2e45d77b1fae5e0769d292880462d16828b0c8a62eb16694f342",
+            "raw_range": [
+              30,
+              69
+            ]
+          }
+        ]
+      ]
+    },
+    "range-two-sources": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "96 hours"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 1,
+            "raw_sha256": "ecd4be28b339e5ea60e48931a4b9933b0e258028f35c4050c4dcc01f696196f1",
+            "raw_range": [
+              0,
+              38
+            ]
+          }
+        ]
+      ]
+    }
+  }
+}

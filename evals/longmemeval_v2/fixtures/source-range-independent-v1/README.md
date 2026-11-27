@@ -1,0 +1,1 @@
+Sixteen authored development controls, labels and source support frozen before inference. Not a blind benchmark. UI proofs conservatively include the relevant closed/partial scope; numeric proofs include subject/value/unit and status. The raw text is retained with source identity. Unknown/conflicting/partial cases cannot be relabeled None. One finite capture; all faults included.

@@ -76,8 +76,14 @@ bypass a refused credential-bearing write or to grant an agent arbitrary access.
 
 Extraction returns statement/quote pairs by default within a shared 4 KiB JSON
 budget. Missing pairs or overflow omit all pairs and set `fact_evidence_omitted`;
-this is not an empty-fact verdict. `extract --compact` opts out. Claim rollout
+this is not an empty-fact verdict. `extract --compact` opts out of inline
+statement/quote evidence; use the default when that evidence is needed, or explain
+the returned item separately. Claim rollout
 defaults to `evidence`; configured stages and unknown role/coverage still matter.
+
+For `--context-items`, JSON-encode selected assembly items whole, retaining
+top-level `source_episode`, `fact_id` and provenance. Time selectors belong to
+`assemble-context`, not `explain`; source `t_ref` is not a retrieval snapshot.
 
 `explain` accepts `--item-offset`, `--source-offset`, `--source-limit-scalars`
 (maximum 8000, requires source offset), and `--provenance-offset`. Source and
@@ -86,5 +92,9 @@ to 32 KiB, default source context to 1200 Unicode scalars, provenance pages to 2
 sources. Follow response `next_offset`, `citation_context_next_offset` and
 `provenance_next_offset`; offsets count Unicode scalars for source text.
 Check quote verification/completeness and entire-source flags before quoting.
+Keep fact identity separate from quote verification: `quote_verified=false`
+does not turn a `fact:…` into an episode fallback. Report fallback only when
+the returned item identifies it. In a historical final answer include the
+actual `context.snapshot` boundary; source `t_ref` cannot substitute for it.
 A partial response is not evidence that omitted content is absent. Assembly is
 a logical read and can persist fact-access heat.
