@@ -1,0 +1,361 @@
+{
+  "schema": "memory-skill-dynamic-adjudicated/v1",
+  "scheduled": 32,
+  "prompt_families": 16,
+  "full_pass": 8,
+  "answered": 14,
+  "terminal_faults": 18,
+  "operation_metric": {
+    "original": 10,
+    "corrected_frozen": 16,
+    "scope": "frozen exact operation predicate, not every legitimate action path; harmless extra readback in CLI1 is a documented limitation; final timeouts never full pass"
+  },
+  "arms": {
+    "previous": {
+      "scheduled": 16,
+      "full_pass": 3
+    },
+    "current": {
+      "scheduled": 16,
+      "full_pass": 5
+    }
+  },
+  "bindings": {
+    "native": {
+      "scheduled": 14,
+      "full_pass": 5
+    },
+    "controlled": {
+      "scheduled": 18,
+      "full_pass": 3
+    }
+  },
+  "trial_seconds_sum": 1289.7251852879126,
+  "review_blinding": {
+    "MCP": false,
+    "CLI": true
+  },
+  "causal_limit": "Exposed development prompts; single local capture, same16families in both arms. Temperature0 is not bitwise determinism; no general instruction or memory-benefit effect is established. Native/controlled outcomes are separate.",
+  "rows": [
+    {
+      "identity": "memory-cli-1-current",
+      "full_pass": false,
+      "trial_sha256": "44314f07a51dde02607a216985f2986994c2b4d3a2876d53f653a032236e8d26",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-1-previous",
+      "full_pass": false,
+      "trial_sha256": "a20d78469fc0ae33b6de79ba2963887bce114359f8fb2c86d4f3774eeef1c700",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-2-current",
+      "full_pass": false,
+      "trial_sha256": "979462fdf7a85ca3533dbe0254f31f93d56668d9e9cdac66b432eb3de07f4b10",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-2-previous",
+      "full_pass": false,
+      "trial_sha256": "e4b916d5b2fa41093cc0802b7845863b8bf8cf752780ddb4f32fc23d3fc60bde",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-3-current",
+      "full_pass": true,
+      "trial_sha256": "cd577d9fb8ba725849fe7a74c231931eb60a7f2183e64adeb88f50e9829eeee3",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-3-previous",
+      "full_pass": true,
+      "trial_sha256": "e6a8505f49206edce43718ce1624057537109475d0b9bd0dfe25e527f5aec77b",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-4-current",
+      "full_pass": false,
+      "trial_sha256": "8576b4cbf3c3de023a5d0e112f678020c54588e625906ac36b622a976c89652a",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-4-previous",
+      "full_pass": false,
+      "trial_sha256": "bf8a6e0b124eb8fb0a1cc0d6ef5d2837015f063f077da218ebc4470db5f04356",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-5-current",
+      "full_pass": false,
+      "trial_sha256": "53003865a588b15c4971bbc2bc7b37d7a7fbb8fa326fa7ea2e00cf77b28428e3",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-5-previous",
+      "full_pass": false,
+      "trial_sha256": "a2af71c128c97cd88ce3c2d9a66b30f7fd086b26b40da5b915ee676d5564de60",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-6-current",
+      "full_pass": false,
+      "trial_sha256": "9898ed55045ed5614b5abd0035e86a830945f6e8aa9b2eb4bccf38dba1f81f32",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-6-previous",
+      "full_pass": false,
+      "trial_sha256": "9ce220914b39adb922cf1fcfefbd4fb2447809d7bec988bdabaa28c2cd5d4200",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-cli-7-current",
+      "full_pass": false,
+      "trial_sha256": "dbcfbd40d8c257545b749bc67a78c18d7531f77370ff9c25d51a8cc709c6f716",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-7-previous",
+      "full_pass": false,
+      "trial_sha256": "fd7ad3a06736ac5357a98bcb132c8ce4a40d9c88aa5e82c024ae2bf4b1ec1e18",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-8-current",
+      "full_pass": true,
+      "trial_sha256": "e45b96c698f9170753588e053e7b20cb01c7963b6070054cdcbed0c9b52d0813",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-cli-8-previous",
+      "full_pass": false,
+      "trial_sha256": "82cc26c6b9f2d4aa66a6e619b16661faf05a84257fd670472f95bf07f32cb736",
+      "review": "cli-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-1-current",
+      "full_pass": false,
+      "trial_sha256": "c7802ba24ac6c6c5863196bd7b6df9358210774d33df25adce6f497e0c03ad42",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-1-previous",
+      "full_pass": false,
+      "trial_sha256": "4b47b91a18eb745bf37a6ac982c05240ca4e1b92549b17a0e1105579026f6f3c",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-2-current",
+      "full_pass": true,
+      "trial_sha256": "177908a614583a76106bc26cbfd3458f2241f050e8c7dfeb4447c2f963e44ec2",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-2-previous",
+      "full_pass": true,
+      "trial_sha256": "712bcf6f3541e2da81b6a3e3739ccca47742f8078d23b6e7ff7a48e0973b3de6",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-3-current",
+      "full_pass": true,
+      "trial_sha256": "6ea67506dd4e7644d7d40aacb7534cd933b9eaa829dbeb1933a2087d5cbfb9af",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-3-previous",
+      "full_pass": true,
+      "trial_sha256": "08a210e44134923dc1e7b494a80a450d95da78e50c92345924b1eef6b70ac0d5",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-4-current",
+      "full_pass": true,
+      "trial_sha256": "45fd0bcffad86f65d33e380ef3b1457c3cd8fe634f9add87ded6ecb549a879ca",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-4-previous",
+      "full_pass": false,
+      "trial_sha256": "add331b050826cf24db24392891ca693d89bc127a3d9ceb159ae3458938789d2",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "native",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-5-current",
+      "full_pass": false,
+      "trial_sha256": "6010b7e0247443355391e311dc5670afe62d5afdc1966ba99fae73235758fa48",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-5-previous",
+      "full_pass": false,
+      "trial_sha256": "d004a71455a1d3e69319cbc74356f5ac5264468d50035499f4d8d91895c6d4be",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "identity": "memory-mcp-6-current",
+      "full_pass": false,
+      "trial_sha256": "6209c61b18431a5bd63d8f0e7f6c7c5aafa583c5ff120eab87236d82030fa99b",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-6-previous",
+      "full_pass": false,
+      "trial_sha256": "c77c1ae88b602d9e6d4aa2dc41aa2ff2661f06023f2830dd6b249ba058056858",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-7-current",
+      "full_pass": false,
+      "trial_sha256": "a82553929048bd6b7cefc5bdecbf9448b45adac51680f54af2c025c025140667",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-7-previous",
+      "full_pass": false,
+      "trial_sha256": "35807ff7719c3a4f7186811c467b7e9f1d2a8ed2c746978781ac438f28a08b22",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-8-current",
+      "full_pass": false,
+      "trial_sha256": "98f2a29295c8d417b3d6218e37ae348a36d0376ea564bb46da1e47f427776741",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "current",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "identity": "memory-mcp-8-previous",
+      "full_pass": false,
+      "trial_sha256": "da682f7b3d6b99313cbd4676bd9f6f3145ca7ee90bfeb5a556979be6c7d2c6ba",
+      "review": "mcp-semantic-review-v1.json",
+      "arm": "previous",
+      "binding": "controlled",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    }
+  ]
+}

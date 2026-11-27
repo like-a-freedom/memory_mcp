@@ -1,0 +1,13 @@
+# Independent citation usability diagnostic
+
+Frozen before outputs, 27 November 2026. Four authored short multi-source tasks × two citation presentations; identical text/order, local model, temperature 0 and 192-token limit. The handle variant adds a public mapping to the same exact source IDs; this is an additive presentation comparison, not an equal-token comparison. Actual public ingest/extract forms each disposable store. Only the fixed-sufficient-reply arm is scheduled: retrieval and autonomous queries are not qualified here. Embeddings are disabled because no retrieval is performed. No LM Studio server or remote inference is used.
+
+All eight first-pass rows count, including formation, transport, truncation and parse failures. No output repair. A second complete fresh-store capture is allowed only if every first-pass row passes all dimensions. Any failure stops repetition. Value (including complete closed lists), abstention, exact cited source and source-bound full-proposition quote are separate dimensions. Invalid rows score zero in the eight-row denominator. This exposed author-reviewed development set cannot establish general treatment benefit.
+
+## Explicit stored-episode protocol v2
+
+The first preregistered run is retained in the sibling directory: 8/8 rows invalid before inference because the first successfully stored source produced no canonical facts. This version changes only the fixed-reply formation prerequisite, not texts, labels or scoring. Public ingest and successful completed extract remain mandatory; pending extraction is rejected. An explicitly supplied sufficient source is usable independently of whether the heuristic extractor formed canonical facts. This does not qualify recallability, extraction success, live retrieval or autonomous workflow. The original source and failed result are retained; this is a separately registered protocol correction, not a successful retry of v1.
+
+## Observed result
+
+8/8 completed, eight one-attempt reader requests, no transport/parse/truncation faults; 51.026 seconds total including product startup and formation, under concurrent native/Cargo host load. Values (including complete sets) 8/8, exact source binding 5/8, full source-bound quotes 8/8, abstention classification 8/8, false-premise refusals 2/2. All-dimension success: raw IDs 4/4, handles 1/4. In the three failed handle rows the model selected the correct `s2` but placed it in an unregistered `citation` field rather than `source_refs`. They remain failures: no repair or channel fallback. No second capture is permitted. No product default change is supported by these tiny exposed cases. This is not a general model ranking or an equal-token performance estimate.

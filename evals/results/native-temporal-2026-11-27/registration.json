@@ -1,0 +1,24 @@
+{
+  "schema": "native-regression-registration/v1",
+  "native_only": true,
+  "models": false,
+  "product_profile": "debug; native Apple Silicon",
+  "product_binary_sha256": "d12239c5162717811426eae15be6794fbdee94b19eb7d92c13d6e6e6250e313c",
+  "runner_binary_sha256": "529fbd08766e19672d27f0c2c7db789d9b8611abbf38ba11d31e7134d0896ebe",
+  "baseline_index_sha256": "665c7a9799df8b95d4e3728ad4b2497abfe60b20f3deb97b2b2aef770028e903",
+  "profile_sha256": "b3740ed049e44d3d45cd9d62928b2074a5ef5d272ae8ae941a871d1517852ad0",
+  "expected_cases": 8,
+  "external_seconds": 180,
+  "no_reruns": true,
+  "source_sha256": {
+    "crates/memory-mcp/src/knowledge/queries.rs": "d8f3836e0db011ed9297b2806337848525fbf178c8529161a4ad81fd5d765a4c",
+    "crates/memory-mcp/src/memory/retrieval/lexical.rs": "a12e929e57328c6788cbbde8881f16bdda317f01533bfcb8836a713317b2da19",
+    "crates/memory-mcp/src/shared/search.rs": "1adbb304c0adc6d838dabbf847a6869e8a4d1df24c19bfa0725021196905a85a",
+    "crates/memory-mcp/src/shared/search_lexical.rs": "6d226c68eb4c9b4e5166674737666fcd37c900a997d1288775ea26bf4ee4a1d7",
+    "crates/memory-mcp/src/memory/retrieval/budget.rs": "75752df6d61695a4cd3c5a2dda94b4ad912092a0f91fe161bf9929a69cc01e6b",
+    "crates/memory-mcp/src/memory/retrieval/query_mode.rs": "a84316779f075d6ca7117a0d59aeb75d09e9b2fcbe4133658532fb34e710c124",
+    "crates/memory-mcp/src/memory/retrieval/ranking.rs": "6e9564974e588f3e715df1ec74e80aa566d7bf2fb77d7583a3dd95ec60864daf",
+    "crates/memory-mcp/src/memory/retrieval/scoring.rs": "8fc2284712096a9ae6ae55ff4842050b337bdb784abc9aa628bee4aa04b84e87",
+    "crates/memory-mcp/src/memory/retrieval/types.rs": "5e2895a3074514b6aafbcfb90bcd908cbb90008d1f2f5107717ce3a9a1d4aeb2"
+  }
+}

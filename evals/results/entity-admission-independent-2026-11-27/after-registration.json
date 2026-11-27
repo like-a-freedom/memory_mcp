@@ -1,0 +1,17 @@
+{
+  "schema": "entity-admission-after-registration/v1",
+  "cases": 16,
+  "captures": 1,
+  "labels_unchanged": true,
+  "repair": "finite French/Russian measure predicate grammar; per-occurrence admission; genuine/manual identities remain",
+  "files": {
+    "evals/corpora/entity-admission-multilingual-v1/cases.json": "f4db85976466e5dc02d6c89ebf921f3b59a9e3fb1ea85f6f0eb9ced8973f2d79",
+    "crates/memory-mcp/src/knowledge/entity_extraction/anno.rs": "29dcd1aae2079f51460c77e25fb882aa43ca58460b1af647c82fb5d812feeda8",
+    "crates/eval-harness/tests/extraction_suite_contract.rs": "a28e2a80fe1eacd572c3d39344ab72aebfacafbc382ee83bc2940256189efefd"
+  },
+  "unresolved_before_capture": [
+    "German generic noun false identity",
+    "digit-containing names without explicit actor predicate",
+    "Project Cedar canonical-name annotation ambiguity"
+  ]
+}

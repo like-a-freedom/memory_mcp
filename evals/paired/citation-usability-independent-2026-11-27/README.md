@@ -1,0 +1,5 @@
+# Independent citation usability diagnostic
+
+Frozen before outputs, 27 November 2026. Four authored short multi-source tasks × two citation presentations; identical text/order, local model, temperature 0 and 192-token limit. The handle variant adds a public mapping to the same exact source IDs; this is an additive presentation comparison, not an equal-token comparison. Actual public ingest/extract forms each disposable store. Only the fixed-sufficient-reply arm is scheduled: retrieval and autonomous queries are not qualified here. Embeddings are disabled because no retrieval is performed. No LM Studio server or remote inference is used.
+
+All eight first-pass rows count, including formation, transport, truncation and parse failures. No output repair. A second complete fresh-store capture is allowed only if every first-pass row passes all dimensions. Any failure stops repetition. Value (including complete closed lists), abstention, exact cited source and source-bound full-proposition quote are separate dimensions. Invalid rows score zero in the eight-row denominator. This exposed author-reviewed development set cannot establish general treatment benefit.

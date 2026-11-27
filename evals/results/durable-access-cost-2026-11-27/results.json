@@ -1,0 +1,55 @@
+{
+  "schema": "durable-access-cost-results/v1",
+  "rows": [
+    {
+      "case": "large-body-large-keys",
+      "content_bytes": 270000,
+      "elapsed_us": 164564,
+      "fact_id": "fact:cost_probe",
+      "index_key_bytes": 170922,
+      "index_keys": 8192,
+      "queries": 1,
+      "request_bytes": 554,
+      "returned_bytes": 2,
+      "statistics_verified": true
+    },
+    {
+      "case": "large-body-small-keys",
+      "content_bytes": 270000,
+      "elapsed_us": 1944,
+      "fact_id": "fact:cost_probe",
+      "index_key_bytes": 18,
+      "index_keys": 1,
+      "queries": 1,
+      "request_bytes": 554,
+      "returned_bytes": 2,
+      "statistics_verified": true
+    },
+    {
+      "case": "small-body-large-keys",
+      "content_bytes": 27,
+      "elapsed_us": 162323,
+      "fact_id": "fact:cost_probe",
+      "index_key_bytes": 170922,
+      "index_keys": 8192,
+      "queries": 1,
+      "request_bytes": 554,
+      "returned_bytes": 2,
+      "statistics_verified": true
+    },
+    {
+      "case": "small-body-small-keys",
+      "content_bytes": 27,
+      "elapsed_us": 1386,
+      "fact_id": "fact:cost_probe",
+      "index_key_bytes": 18,
+      "index_keys": 1,
+      "queries": 1,
+      "request_bytes": 554,
+      "returned_bytes": 2,
+      "statistics_verified": true
+    }
+  ],
+  "integration_controls_passed": 9,
+  "production_change": false
+}

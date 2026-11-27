@@ -1,0 +1,27 @@
+{
+  "schema": "source-ledger-local-execution/v1",
+  "frozen_at_utc": "2026-11-27T15:23:43.488399+00:00",
+  "architecture": "arm64",
+  "owned_server_pid": 66845,
+  "server_script_sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec",
+  "server_start_log": "/tmp/memory-quality-mlx-source-ledger-start.log",
+  "server_startup_seconds": null,
+  "model_state": "First observed request is not proof of cold model state; weights verified before capture",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "all_model_files_rehashed": 13,
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-lm": "0.32.2",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  },
+  "reader_source_sha256": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+  "registration_sha256": "3522269fa86549afeda59ccdad838015c61c4b49de87679de02fe13b02373252",
+  "acceptance_sha256": "a325375b148f2fc3be2fc2735b3850d8a2096e0304dd7a91b91c90d2d23b07f7",
+  "source_review_sha256": "6fbbe1635067ef3d7680d0ba9fd2e0883de541ef2b8c6cb5e2ce49d12a3624dc",
+  "prior_prompts_unchanged": 119,
+  "source_only_v7_gate_sha256": "08ebae552033b1db8321560f288d660ea6a299555ecab14b50e19b07c25b7840",
+  "final_readiness_checks_sha256": "17731bd92b749895a4873b3d234a394eda0baa8862448d2d53a619737546ee48",
+  "concurrent_owned_cargo_or_native_evals": false
+}

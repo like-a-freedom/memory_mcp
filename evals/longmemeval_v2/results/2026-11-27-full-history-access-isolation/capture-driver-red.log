@@ -1,0 +1,161 @@
+test_completed_read_above_internal_30_second_budget_is_a_fault (__main__.ReadClassification.test_completed_read_above_internal_30_second_budget_is_a_fault) ... ERROR
+test_controlled_child_timeout_is_killed_and_frames_still_parsed (__main__.ReadClassification.test_controlled_child_timeout_is_killed_and_frames_still_parsed) ... ERROR
+test_duplicate_receipt_is_a_fault (__main__.ReadClassification.test_duplicate_receipt_is_a_fault) ... ERROR
+test_full_span_and_exit_zero_delivers_context (__main__.ReadClassification.test_full_span_and_exit_zero_delivers_context) ... ERROR
+test_known_101_strict_span_failure_has_a_delivered_context (__main__.ReadClassification.test_known_101_strict_span_failure_has_a_delivered_context) ... ERROR
+test_malformed_receipt_is_a_fault (__main__.ReadClassification.test_malformed_receipt_is_a_fault) ... ERROR
+test_missing_receipt_does_not_turn_exit_zero_into_success (__main__.ReadClassification.test_missing_receipt_does_not_turn_exit_zero_into_success) ... ERROR
+test_natural_late_exit_is_a_process_deadline_fault (__main__.ReadClassification.test_natural_late_exit_is_a_process_deadline_fault) ... ERROR
+test_raw_child_parser_retains_later_lines_after_truncated_utf8 (__main__.ReadClassification.test_raw_child_parser_retains_later_lines_after_truncated_utf8) ... ERROR
+test_strict_match_must_come_from_registered_source (__main__.ReadClassification.test_strict_match_must_come_from_registered_source) ... ERROR
+test_timeout_is_a_fault_even_when_a_receipt_was_printed (__main__.ReadClassification.test_timeout_is_a_fault_even_when_a_receipt_was_printed) ... ERROR
+test_unexplained_101_preserves_observation_without_delivered_context (__main__.ReadClassification.test_unexplained_101_preserves_observation_without_delivered_context) ... ERROR
+test_wrong_case_receipt_is_a_fault (__main__.ReadClassification.test_wrong_case_receipt_is_a_fault) ... ERROR
+
+======================================================================
+ERROR: test_completed_read_above_internal_30_second_budget_is_a_fault (__main__.ReadClassification.test_completed_read_above_internal_30_second_budget_is_a_fault)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 62, in test_completed_read_above_internal_30_second_budget_is_a_fault
+    result = self.classify([receipt(elapsed=30000.1)])
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_controlled_child_timeout_is_killed_and_frames_still_parsed (__main__.ReadClassification.test_controlled_child_timeout_is_killed_and_frames_still_parsed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 102, in test_controlled_child_timeout_is_killed_and_frames_still_parsed
+    meta, events = driver.run_child([sys.executable, '-c', code], {}, raw, 0.5)
+                   ^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'run_child'
+
+======================================================================
+ERROR: test_duplicate_receipt_is_a_fault (__main__.ReadClassification.test_duplicate_receipt_is_a_fault)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 70, in test_duplicate_receipt_is_a_fault
+    self.assertEqual(self.classify([receipt(), receipt()])['retrieval_fault'], 'invalid_receipt')
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_full_span_and_exit_zero_delivers_context (__main__.ReadClassification.test_full_span_and_exit_zero_delivers_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 41, in test_full_span_and_exit_zero_delivers_context
+    result = self.classify([receipt(content=SPAN)], {'exit_code': 0, 'strict_span_assertion': False})
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_known_101_strict_span_failure_has_a_delivered_context (__main__.ReadClassification.test_known_101_strict_span_failure_has_a_delivered_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 34, in test_known_101_strict_span_failure_has_a_delivered_context
+    result = self.classify()
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_malformed_receipt_is_a_fault (__main__.ReadClassification.test_malformed_receipt_is_a_fault)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 73, in test_malformed_receipt_is_a_fault
+    self.assertEqual(self.classify([{'case_id': CASE}])['retrieval_fault'], 'invalid_receipt')
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_missing_receipt_does_not_turn_exit_zero_into_success (__main__.ReadClassification.test_missing_receipt_does_not_turn_exit_zero_into_success)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 76, in test_missing_receipt_does_not_turn_exit_zero_into_success
+    self.assertEqual(self.classify([], {'exit_code': 0})['retrieval_fault'], 'missing_receipt')
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_natural_late_exit_is_a_process_deadline_fault (__main__.ReadClassification.test_natural_late_exit_is_a_process_deadline_fault)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 58, in test_natural_late_exit_is_a_process_deadline_fault
+    result = self.classify(meta={'exit_code': 0, 'external_timeout': False, 'elapsed_seconds': 45.01})
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_raw_child_parser_retains_later_lines_after_truncated_utf8 (__main__.ReadClassification.test_raw_child_parser_retains_later_lines_after_truncated_utf8)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 91, in test_raw_child_parser_retains_later_lines_after_truncated_utf8
+    meta, events = driver.run_child([sys.executable, '-c', code], {}, raw, 5)
+                   ^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'run_child'
+
+======================================================================
+ERROR: test_strict_match_must_come_from_registered_source (__main__.ReadClassification.test_strict_match_must_come_from_registered_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 81, in test_strict_match_must_come_from_registered_source
+    result = self.classify([row])
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_timeout_is_a_fault_even_when_a_receipt_was_printed (__main__.ReadClassification.test_timeout_is_a_fault_even_when_a_receipt_was_printed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 52, in test_timeout_is_a_fault_even_when_a_receipt_was_printed
+    result = self.classify(meta={'exit_code': -9, 'external_timeout': True, 'elapsed_seconds': 45.1})
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_unexplained_101_preserves_observation_without_delivered_context (__main__.ReadClassification.test_unexplained_101_preserves_observation_without_delivered_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 46, in test_unexplained_101_preserves_observation_without_delivered_context
+    result = self.classify(meta={'strict_span_assertion': False})
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+======================================================================
+ERROR: test_wrong_case_receipt_is_a_fault (__main__.ReadClassification.test_wrong_case_receipt_is_a_fault)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 67, in test_wrong_case_receipt_is_a_fault
+    self.assertEqual(self.classify([receipt(case='other')])['retrieval_fault'], 'invalid_receipt')
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/test_memory_quality_v5_paired_capture.py", line 31, in classify
+    return driver.classify_read({**META, **(meta or {})}, events, CASE, SPAN)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'paired_driver' has no attribute 'classify_read'
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.010s
+
+FAILED (errors=13)

@@ -1,0 +1,107 @@
+{
+  "candidate_pools": [
+    {
+      "stage": "facts.initial_fetched",
+      "elapsed_ms": 4.745542,
+      "records": 31,
+      "content_bytes": 404519,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 1,
+      "unique_sources": 31,
+      "tracked_source_fact_ids": []
+    },
+    {
+      "stage": "facts.term_groups_fetched",
+      "elapsed_ms": 63.058417000000006,
+      "records": 32,
+      "content_bytes": 408002,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 32,
+      "tracked_source_fact_ids": [
+        "fact:competing32_31"
+      ]
+    },
+    {
+      "stage": "facts.term_groups_deduplicated",
+      "elapsed_ms": 63.624584,
+      "records": 32,
+      "content_bytes": 408002,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 32,
+      "tracked_source_fact_ids": [
+        "fact:competing32_31"
+      ]
+    },
+    {
+      "stage": "episodes.fetched",
+      "elapsed_ms": 237.703625,
+      "records": 21,
+      "content_bytes": 264463,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 21,
+      "tracked_source_fact_ids": []
+    }
+  ],
+  "stages": [
+    {
+      "stage": "formation",
+      "elapsed_ms": 0.374459,
+      "tracked_source_items": 1
+    },
+    {
+      "stage": "ranked_fact_candidates",
+      "elapsed_ms": 200.016125,
+      "tracked_source_items": 1
+    },
+    {
+      "stage": "subject_scoped_fact_candidates",
+      "elapsed_ms": 201.89499999999998,
+      "tracked_source_items": 1
+    },
+    {
+      "stage": "admitted_fact_candidates",
+      "elapsed_ms": 217.2485,
+      "tracked_source_items": 0
+    },
+    {
+      "stage": "bounded_fact_candidates",
+      "elapsed_ms": 217.264084,
+      "tracked_source_items": 0
+    },
+    {
+      "stage": "episode_candidates",
+      "elapsed_ms": 292.250584,
+      "tracked_source_items": 0
+    },
+    {
+      "stage": "selected_pre_packaging",
+      "elapsed_ms": 318.72858399999996,
+      "tracked_source_items": 0
+    },
+    {
+      "stage": "packed_context",
+      "elapsed_ms": 355.67387499999995,
+      "tracked_source_items": 0
+    }
+  ],
+  "status": "quality_failed",
+  "first_observed_loss": "admission, not fetch",
+  "source_fixture": "evals/longmemeval_v2/fixtures/independent-control-source-fetch-v1.json",
+  "raw_log_retained_in_ledger": ".superpowers/sdd/2026-11-26-post-release-memory-quality/task3-exploratory-red.log",
+  "classification": "synthetic exploratory; not the unrecovered historical 32-source input"
+}

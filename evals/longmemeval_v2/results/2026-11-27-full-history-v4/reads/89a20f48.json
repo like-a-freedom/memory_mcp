@@ -1,0 +1,1736 @@
+{
+  "case_id": "89a20f48",
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 31.05457654199563,
+  "copy_seconds": 0.6448178330028895,
+  "raw_sha256": "e43116d6095263e2062f2383c40d4082cec8a236cf9ac437349900dd608ec0b2",
+  "raw_bytes": 6327071,
+  "process_deadline_exceeded": false,
+  "delivered_items": [
+    {
+      "confidence": 0.0,
+      "content": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+      "fact_id": "fact:72dae2359d272b755a877236",
+      "grounding": 0.6,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 118806,
+          "original_bytes": 382024,
+          "start_byte": 116758
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "by",
+          "dropdown",
+          "forum",
+          "option",
+          "sorted",
+          "time",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 118806,
+          "original_bytes": 382024,
+          "start_byte": 116758
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "forum",
+            "sorted",
+            "by",
+            "top",
+            "time",
+            "option",
+            "all",
+            "dropdown",
+            "final",
+            "short"
+          ],
+          "matched_index_key_terms": [
+            "forum",
+            "by",
+            "top",
+            "all",
+            "short"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "forum",
+              "by",
+              "top",
+              "all",
+              "short"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "02",
+              "05",
+              "09",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:2c4d2684e69d1223e22449d9",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:dafd79dd360e7fe0a0e14328"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+        "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+      "rationale": "tier=fallback fts=22.48 access_count=0 confidence=0.00 relevance=0.00 grounding=0.60 alignment=1.03 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+    },
+    {
+      "confidence": 0.0,
+      "content": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+      "fact_id": "fact:c82dcfb33cc2a386347450a6",
+      "grounding": 0.34,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 49152,
+          "original_bytes": 59676,
+          "start_byte": 47104
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "sorted",
+          "by",
+          "top",
+          "option",
+          "appear",
+          "all"
+        ],
+        "quote_excerpt": {
+          "end_byte": 49152,
+          "original_bytes": 59676,
+          "start_byte": 47104
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "using",
+            "our",
+            "website",
+            "sorted",
+            "by",
+            "top",
+            "option",
+            "appear",
+            "all",
+            "answer"
+          ],
+          "matched_index_key_terms": [
+            "top",
+            "all"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "top",
+              "all"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:2c4d2684e69d1223e22449d9",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:dafd79dd360e7fe0a0e14328"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:ec03490ff27b058f0a75e1a1",
+        "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+      "rationale": "tier=fallback fts=26.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.34 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:ec03490ff27b058f0a75e1a1"
+    },
+    {
+      "confidence": 0.0,
+      "content": "k Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'NOZE Rustic Coat Rack Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom'\\n\\t\\t\\t\\t[1664] listitem ''\\n\\t\\t\\t\\t\\t[1666] LabelText '', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t\\t[1669] checkbox 'Add to Cart', clickable, checked='false'\\n\\t\\t\\t\\t\\t[1670] strong ''\\n\\t\\t\\t\\t\\t\\t[1671] link 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp'\\n\\t\\t\\t[1676] button 'Add to Cart', clickable\\n\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t[1679] link 'View All', clickable\\n\\t\\t\\t\\tStaticText 'View All'\\n\\t\\t[1684] heading 'My Wish List'\\n\\t\\tStaticText 'You have no items in your wish list.'\\n\\t[1688] contentinfo ''\\n\\t\\t[1694] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1697] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1699] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1701] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1703] list ''\\n\\t\\t\\t[1704] listitem ''\\n\\t\\t\\t\\t[1705] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1706] listitem ''\\n\\t\\t\\t\\t[1707] link 'Search Terms', clickable\\n\\t\\t\\t[1708] listitem ''\\n\\t\\t\\t\\t[1709] link 'Advanced Search', clickable\\n\\t\\t\\t[1710] listitem ''\\n\\t\\t\\t\\t[1711] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1716] link 'Report All Bugs', clickable\", \"action\": \"click('227')\", \"screenshot\": \"screenshots/e5aec2da/1.png\", \"state_index\": 1, \"step\": 1, \"thought\": \"I need to find the order from 2022 to view the picture frame's size confi",
+      "fact_id": "fact:e47c90015a947de79e21c3fa",
+      "grounding": 0.25,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 28672,
+          "original_bytes": 796304,
+          "start_byte": 26624
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "appear",
+          "by",
+          "option",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 28672,
+          "original_bytes": 796304,
+          "start_byte": 26624
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "using",
+            "our",
+            "by",
+            "top",
+            "option",
+            "appear",
+            "all"
+          ],
+          "matched_index_key_terms": [
+            "our",
+            "top",
+            "all"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "our",
+              "top",
+              "all"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "02",
+              "05",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:2c4d2684e69d1223e22449d9",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:dafd79dd360e7fe0a0e14328"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:d2f4d8b53dd2179274260ced",
+        "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "k Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'NOZE Rustic Coat Rack Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom'\\n\\t\\t\\t\\t[1664] listitem ''\\n\\t\\t\\t\\t\\t[1666] LabelText '', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t\\t[1669] checkbox 'Add to Cart', clickable, checked='false'\\n\\t\\t\\t\\t\\t[1670] strong ''\\n\\t\\t\\t\\t\\t\\t[1671] link 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp'\\n\\t\\t\\t[1676] button 'Add to Cart', clickable\\n\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t[1679] link 'View All', clickable\\n\\t\\t\\t\\tStaticText 'View All'\\n\\t\\t[1684] heading 'My Wish List'\\n\\t\\tStaticText 'You have no items in your wish list.'\\n\\t[1688] contentinfo ''\\n\\t\\t[1694] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1697] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1699] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1701] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1703] list ''\\n\\t\\t\\t[1704] listitem ''\\n\\t\\t\\t\\t[1705] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1706] listitem ''\\n\\t\\t\\t\\t[1707] link 'Search Terms', clickable\\n\\t\\t\\t[1708] listitem ''\\n\\t\\t\\t\\t[1709] link 'Advanced Search', clickable\\n\\t\\t\\t[1710] listitem ''\\n\\t\\t\\t\\t[1711] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1716] link 'Report All Bugs', clickable\", \"action\": \"click('227')\", \"screenshot\": \"screenshots/e5aec2da/1.png\", \"state_index\": 1, \"step\": 1, \"thought\": \"I need to find the order from 2022 to view the picture frame's size confi",
+      "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.25 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:d2f4d8b53dd2179274260ced"
+    },
+    {
+      "confidence": 0.0,
+      "content": "\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '(+1, −0)'\\n\\t\\t\\t[329] heading 'Short URL:', visible\\n\\t\\t\\t[330] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'http://localhost:9080/4'\\n\\t\\t[332] Section '', visible\\n\\t\\t\\t[333] heading 'pittsburgh', visible\\n\\t\\t\\t\\t[334] link 'pittsburgh', clickable, visible\\n\\t\\t\\t[335] Section '', visible\\n\\t\\t\\t\\t[338] button 'Unsubscribe 1 subscriber', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Unsubscribe'\\n\\t\\t\\t[345] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qhrn'\\n\\t\\t\\t[346] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[347] list '', visible\\n\\t\\t\\t\\t[348] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[349] time 'October 1, 2022 at 1:02:24 PM EDT', visible\\n\\t\\t\\t\\t\\t\\tStaticText '3 years ago'\\n\\t\\t\\t\\t[350] listitem '', visible\\n\\t\\t\\t\\t\\t[351] link 'Subscribe via RSS', clickable, visible\\n\\t\\t\\t\\t\\t\\t[353] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Subscribe via RSS'\\n\\t\\t[355] group '', visible\\n\\t\\t\\t[356] DisclosureTriangle 'Hide this forum', clickable, visible, expanded=False\\n\\t\\t[362] Section '', visible\\n\\t\\t\\t[363] heading 'Toolbox', visible\\n\\t\\t\\t[364] list '', visible\\n\\t\\t\\t\\t[365] listitem '', visible\\n\\t\\t\\t\\t\\t[366] link 'Bans', clickable, visible\\n\\t\\t\\t\\t[367] listitem '', visible\\n\\t\\t\\t\\t\\t[368] link 'Moderation log', clickable, visible\\n\\t[369] contentinfo ''\\n\\t\\t[370] paragraph ''\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[372] link 'Postmill', clickable\", \"action\": \"send_msg_to_user(\\\"Done — your question has been posted to r/pittsburgh.\\\\n\\\\nTitle: places for new drivers to learn driving in pittsburgh\\\\nLink: http://localhost:9080/4\\\\n\\\\nIt's currently showing 0 comments. Would you like me to:\\\\n1) Edit the post to add more details (to get better answers)?\\\\n2) Crosspost to another subreddit? If so, tell me which one.\\\\n3) Post a comment on the submission to prompt responses?\\\\n\\\\nTell me which option you want and I’ll do it.\\\")\", \"screenshot\": \"screenshots/4ba5e9cb/5.png\", \"state_index\": 5, \"step\": 5, \"thought\": null, \"ur",
+      "fact_id": "fact:e70983ac3e3424e1680f40c8",
+      "grounding": 0.34,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 59392,
+          "original_bytes": 59491,
+          "start_byte": 57344
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "by",
+          "forum",
+          "option",
+          "time",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 59392,
+          "original_bytes": 59491,
+          "start_byte": 57344
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "forum",
+            "by",
+            "top",
+            "time",
+            "option",
+            "all",
+            "answer",
+            "short"
+          ],
+          "matched_index_key_terms": [
+            "forum",
+            "by",
+            "top",
+            "time",
+            "all",
+            "short"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "forum",
+              "by",
+              "top",
+              "time",
+              "all",
+              "short"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "02",
+              "05",
+              "09",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:2c4d2684e69d1223e22449d9",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:dafd79dd360e7fe0a0e14328"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:d15c6332e98036e1b4cbe1a4",
+        "source_id": "longmemeval_v2_trajectory_0c4a214e66fb83ebb68e07357bfcaa3007b8dc71aca461d1d7ffa3f2f5abf64e_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '(+1, −0)'\\n\\t\\t\\t[329] heading 'Short URL:', visible\\n\\t\\t\\t[330] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'http://localhost:9080/4'\\n\\t\\t[332] Section '', visible\\n\\t\\t\\t[333] heading 'pittsburgh', visible\\n\\t\\t\\t\\t[334] link 'pittsburgh', clickable, visible\\n\\t\\t\\t[335] Section '', visible\\n\\t\\t\\t\\t[338] button 'Unsubscribe 1 subscriber', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Unsubscribe'\\n\\t\\t\\t[345] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qhrn'\\n\\t\\t\\t[346] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[347] list '', visible\\n\\t\\t\\t\\t[348] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[349] time 'October 1, 2022 at 1:02:24 PM EDT', visible\\n\\t\\t\\t\\t\\t\\tStaticText '3 years ago'\\n\\t\\t\\t\\t[350] listitem '', visible\\n\\t\\t\\t\\t\\t[351] link 'Subscribe via RSS', clickable, visible\\n\\t\\t\\t\\t\\t\\t[353] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Subscribe via RSS'\\n\\t\\t[355] group '', visible\\n\\t\\t\\t[356] DisclosureTriangle 'Hide this forum', clickable, visible, expanded=False\\n\\t\\t[362] Section '', visible\\n\\t\\t\\t[363] heading 'Toolbox', visible\\n\\t\\t\\t[364] list '', visible\\n\\t\\t\\t\\t[365] listitem '', visible\\n\\t\\t\\t\\t\\t[366] link 'Bans', clickable, visible\\n\\t\\t\\t\\t[367] listitem '', visible\\n\\t\\t\\t\\t\\t[368] link 'Moderation log', clickable, visible\\n\\t[369] contentinfo ''\\n\\t\\t[370] paragraph ''\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[372] link 'Postmill', clickable\", \"action\": \"send_msg_to_user(\\\"Done — your question has been posted to r/pittsburgh.\\\\n\\\\nTitle: places for new drivers to learn driving in pittsburgh\\\\nLink: http://localhost:9080/4\\\\n\\\\nIt's currently showing 0 comments. Would you like me to:\\\\n1) Edit the post to add more details (to get better answers)?\\\\n2) Crosspost to another subreddit? If so, tell me which one.\\\\n3) Post a comment on the submission to prompt responses?\\\\n\\\\nTell me which option you want and I’ll do it.\\\")\", \"screenshot\": \"screenshots/4ba5e9cb/5.png\", \"state_index\": 5, \"step\": 5, \"thought\": null, \"ur",
+      "rationale": "tier=fallback fts=12.52 access_count=0 confidence=0.00 relevance=0.00 grounding=0.34 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:d15c6332e98036e1b4cbe1a4"
+    },
+    {
+      "confidence": 0.4,
+      "content": "8] heading 'Preview', visible\\n\\t\\t\\t[288] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'I am a robot'\\n\\t\\t\\t[122] checkbox 'Formatting help +', clickable, visible, checked='false'\\n\\t\\t\\tStaticText 'Markdown allowed.'\\n\\t\\t\\t[124] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Formatting help'\\n\\t\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '+'\\n\\t\\t\\t[250] button 'Save', clickable, visible\\n\\t[252] complementary '', visible\\n\\t\\t[253] Section '', visible\\n\\t\\t\\t[255] heading 'MarvelsGrantMan136', visible\\n\\t\\t\\t\\t[256] link 'MarvelsGrantMan136', clickable, visible\\n\\t\\t\\t[257] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Registered'\\n\\t\\t\\t\\t[259] time 'June 24, 2020 at 11:02:10 AM EDT', visible\\n\\t\\t\\t\\t\\tStaticText '6 years ago'\\n\\t\\t\\t\\tStaticText 'Not whitelisted'\\n\\t\\t\\t[263] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't2_5adwlxvn'\\n\\t\\t\\t[264] paragraph '', visible\\n\\t\\t\\t\\t[265] link 'Edit biography', clickable, visible\\n\\t\\t\\t\\t\\t[267] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Edit biography'\\n\\t\\t[269] Section '', visible\\n\\t\\t\\t[270] heading 'Toolbox', visible\\n\\t\\t\\t[271] list '', visible\\n\\t\\t\\t\\t[272] listitem '', visible\\n\\t\\t\\t\\t\\t[273] link 'Hidden forums', clickable, visible\\n\\t\\t\\t\\t[274] listitem '', visible\\n\\t\\t\\t\\t\\t[275] link 'Trash', clickable, visible\\n\\t[276] contentinfo '', visible\\n\\t\\t[277] paragraph '', visible\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[279] link 'Postmill', clickable, visible\", \"action\": \"fill('116', 'I am a robot')\", \"screenshot\": \"screenshots/3331c568/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"The biography textbox now contains the desired text “I am a robot”. The next step to complete the change is to click the Save button to submit the update.\", \"url\": \"http://localhost:9080/user/MarvelsGrantMan136/edit_biography\"}, {\"accessibility_tree\": \"RootWebArea 'Editing biography for MarvelsGrantMan136', focused\\n\\t[19] alert '', visible, live='assertive', atomic, relevant='additions text'\\n\\t\\t[24] paragraph '', visible\\n\\t\\t\\tStaticText 'The biography was updated.'\\n\\t",
+      "fact_id": "episode_fallback:episode:c8c7809cd6bdec19b5c7b8a3",
+      "grounding": 0.5,
+      "provenance": {
+        "episode_excerpt": {
+          "end_byte": 48128,
+          "source_bytes": 51272,
+          "start_byte": 46080
+        },
+        "episode_fallback": true,
+        "reference_time": "2000-01-01T00:00:00Z",
+        "source_episode": "episode:c8c7809cd6bdec19b5c7b8a3",
+        "source_id": "longmemeval_v2_trajectory_f3a69bd9c2ddc7852026e0c3361711f3d961ef4c6e0386dc7ad07e63f8692c44_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "8] heading 'Preview', visible\\n\\t\\t\\t[288] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'I am a robot'\\n\\t\\t\\t[122] checkbox 'Formatting help +', clickable, visible, checked='false'\\n\\t\\t\\tStaticText 'Markdown allowed.'\\n\\t\\t\\t[124] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Formatting help'\\n\\t\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '+'\\n\\t\\t\\t[250] button 'Save', clickable, visible\\n\\t[252] complementary '', visible\\n\\t\\t[253] Section '', visible\\n\\t\\t\\t[255] heading 'MarvelsGrantMan136', visible\\n\\t\\t\\t\\t[256] link 'MarvelsGrantMan136', clickable, visible\\n\\t\\t\\t[257] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Registered'\\n\\t\\t\\t\\t[259] time 'June 24, 2020 at 11:02:10 AM EDT', visible\\n\\t\\t\\t\\t\\tStaticText '6 years ago'\\n\\t\\t\\t\\tStaticText 'Not whitelisted'\\n\\t\\t\\t[263] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't2_5adwlxvn'\\n\\t\\t\\t[264] paragraph '', visible\\n\\t\\t\\t\\t[265] link 'Edit biography', clickable, visible\\n\\t\\t\\t\\t\\t[267] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Edit biography'\\n\\t\\t[269] Section '', visible\\n\\t\\t\\t[270] heading 'Toolbox', visible\\n\\t\\t\\t[271] list '', visible\\n\\t\\t\\t\\t[272] listitem '', visible\\n\\t\\t\\t\\t\\t[273] link 'Hidden forums', clickable, visible\\n\\t\\t\\t\\t[274] listitem '', visible\\n\\t\\t\\t\\t\\t[275] link 'Trash', clickable, visible\\n\\t[276] contentinfo '', visible\\n\\t\\t[277] paragraph '', visible\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[279] link 'Postmill', clickable, visible\", \"action\": \"fill('116', 'I am a robot')\", \"screenshot\": \"screenshots/3331c568/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"The biography textbox now contains the desired text “I am a robot”. The next step to complete the change is to click the Save button to submit the update.\", \"url\": \"http://localhost:9080/user/MarvelsGrantMan136/edit_biography\"}, {\"accessibility_tree\": \"RootWebArea 'Editing biography for MarvelsGrantMan136', focused\\n\\t[19] alert '', visible, live='assertive', atomic, relevant='additions text'\\n\\t\\t[24] paragraph '', visible\\n\\t\\t\\tStaticText 'The biography was updated.'\\n\\t",
+      "rationale": "tier=fallback fts=6.00 access_count=0 confidence=0.40 grounding=0.50 semantic=disabled matched episode content query=\"forum sorted by top time range option appear below all time dropdown\" and active at 2026-11-27",
+      "relevance": 0.5,
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:c8c7809cd6bdec19b5c7b8a3"
+    }
+  ],
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2.446834,
+        "duration_us": 2425,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 4.404,
+        "duration_us": 325,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "carrier_span_present": true,
+        "case_id": "89a20f48",
+        "episode_count": 151,
+        "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 4.74775,
+        "duration_us": 311,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 8.534500000000001,
+        "duration_us": 3314,
+        "sql_sha256": "04f02dc2b774e4e04944862ffee28181c72e4832892c9df01133a75214aab8cc"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 4.1227920000000005,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 4.130166999999999,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 253.06325,
+        "duration_us": 244471,
+        "sql_sha256": "1bd1a5f01465ddbe6d75015850dc1329e7c42632ce7e9d8384bc04fd3adf32fa"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 637.966292,
+        "duration_us": 382752,
+        "sql_sha256": "951ee6ea8cd30e71feabca73e9458be08f0dabef070b542e34ab88d1397c2579"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 941.551584,
+        "duration_us": 301757,
+        "sql_sha256": "a428e877f1875f0b3413195dfca59be2098764c28f3a1d62c37a7c388e838202"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 1532.177584,
+        "duration_us": 589730,
+        "sql_sha256": "9dcb6549e92d797f4deed49a386b9c0e3a29dc473f613f698ac1ebff5be47f8a"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 1561.710417,
+        "records": 258,
+        "content_bytes": 119023754,
+        "max_content_bytes": 1048542,
+        "index_keys": 2083075,
+        "index_key_bytes": 46488130,
+        "max_index_key_bytes": 266,
+        "unique_contents": 101,
+        "unique_sources": 101,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 1593.699584,
+        "records": 258,
+        "content_bytes": 119023754,
+        "max_content_bytes": 1048542,
+        "index_keys": 2083075,
+        "index_key_bytes": 46488130,
+        "max_index_key_bytes": 266,
+        "unique_contents": 101,
+        "unique_sources": 101,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 3050.115792,
+        "records": 258,
+        "content_dictionaries": 101,
+        "index_dictionaries": 101
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3141.210167,
+        "duration_us": 13409,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3176.157709,
+        "duration_us": 1704,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3178.070709,
+        "duration_us": 1630,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3179.35875,
+        "duration_us": 798,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3180.3904589999997,
+        "duration_us": 893,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3181.9139999999998,
+        "duration_us": 1360,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3448.359375,
+        "duration_us": 243947,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6304.155167,
+        "duration_us": 2128,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6704.087750000001,
+        "duration_us": 18297,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6751.751125,
+        "duration_us": 36969,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6757.389375,
+        "duration_us": 52052,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6760.053417,
+        "duration_us": 40900,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6762.947084,
+        "duration_us": 43829,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6807.235125,
+        "duration_us": 34747,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6815.598875,
+        "duration_us": 50905,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6825.346959,
+        "duration_us": 48444,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6827.824084,
+        "duration_us": 50893,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6896.1715,
+        "duration_us": 66399,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6899.827917,
+        "duration_us": 58851,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6903.025834,
+        "duration_us": 67222,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6907.248334,
+        "duration_us": 66243,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6964.316667,
+        "duration_us": 55055,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6971.7940419999995,
+        "duration_us": 55391,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6974.356084,
+        "duration_us": 53389,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6976.356709,
+        "duration_us": 55415,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7045.898875,
+        "duration_us": 67446,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7055.230791999999,
+        "duration_us": 64674,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7060.115,
+        "duration_us": 74101,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7063.720125,
+        "duration_us": 73139,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7111.598459,
+        "duration_us": 33195,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7116.230167000001,
+        "duration_us": 37801,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7123.106917,
+        "duration_us": 49252,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7125.514749999999,
+        "duration_us": 59416,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7170.8093340000005,
+        "duration_us": 34348,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7186.4256669999995,
+        "duration_us": 58875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7190.1710840000005,
+        "duration_us": 49162,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7194.015084000001,
+        "duration_us": 53035,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7240.070084,
+        "duration_us": 35926,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7253.061167,
+        "duration_us": 57007,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7256.790625,
+        "duration_us": 47997,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7260.96375,
+        "duration_us": 52143,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7320.4196249999995,
+        "duration_us": 57122,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7325.9704169999995,
+        "duration_us": 55047,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7328.134209,
+        "duration_us": 52631,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7333.052084,
+        "duration_us": 57523,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7394.606209,
+        "duration_us": 59113,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7400.186667,
+        "duration_us": 52468,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7404.058417,
+        "duration_us": 56366,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7407.805375,
+        "duration_us": 64700,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7456.32525,
+        "duration_us": 41188,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7470.489959,
+        "duration_us": 60631,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7474.107709,
+        "duration_us": 54587,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7477.240334,
+        "duration_us": 57696,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7524.460209,
+        "duration_us": 38822,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7531.448208999999,
+        "duration_us": 41390,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7545.302042,
+        "duration_us": 55269,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7549.0397920000005,
+        "duration_us": 69612,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7617.552667,
+        "duration_us": 53782,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7623.232334,
+        "duration_us": 64124,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7626.503,
+        "duration_us": 62705,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7629.2606670000005,
+        "duration_us": 77827,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7649.731124999999,
+        "duration_us": 18121,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7757.908209,
+        "duration_us": 48795,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 9968.820125,
+        "duration_us": 943,
+        "sql_sha256": "41a1919ccdf316aa968c079683e96ae6c0bf0b4832ee2f88f57a345e97172b36"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9968.220084,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 10036.359167,
+        "duration_us": 62983,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 10032.024417,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 10078.124458999999,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 13366.018958999999,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 15568.094374999999,
+        "records": 151,
+        "content_dictionaries": 151,
+        "index_dictionaries": 298
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15743.942000000001,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15857.313167,
+        "duration_us": 108372,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15994.608209,
+        "duration_us": 137238,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16125.334584,
+        "duration_us": 130671,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16271.882167000002,
+        "duration_us": 146491,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16395.008292,
+        "duration_us": 123044,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 16403.908375,
+        "records": 67,
+        "content_bytes": 29890205,
+        "max_content_bytes": 1047521,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 67,
+        "unique_sources": 67,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 17940.035292,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18023.747209,
+        "duration_us": 4669,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18025.100042,
+        "duration_us": 970,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18311.443584,
+        "duration_us": 284289,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18322.503,
+        "duration_us": 297308,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18322.564209,
+        "duration_us": 295422,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 18331.691166999997,
+        "duration_us": 304540,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "89a20f48",
+        "elapsed_ms": 18413.418583,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "fact_id": "fact:72dae2359d272b755a877236",
+              "grounding": 0.6,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "by",
+                  "dropdown",
+                  "forum",
+                  "option",
+                  "sorted",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "forum",
+                    "sorted",
+                    "by",
+                    "top",
+                    "time",
+                    "option",
+                    "all",
+                    "dropdown",
+                    "final",
+                    "short"
+                  ],
+                  "matched_index_key_terms": [
+                    "forum",
+                    "by",
+                    "top",
+                    "all",
+                    "short"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "forum",
+                      "by",
+                      "top",
+                      "all",
+                      "short"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "02",
+                      "05",
+                      "09",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:2c4d2684e69d1223e22449d9",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:dafd79dd360e7fe0a0e14328"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "rationale": "tier=fallback fts=22.48 access_count=0 confidence=0.00 relevance=0.00 grounding=0.60 alignment=1.03 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+            },
+            {
+              "confidence": 0.0,
+              "content": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+              "fact_id": "fact:c82dcfb33cc2a386347450a6",
+              "grounding": 0.34,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 49152,
+                  "original_bytes": 59676,
+                  "start_byte": 47104
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "sorted",
+                  "by",
+                  "top",
+                  "option",
+                  "appear",
+                  "all"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 49152,
+                  "original_bytes": 59676,
+                  "start_byte": 47104
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "using",
+                    "our",
+                    "website",
+                    "sorted",
+                    "by",
+                    "top",
+                    "option",
+                    "appear",
+                    "all",
+                    "answer"
+                  ],
+                  "matched_index_key_terms": [
+                    "top",
+                    "all"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "top",
+                      "all"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:2c4d2684e69d1223e22449d9",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:dafd79dd360e7fe0a0e14328"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:ec03490ff27b058f0a75e1a1",
+                "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+              "rationale": "tier=fallback fts=26.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.34 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:ec03490ff27b058f0a75e1a1"
+            },
+            {
+              "confidence": 0.0,
+              "content": "k Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'NOZE Rustic Coat Rack Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom'\\n\\t\\t\\t\\t[1664] listitem ''\\n\\t\\t\\t\\t\\t[1666] LabelText '', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t\\t[1669] checkbox 'Add to Cart', clickable, checked='false'\\n\\t\\t\\t\\t\\t[1670] strong ''\\n\\t\\t\\t\\t\\t\\t[1671] link 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp'\\n\\t\\t\\t[1676] button 'Add to Cart', clickable\\n\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t[1679] link 'View All', clickable\\n\\t\\t\\t\\tStaticText 'View All'\\n\\t\\t[1684] heading 'My Wish List'\\n\\t\\tStaticText 'You have no items in your wish list.'\\n\\t[1688] contentinfo ''\\n\\t\\t[1694] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1697] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1699] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1701] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1703] list ''\\n\\t\\t\\t[1704] listitem ''\\n\\t\\t\\t\\t[1705] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1706] listitem ''\\n\\t\\t\\t\\t[1707] link 'Search Terms', clickable\\n\\t\\t\\t[1708] listitem ''\\n\\t\\t\\t\\t[1709] link 'Advanced Search', clickable\\n\\t\\t\\t[1710] listitem ''\\n\\t\\t\\t\\t[1711] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1716] link 'Report All Bugs', clickable\", \"action\": \"click('227')\", \"screenshot\": \"screenshots/e5aec2da/1.png\", \"state_index\": 1, \"step\": 1, \"thought\": \"I need to find the order from 2022 to view the picture frame's size confi",
+              "fact_id": "fact:e47c90015a947de79e21c3fa",
+              "grounding": 0.25,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 28672,
+                  "original_bytes": 796304,
+                  "start_byte": 26624
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "appear",
+                  "by",
+                  "option",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 28672,
+                  "original_bytes": 796304,
+                  "start_byte": 26624
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "using",
+                    "our",
+                    "by",
+                    "top",
+                    "option",
+                    "appear",
+                    "all"
+                  ],
+                  "matched_index_key_terms": [
+                    "our",
+                    "top",
+                    "all"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "our",
+                      "top",
+                      "all"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "02",
+                      "05",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:2c4d2684e69d1223e22449d9",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:dafd79dd360e7fe0a0e14328"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:d2f4d8b53dd2179274260ced",
+                "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "k Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'NOZE Rustic Coat Rack Wall Mounted Shelf with 4 Hooks, Hanging Entryway Organizer for Mug Coffee Cup, Holding Solid Wooden Shelf with 2 Baskets for Kitchen Living Room, Bathroom and Bedroom'\\n\\t\\t\\t\\t[1664] listitem ''\\n\\t\\t\\t\\t\\t[1666] LabelText '', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t\\t[1669] checkbox 'Add to Cart', clickable, checked='false'\\n\\t\\t\\t\\t\\t[1670] strong ''\\n\\t\\t\\t\\t\\t\\t[1671] link 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp', clickable\\n\\t\\t\\t\\t\\t\\t\\tStaticText 'Uttermost Volterra Crackled Taupe-Gray Ceramic Table Lamp'\\n\\t\\t\\t[1676] button 'Add to Cart', clickable\\n\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t[1679] link 'View All', clickable\\n\\t\\t\\t\\tStaticText 'View All'\\n\\t\\t[1684] heading 'My Wish List'\\n\\t\\tStaticText 'You have no items in your wish list.'\\n\\t[1688] contentinfo ''\\n\\t\\t[1694] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1697] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1699] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1701] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1703] list ''\\n\\t\\t\\t[1704] listitem ''\\n\\t\\t\\t\\t[1705] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1706] listitem ''\\n\\t\\t\\t\\t[1707] link 'Search Terms', clickable\\n\\t\\t\\t[1708] listitem ''\\n\\t\\t\\t\\t[1709] link 'Advanced Search', clickable\\n\\t\\t\\t[1710] listitem ''\\n\\t\\t\\t\\t[1711] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1716] link 'Report All Bugs', clickable\", \"action\": \"click('227')\", \"screenshot\": \"screenshots/e5aec2da/1.png\", \"state_index\": 1, \"step\": 1, \"thought\": \"I need to find the order from 2022 to view the picture frame's size confi",
+              "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.25 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:d2f4d8b53dd2179274260ced"
+            },
+            {
+              "confidence": 0.0,
+              "content": "\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '(+1, −0)'\\n\\t\\t\\t[329] heading 'Short URL:', visible\\n\\t\\t\\t[330] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'http://localhost:9080/4'\\n\\t\\t[332] Section '', visible\\n\\t\\t\\t[333] heading 'pittsburgh', visible\\n\\t\\t\\t\\t[334] link 'pittsburgh', clickable, visible\\n\\t\\t\\t[335] Section '', visible\\n\\t\\t\\t\\t[338] button 'Unsubscribe 1 subscriber', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Unsubscribe'\\n\\t\\t\\t[345] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qhrn'\\n\\t\\t\\t[346] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[347] list '', visible\\n\\t\\t\\t\\t[348] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[349] time 'October 1, 2022 at 1:02:24 PM EDT', visible\\n\\t\\t\\t\\t\\t\\tStaticText '3 years ago'\\n\\t\\t\\t\\t[350] listitem '', visible\\n\\t\\t\\t\\t\\t[351] link 'Subscribe via RSS', clickable, visible\\n\\t\\t\\t\\t\\t\\t[353] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Subscribe via RSS'\\n\\t\\t[355] group '', visible\\n\\t\\t\\t[356] DisclosureTriangle 'Hide this forum', clickable, visible, expanded=False\\n\\t\\t[362] Section '', visible\\n\\t\\t\\t[363] heading 'Toolbox', visible\\n\\t\\t\\t[364] list '', visible\\n\\t\\t\\t\\t[365] listitem '', visible\\n\\t\\t\\t\\t\\t[366] link 'Bans', clickable, visible\\n\\t\\t\\t\\t[367] listitem '', visible\\n\\t\\t\\t\\t\\t[368] link 'Moderation log', clickable, visible\\n\\t[369] contentinfo ''\\n\\t\\t[370] paragraph ''\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[372] link 'Postmill', clickable\", \"action\": \"send_msg_to_user(\\\"Done — your question has been posted to r/pittsburgh.\\\\n\\\\nTitle: places for new drivers to learn driving in pittsburgh\\\\nLink: http://localhost:9080/4\\\\n\\\\nIt's currently showing 0 comments. Would you like me to:\\\\n1) Edit the post to add more details (to get better answers)?\\\\n2) Crosspost to another subreddit? If so, tell me which one.\\\\n3) Post a comment on the submission to prompt responses?\\\\n\\\\nTell me which option you want and I’ll do it.\\\")\", \"screenshot\": \"screenshots/4ba5e9cb/5.png\", \"state_index\": 5, \"step\": 5, \"thought\": null, \"ur",
+              "fact_id": "fact:e70983ac3e3424e1680f40c8",
+              "grounding": 0.34,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 59392,
+                  "original_bytes": 59491,
+                  "start_byte": 57344
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "by",
+                  "forum",
+                  "option",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 59392,
+                  "original_bytes": 59491,
+                  "start_byte": 57344
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "forum",
+                    "by",
+                    "top",
+                    "time",
+                    "option",
+                    "all",
+                    "answer",
+                    "short"
+                  ],
+                  "matched_index_key_terms": [
+                    "forum",
+                    "by",
+                    "top",
+                    "time",
+                    "all",
+                    "short"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "forum",
+                      "by",
+                      "top",
+                      "time",
+                      "all",
+                      "short"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "02",
+                      "05",
+                      "09",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:2c4d2684e69d1223e22449d9",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:dafd79dd360e7fe0a0e14328"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:d15c6332e98036e1b4cbe1a4",
+                "source_id": "longmemeval_v2_trajectory_0c4a214e66fb83ebb68e07357bfcaa3007b8dc71aca461d1d7ffa3f2f5abf64e_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '(+1, −0)'\\n\\t\\t\\t[329] heading 'Short URL:', visible\\n\\t\\t\\t[330] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'http://localhost:9080/4'\\n\\t\\t[332] Section '', visible\\n\\t\\t\\t[333] heading 'pittsburgh', visible\\n\\t\\t\\t\\t[334] link 'pittsburgh', clickable, visible\\n\\t\\t\\t[335] Section '', visible\\n\\t\\t\\t\\t[338] button 'Unsubscribe 1 subscriber', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Unsubscribe'\\n\\t\\t\\t[345] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qhrn'\\n\\t\\t\\t[346] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[347] list '', visible\\n\\t\\t\\t\\t[348] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[349] time 'October 1, 2022 at 1:02:24 PM EDT', visible\\n\\t\\t\\t\\t\\t\\tStaticText '3 years ago'\\n\\t\\t\\t\\t[350] listitem '', visible\\n\\t\\t\\t\\t\\t[351] link 'Subscribe via RSS', clickable, visible\\n\\t\\t\\t\\t\\t\\t[353] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Subscribe via RSS'\\n\\t\\t[355] group '', visible\\n\\t\\t\\t[356] DisclosureTriangle 'Hide this forum', clickable, visible, expanded=False\\n\\t\\t[362] Section '', visible\\n\\t\\t\\t[363] heading 'Toolbox', visible\\n\\t\\t\\t[364] list '', visible\\n\\t\\t\\t\\t[365] listitem '', visible\\n\\t\\t\\t\\t\\t[366] link 'Bans', clickable, visible\\n\\t\\t\\t\\t[367] listitem '', visible\\n\\t\\t\\t\\t\\t[368] link 'Moderation log', clickable, visible\\n\\t[369] contentinfo ''\\n\\t\\t[370] paragraph ''\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[372] link 'Postmill', clickable\", \"action\": \"send_msg_to_user(\\\"Done — your question has been posted to r/pittsburgh.\\\\n\\\\nTitle: places for new drivers to learn driving in pittsburgh\\\\nLink: http://localhost:9080/4\\\\n\\\\nIt's currently showing 0 comments. Would you like me to:\\\\n1) Edit the post to add more details (to get better answers)?\\\\n2) Crosspost to another subreddit? If so, tell me which one.\\\\n3) Post a comment on the submission to prompt responses?\\\\n\\\\nTell me which option you want and I’ll do it.\\\")\", \"screenshot\": \"screenshots/4ba5e9cb/5.png\", \"state_index\": 5, \"step\": 5, \"thought\": null, \"ur",
+              "rationale": "tier=fallback fts=12.52 access_count=0 confidence=0.00 relevance=0.00 grounding=0.34 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:d15c6332e98036e1b4cbe1a4"
+            },
+            {
+              "confidence": 0.4,
+              "content": "8] heading 'Preview', visible\\n\\t\\t\\t[288] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'I am a robot'\\n\\t\\t\\t[122] checkbox 'Formatting help +', clickable, visible, checked='false'\\n\\t\\t\\tStaticText 'Markdown allowed.'\\n\\t\\t\\t[124] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Formatting help'\\n\\t\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '+'\\n\\t\\t\\t[250] button 'Save', clickable, visible\\n\\t[252] complementary '', visible\\n\\t\\t[253] Section '', visible\\n\\t\\t\\t[255] heading 'MarvelsGrantMan136', visible\\n\\t\\t\\t\\t[256] link 'MarvelsGrantMan136', clickable, visible\\n\\t\\t\\t[257] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Registered'\\n\\t\\t\\t\\t[259] time 'June 24, 2020 at 11:02:10 AM EDT', visible\\n\\t\\t\\t\\t\\tStaticText '6 years ago'\\n\\t\\t\\t\\tStaticText 'Not whitelisted'\\n\\t\\t\\t[263] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't2_5adwlxvn'\\n\\t\\t\\t[264] paragraph '', visible\\n\\t\\t\\t\\t[265] link 'Edit biography', clickable, visible\\n\\t\\t\\t\\t\\t[267] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Edit biography'\\n\\t\\t[269] Section '', visible\\n\\t\\t\\t[270] heading 'Toolbox', visible\\n\\t\\t\\t[271] list '', visible\\n\\t\\t\\t\\t[272] listitem '', visible\\n\\t\\t\\t\\t\\t[273] link 'Hidden forums', clickable, visible\\n\\t\\t\\t\\t[274] listitem '', visible\\n\\t\\t\\t\\t\\t[275] link 'Trash', clickable, visible\\n\\t[276] contentinfo '', visible\\n\\t\\t[277] paragraph '', visible\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[279] link 'Postmill', clickable, visible\", \"action\": \"fill('116', 'I am a robot')\", \"screenshot\": \"screenshots/3331c568/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"The biography textbox now contains the desired text “I am a robot”. The next step to complete the change is to click the Save button to submit the update.\", \"url\": \"http://localhost:9080/user/MarvelsGrantMan136/edit_biography\"}, {\"accessibility_tree\": \"RootWebArea 'Editing biography for MarvelsGrantMan136', focused\\n\\t[19] alert '', visible, live='assertive', atomic, relevant='additions text'\\n\\t\\t[24] paragraph '', visible\\n\\t\\t\\tStaticText 'The biography was updated.'\\n\\t",
+              "fact_id": "episode_fallback:episode:c8c7809cd6bdec19b5c7b8a3",
+              "grounding": 0.5,
+              "provenance": {
+                "episode_excerpt": {
+                  "end_byte": 48128,
+                  "source_bytes": 51272,
+                  "start_byte": 46080
+                },
+                "episode_fallback": true,
+                "reference_time": "2000-01-01T00:00:00Z",
+                "source_episode": "episode:c8c7809cd6bdec19b5c7b8a3",
+                "source_id": "longmemeval_v2_trajectory_f3a69bd9c2ddc7852026e0c3361711f3d961ef4c6e0386dc7ad07e63f8692c44_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "8] heading 'Preview', visible\\n\\t\\t\\t[288] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'I am a robot'\\n\\t\\t\\t[122] checkbox 'Formatting help +', clickable, visible, checked='false'\\n\\t\\t\\tStaticText 'Markdown allowed.'\\n\\t\\t\\t[124] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Formatting help'\\n\\t\\t\\t\\tStaticText ''\\n\\t\\t\\t\\tStaticText '+'\\n\\t\\t\\t[250] button 'Save', clickable, visible\\n\\t[252] complementary '', visible\\n\\t\\t[253] Section '', visible\\n\\t\\t\\t[255] heading 'MarvelsGrantMan136', visible\\n\\t\\t\\t\\t[256] link 'MarvelsGrantMan136', clickable, visible\\n\\t\\t\\t[257] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Registered'\\n\\t\\t\\t\\t[259] time 'June 24, 2020 at 11:02:10 AM EDT', visible\\n\\t\\t\\t\\t\\tStaticText '6 years ago'\\n\\t\\t\\t\\tStaticText 'Not whitelisted'\\n\\t\\t\\t[263] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't2_5adwlxvn'\\n\\t\\t\\t[264] paragraph '', visible\\n\\t\\t\\t\\t[265] link 'Edit biography', clickable, visible\\n\\t\\t\\t\\t\\t[267] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Edit biography'\\n\\t\\t[269] Section '', visible\\n\\t\\t\\t[270] heading 'Toolbox', visible\\n\\t\\t\\t[271] list '', visible\\n\\t\\t\\t\\t[272] listitem '', visible\\n\\t\\t\\t\\t\\t[273] link 'Hidden forums', clickable, visible\\n\\t\\t\\t\\t[274] listitem '', visible\\n\\t\\t\\t\\t\\t[275] link 'Trash', clickable, visible\\n\\t[276] contentinfo '', visible\\n\\t\\t[277] paragraph '', visible\\n\\t\\t\\tStaticText 'Running'\\n\\t\\t\\t[279] link 'Postmill', clickable, visible\", \"action\": \"fill('116', 'I am a robot')\", \"screenshot\": \"screenshots/3331c568/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"The biography textbox now contains the desired text “I am a robot”. The next step to complete the change is to click the Save button to submit the update.\", \"url\": \"http://localhost:9080/user/MarvelsGrantMan136/edit_biography\"}, {\"accessibility_tree\": \"RootWebArea 'Editing biography for MarvelsGrantMan136', focused\\n\\t[19] alert '', visible, live='assertive', atomic, relevant='additions text'\\n\\t\\t[24] paragraph '', visible\\n\\t\\t\\tStaticText 'The biography was updated.'\\n\\t",
+              "rationale": "tier=fallback fts=6.00 access_count=0 confidence=0.40 grounding=0.50 semantic=disabled matched episode content query=\"forum sorted by top time range option appear below all time dropdown\" and active at 2026-11-27",
+              "relevance": 0.5,
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:c8c7809cd6bdec19b5c7b8a3"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.386334,
+              "items": [
+                {
+                  "fact_id": "",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 13366.168792,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 13367.347416999999,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15736.209375,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15744.098875000001,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 17456.508917,
+              "items": [
+                {
+                  "fact_id": "episode_fallback:episode:28a05ac3465896dd0fa1dd41",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 18327.392208999998,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 18413.283459,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 2048,
+                  "content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

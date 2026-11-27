@@ -1,0 +1,47 @@
+{
+  "schema": "reader-reviewed-truth/v1",
+  "cases": {
+    "ledger-conflicting-repeat": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "Two matching button anchors have different immediate successors: River and Hill."
+    },
+    "ledger-consistent-repeat": {
+      "accepted_answers": [
+        "River"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "Every matching Release button has the same observed successor River; repetition alone does not imply ambiguity."
+    },
+    "ledger-named-scope-repeat": {
+      "accepted_answers": [
+        "Port"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "The question names Footer; Header is a separate scope and cannot supply a competing answer."
+    },
+    "ledger-role-selected-repeat": {
+      "accepted_answers": [
+        "River"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "Only one button anchor matches. The same-name link is a different role; River immediately follows the button."
+    },
+    "ledger-opaque-intervening": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "An intervening group has omitted children. The source does not establish which interactive action is next; it is unsafe to skip the group."
+    },
+    "ledger-clipped-repeat": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "The first anchor is followed by River, but the second matching anchor is followed by a clipped action label. The answer cannot be uniquely established."
+    }
+  }
+}

@@ -1,0 +1,470 @@
+{
+  "schema": "memory-skill-semantic-review/v1",
+  "scope": "MCP 16 original scheduled trials; every terminal error retained",
+  "reviewer": "independent collaborator semantic_review",
+  "blinding": {
+    "arm_blinded": false,
+    "limitation": "Original file identities and reference contents reveal arms. Identical substantive rubric used for both; this is transparent independent source review, not a blinded judge."
+  },
+  "rubric_path": "adjudication-protocol.md",
+  "rubric_sha256": "c10101aa5c3f31df5a80f24fb22dd226aeb4e498890e92631ccb83ef1ed4215a",
+  "plan_sha256": "df4da698b62b2ec93893211417705d6c167d4769b0195fa6330df3f399d32206",
+  "method": "No trial/prediction changes, no inferred final answers, no extra inference. Frozen automatic action gate remains mandatory. Null is unobserved/not applicable with explanation; it never passes an applicable missing requirement. Explicit default evidence=true does not change extract identity. First-write reference omission recorded separately from frozen case3 score.",
+  "summary": {
+    "scheduled": 16,
+    "answered": 7,
+    "terminal_faults": 9,
+    "full_row_pass": 5,
+    "native_full_pass": 5,
+    "native_scheduled": 8,
+    "controlled_full_pass": 0,
+    "controlled_scheduled": 8,
+    "arms": {
+      "previous": {
+        "scheduled": 8,
+        "full_row_pass": 2
+      },
+      "current": {
+        "scheduled": 8,
+        "full_row_pass": 3
+      }
+    }
+  },
+  "supplemental_product_observations": [
+    "Both MCP1 native extractions label Cedar Index as person and Tuesday as technology. The final semantic task outcome is still unknown due timeout; these returned entity types merit a separately labeled entity-quality case, not rewriting this skill outcome."
+  ],
+  "rows": [
+    {
+      "identity": "memory-mcp-1-current",
+      "trial_path": "capture/memory-mcp-1-current/trial.json",
+      "trial_sha256": "c7802ba24ac6c6c5863196bd7b6df9358210774d33df25adce6f497e0c03ad42",
+      "binding": "native",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Literal source and time exactly bound; ingest success and matching episode extract success contain a decision fact. Explicit include_fact_evidence=true is the documented default. Final response request timed out; no reported classification/IDs can be inferred."
+      ]
+    },
+    {
+      "identity": "memory-mcp-1-previous",
+      "trial_path": "capture/memory-mcp-1-previous/trial.json",
+      "trial_sha256": "4b47b91a18eb745bf37a6ac982c05240ca4e1b92549b17a0e1105579026f6f3c",
+      "binding": "native",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Literal source and time exactly bound; ingest success and matching episode extract success contain a decision fact. Explicit include_fact_evidence=true is the documented default. Final response request timed out; no reported classification/IDs can be inferred."
+      ]
+    },
+    {
+      "identity": "memory-mcp-2-current",
+      "trial_path": "capture/memory-mcp-2-current/trial.json",
+      "trial_sha256": "177908a614583a76106bc26cbfd3458f2241f050e8c7dfeb4447c2f963e44ec2",
+      "binding": "native",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": null,
+        "final_source_binding": true,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": null
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": true,
+      "reasons": [
+        "assemble_context then explain only; actual decision, source_id, episode_id, fact_id and exact source-window quotation agree. Present source valid time is cited; native response has no snapshot field to require. No capture/write tool used; logical read may update access heat."
+      ]
+    },
+    {
+      "identity": "memory-mcp-2-previous",
+      "trial_path": "capture/memory-mcp-2-previous/trial.json",
+      "trial_sha256": "712bcf6f3541e2da81b6a3e3739ccca47742f8078d23b6e7ff7a48e0973b3de6",
+      "binding": "native",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": null,
+        "final_source_binding": true,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": null
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": true,
+      "reasons": [
+        "assemble_context then explain only; actual decision, source_id, episode_id, fact_id and exact source-window quotation agree. Present source valid time is cited; native response has no snapshot field to require. No capture/write tool used; logical read may update access heat."
+      ]
+    },
+    {
+      "identity": "memory-mcp-3-current",
+      "trial_path": "capture/memory-mcp-3-current/trial.json",
+      "trial_sha256": "6ea67506dd4e7644d7d40aacb7534cd933b9eaa829dbeb1933a2087d5cbfb9af",
+      "binding": "native",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": null,
+        "final_source_binding": true,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": null
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": false
+      },
+      "full_row_pass": true,
+      "reasons": [
+        "Qualified resolve persists the confirmed aliases, returns success and canonical entity ID cited exactly in final answer. No existing distinct entity IDs were claimed merged. Supplemental adherence gap: mandatory first-write memory-contract reference was not loaded; frozen case3 expected_behavior does not include this specific reference read."
+      ]
+    },
+    {
+      "identity": "memory-mcp-3-previous",
+      "trial_path": "capture/memory-mcp-3-previous/trial.json",
+      "trial_sha256": "08a210e44134923dc1e7b494a80a450d95da78e50c92345924b1eef6b70ac0d5",
+      "binding": "native",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": null,
+        "final_source_binding": true,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": null
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": false
+      },
+      "full_row_pass": true,
+      "reasons": [
+        "Qualified resolve persists the confirmed aliases, returns success and canonical entity ID cited exactly in final answer. No existing distinct entity IDs were claimed merged. Supplemental adherence gap: mandatory first-write memory-contract reference was not loaded; frozen case3 expected_behavior does not include this specific reference read."
+      ]
+    },
+    {
+      "identity": "memory-mcp-4-current",
+      "trial_path": "capture/memory-mcp-4-current/trial.json",
+      "trial_sha256": "45fd0bcffad86f65d33e380ef3b1457c3cd8fe634f9add87ded6ecb549a879ca",
+      "binding": "native",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": true,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": true,
+        "final_source_binding": true,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": true,
+      "reasons": [
+        "Exact literal URL/path stored without external access; event t_ref matches scenario. Caller t_ingested omitted and server ownership explained. Completed successful empty facts truthfully reported episode-only with exact source/episode handles. Optional offer to add structured facts omits reminder that source fallback can already retrieve episode text; it does not assert universal unrecallability."
+      ]
+    },
+    {
+      "identity": "memory-mcp-4-previous",
+      "trial_path": "capture/memory-mcp-4-previous/trial.json",
+      "trial_sha256": "add331b050826cf24db24392891ca693d89bc127a3d9ceb159ae3458938789d2",
+      "binding": "native",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": false,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Initial literal ingest/extract succeeds. Additional structured-source ingest/extract goes beyond frozen exact literal operation sequence; original source remains intact. Final request timed out, no final status or source report observed."
+      ]
+    },
+    {
+      "identity": "memory-mcp-5-current",
+      "trial_path": "capture/memory-mcp-5-current/trial.json",
+      "trial_sha256": "6010b7e0247443355391e311dc5670afe62d5afdc1966ba99fae73235758fa48",
+      "binding": "controlled",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": false,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": true,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Final advice preserves query, valid_at, known_revision, budget, fact_types and view_mode, omits known_at/as_of, respects one refinement and does not infer absence from partial. No assemble_context was dispatched, failing frozen action gate. Prompt asks what to pass as well as says repeat; this is an action-versus-advice ambiguity, not proof that instruction text is incorrect."
+      ]
+    },
+    {
+      "identity": "memory-mcp-5-previous",
+      "trial_path": "capture/memory-mcp-5-previous/trial.json",
+      "trial_sha256": "d004a71455a1d3e69319cbc74356f5ac5264468d50035499f4d8d91895c6d4be",
+      "binding": "controlled",
+      "terminal": "answered",
+      "dimensions": {
+        "operation_and_exact_arguments": false,
+        "substantive_final_answer": true,
+        "truthful_status_recovery": true,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Final advice preserves query, valid_at, known_revision, budget, fact_types and view_mode, omits known_at/as_of, respects one refinement and does not infer absence from partial. No assemble_context was dispatched, failing frozen action gate. Prompt asks what to pass as well as says repeat; this is an action-versus-advice ambiguity, not proof that instruction text is incorrect."
+      ]
+    },
+    {
+      "identity": "memory-mcp-6-current",
+      "trial_path": "capture/memory-mcp-6-current/trial.json",
+      "trial_sha256": "6209c61b18431a5bd63d8f0e7f6c7c5aafa583c5ff120eab87236d82030fa99b",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": false,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Canonical single-item explain and scalar offset1200 continuation are observed; later repeated windows, provenance_offset0 then20 add work. No request supplies the exact quote for server verification; quote_verified/complete/contained remain false. No final answer after TimeoutError. This is not evidence of an incorrect final cap/status claim."
+      ]
+    },
+    {
+      "identity": "memory-mcp-6-previous",
+      "trial_path": "capture/memory-mcp-6-previous/trial.json",
+      "trial_sha256": "c77c1ae88b602d9e6d4aa2dc41aa2ff2661f06023f2830dd6b249ba058056858",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": false,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Canonical single-item explain and scalar offset1200 continuation are observed, then a full1970-scalar source window. No exact quote is supplied for verification; quote_verified/complete/contained remain false. No final answer after TimeoutError. This is not evidence of an incorrect final cap/status claim."
+      ]
+    },
+    {
+      "identity": "memory-mcp-7-current",
+      "trial_path": "capture/memory-mcp-7-current/trial.json",
+      "trial_sha256": "a82553929048bd6b7cefc5bdecbf9448b45adac51680f54af2c025c025140667",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": "unobserved question-only decision after reference-only timeout",
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Only task-appropriate memory-contract reference read observed, then TimeoutError. No final source-dependent classification or fallback/access-heat explanation is available. No observed universal free-form claim; classification is unobserved, full row fails."
+      ]
+    },
+    {
+      "identity": "memory-mcp-7-previous",
+      "trial_path": "capture/memory-mcp-7-previous/trial.json",
+      "trial_sha256": "35807ff7719c3a4f7186811c467b7e9f1d2a8ed2c746978781ac438f28a08b22",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": "unobserved question-only decision after reference-only timeout",
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Only task-appropriate memory-contract reference read observed, then TimeoutError. No final source-dependent classification or fallback/access-heat explanation is available. No observed universal free-form claim; classification is unobserved, full row fails."
+      ]
+    },
+    {
+      "identity": "memory-mcp-8-current",
+      "trial_path": "capture/memory-mcp-8-current/trial.json",
+      "trial_sha256": "98f2a29295c8d417b3d6218e37ae348a36d0376ea564bb46da1e47f427776741",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": "unobserved question-only decision after reference-only timeout",
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Only task-appropriate memory-contract reference read observed, then TimeoutError. No final pending classification or safe next-step advice is available. Do not infer episode-only/verified or instruction failure from an absent answer; full row fails."
+      ]
+    },
+    {
+      "identity": "memory-mcp-8-previous",
+      "trial_path": "capture/memory-mcp-8-previous/trial.json",
+      "trial_sha256": "da682f7b3d6b99313cbd4676bd9f6f3145ca7ee90bfeb5a556979be6c7d2c6ba",
+      "binding": "controlled",
+      "terminal": "error",
+      "dimensions": {
+        "operation_and_exact_arguments": null,
+        "substantive_final_answer": null,
+        "truthful_status_recovery": null,
+        "final_source_binding": null,
+        "unnecessary_reference_loading": false
+      },
+      "not_applicable_or_unobserved": {
+        "operation_and_exact_arguments": "unobserved question-only decision after reference-only timeout",
+        "substantive_final_answer": "unobserved: no terminal answer",
+        "truthful_status_recovery": "not a classification/recovery case or no observed answer",
+        "final_source_binding": "no final answer or no source citation required"
+      },
+      "supplemental_instruction_adherence": {
+        "first_write_contract_read": null
+      },
+      "full_row_pass": false,
+      "reasons": [
+        "Only task-appropriate memory-contract reference read observed, then TimeoutError. No final pending classification or safe next-step advice is available. Do not infer episode-only/verified or instruction failure from an absent answer; full row fails."
+      ]
+    }
+  ]
+}

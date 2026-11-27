@@ -1,0 +1,9 @@
+# Semantic adjudication, registered before model outputs
+
+Review every scheduled answer against its frozen `expected_behavior`, actual calls, results, source identities and fault metadata. Do not repair model JSON, fill omitted citations or replace trials. Native and controlled bindings are reported separately. Current/previous labels should be concealed during semantic review where practical; the labels are joined only for aggregation.
+
+An operational requirement is assessed from observed actions and responses, not keyword matching in the final prose. Every substantive requirement still applies: correct operation and arguments; truthful terminal state; source-bound quotation/identifiers when required; preservation of temporal selectors; no absence claim from partial coverage; no caller transaction time or external read for literal capture. If the answer explains a numeric bound it must be correct. An instruction/reference being available does not prove the participant followed it.
+
+A complete row needs an observed terminal answer, the automatic operation/binding criteria, the applicable pending/completed and source criteria, all substantive semantic clauses, and no unnecessary reference loading. A correct operation with an incorrect final claim fails. A correct final claim without required dispatched operations fails. Setup, process, HTTP, parse, truncation, deadline and cleanup errors remain failed rows in the fixed32 denominator. Report value/procedure/recovery/source/loading dimensions separately; static reference checks and positive scripted controls are never counted as agent trials.
+
+Only a demonstrated instruction defect may justify a later skill edit. Such an edit requires an independent deterministic regression and a separately frozen bounded regression capture with identical budgets. The original32 outcomes remain immutable; the regression capture cannot replace them or establish independent generalization.

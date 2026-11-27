@@ -1,0 +1,46 @@
+{
+  "status": "completed",
+  "body": {
+    "id": "chatcmpl-96c65782-2648-47ed-9d7d-a0e6d3d87979",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "READY",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": null,
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1795781371,
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "object": "chat.completion",
+    "metadata": null,
+    "moderation": null,
+    "service_tier": null,
+    "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+    "usage": {
+      "completion_tokens": 2,
+      "prompt_tokens": 16,
+      "total_tokens": 18,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    }
+  },
+  "purpose": "single non-study local runtime startup probe; never a skill/reader evaluation row",
+  "elapsed_seconds": 1.7769599170133006,
+  "provider_startup_prefill_generation_timings": "unobserved separately",
+  "concurrent_host_work": "source-only 100-trajectory formation; no speed comparison"
+}

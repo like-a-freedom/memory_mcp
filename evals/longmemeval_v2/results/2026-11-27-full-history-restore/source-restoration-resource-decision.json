@@ -1,0 +1,26 @@
+{
+  "schema": "source-restoration-resource-decision/v1",
+  "timing": "before original whole-build resource deadline and before source audit, reads or model outputs",
+  "original_whole_build_seconds": 1800,
+  "original_deadline_result": "assess unchanged; never count an overrun as passing",
+  "continuation_ceiling_seconds": 5400,
+  "attempts": 1,
+  "reason": "Observed source-only formation cost exceeds the initial restoration allowance. Preserve the same deterministic attempt instead of discarding and repeating a partial history. The continuation is an operational recovery, not a latency acceptance gain.",
+  "unchanged": [
+    "100 ordered trajectories",
+    "151 segments and original content hashes",
+    "original source spans and answers",
+    "30-second read deadline",
+    "45-second child deadline",
+    "reader and skill budgets",
+    "all failure denominators",
+    "no best retry selection"
+  ],
+  "observed_progress_before_decision": {
+    "completed_trajectories": 43,
+    "elapsed_seconds_at_last_progress": 1157,
+    "completed_input_segments": 59,
+    "completed_input_bytes": 26512413,
+    "total_input_bytes": 77373572
+  }
+}

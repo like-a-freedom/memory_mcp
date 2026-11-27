@@ -1,0 +1,510 @@
+[
+  {
+    "case": "complete-list-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "source_ids": [
+        "episode:2ae67cbb659a3b62883ca247"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive access gates are East, North, and West.",
+      "quote_evidence": [
+        "The Marigold archive access gates are East, North, and West."
+      ]
+    },
+    "formation": [
+      {
+        "source_id": "complete-list-distractor",
+        "episode_id": "episode:8f4c8eb0378f2794a8c3c854",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "complete-list-gold",
+        "episode_id": "episode:2ae67cbb659a3b62883ca247",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "complete-list-other",
+        "episode_id": "episode:a38dcdfd494f0506865eb116",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "source_ids": [
+        "episode:2ae67cbb659a3b62883ca247"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "resolved_source_ids": [
+        "episode:2ae67cbb659a3b62883ca247"
+      ],
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "complete-list-handles",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "source_ids": [
+        "episode:2ae67cbb659a3b62883ca247"
+      ],
+      "abstain": false,
+      "answer_mode": "set",
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive access gates are East, North, and West.",
+      "quote_evidence": [
+        "The Marigold archive access gates are East, North, and West."
+      ],
+      "citation_mode": "handles",
+      "citation_map": {
+        "s1": "episode:8f4c8eb0378f2794a8c3c854",
+        "s2": "episode:2ae67cbb659a3b62883ca247",
+        "s3": "episode:a38dcdfd494f0506865eb116"
+      }
+    },
+    "formation": [
+      {
+        "source_id": "complete-list-distractor",
+        "episode_id": "episode:8f4c8eb0378f2794a8c3c854",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "complete-list-gold",
+        "episode_id": "episode:2ae67cbb659a3b62883ca247",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "complete-list-other",
+        "episode_id": "episode:a38dcdfd494f0506865eb116",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "citation": [
+        "s2"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": false,
+      "resolved_source_ids": null,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": false
+    }
+  },
+  {
+    "case": "neighborhood-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "Export",
+      "source_ids": [
+        "episode:ab82efa401e7654c13ce8d16"
+      ],
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_evidence": [
+        "The Marigold toolbar order is Inspect, Validate, Export, and Archive."
+      ]
+    },
+    "formation": [
+      {
+        "source_id": "neighborhood-distractor",
+        "episode_id": "episode:9b0856a827061511f1c654cf",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "neighborhood-gold",
+        "episode_id": "episode:ab82efa401e7654c13ce8d16",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "neighborhood-other",
+        "episode_id": "episode:b870397fbd5e53d2fc696640",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Export",
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "source_ids": [
+        "episode:ab82efa401e7654c13ce8d16"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "resolved_source_ids": [
+        "episode:ab82efa401e7654c13ce8d16"
+      ],
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "neighborhood-handles",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "Export",
+      "source_ids": [
+        "episode:ab82efa401e7654c13ce8d16"
+      ],
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_evidence": [
+        "The Marigold toolbar order is Inspect, Validate, Export, and Archive."
+      ],
+      "citation_mode": "handles",
+      "citation_map": {
+        "s1": "episode:9b0856a827061511f1c654cf",
+        "s2": "episode:ab82efa401e7654c13ce8d16",
+        "s3": "episode:b870397fbd5e53d2fc696640"
+      }
+    },
+    "formation": [
+      {
+        "source_id": "neighborhood-distractor",
+        "episode_id": "episode:9b0856a827061511f1c654cf",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "neighborhood-gold",
+        "episode_id": "episode:ab82efa401e7654c13ce8d16",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "neighborhood-other",
+        "episode_id": "episode:b870397fbd5e53d2fc696640",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "Export",
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "citation": [
+        "s2"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": false,
+      "resolved_source_ids": null,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": false
+    }
+  },
+  {
+    "case": "count-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "3",
+      "source_ids": [
+        "episode:31a7c42255f6ba83f7bbbc0b"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_evidence": [
+        "The Marigold archive access gates are Amber, Jade, and Violet."
+      ]
+    },
+    "formation": [
+      {
+        "source_id": "count-distractor",
+        "episode_id": "episode:c3c09f7606d01eb8ae96d4a1",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "count-gold",
+        "episode_id": "episode:31a7c42255f6ba83f7bbbc0b",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "count-other",
+        "episode_id": "episode:81dfab73a92a675032a3db49",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "3",
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "source_ids": [
+        "episode:31a7c42255f6ba83f7bbbc0b"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "resolved_source_ids": [
+        "episode:31a7c42255f6ba83f7bbbc0b"
+      ],
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "count-handles",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": "3",
+      "source_ids": [
+        "episode:31a7c42255f6ba83f7bbbc0b"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_evidence": [
+        "The Marigold archive access gates are Amber, Jade, and Violet."
+      ],
+      "citation_mode": "handles",
+      "citation_map": {
+        "s1": "episode:c3c09f7606d01eb8ae96d4a1",
+        "s2": "episode:31a7c42255f6ba83f7bbbc0b",
+        "s3": "episode:81dfab73a92a675032a3db49"
+      }
+    },
+    "formation": [
+      {
+        "source_id": "count-distractor",
+        "episode_id": "episode:c3c09f7606d01eb8ae96d4a1",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "count-gold",
+        "episode_id": "episode:31a7c42255f6ba83f7bbbc0b",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "count-other",
+        "episode_id": "episode:81dfab73a92a675032a3db49",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": true,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": "3",
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "citation": [
+        "s2"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": false,
+      "resolved_source_ids": null,
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": false
+    }
+  },
+  {
+    "case": "false-premise-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ],
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_evidence": [
+        "The Marigold archive release key allocation is pending; no vault has been approved."
+      ]
+    },
+    "formation": [
+      {
+        "source_id": "false-premise-distractor",
+        "episode_id": "episode:aec8bc92ee35653ef887f76c",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "false-premise-gold",
+        "episode_id": "episode:4423ca254ef6c80217e00040",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "false-premise-other",
+        "episode_id": "episode:c0ab85884d701b8c895ba97b",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "source_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "resolved_source_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ],
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  },
+  {
+    "case": "false-premise-handles",
+    "arm": "fixed_sufficient_reply",
+    "expected": {
+      "answer": null,
+      "source_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ],
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_mode": "source_span",
+      "quote_source": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_evidence": [
+        "The Marigold archive release key allocation is pending; no vault has been approved."
+      ],
+      "citation_mode": "handles",
+      "citation_map": {
+        "s1": "episode:aec8bc92ee35653ef887f76c",
+        "s2": "episode:4423ca254ef6c80217e00040",
+        "s3": "episode:c0ab85884d701b8c895ba97b"
+      }
+    },
+    "formation": [
+      {
+        "source_id": "false-premise-distractor",
+        "episode_id": "episode:aec8bc92ee35653ef887f76c",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "false-premise-gold",
+        "episode_id": "episode:4423ca254ef6c80217e00040",
+        "status": "success",
+        "fact_count": 0
+      },
+      {
+        "source_id": "false-premise-other",
+        "episode_id": "episode:c0ab85884d701b8c895ba97b",
+        "status": "success",
+        "fact_count": 0
+      }
+    ],
+    "status": "completed",
+    "expected_source_observed": true,
+    "expected_value_literal_observed": false,
+    "expected_quote_literal_observed": true,
+    "actual": {
+      "answer": null,
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "source_refs": [
+        "s2"
+      ]
+    },
+    "scores": {
+      "value_correct": true,
+      "sources_correct": true,
+      "resolved_source_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ],
+      "abstention_correct": true,
+      "quote_correct": true,
+      "passed": true
+    }
+  }
+]

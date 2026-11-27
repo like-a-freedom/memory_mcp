@@ -1,0 +1,19 @@
+{
+  "schema": "full-history-v4-capture/v1",
+  "source_build_registration": "registration.json records v3 source formation; no source reformation",
+  "read_registration_sha256": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+  "source_snapshot_unchanged_required": true,
+  "provider": "same native opt-level3 ignored observer; same embedded dataset and request fields",
+  "purpose": "one candidate capture after deterministic lazy-dictionary regression and native gates",
+  "preregistered_acceptance": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-full-history-restore/post-restoration-optimization-registration.json",
+  "driver_sha256": "980abe16d6c57802ad6007f8c7ca12d75bddf91220163c78e47c3b9348ff4e38",
+  "binaries": {
+    "memory-quality-product-v4-2026-11-27": "5b490dbd9babd356cf22c53068f9e050cd5c345ad954dcddd39acc5f513c5d63",
+    "memory-quality-eval-v4-2026-11-27": "de03bcccc8d69fbd6f82b5e1ac1d06d3fcbfb3977556969bc6c8085c61834df9",
+    "memory-quality-history-v4-2026-11-27": "943b35cf8fcbe8e580afc9c6e219efc284c059cea226587264ebf60be0cd97c0"
+  },
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/retrieval/admission.rs": "535244c858a4733a928ff0757b304c8da4686d83fea44a131b3b882671267035",
+    "crates/memory-mcp/tests/retrieval_partial_evidence.rs": "23736893d0ee5320d1bf0bee637cb40376c22b90b610df8c6c4db91a66e4d5de"
+  }
+}

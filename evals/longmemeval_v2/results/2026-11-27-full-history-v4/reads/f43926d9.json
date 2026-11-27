@@ -1,0 +1,1718 @@
+{
+  "case_id": "f43926d9",
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 32.642664624989266,
+  "copy_seconds": 0.9451024169975426,
+  "raw_sha256": "4e2544a229308214873760337388c4534b49beae0c8524d1279d3e3e5369fce3",
+  "raw_bytes": 1669221,
+  "process_deadline_exceeded": false,
+  "delivered_items": [
+    {
+      "confidence": 0.0,
+      "content": "d to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1929] link '\\\\ue601 Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1931] link '\\\\ue61f Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t[1934] paragraph ''\\n\\t\\t\\tStaticText 'Items 1 to 12 of 24 total'\\n\\t\\t[1937] strong ''\\n\\t\\t\\tStaticText 'Page'\\n\\t\\t[1938] list 'Page'\\n\\t\\t\\t[1939] listitem ''\\n\\t\\t\\t\\t[1940] strong ''\\n\\t\\t\\t\\t\\tStaticText \\\"You're currently reading page\\\"\\n\\t\\t\\t\\t\\tStaticText '1'\\n\\t\\t\\t[1943] listitem ''\\n\\t\\t\\t\\t[1944] link 'Page 2', clickable\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText '2'\\n\\t\\t\\t[1947] listitem ''\\n\\t\\t\\t\\t[1948] link '\\\\ue608 Page Next', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText 'Next'\\n\\t[1951] contentinfo ''\\n\\t\\t[1957] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1960] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1962] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1964] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1966] list ''\\n\\t\\t\\t[1967] listitem ''\\n\\t\\t\\t\\t[1968] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1969] listitem ''\\n\\t\\t\\t\\t[1970] link 'Search Terms', clickable\\n\\t\\t\\t[1971] listitem ''\\n\\t\\t\\t\\t[1972] link 'Advanced Search', clickable\\n\\t\\t\\t[1973] listitem ''\\n\\t\\t\\t\\t[1974] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1979] link 'Report All Bugs', clickable\", \"action\": null, \"screenshot\": \"screenshots/e5aec2da/0.png\", \"state_index\": 0, \"step\": 0, \"thought\": \"To find the size configuration of the picture frame purchased in 2022, I need to open the account/order history. The \\\"My Account\\\" link (bid 227) should lead to the account dashboard where order history and order details are ",
+      "fact_id": "fact:e47c90015a947de79e21c3fa",
+      "grounding": 0.22,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 16486,
+          "original_bytes": 796304,
+          "start_byte": 14438
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "appear",
+          "list",
+          "page"
+        ],
+        "quote_excerpt": {
+          "end_byte": 16486,
+          "original_bytes": 796304,
+          "start_byte": 14438
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "using",
+            "our",
+            "all",
+            "page",
+            "appear",
+            "list"
+          ],
+          "matched_index_key_terms": [
+            "our",
+            "all",
+            "page",
+            "list"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "our",
+              "all",
+              "page",
+              "list"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "05",
+              "07",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:026a07325991be64372d2494",
+              "fact:121f83008279cc0ffbd7edbb",
+              "fact:851008bac37451bacd3e9444",
+              "fact:dafd79dd360e7fe0a0e14328",
+              "fact:e8f1eee52d20e0569dc802c8"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:d2f4d8b53dd2179274260ced",
+        "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "d to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1929] link '\\\\ue601 Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1931] link '\\\\ue61f Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t[1934] paragraph ''\\n\\t\\t\\tStaticText 'Items 1 to 12 of 24 total'\\n\\t\\t[1937] strong ''\\n\\t\\t\\tStaticText 'Page'\\n\\t\\t[1938] list 'Page'\\n\\t\\t\\t[1939] listitem ''\\n\\t\\t\\t\\t[1940] strong ''\\n\\t\\t\\t\\t\\tStaticText \\\"You're currently reading page\\\"\\n\\t\\t\\t\\t\\tStaticText '1'\\n\\t\\t\\t[1943] listitem ''\\n\\t\\t\\t\\t[1944] link 'Page 2', clickable\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText '2'\\n\\t\\t\\t[1947] listitem ''\\n\\t\\t\\t\\t[1948] link '\\\\ue608 Page Next', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText 'Next'\\n\\t[1951] contentinfo ''\\n\\t\\t[1957] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1960] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1962] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1964] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1966] list ''\\n\\t\\t\\t[1967] listitem ''\\n\\t\\t\\t\\t[1968] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1969] listitem ''\\n\\t\\t\\t\\t[1970] link 'Search Terms', clickable\\n\\t\\t\\t[1971] listitem ''\\n\\t\\t\\t\\t[1972] link 'Advanced Search', clickable\\n\\t\\t\\t[1973] listitem ''\\n\\t\\t\\t\\t[1974] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1979] link 'Report All Bugs', clickable\", \"action\": null, \"screenshot\": \"screenshots/e5aec2da/0.png\", \"state_index\": 0, \"step\": 0, \"thought\": \"To find the size configuration of the picture frame purchased in 2022, I need to open the account/order history. The \\\"My Account\\\" link (bid 227) should lead to the account dashboard where order history and order details are ",
+      "rationale": "tier=fallback fts=6.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.22 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:d2f4d8b53dd2179274260ced"
+    },
+    {
+      "confidence": 0.0,
+      "content": "ires submissions in subreddit/news, the next step is to navigate to the forums list and open the news forum.\", \"url\": \"http://localhost:9080/\"}, {\"accessibility_tree\": \"RootWebArea 'List of forums', focused\\n\\t[20] navigation '', visible\\n\\t\\t[21] link 'Jump to main content', clickable\\n\\t\\t[22] link 'Jump to sidebar', clickable\\n\\t[23] navigation '', visible\\n\\t\\t[26] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[36] list '', visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Forums', clickable, visible\\n\\t\\t\\t[39] listitem '', visible\\n\\t\\t\\t\\t[40] link 'Wiki', clickable, visible\\n\\t\\t[41] Section '', visible\\n\\t\\t\\t[50] searchbox 'Search query', clickable, visible\\n\\t\\t[51] list '', visible\\n\\t\\t\\t[52] listitem '', visible\\n\\t\\t\\t\\t[53] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[56] image '', visible\\n\\t\\t\\t[57] listitem '', visible\\n\\t\\t\\t\\t[58] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[61] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[63] listitem '', visible\\n\\t\\t\\t\\t[64] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[67] image '', visible\\n\\t\\t\\t\\t\\t[68] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible\\n\\t\\t[139] link 'Create forum', clickable, visible\\n\\t\\t[141] article '', visible\\n\\t\\t\\t[143] heading 'AskReddit — AskReddit', visible\\n\\t\\t\\t\\t[144] link 'AskReddit — AskReddit', click",
+      "fact_id": "fact:05320c6893d56d323fc8f6fa",
+      "grounding": 0.42,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 35368,
+          "original_bytes": 384247,
+          "start_byte": 33320
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "above",
+          "all",
+          "alphabetical",
+          "between",
+          "forum",
+          "list",
+          "page",
+          "tags"
+        ],
+        "quote_excerpt": {
+          "end_byte": 35368,
+          "original_bytes": 384247,
+          "start_byte": 33320
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "all",
+            "page",
+            "between",
+            "tags",
+            "alphabetical",
+            "above",
+            "list",
+            "final"
+          ],
+          "matched_index_key_terms": [
+            "page",
+            "tags",
+            "alphabetical",
+            "list",
+            "final"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "all",
+              "page",
+              "tags",
+              "alphabetical",
+              "list",
+              "final"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "05",
+              "07",
+              "10",
+              "1004c6a"
+            ],
+            "supporting_fact_ids": [
+              "fact:026a07325991be64372d2494",
+              "fact:121f83008279cc0ffbd7edbb",
+              "fact:851008bac37451bacd3e9444",
+              "fact:dafd79dd360e7fe0a0e14328",
+              "fact:e8f1eee52d20e0569dc802c8"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:c520192e24c28192c9c107c6",
+        "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "ires submissions in subreddit/news, the next step is to navigate to the forums list and open the news forum.\", \"url\": \"http://localhost:9080/\"}, {\"accessibility_tree\": \"RootWebArea 'List of forums', focused\\n\\t[20] navigation '', visible\\n\\t\\t[21] link 'Jump to main content', clickable\\n\\t\\t[22] link 'Jump to sidebar', clickable\\n\\t[23] navigation '', visible\\n\\t\\t[26] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[36] list '', visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Forums', clickable, visible\\n\\t\\t\\t[39] listitem '', visible\\n\\t\\t\\t\\t[40] link 'Wiki', clickable, visible\\n\\t\\t[41] Section '', visible\\n\\t\\t\\t[50] searchbox 'Search query', clickable, visible\\n\\t\\t[51] list '', visible\\n\\t\\t\\t[52] listitem '', visible\\n\\t\\t\\t\\t[53] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[56] image '', visible\\n\\t\\t\\t[57] listitem '', visible\\n\\t\\t\\t\\t[58] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[61] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[63] listitem '', visible\\n\\t\\t\\t\\t[64] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[67] image '', visible\\n\\t\\t\\t\\t\\t[68] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible\\n\\t\\t[139] link 'Create forum', clickable, visible\\n\\t\\t[141] article '', visible\\n\\t\\t\\t[143] heading 'AskReddit — AskReddit', visible\\n\\t\\t\\t\\t[144] link 'AskReddit — AskReddit', click",
+      "rationale": "tier=fallback fts=15.35 access_count=0 confidence=0.00 relevance=0.00 grounding=0.42 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:c520192e24c28192c9c107c6"
+    },
+    {
+      "confidence": 0.0,
+      "content": "\"goal\": \"Change my reddit bio to \\\"Freelance Web Developer\\\"\", \"id\": \"2d00b63d\", \"outcome\": \"failure\", \"start_url\": \"http://localhost:9080/forums/all\", \"states\": [{\"accessibility_tree\": \"RootWebArea 'All forums', focused\\n\\t[18] navigation '', visible\\n\\t\\t[19] link 'Jump to main content', clickable\\n\\t\\t[20] link 'Jump to sidebar', clickable\\n\\t[21] navigation '', visible\\n\\t\\t[24] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[34] list '', visible\\n\\t\\t\\t[35] listitem '', visible\\n\\t\\t\\t\\t[36] link 'Forums', clickable, visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Wiki', clickable, visible\\n\\t\\t[39] Section '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '', visible\\n\\t\\t\\t\\t[121] link 'allentown', clickable, visible\\n\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t[123] link 'arlingtonva', clickable, visible\\n\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t[125] link 'Art', clickable, visible\\n\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t[127] link 'AskReddit', clickable, visible\\n\\t\\t\\t[128] listitem '', visible\\n\\t\\t\\t\\t[129] ",
+      "fact_id": "fact:93814dfb3aee835f9f3b0149",
+      "grounding": 0.39,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 2093,
+          "original_bytes": 86868,
+          "start_byte": 45
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "alphabetical",
+          "appear",
+          "forum",
+          "list",
+          "page",
+          "tags"
+        ],
+        "quote_excerpt": {
+          "end_byte": 2093,
+          "original_bytes": 86868,
+          "start_byte": 45
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "reddit",
+            "all",
+            "page",
+            "appear",
+            "tags",
+            "alphabetical",
+            "list"
+          ],
+          "matched_index_key_terms": [
+            "reddit",
+            "all",
+            "tags",
+            "alphabetical"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "reddit",
+              "all",
+              "tags",
+              "alphabetical"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "05",
+              "07",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:026a07325991be64372d2494",
+              "fact:121f83008279cc0ffbd7edbb",
+              "fact:851008bac37451bacd3e9444",
+              "fact:dafd79dd360e7fe0a0e14328",
+              "fact:e8f1eee52d20e0569dc802c8"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:3fd1796a0f590ac946fedf12",
+        "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "\"goal\": \"Change my reddit bio to \\\"Freelance Web Developer\\\"\", \"id\": \"2d00b63d\", \"outcome\": \"failure\", \"start_url\": \"http://localhost:9080/forums/all\", \"states\": [{\"accessibility_tree\": \"RootWebArea 'All forums', focused\\n\\t[18] navigation '', visible\\n\\t\\t[19] link 'Jump to main content', clickable\\n\\t\\t[20] link 'Jump to sidebar', clickable\\n\\t[21] navigation '', visible\\n\\t\\t[24] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[34] list '', visible\\n\\t\\t\\t[35] listitem '', visible\\n\\t\\t\\t\\t[36] link 'Forums', clickable, visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Wiki', clickable, visible\\n\\t\\t[39] Section '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '', visible\\n\\t\\t\\t\\t[121] link 'allentown', clickable, visible\\n\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t[123] link 'arlingtonva', clickable, visible\\n\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t[125] link 'Art', clickable, visible\\n\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t[127] link 'AskReddit', clickable, visible\\n\\t\\t\\t[128] listitem '', visible\\n\\t\\t\\t\\t[129] ",
+      "rationale": "tier=fallback fts=15.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.39 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:3fd1796a0f590ac946fedf12"
+    },
+    {
+      "confidence": 0.0,
+      "content": "sh cache types.'\\n\\t[666] banner '', visible\\n\\t\\t[669] heading 'Dashboard', visible\\n\\t\\t[672] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[684] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[686] Section '', visible\\n\\t\\t\\t[688] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[692] textbox '\\\\ue60c', clickable, visible\\n\\t[698] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[709] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[720] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] button 'Reload Data', clickable, visible\\n\\t\\t[731] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[736] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[743] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[746] list '', visible\\n\\t\\t\\t[747] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[749] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[752] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[754] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[757] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[759] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[762] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[764] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[768] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[769] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve this before saving. Loading... Bestsellers', visible, ex",
+      "fact_id": "fact:91641897abb792f416953a33",
+      "grounding": 0.18,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 4096,
+          "original_bytes": 614491,
+          "start_byte": 2048
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "all",
+          "list",
+          "page",
+          "tab"
+        ],
+        "quote_excerpt": {
+          "end_byte": 4096,
+          "original_bytes": 614491,
+          "start_byte": 2048
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "our",
+            "website",
+            "all",
+            "page",
+            "list",
+            "short"
+          ],
+          "matched_index_key_terms": [
+            "website",
+            "page",
+            "short"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "website",
+              "page",
+              "short"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "05",
+              "07",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:026a07325991be64372d2494",
+              "fact:121f83008279cc0ffbd7edbb",
+              "fact:851008bac37451bacd3e9444",
+              "fact:dafd79dd360e7fe0a0e14328",
+              "fact:e8f1eee52d20e0569dc802c8"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:edc93d08cde3e2ed63c0697d",
+        "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "sh cache types.'\\n\\t[666] banner '', visible\\n\\t\\t[669] heading 'Dashboard', visible\\n\\t\\t[672] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[684] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[686] Section '', visible\\n\\t\\t\\t[688] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[692] textbox '\\\\ue60c', clickable, visible\\n\\t[698] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[709] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[720] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] button 'Reload Data', clickable, visible\\n\\t\\t[731] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[736] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[743] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[746] list '', visible\\n\\t\\t\\t[747] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[749] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[752] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[754] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[757] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[759] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[762] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[764] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[768] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[769] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve this before saving. Loading... Bestsellers', visible, ex",
+      "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.18 alignment=0.91 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:edc93d08cde3e2ed63c0697d"
+    }
+  ],
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2.626167,
+        "duration_us": 2602,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 5.2162500000000005,
+        "duration_us": 504,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "carrier_span_present": true,
+        "case_id": "f43926d9",
+        "episode_count": 151,
+        "source_episode": "episode:3fd1796a0f590ac946fedf12"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 5.685708,
+        "duration_us": 391,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 10.010791999999999,
+        "duration_us": 3881,
+        "sql_sha256": "2c6a635b34b4bf331d7ffc86e502b93c545c458a1b0ef7a6f33003eed0e63ad0"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 4.753625,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 4.823083,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 47.996207999999996,
+        "duration_us": 37836,
+        "sql_sha256": "bcdf6d83ddd88a193ffd571cfa9f5b1f989c9e02b4edb2f3ed8f017b694eacf5"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 75.085917,
+        "duration_us": 26769,
+        "sql_sha256": "f6e850b7bf86fa5935003e8bf03f97d7a40bf10e0e299f4965db899e749dbe55"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 432.77349999999996,
+        "duration_us": 357424,
+        "sql_sha256": "f809805fe363c2d4baab564ecbdbb5525ef19d688a102cae794ed5baf5763b47"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 911.262458,
+        "duration_us": 476822,
+        "sql_sha256": "ff34baae2f19f02c828d4d9ba3af6ef8e52a80cfbf28d624b771622afabd6284"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 1059.310208,
+        "duration_us": 145329,
+        "sql_sha256": "aa27596c8f0dd224f52ca35fa363831eb8e274276bb0d0e23bec8a58d67dd017"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 1078.5887910000001,
+        "records": 206,
+        "content_bytes": 87207250,
+        "max_content_bytes": 1048542,
+        "index_keys": 1495483,
+        "index_key_bytes": 33064858,
+        "max_index_key_bytes": 266,
+        "unique_contents": 89,
+        "unique_sources": 89,
+        "tracked_source_fact_ids": [
+          "fact:1e674ebb37384dba5ca6455e",
+          "fact:93814dfb3aee835f9f3b0149",
+          "fact:b9f245f71c65552d7249ea1b"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 1103.1987080000001,
+        "records": 206,
+        "content_bytes": 87207250,
+        "max_content_bytes": 1048542,
+        "index_keys": 1495483,
+        "index_key_bytes": 33064858,
+        "max_index_key_bytes": 266,
+        "unique_contents": 89,
+        "unique_sources": 89,
+        "tracked_source_fact_ids": [
+          "fact:1e674ebb37384dba5ca6455e",
+          "fact:93814dfb3aee835f9f3b0149",
+          "fact:b9f245f71c65552d7249ea1b"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 2285.586291,
+        "records": 206,
+        "content_dictionaries": 89,
+        "index_dictionaries": 89
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2364.866708,
+        "duration_us": 14258,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2403.0079579999997,
+        "duration_us": 1456,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2404.3983749999998,
+        "duration_us": 1141,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2406.1786669999997,
+        "duration_us": 1563,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2407.541292,
+        "duration_us": 950,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2408.4589579999997,
+        "duration_us": 745,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2659.50175,
+        "duration_us": 238336,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6397.9689579999995,
+        "duration_us": 2150,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6757.630375,
+        "duration_us": 19947,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6807.0007080000005,
+        "duration_us": 39095,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6811.2907079999995,
+        "duration_us": 38744,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6816.999708,
+        "duration_us": 58090,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6820.532042,
+        "duration_us": 48023,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6870.119708,
+        "duration_us": 38792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6873.266208,
+        "duration_us": 50799,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6888.2750829999995,
+        "duration_us": 52298,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6891.517208,
+        "duration_us": 55569,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6949.673417,
+        "duration_us": 55487,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6960.625999999999,
+        "duration_us": 58329,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6963.7535,
+        "duration_us": 56356,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6967.652875,
+        "duration_us": 60228,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7026.326625000001,
+        "duration_us": 45373,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7032.389792,
+        "duration_us": 63034,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7035.516542,
+        "duration_us": 59198,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7038.793417,
+        "duration_us": 57810,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7107.876832999999,
+        "duration_us": 67226,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7111.859,
+        "duration_us": 59353,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7116.554292,
+        "duration_us": 68553,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7121.918917,
+        "duration_us": 69383,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7175.6894999999995,
+        "duration_us": 43495,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7180.4875,
+        "duration_us": 43398,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7186.986875,
+        "duration_us": 49932,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7193.784583000001,
+        "duration_us": 68850,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7245.195625,
+        "duration_us": 37164,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7247.817875,
+        "duration_us": 51274,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7250.959625,
+        "duration_us": 47737,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7254.341667000001,
+        "duration_us": 46283,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7297.913792,
+        "duration_us": 30525,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7300.30875,
+        "duration_us": 37141,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7312.635833,
+        "duration_us": 56393,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7316.521542,
+        "duration_us": 49106,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7364.769333,
+        "duration_us": 35425,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7375.802833,
+        "duration_us": 46431,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7378.735500000001,
+        "duration_us": 60409,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7382.807917,
+        "duration_us": 58232,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7451.327958,
+        "duration_us": 55416,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7456.8264580000005,
+        "duration_us": 65445,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7459.9710000000005,
+        "duration_us": 64032,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7463.763375,
+        "duration_us": 78476,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7512.976417,
+        "duration_us": 37635,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7523.089333,
+        "duration_us": 43352,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7529.946167,
+        "duration_us": 50236,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7532.781875,
+        "duration_us": 66536,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7590.229125000001,
+        "duration_us": 55060,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7599.389292,
+        "duration_us": 52344,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7604.9193749999995,
+        "duration_us": 57847,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7607.4868750000005,
+        "duration_us": 64982,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7667.271624999999,
+        "duration_us": 49738,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7683.844917,
+        "duration_us": 61724,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7687.596417,
+        "duration_us": 65444,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7691.009083,
+        "duration_us": 81339,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7717.62725,
+        "duration_us": 10602,
+        "sql_sha256": "08df20cf872b6193dad4d0506d64882d4be8aa0757237e9f3441517934891a69"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7729.948125,
+        "duration_us": 36436,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7745.57875,
+        "duration_us": 38573,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7748.384875,
+        "duration_us": 46353,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7853.581667,
+        "duration_us": 49262,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 9854.704167,
+        "duration_us": 1071,
+        "sql_sha256": "d893b03198442e74ef6a692ed10c7a37b040c02457c88f73ec20719154bf01a2"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9852.862541,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 9914.935333000001,
+        "duration_us": 56007,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9909.724666,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9940.953415999998,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 13257.81525,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 15382.067458,
+        "records": 149,
+        "content_dictionaries": 149,
+        "index_dictionaries": 296
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15560.176625,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15675.719292,
+        "duration_us": 109808,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15809.856458,
+        "duration_us": 134081,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15948.998292,
+        "duration_us": 139073,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16107.81125,
+        "duration_us": 158738,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16238.849833,
+        "duration_us": 130953,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16358.482082999999,
+        "duration_us": 119543,
+        "sql_sha256": "4b01fe1239e920267f855bc0059f6e75abd882b85c8b862798663fce567cc743"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 16360.75275,
+        "records": 53,
+        "content_bytes": 22322724,
+        "max_content_bytes": 1047521,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 53,
+        "unique_sources": 53,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 17436.273083,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 17527.851208,
+        "duration_us": 4284,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 17529.163333,
+        "duration_us": 975,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19385.917583000002,
+        "duration_us": 1627591,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19385.966207999998,
+        "duration_us": 1609507,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19417.221833,
+        "duration_us": 1887942,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19424.853625,
+        "duration_us": 1636510,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "f43926d9",
+        "elapsed_ms": 19572.78775,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": "d to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1929] link '\\\\ue601 Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1931] link '\\\\ue61f Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t[1934] paragraph ''\\n\\t\\t\\tStaticText 'Items 1 to 12 of 24 total'\\n\\t\\t[1937] strong ''\\n\\t\\t\\tStaticText 'Page'\\n\\t\\t[1938] list 'Page'\\n\\t\\t\\t[1939] listitem ''\\n\\t\\t\\t\\t[1940] strong ''\\n\\t\\t\\t\\t\\tStaticText \\\"You're currently reading page\\\"\\n\\t\\t\\t\\t\\tStaticText '1'\\n\\t\\t\\t[1943] listitem ''\\n\\t\\t\\t\\t[1944] link 'Page 2', clickable\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText '2'\\n\\t\\t\\t[1947] listitem ''\\n\\t\\t\\t\\t[1948] link '\\\\ue608 Page Next', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText 'Next'\\n\\t[1951] contentinfo ''\\n\\t\\t[1957] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1960] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1962] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1964] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1966] list ''\\n\\t\\t\\t[1967] listitem ''\\n\\t\\t\\t\\t[1968] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1969] listitem ''\\n\\t\\t\\t\\t[1970] link 'Search Terms', clickable\\n\\t\\t\\t[1971] listitem ''\\n\\t\\t\\t\\t[1972] link 'Advanced Search', clickable\\n\\t\\t\\t[1973] listitem ''\\n\\t\\t\\t\\t[1974] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1979] link 'Report All Bugs', clickable\", \"action\": null, \"screenshot\": \"screenshots/e5aec2da/0.png\", \"state_index\": 0, \"step\": 0, \"thought\": \"To find the size configuration of the picture frame purchased in 2022, I need to open the account/order history. The \\\"My Account\\\" link (bid 227) should lead to the account dashboard where order history and order details are ",
+              "fact_id": "fact:e47c90015a947de79e21c3fa",
+              "grounding": 0.22,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 16486,
+                  "original_bytes": 796304,
+                  "start_byte": 14438
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "appear",
+                  "list",
+                  "page"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 16486,
+                  "original_bytes": 796304,
+                  "start_byte": 14438
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "using",
+                    "our",
+                    "all",
+                    "page",
+                    "appear",
+                    "list"
+                  ],
+                  "matched_index_key_terms": [
+                    "our",
+                    "all",
+                    "page",
+                    "list"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "our",
+                      "all",
+                      "page",
+                      "list"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "05",
+                      "07",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:026a07325991be64372d2494",
+                      "fact:121f83008279cc0ffbd7edbb",
+                      "fact:851008bac37451bacd3e9444",
+                      "fact:dafd79dd360e7fe0a0e14328",
+                      "fact:e8f1eee52d20e0569dc802c8"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:d2f4d8b53dd2179274260ced",
+                "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "d to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1929] link '\\\\ue601 Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1931] link '\\\\ue61f Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t[1934] paragraph ''\\n\\t\\t\\tStaticText 'Items 1 to 12 of 24 total'\\n\\t\\t[1937] strong ''\\n\\t\\t\\tStaticText 'Page'\\n\\t\\t[1938] list 'Page'\\n\\t\\t\\t[1939] listitem ''\\n\\t\\t\\t\\t[1940] strong ''\\n\\t\\t\\t\\t\\tStaticText \\\"You're currently reading page\\\"\\n\\t\\t\\t\\t\\tStaticText '1'\\n\\t\\t\\t[1943] listitem ''\\n\\t\\t\\t\\t[1944] link 'Page 2', clickable\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText '2'\\n\\t\\t\\t[1947] listitem ''\\n\\t\\t\\t\\t[1948] link '\\\\ue608 Page Next', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\t\\tStaticText 'Page'\\n\\t\\t\\t\\t\\tStaticText 'Next'\\n\\t[1951] contentinfo ''\\n\\t\\t[1957] Section '', clickable\\n\\t\\t\\tStaticText '\\\\ue61d'\\n\\t\\t\\t[1960] LabelText '', clickable\\n\\t\\t\\t\\tStaticText 'Sign Up for Our Newsletter:'\\n\\t\\t\\t\\t[1962] textbox 'Sign Up for Our Newsletter:', clickable\\n\\t\\t\\t[1964] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1966] list ''\\n\\t\\t\\t[1967] listitem ''\\n\\t\\t\\t\\t[1968] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1969] listitem ''\\n\\t\\t\\t\\t[1970] link 'Search Terms', clickable\\n\\t\\t\\t[1971] listitem ''\\n\\t\\t\\t\\t[1972] link 'Advanced Search', clickable\\n\\t\\t\\t[1973] listitem ''\\n\\t\\t\\t\\t[1974] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright © 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1979] link 'Report All Bugs', clickable\", \"action\": null, \"screenshot\": \"screenshots/e5aec2da/0.png\", \"state_index\": 0, \"step\": 0, \"thought\": \"To find the size configuration of the picture frame purchased in 2022, I need to open the account/order history. The \\\"My Account\\\" link (bid 227) should lead to the account dashboard where order history and order details are ",
+              "rationale": "tier=fallback fts=6.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.22 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:d2f4d8b53dd2179274260ced"
+            },
+            {
+              "confidence": 0.0,
+              "content": "ires submissions in subreddit/news, the next step is to navigate to the forums list and open the news forum.\", \"url\": \"http://localhost:9080/\"}, {\"accessibility_tree\": \"RootWebArea 'List of forums', focused\\n\\t[20] navigation '', visible\\n\\t\\t[21] link 'Jump to main content', clickable\\n\\t\\t[22] link 'Jump to sidebar', clickable\\n\\t[23] navigation '', visible\\n\\t\\t[26] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[36] list '', visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Forums', clickable, visible\\n\\t\\t\\t[39] listitem '', visible\\n\\t\\t\\t\\t[40] link 'Wiki', clickable, visible\\n\\t\\t[41] Section '', visible\\n\\t\\t\\t[50] searchbox 'Search query', clickable, visible\\n\\t\\t[51] list '', visible\\n\\t\\t\\t[52] listitem '', visible\\n\\t\\t\\t\\t[53] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[56] image '', visible\\n\\t\\t\\t[57] listitem '', visible\\n\\t\\t\\t\\t[58] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[61] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[63] listitem '', visible\\n\\t\\t\\t\\t[64] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[67] image '', visible\\n\\t\\t\\t\\t\\t[68] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible\\n\\t\\t[139] link 'Create forum', clickable, visible\\n\\t\\t[141] article '', visible\\n\\t\\t\\t[143] heading 'AskReddit — AskReddit', visible\\n\\t\\t\\t\\t[144] link 'AskReddit — AskReddit', click",
+              "fact_id": "fact:05320c6893d56d323fc8f6fa",
+              "grounding": 0.42,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 35368,
+                  "original_bytes": 384247,
+                  "start_byte": 33320
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "above",
+                  "all",
+                  "alphabetical",
+                  "between",
+                  "forum",
+                  "list",
+                  "page",
+                  "tags"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 35368,
+                  "original_bytes": 384247,
+                  "start_byte": 33320
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "all",
+                    "page",
+                    "between",
+                    "tags",
+                    "alphabetical",
+                    "above",
+                    "list",
+                    "final"
+                  ],
+                  "matched_index_key_terms": [
+                    "page",
+                    "tags",
+                    "alphabetical",
+                    "list",
+                    "final"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "all",
+                      "page",
+                      "tags",
+                      "alphabetical",
+                      "list",
+                      "final"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "05",
+                      "07",
+                      "10",
+                      "1004c6a"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:026a07325991be64372d2494",
+                      "fact:121f83008279cc0ffbd7edbb",
+                      "fact:851008bac37451bacd3e9444",
+                      "fact:dafd79dd360e7fe0a0e14328",
+                      "fact:e8f1eee52d20e0569dc802c8"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:c520192e24c28192c9c107c6",
+                "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "ires submissions in subreddit/news, the next step is to navigate to the forums list and open the news forum.\", \"url\": \"http://localhost:9080/\"}, {\"accessibility_tree\": \"RootWebArea 'List of forums', focused\\n\\t[20] navigation '', visible\\n\\t\\t[21] link 'Jump to main content', clickable\\n\\t\\t[22] link 'Jump to sidebar', clickable\\n\\t[23] navigation '', visible\\n\\t\\t[26] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[36] list '', visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Forums', clickable, visible\\n\\t\\t\\t[39] listitem '', visible\\n\\t\\t\\t\\t[40] link 'Wiki', clickable, visible\\n\\t\\t[41] Section '', visible\\n\\t\\t\\t[50] searchbox 'Search query', clickable, visible\\n\\t\\t[51] list '', visible\\n\\t\\t\\t[52] listitem '', visible\\n\\t\\t\\t\\t[53] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[56] image '', visible\\n\\t\\t\\t[57] listitem '', visible\\n\\t\\t\\t\\t[58] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[61] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[63] listitem '', visible\\n\\t\\t\\t\\t[64] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[67] image '', visible\\n\\t\\t\\t\\t\\t[68] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible\\n\\t\\t[139] link 'Create forum', clickable, visible\\n\\t\\t[141] article '', visible\\n\\t\\t\\t[143] heading 'AskReddit — AskReddit', visible\\n\\t\\t\\t\\t[144] link 'AskReddit — AskReddit', click",
+              "rationale": "tier=fallback fts=15.35 access_count=0 confidence=0.00 relevance=0.00 grounding=0.42 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:c520192e24c28192c9c107c6"
+            },
+            {
+              "confidence": 0.0,
+              "content": "\"goal\": \"Change my reddit bio to \\\"Freelance Web Developer\\\"\", \"id\": \"2d00b63d\", \"outcome\": \"failure\", \"start_url\": \"http://localhost:9080/forums/all\", \"states\": [{\"accessibility_tree\": \"RootWebArea 'All forums', focused\\n\\t[18] navigation '', visible\\n\\t\\t[19] link 'Jump to main content', clickable\\n\\t\\t[20] link 'Jump to sidebar', clickable\\n\\t[21] navigation '', visible\\n\\t\\t[24] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[34] list '', visible\\n\\t\\t\\t[35] listitem '', visible\\n\\t\\t\\t\\t[36] link 'Forums', clickable, visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Wiki', clickable, visible\\n\\t\\t[39] Section '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '', visible\\n\\t\\t\\t\\t[121] link 'allentown', clickable, visible\\n\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t[123] link 'arlingtonva', clickable, visible\\n\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t[125] link 'Art', clickable, visible\\n\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t[127] link 'AskReddit', clickable, visible\\n\\t\\t\\t[128] listitem '', visible\\n\\t\\t\\t\\t[129] ",
+              "fact_id": "fact:93814dfb3aee835f9f3b0149",
+              "grounding": 0.39,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 2093,
+                  "original_bytes": 86868,
+                  "start_byte": 45
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "alphabetical",
+                  "appear",
+                  "forum",
+                  "list",
+                  "page",
+                  "tags"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 2093,
+                  "original_bytes": 86868,
+                  "start_byte": 45
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "reddit",
+                    "all",
+                    "page",
+                    "appear",
+                    "tags",
+                    "alphabetical",
+                    "list"
+                  ],
+                  "matched_index_key_terms": [
+                    "reddit",
+                    "all",
+                    "tags",
+                    "alphabetical"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "reddit",
+                      "all",
+                      "tags",
+                      "alphabetical"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "05",
+                      "07",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:026a07325991be64372d2494",
+                      "fact:121f83008279cc0ffbd7edbb",
+                      "fact:851008bac37451bacd3e9444",
+                      "fact:dafd79dd360e7fe0a0e14328",
+                      "fact:e8f1eee52d20e0569dc802c8"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:3fd1796a0f590ac946fedf12",
+                "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "\"goal\": \"Change my reddit bio to \\\"Freelance Web Developer\\\"\", \"id\": \"2d00b63d\", \"outcome\": \"failure\", \"start_url\": \"http://localhost:9080/forums/all\", \"states\": [{\"accessibility_tree\": \"RootWebArea 'All forums', focused\\n\\t[18] navigation '', visible\\n\\t\\t[19] link 'Jump to main content', clickable\\n\\t\\t[20] link 'Jump to sidebar', clickable\\n\\t[21] navigation '', visible\\n\\t\\t[24] link 'Home', clickable, visible\\n\\t\\t\\tStaticText 'Postmill'\\n\\t\\t[34] list '', visible\\n\\t\\t\\t[35] listitem '', visible\\n\\t\\t\\t\\t[36] link 'Forums', clickable, visible\\n\\t\\t\\t[37] listitem '', visible\\n\\t\\t\\t\\t[38] link 'Wiki', clickable, visible\\n\\t\\t[39] Section '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '', visible\\n\\t\\t\\t\\t[121] link 'allentown', clickable, visible\\n\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t[123] link 'arlingtonva', clickable, visible\\n\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t[125] link 'Art', clickable, visible\\n\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t[127] link 'AskReddit', clickable, visible\\n\\t\\t\\t[128] listitem '', visible\\n\\t\\t\\t\\t[129] ",
+              "rationale": "tier=fallback fts=15.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.39 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:3fd1796a0f590ac946fedf12"
+            },
+            {
+              "confidence": 0.0,
+              "content": "sh cache types.'\\n\\t[666] banner '', visible\\n\\t\\t[669] heading 'Dashboard', visible\\n\\t\\t[672] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[684] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[686] Section '', visible\\n\\t\\t\\t[688] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[692] textbox '\\\\ue60c', clickable, visible\\n\\t[698] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[709] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[720] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] button 'Reload Data', clickable, visible\\n\\t\\t[731] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[736] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[743] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[746] list '', visible\\n\\t\\t\\t[747] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[749] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[752] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[754] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[757] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[759] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[762] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[764] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[768] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[769] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve this before saving. Loading... Bestsellers', visible, ex",
+              "fact_id": "fact:91641897abb792f416953a33",
+              "grounding": 0.18,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 4096,
+                  "original_bytes": 614491,
+                  "start_byte": 2048
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "all",
+                  "list",
+                  "page",
+                  "tab"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 4096,
+                  "original_bytes": 614491,
+                  "start_byte": 2048
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "website",
+                    "all",
+                    "page",
+                    "list",
+                    "short"
+                  ],
+                  "matched_index_key_terms": [
+                    "website",
+                    "page",
+                    "short"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "website",
+                      "page",
+                      "short"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "05",
+                      "07",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:026a07325991be64372d2494",
+                      "fact:121f83008279cc0ffbd7edbb",
+                      "fact:851008bac37451bacd3e9444",
+                      "fact:dafd79dd360e7fe0a0e14328",
+                      "fact:e8f1eee52d20e0569dc802c8"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:edc93d08cde3e2ed63c0697d",
+                "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "sh cache types.'\\n\\t[666] banner '', visible\\n\\t\\t[669] heading 'Dashboard', visible\\n\\t\\t[672] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[684] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[686] Section '', visible\\n\\t\\t\\t[688] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[692] textbox '\\\\ue60c', clickable, visible\\n\\t[698] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[709] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[720] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] button 'Reload Data', clickable, visible\\n\\t\\t[731] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[736] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[743] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[746] list '', visible\\n\\t\\t\\t[747] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[749] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[752] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[754] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[757] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[759] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[762] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[764] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[768] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[769] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve this before saving. Loading... Bestsellers', visible, ex",
+              "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.18 alignment=0.91 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:edc93d08cde3e2ed63c0697d"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.473416,
+              "items": [
+                {
+                  "fact_id": "",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 13257.928541,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 13259.668833,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15551.335375,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15560.30575,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 17084.297583000003,
+              "items": [
+                {
+                  "fact_id": "episode_fallback:episode:3fd1796a0f590ac946fedf12",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 19419.672375000002,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 86868,
+                  "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 19572.739416,
+              "items": [
+                {
+                  "fact_id": "fact:93814dfb3aee835f9f3b0149",
+                  "source_episode": "episode:3fd1796a0f590ac946fedf12",
+                  "content_bytes": 2048,
+                  "content_sha256": "d1dee0e8654694f4f59379ffdd1b9127cb6cb202dda8df12b740927b97f04dd8",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

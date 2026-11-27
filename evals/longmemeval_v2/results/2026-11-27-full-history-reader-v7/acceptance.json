@@ -1,0 +1,26 @@
+{
+  "schema": "full-history-reader-v7-acceptance/v1",
+  "registered_at_utc": "2026-11-27T15:20:36.283303+00:00",
+  "before_inference_outputs": true,
+  "activation": [
+    "All7 actual v7contexts independently source-adjudicated sufficient with0readfaults",
+    "Source-ledger frozen16case qualification PASS without reruns"
+  ],
+  "scheduled_if_activated": 14,
+  "case_denominator": 7,
+  "candidate": "source-ledger-final-first",
+  "baseline": "ordered-relations-final-first",
+  "per_candidate_case_required": [
+    "correct frozen value",
+    "finish_reason stop",
+    "registered box format",
+    "literal quote from one actual returned source/decoded text",
+    "no errors"
+  ],
+  "required_candidate_cases": 7,
+  "required_false_premise": 3,
+  "required_errors": 0,
+  "stop_rule": "Onecase-majorcapture,256tokens/60srequest/retry0/1800swholecapture, unchanged registration. If activation fails, retain NOTACTIVATED and no outputs; no substitute easier cases.",
+  "scope": "Exposed reader-only comparison on identical actual V7sources, not memory benefit or independentconfirmation. Literal quote alone is not complete citation entailment/binding.",
+  "registration_sha256": "8888e7d31a8c2df5e1b5e97defd4b79095b65dd7d196a5820bc8627515ffbecd"
+}

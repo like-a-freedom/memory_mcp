@@ -1,0 +1,1848 @@
+{
+  "ordinal": 4,
+  "case_id": "d6da3938",
+  "arm": "candidate",
+  "command": [
+    "/tmp/memory-quality-history-v7-2026-11-27",
+    "full_history_registered_case_retains_reviewed_source",
+    "--exact",
+    "--ignored",
+    "--nocapture"
+  ],
+  "raw_log": "/tmp/memory-quality-full-100-2026-11-27/observations-positional-v7/d6da3938.log",
+  "copy_seconds": 0.7733034169941675,
+  "exit_code": 101,
+  "external_timeout": false,
+  "elapsed_seconds": 33.953513415995985,
+  "process_fault": null,
+  "malformed_events": [],
+  "strict_span_assertion": true,
+  "raw_sha256": "954c3d4ce725d9d8a89862bc9f36184b9cf9f072e03b88a09b7cd1399de08211",
+  "raw_bytes": 13550361,
+  "receipt_observed": true,
+  "assembly_elapsed_ms": 21686.614792,
+  "partial_elapsed_ms": null,
+  "assembly_within_30": true,
+  "strict_original_source_span": false,
+  "process_deadline_exceeded": false,
+  "runtime_completed": true,
+  "retrieval_fault": null,
+  "delivered_items": [
+    {
+      "confidence": 0.0,
+      "content": "ake sure your'\\n\\t[995] link 'Magento cron job', clickable, visible\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main ''\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\t[1008] button 'Search', clickable, visible\\n\\t\\t\\tStaticText 'Search'\\n\\t\\t[1011] button 'Reset Filter', clickable, visible\\n\\t\\t\\tStaticText 'Reset Filter'\\n\\t\\tStaticText '8'\\n\\t\\tStaticText 'records found'\\n\\t\\t[1020] combobox 'per page' value='20', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t[1021] option '20', selected=True\\n\\t\\t\\t[1022] option '30', selected=False\\n\\t\\t\\t[1023] option '50', selected=False\\n\\t\\t\\t[1024] option '100', selected=False\\n\\t\\t\\t[1025] option '200', selected=False\\n\\t\\t[1026] LabelText '', visible\\n\\t\\t\\tStaticText 'per page'\\n\\t\\t[1028] button '\\\\ue629', visible\\n\\t\\t\\tStaticText '\\\\ue629'\\n\\t\\t[1030] textbox 'of 1' value='1', clickable, visible\\n\\t\\t\\tS",
+      "fact_id": "fact:07f50ea549db79b8a856800e",
+      "grounding": 0.52,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 439092,
+          "original_bytes": 804658,
+          "start_byte": 437044
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "action",
+          "create",
+          "customer",
+          "detail",
+          "name",
+          "order",
+          "page",
+          "right",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 439092,
+          "original_bytes": 804658,
+          "start_byte": 437044
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "magento",
+            "dashboard",
+            "detail",
+            "page",
+            "name",
+            "right",
+            "create",
+            "order"
+          ],
+          "matched_index_key_terms": [
+            "magento",
+            "dashboard",
+            "name",
+            "create",
+            "order"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "magento",
+              "dashboard",
+              "name",
+              "create",
+              "order"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:185465b40a8b69a80549dbee",
+              "fact:48321f5a8534e8c2e5ac86f3",
+              "fact:6fa05d860c6cf3842c2eb7a9",
+              "fact:ae47632449aacb95d9b40b3a",
+              "fact:c47325fdd147ad91b06ca365"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:751dce326043631881f9bf3b",
+        "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+        "source_type": "other"
+      },
+      "quote": "ake sure your'\\n\\t[995] link 'Magento cron job', clickable, visible\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main ''\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\t[1008] button 'Search', clickable, visible\\n\\t\\t\\tStaticText 'Search'\\n\\t\\t[1011] button 'Reset Filter', clickable, visible\\n\\t\\t\\tStaticText 'Reset Filter'\\n\\t\\tStaticText '8'\\n\\t\\tStaticText 'records found'\\n\\t\\t[1020] combobox 'per page' value='20', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t[1021] option '20', selected=True\\n\\t\\t\\t[1022] option '30', selected=False\\n\\t\\t\\t[1023] option '50', selected=False\\n\\t\\t\\t[1024] option '100', selected=False\\n\\t\\t\\t[1025] option '200', selected=False\\n\\t\\t[1026] LabelText '', visible\\n\\t\\t\\tStaticText 'per page'\\n\\t\\t[1028] button '\\\\ue629', visible\\n\\t\\t\\tStaticText '\\\\ue629'\\n\\t\\t[1030] textbox 'of 1' value='1', clickable, visible\\n\\t\\t\\tS",
+      "rationale": "tier=source fts=0.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.52 alignment=1.01 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action immediately to the right of \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "source",
+      "semantic_available": false,
+      "source_episode": "episode:751dce326043631881f9bf3b"
+    }
+  ],
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2314,
+        "elapsed_ms": 2.342459,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 280,
+        "elapsed_ms": 4.281834,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "carrier_span_present": true,
+        "case_id": "d6da3938",
+        "episode_count": 151,
+        "source_episode": "episode:751dce326043631881f9bf3b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 323,
+        "elapsed_ms": 4.627459,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 4079,
+        "elapsed_ms": 9.262042,
+        "sql_sha256": "411c73628b8907732ac14a9a25284a59852516a6ca7d3369c0220e268560138b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 4.98425,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 4.991375000000001,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 690145,
+        "elapsed_ms": 699.46975,
+        "sql_sha256": "c6baffb3b35b1f3ecad2b9d70d42e6d020ad85b9221fb727605143a6dfaeda93"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 509839,
+        "elapsed_ms": 1211.691417,
+        "sql_sha256": "bf5acd5a9bc156112d05325341e9f9d7b6d46f498e594c8609237f754539875f"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 808768,
+        "elapsed_ms": 2021.1596250000002,
+        "sql_sha256": "fb46735c81dab4e7f233d98f9ba4464b476724dc7e2cbc8b8dc1d175a605c9e8"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 559637,
+        "elapsed_ms": 2581.6728749999997,
+        "sql_sha256": "f12137ac50a3800177d1e724f9d6dccf7ba1d45fcbc0cb05bc9b690d7a871a84"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 2607.005833,
+        "records": 260,
+        "content_bytes": 97376877,
+        "max_content_bytes": 1047521,
+        "index_keys": 1613959,
+        "index_key_bytes": 32466491,
+        "max_index_key_bytes": 266,
+        "unique_contents": 104,
+        "unique_sources": 104,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 2635.118,
+        "records": 260,
+        "content_bytes": 97376877,
+        "max_content_bytes": 1047521,
+        "index_keys": 1613959,
+        "index_key_bytes": 32466491,
+        "max_index_key_bytes": 266,
+        "unique_contents": 104,
+        "unique_sources": 104,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 3836.26275,
+        "records": 260,
+        "content_dictionaries": 104,
+        "index_dictionaries": 104
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 12960,
+        "elapsed_ms": 3906.9731669999996,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1402,
+        "elapsed_ms": 3908.438792,
+        "sql_sha256": "7a17c2d526b2e16cc7a9ccf5aadd990617782f9fa12b2fccc46495b28d24e2f1"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3127,
+        "elapsed_ms": 3911.6146670000003,
+        "sql_sha256": "821f484e6778d1ac8b8ce03bed1d720274fc7a18472e2c0c05d0f1a4afe326e2"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 3907.335375,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 3907.341333,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 568697,
+        "elapsed_ms": 4480.364500000001,
+        "sql_sha256": "219b36a0af78bacb30cfcf37dfbd692e534f86772d2b7b479beab0083803b235"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 537038,
+        "elapsed_ms": 5019.806042,
+        "sql_sha256": "23de51e02a8c279d4a649396ee71ff64fbce0d966c793437c966ef6ca3e5bd53"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 819978,
+        "elapsed_ms": 5840.5010839999995,
+        "sql_sha256": "a82d774c043b70711bdbfcf60aa99ba26b47ad07e77cb752b309f7f722efc335"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 566476,
+        "elapsed_ms": 6407.878459,
+        "sql_sha256": "ed34fc909991160db603baceb1e1ad50e9d2c1c3be46c6f3cd2143f5c0d433a9"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 6434.289583,
+        "records": 260,
+        "content_bytes": 97376877,
+        "max_content_bytes": 1047521,
+        "index_keys": 1613959,
+        "index_key_bytes": 32466491,
+        "max_index_key_bytes": 266,
+        "unique_contents": 104,
+        "unique_sources": 104,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 6462.536667,
+        "records": 260,
+        "content_bytes": 97376877,
+        "max_content_bytes": 1047521,
+        "index_keys": 1613959,
+        "index_key_bytes": 32466491,
+        "max_index_key_bytes": 266,
+        "unique_contents": 104,
+        "unique_sources": 104,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 7676.886792,
+        "records": 260,
+        "content_dictionaries": 104,
+        "index_dictionaries": 104
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 5418,
+        "elapsed_ms": 7808.247292,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3448,
+        "elapsed_ms": 7813.401292,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2086,
+        "elapsed_ms": 7816.677000000001,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2291,
+        "elapsed_ms": 7819.486792000001,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 4098,
+        "elapsed_ms": 7824.291459,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 236082,
+        "elapsed_ms": 8116.591625,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2113,
+        "elapsed_ms": 11271.314125,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18950,
+        "elapsed_ms": 11623.946792,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 28248,
+        "elapsed_ms": 11661.55875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31863,
+        "elapsed_ms": 11669.565917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44582,
+        "elapsed_ms": 11670.724709,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34333,
+        "elapsed_ms": 11672.003792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 28028,
+        "elapsed_ms": 11712.796875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 33470,
+        "elapsed_ms": 11713.992334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31139,
+        "elapsed_ms": 11715.934000000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 45413,
+        "elapsed_ms": 11718.525459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 33169,
+        "elapsed_ms": 11753.275792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 28403,
+        "elapsed_ms": 11759.540083999998,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29818,
+        "elapsed_ms": 11760.929209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35341,
+        "elapsed_ms": 11762.144542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 30984,
+        "elapsed_ms": 11801.024584,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32053,
+        "elapsed_ms": 11806.21875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 45390,
+        "elapsed_ms": 11808.536959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35933,
+        "elapsed_ms": 11810.123709,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29059,
+        "elapsed_ms": 11846.802500000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34358,
+        "elapsed_ms": 11856.166584,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48817,
+        "elapsed_ms": 11859.9855,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 41610,
+        "elapsed_ms": 11863.392875000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31802,
+        "elapsed_ms": 11908.626209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49126,
+        "elapsed_ms": 11914.585042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44224,
+        "elapsed_ms": 11916.470084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 41811,
+        "elapsed_ms": 11918.662375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40507,
+        "elapsed_ms": 11960.505083999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32522,
+        "elapsed_ms": 11964.0525,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42411,
+        "elapsed_ms": 11969.661375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40244,
+        "elapsed_ms": 11971.748916999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32530,
+        "elapsed_ms": 12005.743917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35183,
+        "elapsed_ms": 12016.185334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35641,
+        "elapsed_ms": 12021.214584000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37646,
+        "elapsed_ms": 12023.252959000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35255,
+        "elapsed_ms": 12059.43125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 27967,
+        "elapsed_ms": 12064.707792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29575,
+        "elapsed_ms": 12066.356667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 41100,
+        "elapsed_ms": 12072.826334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34450,
+        "elapsed_ms": 12115.6535,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 45012,
+        "elapsed_ms": 12119.802792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 36733,
+        "elapsed_ms": 12122.187750000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 38442,
+        "elapsed_ms": 12123.871625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39644,
+        "elapsed_ms": 12174.852292000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 53465,
+        "elapsed_ms": 12178.749,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49622,
+        "elapsed_ms": 12180.628375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 52464,
+        "elapsed_ms": 12187.698292000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34670,
+        "elapsed_ms": 12229.960667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40446,
+        "elapsed_ms": 12240.051959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 43845,
+        "elapsed_ms": 12243.475042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 55982,
+        "elapsed_ms": 12245.825208999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 30357,
+        "elapsed_ms": 12287.233709,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 36947,
+        "elapsed_ms": 12289.450667000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34347,
+        "elapsed_ms": 12291.250084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44996,
+        "elapsed_ms": 12292.612500000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 27070,
+        "elapsed_ms": 12327.187167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 26726,
+        "elapsed_ms": 12330.903792000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39227,
+        "elapsed_ms": 12332.783417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29858,
+        "elapsed_ms": 12334.064375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29169,
+        "elapsed_ms": 12371.860917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44163,
+        "elapsed_ms": 12379.27375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34148,
+        "elapsed_ms": 12380.973792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35785,
+        "elapsed_ms": 12382.635542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37439,
+        "elapsed_ms": 12421.301292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35842,
+        "elapsed_ms": 12429.324459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 38591,
+        "elapsed_ms": 12432.100333999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46035,
+        "elapsed_ms": 12435.155334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 25136,
+        "elapsed_ms": 12471.947959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31469,
+        "elapsed_ms": 12474.161458999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29240,
+        "elapsed_ms": 12476.078167000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40583,
+        "elapsed_ms": 12477.520833999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31711,
+        "elapsed_ms": 12516.032375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29266,
+        "elapsed_ms": 12517.715417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37269,
+        "elapsed_ms": 12525.743417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49258,
+        "elapsed_ms": 12527.697417000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35785,
+        "elapsed_ms": 12572.659417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 33995,
+        "elapsed_ms": 12575.143417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47278,
+        "elapsed_ms": 12576.502292000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37273,
+        "elapsed_ms": 12578.390875000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35875,
+        "elapsed_ms": 12615.595167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31679,
+        "elapsed_ms": 12616.742542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37967,
+        "elapsed_ms": 12627.064792000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40405,
+        "elapsed_ms": 12629.478959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32708,
+        "elapsed_ms": 12671.139542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32865,
+        "elapsed_ms": 12675.709875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49843,
+        "elapsed_ms": 12680.808541999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42009,
+        "elapsed_ms": 12684.826041999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 41248,
+        "elapsed_ms": 12734.536834,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39018,
+        "elapsed_ms": 12736.730417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 52809,
+        "elapsed_ms": 12739.592417000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 43899,
+        "elapsed_ms": 12741.635625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32786,
+        "elapsed_ms": 12782.9515,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 30244,
+        "elapsed_ms": 12784.601125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 43992,
+        "elapsed_ms": 12786.903584000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34783,
+        "elapsed_ms": 12789.165417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34734,
+        "elapsed_ms": 12824.996042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29951,
+        "elapsed_ms": 12831.541417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31714,
+        "elapsed_ms": 12833.328834,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37311,
+        "elapsed_ms": 12834.690125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31540,
+        "elapsed_ms": 12874.641458999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46423,
+        "elapsed_ms": 12882.338042000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37500,
+        "elapsed_ms": 12884.957959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39212,
+        "elapsed_ms": 12886.644042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 25442,
+        "elapsed_ms": 12923.966375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31448,
+        "elapsed_ms": 12925.789417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49299,
+        "elapsed_ms": 12937.469625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42466,
+        "elapsed_ms": 12941.016542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29123,
+        "elapsed_ms": 12981.371083999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35520,
+        "elapsed_ms": 12983.577084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47484,
+        "elapsed_ms": 12990.504625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 43065,
+        "elapsed_ms": 12995.33925,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32309,
+        "elapsed_ms": 13038.929124999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37199,
+        "elapsed_ms": 13043.786125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48295,
+        "elapsed_ms": 13045.506959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48357,
+        "elapsed_ms": 13050.375667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 30327,
+        "elapsed_ms": 13089.294334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44324,
+        "elapsed_ms": 13096.630541999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34935,
+        "elapsed_ms": 13098.187459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37181,
+        "elapsed_ms": 13100.457167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 7904,
+        "elapsed_ms": 13120.53725,
+        "sql_sha256": "6d33bf535b10b7054dc47eca7e3fefaa1eeeb376d8d9760a1a9e9ff439a9fc7c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20181,
+        "elapsed_ms": 13128.500250000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 29399,
+        "elapsed_ms": 13131.029375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 53403,
+        "elapsed_ms": 13293.185667,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 902,
+        "elapsed_ms": 15349.214875,
+        "sql_sha256": "10a07210ef2aa541edf8f9a415176b77894f655b7cb39a01d1528b163f2783ad"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15374.461542000001,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42881,
+        "elapsed_ms": 15422.161125,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15417.921,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15510.418458,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1112,
+        "elapsed_ms": 15515.908334,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 444,
+        "elapsed_ms": 15516.372042,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 365,
+        "elapsed_ms": 15516.747792,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 347,
+        "elapsed_ms": 15517.104125,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 342,
+        "elapsed_ms": 15517.455167,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 255,
+        "elapsed_ms": 15517.717584,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 18513.947042000003,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 19732.555375,
+        "records": 1,
+        "content_dictionaries": 1,
+        "index_dictionaries": 2
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 19734.897375,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 104433,
+        "elapsed_ms": 19843.992042,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 125724,
+        "elapsed_ms": 19969.770542,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 127246,
+        "elapsed_ms": 20097.060417,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 123474,
+        "elapsed_ms": 20220.603874999997,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 112795,
+        "elapsed_ms": 20333.474792,
+        "sql_sha256": "ea19f923f4b85acef67cbc52b50baf267dec83dbd9352440ef2ac14e5834fb50"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 20341.822083,
+        "records": 54,
+        "content_bytes": 30824623,
+        "max_content_bytes": 1047521,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 54,
+        "unique_sources": 54,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 21563.384208,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 974,
+        "elapsed_ms": 21627.572167000002,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 858,
+        "elapsed_ms": 21628.576334,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 21624.330749999997,
+        "stage": "access_heat.started"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 9935,
+        "elapsed_ms": 21638.575500000003,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 21634.290208,
+        "stage": "access_heat.settled"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "d6da3938",
+        "elapsed_ms": 21686.614792,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": "ake sure your'\\n\\t[995] link 'Magento cron job', clickable, visible\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main ''\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\t[1008] button 'Search', clickable, visible\\n\\t\\t\\tStaticText 'Search'\\n\\t\\t[1011] button 'Reset Filter', clickable, visible\\n\\t\\t\\tStaticText 'Reset Filter'\\n\\t\\tStaticText '8'\\n\\t\\tStaticText 'records found'\\n\\t\\t[1020] combobox 'per page' value='20', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t[1021] option '20', selected=True\\n\\t\\t\\t[1022] option '30', selected=False\\n\\t\\t\\t[1023] option '50', selected=False\\n\\t\\t\\t[1024] option '100', selected=False\\n\\t\\t\\t[1025] option '200', selected=False\\n\\t\\t[1026] LabelText '', visible\\n\\t\\t\\tStaticText 'per page'\\n\\t\\t[1028] button '\\\\ue629', visible\\n\\t\\t\\tStaticText '\\\\ue629'\\n\\t\\t[1030] textbox 'of 1' value='1', clickable, visible\\n\\t\\t\\tS",
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "grounding": 0.52,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 439092,
+                  "original_bytes": 804658,
+                  "start_byte": 437044
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "action",
+                  "create",
+                  "customer",
+                  "detail",
+                  "name",
+                  "order",
+                  "page",
+                  "right",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 439092,
+                  "original_bytes": 804658,
+                  "start_byte": 437044
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "magento",
+                    "dashboard",
+                    "detail",
+                    "page",
+                    "name",
+                    "right",
+                    "create",
+                    "order"
+                  ],
+                  "matched_index_key_terms": [
+                    "magento",
+                    "dashboard",
+                    "name",
+                    "create",
+                    "order"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "magento",
+                      "dashboard",
+                      "name",
+                      "create",
+                      "order"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:185465b40a8b69a80549dbee",
+                      "fact:48321f5a8534e8c2e5ac86f3",
+                      "fact:6fa05d860c6cf3842c2eb7a9",
+                      "fact:ae47632449aacb95d9b40b3a",
+                      "fact:c47325fdd147ad91b06ca365"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:751dce326043631881f9bf3b",
+                "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+                "source_type": "other"
+              },
+              "quote": "ake sure your'\\n\\t[995] link 'Magento cron job', clickable, visible\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main ''\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\t[1008] button 'Search', clickable, visible\\n\\t\\t\\tStaticText 'Search'\\n\\t\\t[1011] button 'Reset Filter', clickable, visible\\n\\t\\t\\tStaticText 'Reset Filter'\\n\\t\\tStaticText '8'\\n\\t\\tStaticText 'records found'\\n\\t\\t[1020] combobox 'per page' value='20', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t[1021] option '20', selected=True\\n\\t\\t\\t[1022] option '30', selected=False\\n\\t\\t\\t[1023] option '50', selected=False\\n\\t\\t\\t[1024] option '100', selected=False\\n\\t\\t\\t[1025] option '200', selected=False\\n\\t\\t[1026] LabelText '', visible\\n\\t\\t\\tStaticText 'per page'\\n\\t\\t[1028] button '\\\\ue629', visible\\n\\t\\t\\tStaticText '\\\\ue629'\\n\\t\\t[1030] textbox 'of 1' value='1', clickable, visible\\n\\t\\t\\tS",
+              "rationale": "tier=source fts=0.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.52 alignment=1.01 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action immediately to the right of \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "source",
+              "semantic_available": false,
+              "source_episode": "episode:751dce326043631881f9bf3b"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.479917,
+              "items": [
+                {
+                  "fact_id": "",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 18514.379042,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 19714.346292,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 19734.894958,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 19735.160292,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 21549.0165,
+              "items": [
+                {
+                  "fact_id": "episode_fallback:episode:751dce326043631881f9bf3b",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 21634.356875,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 21686.397667,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 2048,
+                  "content_sha256": "5472b38e21d7ff629692b6c55679431111931b953403932561f9351ac828f1ec",
+                  "registered_span_present": false
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

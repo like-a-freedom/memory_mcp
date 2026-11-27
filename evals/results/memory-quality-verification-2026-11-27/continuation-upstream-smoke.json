@@ -1,0 +1,109 @@
+{
+  "schema": "memory-mcp-native-upstream-restore-smoke/v1",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  },
+  "started_utc": "2026-11-27T12:28:05.250451+00:00",
+  "elapsed_seconds": 13.053337,
+  "test_timeout_seconds": 108,
+  "test_selector": "evals.longmemeval_v2.test_upstream_restore.UpstreamRestoreTests.test_saved_store_reopens_after_original_store_moves",
+  "command": [
+    "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+    "-c",
+    "<observe test TemporaryDirectory before cleanup; invoke the selected unittest>",
+    "evals.longmemeval_v2.test_upstream_restore.UpstreamRestoreTests.test_saved_store_reopens_after_original_store_moves"
+  ],
+  "unwrapped_test_command": [
+    "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+    "-m",
+    "unittest",
+    "-v",
+    "evals.longmemeval_v2.test_upstream_restore.UpstreamRestoreTests.test_saved_store_reopens_after_original_store_moves"
+  ],
+  "observation_script_sha256": "9a52da7b17325ea3a611643e8b2657dd1a65ae8e4a3dc9dd9e1184f0affeb850",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/memory-mcp-longmemeval-v2:/Users/solovey/Documents/dev/memory_mcp",
+    "LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY": "/tmp/memory-quality-product-2026-11-27",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "cwd": "/Users/solovey/Documents/dev/memory_mcp",
+  "upstream_revision": "ef67f10aacd9080c75aeb2dd527a0af25dc26f1b",
+  "binary": {
+    "path": "/tmp/memory-quality-product-2026-11-27",
+    "sha256": "d12239c5162717811426eae15be6794fbdee94b19eb7d92c13d6e6e6250e313c",
+    "bytes": 251355432
+  },
+  "sources_sha256": {
+    "evals/longmemeval_v2/memory_mcp_backend.py": "32a97867f3a52706355759603bc69229c844dba2cade5a797e25e2632bfd088b",
+    "evals/longmemeval_v2/build_preflight.py": "465dad19a1a99d2e1b7ace1fde851baf37d93876723546a20a1b8eafabb91c7a",
+    "evals/longmemeval_v2/test_upstream_restore.py": "a6704caedfc232977caa2fe7a954a4e6571555e072e3e66d724260a673382ad9"
+  },
+  "exit_code": 0,
+  "faults": [],
+  "stdout_sha256": "9eb504cd606b0f05570a4bdaf6339920f2d3427db5777ff41ecc7b4315258c6b",
+  "stderr_sha256": "f471cb45b6a4d08ca335a9c958615e685ed52161366f22c6c544983287e53d65",
+  "status": "passed",
+  "evidence_scope": "one synthetic native upstream restore using embedded storage, deterministic default Anno and disabled embeddings",
+  "observation": {
+    "build_coverage": {
+      "affected_case_ids": [],
+      "build_status": "saved",
+      "scored_case_count": 0,
+      "sha256": "9852a4dcf8f2cacba484329cf5668b9c7cdc38e2a0262365ea96fdc9fbd09f0c"
+    },
+    "journal": {
+      "bytes": 954,
+      "extract_episode_identity_validated_by_adapter": true,
+      "finished": {
+        "attempt_id": "88d7f71a4eff4fc3ab3dfaf1db6bf3fe",
+        "body_bytes": 57,
+        "body_sha256": "7aa0b778a0b346c308a330fc1f2863f3776e5bcd4663904522ccc8f404081dbd",
+        "episode_id": "episode:10699efbc80ccbbc54b0b2bc",
+        "error_type": null,
+        "event": "formation_finished",
+        "fact_count": 1,
+        "observed_status": "success",
+        "outcome": "completed",
+        "output_sha256": "e419ffb7d444d73fa77d97b3a30237b934e23bd676d71c23a5e945548a5f2750",
+        "schema": "memory-mcp-formation-attempt/v1",
+        "source_id": "longmemeval_v2_trajectory_7aa0b778a0b346c308a330fc1f2863f3776e5bcd4663904522ccc8f404081dbd",
+        "step": "extract"
+      },
+      "matching_receipts": true,
+      "sha256": "7329393344087d2e91b15d60791eac24bc4f35c5862d4313dc81acfc9cb3e3a3",
+      "started": {
+        "attempt_id": "88d7f71a4eff4fc3ab3dfaf1db6bf3fe",
+        "body_bytes": 57,
+        "body_sha256": "7aa0b778a0b346c308a330fc1f2863f3776e5bcd4663904522ccc8f404081dbd",
+        "event": "formation_started",
+        "outcome": "pending",
+        "schema": "memory-mcp-formation-attempt/v1",
+        "source_id": "longmemeval_v2_trajectory_7aa0b778a0b346c308a330fc1f2863f3776e5bcd4663904522ccc8f404081dbd",
+        "step": "ingest"
+      }
+    },
+    "restore": {
+      "normal_restore_assertions_completed": true,
+      "original_store_moved": true,
+      "snapshot_files": {
+        "memory_config.json": {
+          "bytes": 411,
+          "sha256": "d0e5735c5538c8ea33ce2116975d3c743bc8511d67acef4ac3f072b19f30e88c"
+        },
+        "store/LOCK": {
+          "bytes": 5,
+          "sha256": "55d0293ba683c43874c944db1d8dc8455e2e69923aa18a93ee2ec0e0e217a1a4"
+        },
+        "store/manifest/00000000000000000000.manifest": {
+          "bytes": 71,
+          "sha256": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5"
+        },
+        "store/wal/00000000000000000002.wal": {
+          "bytes": 34177024,
+          "sha256": "9ed3f5f2005f46474256e37ca9a1924d01f4f7d2fa4c3bc86811cee16c62b0eb"
+        }
+      }
+    }
+  }
+}

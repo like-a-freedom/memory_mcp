@@ -1,0 +1,50 @@
+[
+  {
+    "case": "complete-list-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "complete-list-handles",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "neighborhood-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "neighborhood-handles",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "count-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "count-handles",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "false-premise-source_ids",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  },
+  {
+    "case": "false-premise-handles",
+    "arm": "fixed_sufficient_reply",
+    "status": "invalid",
+    "error": "RuntimeError: episode-only formation: complete-list-distractor"
+  }
+]

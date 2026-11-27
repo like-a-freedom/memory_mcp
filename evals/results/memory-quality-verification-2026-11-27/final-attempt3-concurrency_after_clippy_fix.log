@@ -1,0 +1,15 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.84s
+     Running tests/fact_access_concurrency.rs (target/debug/build/memory_mcp/37e4bb68eb3c3caf/out/fact_access_concurrency-37e4bb68eb3c3caf)
+
+running 6 tests
+test cancellation_drops_all_pending_access_writes ... ok
+2026-11-27T14:43:56.565951Z ERROR  op=assemble_context.access_track_error  access.allowed_tags=null  access.caller_id=null  access.content_type=null  access.session_vars=null  access.transport=null  args={}  result.error_code=storage
+test public_read_awaits_four_access_writes_before_starting_the_next_wave ... ok
+test access_observation::public_cold_read_observes_access_phases_around_all_writes ... ok
+test failed_access_does_not_cancel_siblings_or_skip_later_facts ... ok
+test access_observation::public_warm_read_observes_access_phases_around_all_writes ... ok
+test public_read_durably_records_all_distinct_fact_accesses_before_returning ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+

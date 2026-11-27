@@ -11,13 +11,15 @@ import time
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
+from .inference_attempts import ACTIVE_CALL, AttemptRecorder, observed_sdk_clients
+
 
 def failure_status(role, error):
     timeout = isinstance(error, TimeoutError) or type(error).__name__ == "APITimeoutError"
     return f"{role}_{'timeout' if timeout else 'error'}"
 
 
-def run_observed(harness, argv, case_ids, output, preflight=None):
+def run_observed(harness, argv, case_ids, output, preflight=None, attempts=None):
     failures = defaultdict(list)
     reader_cases = {}
     reader_inputs = {}
@@ -61,6 +63,7 @@ def run_observed(harness, argv, case_ids, output, preflight=None):
     async def observe_reader(client, args, messages):
         start = time.monotonic()
         case_id = reader_cases.get(id(messages))
+        identity = ACTIVE_CALL.set((case_id, "reader"))
         try:
             response = await reader(client, args, messages)
             if case_id is not None:
@@ -71,6 +74,13 @@ def run_observed(harness, argv, case_ids, output, preflight=None):
                         "response_raw": response[0],
                         "usage": response[1],
                     }
+                    if attempts is not None:
+                        receipt = attempts.responses.get((case_id, "reader"), {})
+                        reader_outputs[case_id].update({
+                            "schema": "memory-mcp-longmemeval-v2-reader-output/v2",
+                            "usage": receipt.get("usage"),
+                            "finish_reason": receipt.get("finish_reason"),
+                        })
                 else:
                     reader_outputs[case_id] = {
                         "status": "captured_unrecognized_response",
@@ -86,11 +96,13 @@ def run_observed(harness, argv, case_ids, output, preflight=None):
                 persist_reader_outputs()
             raise
         finally:
+            ACTIVE_CALL.reset(identity)
             duration["reader"] += time.monotonic() - start
 
     def observe_score(row, config):
         judge = row["eval_name"] in harness.LLM_EVAL_FUNCTIONS
         start = time.monotonic()
+        identity = ACTIVE_CALL.set((row["question_id"], "judge"))
         try:
             return score(row, config)
         except Exception as error:
@@ -98,6 +110,7 @@ def run_observed(harness, argv, case_ids, output, preflight=None):
             failures[row["question_id"]].append(failure_status(role, error))
             raise
         finally:
+            ACTIVE_CALL.reset(identity)
             if judge:
                 duration["judge_scoring"] += time.monotonic() - start
 
@@ -190,6 +203,8 @@ def main():
         parser.add_argument(f"--{name}", required=True, type=Path)
     parser.add_argument("--domain", required=True, choices=("web", "enterprise"))
     parser.add_argument("--prompt-workers", type=int, default=1)
+    parser.add_argument("--inference-max-retries", type=int, default=1)
+    parser.add_argument("--inference-timeout-seconds", type=float, default=30)
     for role in ("reader", "judge"):
         parser.add_argument(f"--{role}-url", required=True, type=loopback_endpoint)
         parser.add_argument(f"--{role}-model", required=True)
@@ -209,7 +224,9 @@ def main():
     if build["build_status"] != "saved" or any(mapping[case] != build["ordered_haystack_ids"] for case in case_ids):
         raise ValueError("cohort haystack does not match the saved build")
     args.output.mkdir()
-    return run_observed(harness, [
+    attempts = AttemptRecorder(args.output, max_retries=args.inference_max_retries,
+                               timeout_seconds=args.inference_timeout_seconds)
+    argv = [
         "harness.py", "--domain", args.domain, "--questions-path", str(args.questions),
         "--haystack-path", str(args.haystack), "--trajectories-path", str(args.trajectories),
         "--load-memory-dir", str(args.memory_state), "--output-dir", str(args.output),
@@ -220,7 +237,10 @@ def main():
         "--prompt-build-max-workers", str(args.prompt_workers),
         "--temperature", "0", "--max-completion-tokens", "256", "--timeout-seconds", "30",
         "--evaluator-max-completion-tokens", "256", "--evaluator-timeout-seconds", "30",
-    ], case_ids, args.output, preflight=harness.get_memory_context_processor)
+    ]
+    with observed_sdk_clients(harness, attempts):
+        return run_observed(harness, argv, case_ids, args.output,
+                            preflight=harness.get_memory_context_processor, attempts=attempts)
 
 
 if __name__ == "__main__":

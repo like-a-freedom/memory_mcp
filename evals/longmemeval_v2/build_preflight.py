@@ -3,10 +3,10 @@
 import argparse
 import json
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, TimeoutExpired
 import sys
 
-from .memory_mcp_backend import FORMATION_METHODS, WHOLE_TRAJECTORY, MemoryMcpBackend
+from .memory_mcp_backend import FORMATION_METHODS, WHOLE_TRAJECTORY, FormationResponseError, MemoryMcpBackend
 
 
 def run_shared_build(
@@ -38,11 +38,13 @@ def run_shared_build(
     output = output.resolve()
     output.mkdir()
     config = output / "memory-config.json"
+    journal = output / "formation-attempts.jsonl"
     config.write_text(json.dumps({
         "memory_type": MemoryMcpBackend.memory_type,
         "memory_params": {
             "binary": executable, "db_path": str(output / "working-store"),
             "formation_method": formation_method,
+            "formation_attempts_path": str(journal),
         },
     }), encoding="utf-8")
     argv = [
@@ -52,19 +54,28 @@ def run_shared_build(
         "--save-memory", "--skip-evaluation",
     ]
     failed_step = None
+    error_type = None
     original_argv = sys.argv
     try:
         sys.argv = argv
         main()
-    except CalledProcessError as error:
+    except FormationResponseError as error:
+        failed_step = error.step
+        error_type = type(error).__name__
+    except (CalledProcessError, TimeoutExpired) as error:
         cmd = error.cmd
         if not isinstance(cmd, list) or len(cmd) < 2:
             raise
         if cmd[0] != executable or cmd[1] not in {"ingest", "extract"}:
             raise
         failed_step = cmd[1]
+        error_type = type(error).__name__
     finally:
         sys.argv = original_argv
+    if failed_step is None:
+        snapshot = output / "memory_state"
+        if not (snapshot / "memory_config.json").is_file() or not (snapshot / "store").is_dir():
+            failed_step, error_type = "save", "MissingSnapshot"
 
     report = {
         "schema": "memory-mcp-longmemeval-v2-build-preflight/v1",
@@ -75,6 +86,8 @@ def run_shared_build(
         "affected_case_ids": ids if failed_step else [],
         "build_status": "failed" if failed_step else "saved",
         "failed_step": failed_step,
+        "error_type": error_type,
+        "formation_attempts_file": journal.name if journal.is_file() else None,
         "retry_attempted": False,
         "scored_case_count": 0,
         "official_metrics_status": "unavailable",

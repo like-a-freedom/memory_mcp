@@ -1,0 +1,20 @@
+[
+  {
+    "source_id": "complete-list-distractor",
+    "episode_id": "episode:8f4c8eb0378f2794a8c3c854",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "complete-list-gold",
+    "episode_id": "episode:2ae67cbb659a3b62883ca247",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "complete-list-other",
+    "episode_id": "episode:a38dcdfd494f0506865eb116",
+    "status": "success",
+    "fact_count": 0
+  }
+]

@@ -1,0 +1,213 @@
+{
+  "schema": "memory-quality-verification/v1",
+  "date": "2026-11-27",
+  "architecture": "arm64",
+  "revision": "496368549d856957e5fa317c7adea462d925288b",
+  "delivery": "uncommitted; no push; unrelated CI changes retained",
+  "checks": [
+    {
+      "id": "workspace_clippy",
+      "command": "cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "b45eb06747cbaf6ee0a700edbe53871a757aa9f383adb5fa5a31ab0de489294d"
+    },
+    {
+      "id": "eval_support_clippy",
+      "command": "cargo clippy -p memory_mcp -p eval-harness --all-targets --features eval-support --locked -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "d5e21e017a365c3fec265cce5f8dbf762f6c8bbf907d5ae1dae99915deddc6b5"
+    },
+    {
+      "id": "fmt",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "diff_check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "production_lib",
+      "command": "cargo test -p memory_mcp --features eval-support --lib --locked",
+      "exit_code": 0,
+      "log_sha256": "c3a7208e95289b5e60c17058d23cf39af150ba6f3b4c18b188f871d42da91041",
+      "test_targets": [
+        {
+          "passed": 2079,
+          "failed": 0,
+          "ignored": 1
+        }
+      ]
+    },
+    {
+      "id": "harness_lib",
+      "command": "cargo test -p eval-harness --lib --locked",
+      "exit_code": 0,
+      "log_sha256": "387f1d11c8a15761e6eec25ed2e1b88dcbb411a2849c954724def5733d4a55ac",
+      "test_targets": [
+        {
+          "passed": 571,
+          "failed": 0,
+          "ignored": 3
+        }
+      ]
+    },
+    {
+      "id": "owner_integration",
+      "command": "cargo test -p memory_mcp --features eval-support --test long_history_stage_evidence --test conversation_neighborhood --test fact_access_payload --test fact_access_concurrency --test extract_quality_e2e --test service_integration --locked",
+      "exit_code": 0,
+      "log_sha256": "8c2e2a1a21541cd90fec40a9e5f90124acd4e6f33b395aef11564e868cbb80f5",
+      "test_targets": [
+        {
+          "passed": 36,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 30,
+          "failed": 0,
+          "ignored": 2
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 46,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 51,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "id": "harness_integration",
+      "command": "cargo test -p eval-harness --test extraction_suite_contract --test chat_completions_runner --locked",
+      "exit_code": 0,
+      "log_sha256": "ba6c50ea2bfd4f4f186a1e5183bafd26bc4f62943379b68f0f94ab819993ff66",
+      "test_targets": [
+        {
+          "passed": 34,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 1
+        }
+      ]
+    },
+    {
+      "id": "python_longmemeval",
+      "command": "python3 -m unittest discover -s evals/longmemeval_v2 -p 'test_*.py'",
+      "exit_code": 0,
+      "log_sha256": "ed3409d3882c3745f62837613ded412e51bd17d992fe1f2e6252da3832620961",
+      "total": 80,
+      "passed": 69,
+      "skipped": 11
+    },
+    {
+      "id": "python_paired",
+      "command": "python3 -m unittest discover -s evals/paired -p 'test_*.py'",
+      "exit_code": 0,
+      "log_sha256": "40bbae8cdc8406f9d9ee7a4ff21006a01e1f77a5d2c2a8a97f8ff3fe7e3558b6",
+      "total": 47,
+      "passed": 47,
+      "skipped": 0
+    },
+    {
+      "id": "sdk_loopback",
+      "command": "/tmp/memory-mcp-lme-postb5-venv/bin/python -m unittest evals.longmemeval_v2.test_observed_sdk",
+      "exit_code": 0,
+      "log_sha256": "8e4de173a852482dd2c981d6435daef6142683b8dcd2ae8adf2e8966f24686e4",
+      "total": 6,
+      "passed": 6,
+      "skipped": 0
+    },
+    {
+      "id": "paired_power",
+      "command": "cargo test -p eval-harness --lib paired_power --locked",
+      "exit_code": 0,
+      "log_sha256": "8038cb74e3009fb3c1a236df1044f1c4dcb38d206fb4e738b142fa927b54f675",
+      "test_targets": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "id": "allowlist_boundary",
+      "command": "cargo test -p eval-harness --test chat_completions_runner chat_completions_runner_never_executes_a_tool_outside_the_phase_allow_list --locked",
+      "exit_code": 0,
+      "log_sha256": "aadce079725e88f3e9611ea8aa27e4ded1ee45361c44b91cc6bde3326e75b912",
+      "test_targets": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    }
+  ],
+  "native_gates": {
+    "temporal": "evals/results/native-temporal-2026-11-27/comparison.json",
+    "retrieval": "evals/results/native-quality-2026-11-27/result.json"
+  },
+  "not_claimed": [
+    "cross-platform evals",
+    "full historical snapshot replay",
+    "successful 16-prompt skill execution",
+    "powered memory benefit",
+    "speed improvement from single timings"
+  ],
+  "review": {
+    "reviewer": "one fresh-context read-only reviewer",
+    "findings": 5,
+    "fixed": 5,
+    "minor_deferred": 0,
+    "details": "review-findings.md",
+    "no_second_review": "one TDD fix pass and full affected Python discovery; no further Rust edits"
+  },
+  "expected_remaining_failure": "922a0c56 exact registered span on surviving18episode store;2/3 before and after; source alternative retained",
+  "failed_verifications_retained": [
+    {
+      "name": "final-python-longmemeval-before-fixture-correction.log",
+      "reason": "One controlled callback returned a finish_reason-only object rather than a text completion envelope; newly strict validation correctly rejected it. Fixture corrected; labels/scores unchanged.",
+      "sha256": "9acdce14ad7607b4f6c7424cc8542c18b5ab40366f31d901d12e27b872de481a"
+    }
+  ],
+  "final_runtime_source_sha256": {
+    "evals/longmemeval_v2/inference_attempts.py": "1c1f7fb78bc68858f01c2e7dd8ab7d1890413c734bd509246b0818a3f1e61e49",
+    "evals/longmemeval_v2/reader_protocol.py": "63e5ca086256a0d4720845aeea8f95ac25c71c626b803297642397cf7674c106",
+    "evals/longmemeval_v2/scored_coverage.py": "7f401a58a2f908c223ca244f7229a88a9df8018a4ddefd2943a1925fff55b374",
+    "evals/paired/memory_quality_diagnostic.py": "520c2eabb0ad997a085f3c6656a520821c5f3b005f863834e6ad115c2313e108",
+    "crates/memory-mcp/src/memory/retrieval/query_mode.rs": "a84316779f075d6ca7117a0d59aeb75d09e9b2fcbe4133658532fb34e710c124",
+    "crates/memory-mcp/src/memory/retrieval/diagnostics.rs": "919f380660932d9e740794e3aa31c097fc926bdb563be46e8a49b74707bdf807",
+    "crates/memory-mcp/src/knowledge/entity_extraction/anno.rs": "29dcd1aae2079f51460c77e25fb882aa43ca58460b1af647c82fb5d812feeda8"
+  },
+  "capture_source_note": "Archived model captures bind their exact pre-hardening runner and observer sources. New scorer errata are separately identified; no claim that old captures contained a start journal or exercised new routing guards.",
+  "artifact_integrity": {
+    "runtime_sources_match": true,
+    "native8_passed": true,
+    "native37_passed": true,
+    "historical_reader_outputs_and_report_unchanged": true,
+    "delivered_quote_audit_grader_matches": true,
+    "verification_log_hashes_match": true
+  }
+}

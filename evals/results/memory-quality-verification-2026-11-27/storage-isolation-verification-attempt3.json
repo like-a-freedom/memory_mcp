@@ -1,0 +1,157 @@
+{
+  "schema": "memory-quality-verification/v3",
+  "architecture": "arm64",
+  "delivery": "uncommitted; no push; unrelated CI preserved",
+  "previous_successful_crate_checks": "storage-isolation-verification-attempt2.json; production2270/harness571 passed; subsequent source changes only two equivalent concurrency slice assertions, covered here",
+  "checks": [
+    {
+      "id": "concurrency_after_clippy_fix",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--test",
+        "fact_access_concurrency",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 12.510449000023073,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-concurrency_after_clippy_fix.log",
+      "log_sha256": "5ea0874e75289c0f17a36e2d6e6ed0906494997eadfea86239cdda93f1b02f63",
+      "test_targets": [
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace_clippy_after_admission",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.897805708023952,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-workspace_clippy_after_admission.log",
+      "log_sha256": "0682bd49610e075cf387813ceabe04031933a2f9beca575d774628672026a121"
+    },
+    {
+      "id": "eval_clippy_after_admission",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "memory_mcp",
+        "-p",
+        "eval-harness",
+        "--all-targets",
+        "--features",
+        "eval-support,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 52.029124041000614,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-eval_clippy_after_admission.log",
+      "log_sha256": "053fe9b997ce888c3bd501244b4b9d5b7fcb82d5acdfa897641000f677228287"
+    },
+    {
+      "id": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.1101573340129107,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "python_paired_final",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/paired",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 28.95416154200211,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-python_paired_final.log",
+      "log_sha256": "451ad5c053b69e78a4cecca6d63f9fead0ccaaba7d0364cc49e60d814bba81e0",
+      "total": 80,
+      "skipped": 0,
+      "passed": 80
+    },
+    {
+      "id": "python_longmem_final",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/longmemeval_v2",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.687218541017501,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-python_longmem_final.log",
+      "log_sha256": "a55cd75942a196fabc9c77135147bb0d2fb438fad74e35f74ce3b7e5647e83ed",
+      "total": 116,
+      "skipped": 11,
+      "passed": 105
+    },
+    {
+      "id": "sdk_final",
+      "command": [
+        "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+        "-m",
+        "unittest",
+        "evals.longmemeval_v2.test_observed_sdk"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.73805779198301,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-sdk_final.log",
+      "log_sha256": "f3bc93632cbe6ca66707b39292770cde7b186a7c86aea3f66c693cc15ce2a4cf",
+      "total": 6,
+      "skipped": 0,
+      "passed": 6
+    },
+    {
+      "id": "diff_check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.06637437499011867,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-diff_check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "complete": true,
+  "all_passed": true
+}

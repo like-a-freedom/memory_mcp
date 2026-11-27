@@ -1,0 +1,24 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.45s
+     Running tests/fact_access_native_upgrade.rs (target/debug/build/memory_mcp/11d0801f5890b4cc/out/fact_access_native_upgrade-11d0801f5890b4cc)
+
+running 3 tests
+2026-11-27T14:32:10.628647Z  INFO  op=schema.init  namespace=native_upgrade
+2026-11-27T14:32:10.676501Z  INFO  op=schema.init  namespace=native_upgrade
+2026-11-27T14:32:10.688900Z  INFO  op=schema.init  namespace=native_upgrade
+test rollback_rejects_a_page_larger_than_128_keys_before_copying_heat ... ok
+test rollback_aborts_the_whole_page_for_an_inconsistent_fact_identity ... ok
+
+thread 'native_upgrade_reconciles_exact_heat_and_restores_verified_recovery_point' (10727519) panicked at crates/memory-mcp/tests/fact_access_native_upgrade.rs:36:14:
+open SurrealKV: ConfigInvalid("embedded data directory `/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/.tmpAHiuMu/working` is locked by another Memory MCP process: There was a problem with the datastore: Other error: Database at /var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/.tmpAHiuMu/working/LOCK is already locked by another process. Each stdio client needs a unique SURREALDB_DATA_DIR (changing only the database name or namespace does not avoid the directory lock), or use a remote SurrealDB.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test native_upgrade_reconciles_exact_heat_and_restores_verified_recovery_point ... FAILED
+
+failures:
+
+failures:
+    native_upgrade_reconciles_exact_heat_and_restores_verified_recovery_point
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.22s
+
+error: test failed, to rerun pass `-p memory_mcp --test fact_access_native_upgrade`

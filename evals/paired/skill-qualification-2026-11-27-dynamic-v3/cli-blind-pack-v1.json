@@ -1,0 +1,953 @@
+[
+  {
+    "opaque_id": "0af5d28612f6",
+    "case": 1,
+    "binding": "native",
+    "trial_sha256": "44314f07a51dde02607a216985f2986994c2b4d3a2876d53f653a032236e8d26",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "1a74b8b8b1b5e23dc456c830413abfa849401bcc864d63120b10f16566a6954f",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "ingest",
+            "--source-type",
+            "conversation",
+            "--source-id",
+            "cedar-release-minutes-2026-11-20",
+            "--content-stdin",
+            "--t-ref",
+            "2026-11-20T09:30:00Z"
+          ],
+          "stdin": "Decision: Cedar Index publishes incremental updates every Tuesday."
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:ed2dca7d0a1f798a9e758042\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:ed2dca7d0a1f798a9e758042"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:43:21.932179Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:43:21.932223Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:43:22.121072Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121095Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121102Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121105Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121108Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121111Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:22.121113Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:b0dbf5827ac418e034f575d8\",\n        \"type\": \"person\",\n        \"canonical_name\": \"Cedar Index\"\n      },\n      {\n        \"entity_id\": \"entity:e596264314734209645ad6f8\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Tuesday\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:586945ced8101aa99a05d587\",\n        \"type\": \"decision\",\n        \"statement\": \"Cedar Index publishes incremental updates every Tuesday.\",\n        \"source_quote\": \"Cedar Index publishes incremental updates every Tuesday.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:b0dbf5827ac418e034f575d8\",\n        \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\"\n      },\n      {\n        \"entity_id\": \"entity:e596264314734209645ad6f8\",\n        \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index incremental updates Tuesday decision"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:43:27.410871Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:43:27.410917Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:43:27.542932Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542957Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542963Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542966Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542968Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542970Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542973Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:43:27.542975Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": [\n    {\n      \"confidence\": 0.69,\n      \"content\": \"Cedar Index publishes incremental updates every Tuesday.\",\n      \"fact_id\": \"fact:586945ced8101aa99a05d587\",\n      \"grounding\": 0.66,\n      \"provenance\": {\n        \"extraction_strategy\": \"structured_summary_line\",\n        \"ingestion_method\": \"extraction\",\n        \"matched_query_terms\": [\n          \"cedar\",\n          \"index\",\n          \"incremental\",\n          \"update\",\n          \"tuesday\"\n        ],\n        \"retrieval_admission\": {\n          \"basis\": \"lexical\",\n          \"community\": null,\n          \"explicit_date_admitted\": false,\n          \"graph_anchor_origin\": null,\n          \"hop_count\": null,\n          \"matched_content_terms\": [\n            \"incremental\",\n            \"update\"\n          ],\n          \"matched_index_key_terms\": [],\n          \"matched_references\": [],\n          \"policy_version\": \"retrieval-admission-v1\",\n          \"repeated_topic\": null,\n          \"resolved_entity_ids\": [],\n          \"semantic_similarity\": null\n        },\n        \"source_episode_id\": \"episode:ed2dca7d0a1f798a9e758042\",\n        \"source_id\": \"cedar-release-minutes-2026-11-20\",\n        \"source_type\": \"conversation\"\n      },\n      \"rationale\": \"tier=fallback\",\n      \"relevance\": 0.16,\n      \"retrieval_tier\": \"fallback\",\n      \"semantic_available\": false,\n      \"source_episode\": \"episode:ed2dca7d0a1f798a9e758042\"\n    }\n  ],\n  \"guidance\": \"Call explain if you need provenance-ready citations for selected items.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "118f432df717",
+    "case": 5,
+    "binding": "controlled",
+    "trial_sha256": "53003865a588b15c4971bbc2bc7b37d7a7fbb8fa326fa7ea2e00cf77b28428e3",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "1a74b8b8b1b5e23dc456c830413abfa849401bcc864d63120b10f16566a6954f",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "import",
+            "file",
+            "--root",
+            "/work/notes",
+            "--path",
+            "doc.md",
+            "--source-type",
+            "document",
+            "--t-ref",
+            "2026-11-19T08:00:00Z"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-import-file\", \"source_id\": \"import:file:cedar-notes\"}, \"guidance\": \"Extract stored episode separately.\"}"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "import",
+            "url",
+            "--url",
+            "https://example.org/cedar/public-notes",
+            "--source-type",
+            "web",
+            "--t-ref",
+            "2026-11-21T08:00:00Z"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-import-url\", \"source_id\": \"import:url:cedar-notes\"}, \"guidance\": \"Extract stored episode separately.\"}"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:cedar-import-file"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-import-file\", \"facts\": [{\"fact_id\": \"fact:cedar-import-file\", \"type\": \"note\"}]}, \"guidance\": \"\"}"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:cedar-import-url"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-import-url\", \"facts\": [{\"fact_id\": \"fact:cedar-import-url\", \"type\": \"note\"}]}, \"guidance\": \"\"}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "1faef65ff25c",
+    "case": 6,
+    "binding": "controlled",
+    "trial_sha256": "9898ed55045ed5614b5abd0035e86a830945f6e8aa9b2eb4bccf38dba1f81f32",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index retention window",
+            "--fact-type",
+            "decision",
+            "--valid-at",
+            "2026-10-20T12:00:00Z",
+            "--known-revision",
+            "17",
+            "--budget",
+            "3",
+            "--view-mode",
+            "current"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"partial\", \"result\": [], \"context\": {\"snapshot\": {\"valid_at\": \"2026-10-20T12:00:00Z\", \"known_revision\": 17, \"known_at\": \"2026-11-23T10:00:00Z\"}, \"completeness\": \"partial\", \"omitted_channels\": [\"semantic ANN and mutable embeddings\"], \"candidate_scan_truncated\": false}, \"guidance\": \"Refinement exhausted. Report partial coverage.\"}"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "explain",
+            "--context-items",
+            "[{\"content\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"fact_id\":\"fact:cedar-long-approval\",\"provenance\":{\"source_id\":\"cedar-retention-report-v3\"},\"quote\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"source_episode\":\"episode:cedar-long-report\"}]",
+            "--source-offset",
+            "1200",
+            "--source-limit-scalars",
+            "8000"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"partial\", \"result\": [{\"content\": \"Cedar Index retains exactly 42 full days after a successful rollover.\", \"quote\": \"Cedar Index retains exactly 42 full days after a successful rollover.\", \"source_episode\": \"episode:cedar-long-report\", \"fact_id\": \"fact:cedar-long-approval\", \"provenance\": {\"source_id\": \"cedar-retention-report-v3\"}, \"quote_verified\": true, \"quote_complete\": true, \"quote_supplied\": true, \"quote_returned\": true, \"quote_anchored\": false, \"quote_contained_in_window\": true, \"citation_context\": \"Cedar Index retains exactly 42 full days after a successful rollover.\\nAppendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. \", \"citation_context_exact\": true, \"citation_context_covers_entire_source\": false, \"citation_context_start_offset\": 1200, \"citation_context_scalars_returned\": 770, \"citation_context_scalars_total\": 1970, \"provenance_next_offset\": 20, \"provenance_total_count\": 21, \"partial_reasons\": [\"provenance_truncated\"], \"citation_context_next_offset\": null}], \"guidance\": \"Use the returned page offsets for the selected item.\"}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "4e5bbb1dc82e",
+    "case": 4,
+    "binding": "native",
+    "trial_sha256": "bf8a6e0b124eb8fb0a1cc0d6ef5d2837015f063f077da218ebc4470db5f04356",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "63f5ed719cbdb40410d4466e7375e5e20f357bd12c275f9fab38e2a9c7dc3bca",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "ingest",
+            "--source-type",
+            "note",
+            "--source-id",
+            "literal-spec-references-2026-11-23",
+            "--content-stdin",
+            "--t-ref",
+            "2026-11-23T11:15:00Z"
+          ],
+          "stdin": "https://example.org/spec\n/work/spec.md"
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:46:56.412271Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412291Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412295Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412297Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412300Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412302Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412304Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:56.412306Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:b3e00093312f27a9ee2fe929\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:b3e00093312f27a9ee2fe929"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:47:02.061264Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:47:02.061298Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:47:02.153591Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153612Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153618Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153621Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153624Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153627Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153629Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:47:02.153631Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:b3e00093312f27a9ee2fe929\",\n    \"entities\": [],\n    \"facts\": [],\n    \"links\": [],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 0,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"episode-only: the content was stored but no durable facts were extracted. To capture recallable facts, ingest a structured summary — markdown headings such as `## Decisions`, `## Facts` or `## Pending items` with bullet items, or `Decision: …` / `Fact: …` lines. Alternatively open the `ingestion_review` app and approve a draft note.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "58b5bc261fd9",
+    "case": 1,
+    "binding": "native",
+    "trial_sha256": "a20d78469fc0ae33b6de79ba2963887bce114359f8fb2c86d4f3774eeef1c700",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "63f5ed719cbdb40410d4466e7375e5e20f357bd12c275f9fab38e2a9c7dc3bca",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "ingest",
+            "--source-type",
+            "conversation",
+            "--source-id",
+            "cedar-release-minutes-2026-11-20",
+            "--content-stdin",
+            "--t-ref",
+            "2026-11-20T09:30:00Z"
+          ],
+          "stdin": "Decision: Cedar Index publishes incremental updates every Tuesday."
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:42:11.666811Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667076Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667099Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667104Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667108Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667111Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:11.667114Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:ed2dca7d0a1f798a9e758042\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:ed2dca7d0a1f798a9e758042"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:42:17.471706Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:42:17.471744Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:42:17.652837Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652863Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652869Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652872Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652874Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652876Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652878Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:17.652881Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:b0dbf5827ac418e034f575d8\",\n        \"type\": \"person\",\n        \"canonical_name\": \"Cedar Index\"\n      },\n      {\n        \"entity_id\": \"entity:e596264314734209645ad6f8\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Tuesday\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:586945ced8101aa99a05d587\",\n        \"type\": \"decision\",\n        \"statement\": \"Cedar Index publishes incremental updates every Tuesday.\",\n        \"source_quote\": \"Cedar Index publishes incremental updates every Tuesday.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:b0dbf5827ac418e034f575d8\",\n        \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\"\n      },\n      {\n        \"entity_id\": \"entity:e596264314734209645ad6f8\",\n        \"episode_id\": \"episode:ed2dca7d0a1f798a9e758042\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index incremental updates Tuesday decision"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:42:23.115907Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:42:23.115953Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:42:23.263169Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263190Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263196Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263198Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263201Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263203Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263205Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:42:23.263208Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": [\n    {\n      \"confidence\": 0.69,\n      \"content\": \"Cedar Index publishes incremental updates every Tuesday.\",\n      \"fact_id\": \"fact:586945ced8101aa99a05d587\",\n      \"grounding\": 0.66,\n      \"provenance\": {\n        \"extraction_strategy\": \"structured_summary_line\",\n        \"ingestion_method\": \"extraction\",\n        \"matched_query_terms\": [\n          \"cedar\",\n          \"index\",\n          \"incremental\",\n          \"update\",\n          \"tuesday\"\n        ],\n        \"retrieval_admission\": {\n          \"basis\": \"lexical\",\n          \"community\": null,\n          \"explicit_date_admitted\": false,\n          \"graph_anchor_origin\": null,\n          \"hop_count\": null,\n          \"matched_content_terms\": [\n            \"incremental\",\n            \"update\"\n          ],\n          \"matched_index_key_terms\": [],\n          \"matched_references\": [],\n          \"policy_version\": \"retrieval-admission-v1\",\n          \"repeated_topic\": null,\n          \"resolved_entity_ids\": [],\n          \"semantic_similarity\": null\n        },\n        \"source_episode_id\": \"episode:ed2dca7d0a1f798a9e758042\",\n        \"source_id\": \"cedar-release-minutes-2026-11-20\",\n        \"source_type\": \"conversation\"\n      },\n      \"rationale\": \"tier=fallback\",\n      \"relevance\": 0.16,\n      \"retrieval_tier\": \"fallback\",\n      \"semantic_available\": false,\n      \"source_episode\": \"episode:ed2dca7d0a1f798a9e758042\"\n    }\n  ],\n  \"guidance\": \"Call explain if you need provenance-ready citations for selected items.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "6748c38af1e9",
+    "case": 3,
+    "binding": "controlled",
+    "trial_sha256": "e6a8505f49206edce43718ce1624057537109475d0b9bd0dfe25e527f5aec77b",
+    "terminal": "answered",
+    "answer": "Reembed was started after the embedding model change with fail-fast behavior (`--max-failures 0`) per the operator preference. The process was interrupted by the operator (exit status 130). Terminal status is `interrupted`, with 2 of 5 facts processed and 1 failed fact recorded: `fact:cedar-vector-4`. Per the instruction, the work is not reported as completed because the process was interrupted; `interrupted` is an unfinished state. The failed fact identifier is preserved for a future `--retry-failed` run if the operator chooses to resume.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "reembed",
+            "--max-failures",
+            "0"
+          ]
+        },
+        "response": {
+          "exit_status": 130,
+          "stderr": "Reembedding interrupted by operator.",
+          "stdout": "{\"status\": \"interrupted\", \"processed\": 2, \"total\": 5, \"failed_count\": 1, \"failed_fact_ids\": [\"fact:cedar-vector-4\"]}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "8947e9dcf7b4",
+    "case": 2,
+    "binding": "native",
+    "trial_sha256": "979462fdf7a85ca3533dbe0254f31f93d56668d9e9cdac66b432eb3de07f4b10",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "1a74b8b8b1b5e23dc456c830413abfa849401bcc864d63120b10f16566a6954f",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index past decision"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:44:05.974487Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:44:05.974531Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:44:06.103922Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103940Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103946Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103949Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103951Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103953Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103955Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:06.103958Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": [\n    {\n      \"confidence\": 0.69,\n      \"content\": \"The Cedar Index uses weekly incremental indexing.\",\n      \"fact_id\": \"fact:32d8fb4d13b97c2e2a6cae96\",\n      \"grounding\": 0.48,\n      \"provenance\": {\n        \"extraction_strategy\": \"structured_summary_line\",\n        \"ingestion_method\": \"extraction\",\n        \"matched_query_terms\": [\n          \"cedar\",\n          \"index\"\n        ],\n        \"retrieval_admission\": {\n          \"basis\": \"lexical\",\n          \"community\": null,\n          \"explicit_date_admitted\": false,\n          \"graph_anchor_origin\": null,\n          \"hop_count\": null,\n          \"matched_content_terms\": [\n            \"cedar\",\n            \"index\"\n          ],\n          \"matched_index_key_terms\": [\n            \"cedar\",\n            \"index\"\n          ],\n          \"matched_references\": [],\n          \"policy_version\": \"retrieval-admission-v1\",\n          \"repeated_topic\": null,\n          \"resolved_entity_ids\": [],\n          \"semantic_similarity\": null\n        },\n        \"source_episode_id\": \"episode:8c90974a77ca34d60351fbfd\",\n        \"source_id\": \"cedar-index-minutes-2026-11-18\",\n        \"source_type\": \"conversation\"\n      },\n      \"rationale\": \"tier=fallback\",\n      \"relevance\": 0.09,\n      \"retrieval_tier\": \"fallback\",\n      \"semantic_available\": false,\n      \"source_episode\": \"episode:8c90974a77ca34d60351fbfd\"\n    }\n  ],\n  \"guidance\": \"Call explain if you need provenance-ready citations for selected items.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "a5e7f4ef5b0c",
+    "case": 5,
+    "binding": "controlled",
+    "trial_sha256": "a2af71c128c97cd88ce3c2d9a66b30f7fd086b26b40da5b915ee676d5564de60",
+    "terminal": "answered",
+    "answer": "Use exactly these two authorized explicit imports, then extract each returned episode separately. Do not add namespace/scope/project flags, credentials, redirects, file traversal, or any other source.\n\n1) Import /work/notes/doc.md:\nmemory_mcp import file --root /work/notes --path doc.md --source-type document --t-ref 2026-11-19T08:00:00Z\n\n2) Import the public page:\nmemory_mcp import url --url https://example.org/cedar/public-notes --source-type web --t-ref 2026-11-21T08:00:00Z\n\nFor each successful import, capture stdout/stderr/exit status separately, parse the returned episode_id, then run:\nmemory_mcp extract --episode-id <episode_id>\n\nInspect the extraction result and warnings; do not treat exit 0 as verified fact capture. No additional access is granted.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "ae28ef805921",
+    "case": 3,
+    "binding": "controlled",
+    "trial_sha256": "cd577d9fb8ba725849fe7a74c231931eb60a7f2183e64adeb88f50e9829eeee3",
+    "terminal": "answered",
+    "answer": "Reembed was started after the embedding model change with fail-fast behavior (--max-failures 0). The process was interrupted by the operator and exited with status 130. Terminal status is \"interrupted\", not completed: 2 of 5 facts processed, 1 failed fact (fact:cedar-vector-4). Per the operator preference and the skill's completion criteria, an interrupted job is an unfinished state and must not be reported as completed. The failed fact identifier fact:cedar-vector-4 is preserved for a future --retry-failed run.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "reembed",
+            "--max-failures",
+            "0"
+          ]
+        },
+        "response": {
+          "exit_status": 130,
+          "stderr": "Reembedding interrupted by operator.",
+          "stdout": "{\"status\": \"interrupted\", \"processed\": 2, \"total\": 5, \"failed_count\": 1, \"failed_fact_ids\": [\"fact:cedar-vector-4\"]}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "b3266dcc9a9a",
+    "case": 4,
+    "binding": "native",
+    "trial_sha256": "8576b4cbf3c3de023a5d0e112f678020c54588e625906ac36b622a976c89652a",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "1a74b8b8b1b5e23dc456c830413abfa849401bcc864d63120b10f16566a6954f",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "ingest",
+            "--source-type",
+            "note",
+            "--source-id",
+            "literal-spec-references-2026-11-23",
+            "--t-ref",
+            "2026-11-23T11:15:00Z",
+            "--content-stdin"
+          ],
+          "stdin": "https://example.org/spec\n/work/spec.md"
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:b3e00093312f27a9ee2fe929\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:b3e00093312f27a9ee2fe929"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:46:14.166432Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:46:14.166476Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:46:14.272992Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273013Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273021Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273024Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273026Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273029Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273031Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:46:14.273033Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:b3e00093312f27a9ee2fe929\",\n    \"entities\": [],\n    \"facts\": [],\n    \"links\": [],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 0,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"episode-only: the content was stored but no durable facts were extracted. To capture recallable facts, ingest a structured summary — markdown headings such as `## Decisions`, `## Facts` or `## Pending items` with bullet items, or `Decision: …` / `Fact: …` lines. Alternatively open the `ingestion_review` app and approve a draft note.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "b43131d61ab3",
+    "case": 7,
+    "binding": "controlled",
+    "trial_sha256": "fd7ad3a06736ac5357a98bcb132c8ce4a40d9c88aa5e82c024ae2bf4b1ec1e18",
+    "terminal": "answered",
+    "answer": "Компактный повторный extract выполнен: memory_mcp extract --episode-id episode:cedar-long-report --compact завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Теперь fact_evidence_omitted отсутствует, т.к. --compact отключает evidence pairs. Для произвольного текста: если extract вернёт пустые facts, это не означает, что фактов нет — free-form extraction эвристична и может вернуть facts, fallback note или ничего. Нужно инспектировать результат, а не полагаться на exit 0. Для явных решений предпочтительны verified structured summaries. Если нужен компактный результат без evidence, используйте --compact.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:cedar-long-report",
+            "--compact"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-long-report\", \"facts\": [{\"fact_id\": \"fact:cedar-long-approval\", \"type\": \"decision\"}], \"warnings\": []}, \"guidance\": \"\"}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "b5bb53c65bda",
+    "case": 6,
+    "binding": "controlled",
+    "trial_sha256": "9ce220914b39adb922cf1fcfefbd4fb2447809d7bec988bdabaa28c2cd5d4200",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index retention window",
+            "--fact-type",
+            "decision",
+            "--valid-at",
+            "2026-10-20T12:00:00Z",
+            "--known-revision",
+            "17",
+            "--budget",
+            "3",
+            "--view-mode",
+            "current"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"partial\", \"result\": [], \"context\": {\"snapshot\": {\"valid_at\": \"2026-10-20T12:00:00Z\", \"known_revision\": 17, \"known_at\": \"2026-11-23T10:00:00Z\"}, \"completeness\": \"partial\", \"omitted_channels\": [\"semantic ANN and mutable embeddings\"], \"candidate_scan_truncated\": false}, \"guidance\": \"Refinement exhausted. Report partial coverage.\"}"
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "explain",
+            "--context-items",
+            "[{\"content\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"fact_id\":\"fact:cedar-long-approval\",\"provenance\":{\"source_id\":\"cedar-retention-report-v3\"},\"quote\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"source_episode\":\"episode:cedar-long-report\"}]",
+            "--source-offset",
+            "1200",
+            "--source-limit-scalars",
+            "8000"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"partial\", \"result\": [{\"content\": \"Cedar Index retains exactly 42 full days after a successful rollover.\", \"quote\": \"Cedar Index retains exactly 42 full days after a successful rollover.\", \"source_episode\": \"episode:cedar-long-report\", \"fact_id\": \"fact:cedar-long-approval\", \"provenance\": {\"source_id\": \"cedar-retention-report-v3\"}, \"quote_verified\": true, \"quote_complete\": true, \"quote_supplied\": true, \"quote_returned\": true, \"quote_anchored\": false, \"quote_contained_in_window\": true, \"citation_context\": \"Cedar Index retains exactly 42 full days after a successful rollover.\\nAppendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. Appendix. \", \"citation_context_exact\": true, \"citation_context_covers_entire_source\": false, \"citation_context_start_offset\": 1200, \"citation_context_scalars_returned\": 770, \"citation_context_scalars_total\": 1970, \"provenance_next_offset\": 20, \"provenance_total_count\": 21, \"partial_reasons\": [\"provenance_truncated\"], \"citation_context_next_offset\": null}], \"guidance\": \"Use the returned page offsets for the selected item.\"}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "beee4cb06fb4",
+    "case": 8,
+    "binding": "controlled",
+    "trial_sha256": "e45b96c698f9170753588e053e7b20cb01c7963b6070054cdcbed0c9b52d0813",
+    "terminal": "answered",
+    "answer": "No, capture is not finished. The structured response has status=partial, empty facts, and guidance that extraction is pending and retry is safe. Per the memory contract, a zero exit code is not the completion criterion; partial/pending extraction must be classified as pending, not verified or episode-only. Report the capture as pending and preserve the returned episode_id (episode:pending-cedar-295). Next, retry extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the new structured status, facts, and warnings. Only after a completed successful extraction with inspected facts (or a completed successful extraction with no facts, which would be episode-only) can the capture be reported as finished.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "1a74b8b8b1b5e23dc456c830413abfa849401bcc864d63120b10f16566a6954f",
+          "observed": true
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "ca083bdf771a",
+    "case": 2,
+    "binding": "native",
+    "trial_sha256": "e4b916d5b2fa41093cc0802b7845863b8bf8cf752780ddb4f32fc23d3fc60bde",
+    "terminal": "error",
+    "answer": null,
+    "error_type": "TimeoutError",
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "63f5ed719cbdb40410d4466e7375e5e20f357bd12c275f9fab38e2a9c7dc3bca",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "assemble-context",
+            "--query",
+            "Cedar Index past decision"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "2026-11-27T13:44:45.876991Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:44:45.877031Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T13:44:45.994451Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994470Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994477Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994480Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994482Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994485Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994487Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T13:44:45.994489Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+          "stdout": "{\n  \"status\": \"success\",\n  \"result\": [\n    {\n      \"confidence\": 0.69,\n      \"content\": \"The Cedar Index uses weekly incremental indexing.\",\n      \"fact_id\": \"fact:32d8fb4d13b97c2e2a6cae96\",\n      \"grounding\": 0.48,\n      \"provenance\": {\n        \"extraction_strategy\": \"structured_summary_line\",\n        \"ingestion_method\": \"extraction\",\n        \"matched_query_terms\": [\n          \"cedar\",\n          \"index\"\n        ],\n        \"retrieval_admission\": {\n          \"basis\": \"lexical\",\n          \"community\": null,\n          \"explicit_date_admitted\": false,\n          \"graph_anchor_origin\": null,\n          \"hop_count\": null,\n          \"matched_content_terms\": [\n            \"cedar\",\n            \"index\"\n          ],\n          \"matched_index_key_terms\": [\n            \"cedar\",\n            \"index\"\n          ],\n          \"matched_references\": [],\n          \"policy_version\": \"retrieval-admission-v1\",\n          \"repeated_topic\": null,\n          \"resolved_entity_ids\": [],\n          \"semantic_similarity\": null\n        },\n        \"source_episode_id\": \"episode:8c90974a77ca34d60351fbfd\",\n        \"source_id\": \"cedar-index-minutes-2026-11-18\",\n        \"source_type\": \"conversation\"\n      },\n      \"rationale\": \"tier=fallback\",\n      \"relevance\": 0.09,\n      \"retrieval_tier\": \"fallback\",\n      \"semantic_available\": false,\n      \"source_episode\": \"episode:8c90974a77ca34d60351fbfd\"\n    }\n  ],\n  \"guidance\": \"Call explain if you need provenance-ready citations for selected items.\"\n}\n"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop",
+      null
+    ]
+  },
+  {
+    "opaque_id": "ce0f2a6ccc32",
+    "case": 7,
+    "binding": "controlled",
+    "trial_sha256": "dbcfbd40d8c257545b749bc67a78c18d7531f77370ff9c25d51a8cc709c6f716",
+    "terminal": "answered",
+    "answer": "Компактный результат получен: `memory_mcp extract --episode-id episode:cedar-long-report --compact` завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Флаг --compact отключает включение evidence-пар, поэтому `fact_evidence_omitted` больше не появляется. Если на произвольном тексте результат пуст (нет facts), это не означает, что фактов нет — free-form extraction эвристична; пустой результат классифицируется как `episode-only` (эпизод сохранён, но устойчивых фактов не извлечено). Для проверки/цитирования отдельных фактов используйте `memory_mcp explain --context-items ...` с JSON-массивом из assembly, а не полагайтесь на exit code.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/commands.md"
+        },
+        "response": {
+          "body_sha256": "4b6098c27c9080df01c6808c4bc73bbf2965da441af9c0c3160e443a1630c105",
+          "observed": true
+        }
+      },
+      {
+        "request": {
+          "action": "run",
+          "argv": [
+            "memory_mcp",
+            "extract",
+            "--episode-id",
+            "episode:cedar-long-report",
+            "--compact"
+          ]
+        },
+        "response": {
+          "exit_status": 0,
+          "stderr": "",
+          "stdout": "{\"status\": \"success\", \"result\": {\"episode_id\": \"episode:cedar-long-report\", \"facts\": [{\"fact_id\": \"fact:cedar-long-approval\", \"type\": \"decision\"}], \"warnings\": []}, \"guidance\": \"\"}"
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop",
+      "stop"
+    ]
+  },
+  {
+    "opaque_id": "dc0b4357ea84",
+    "case": 8,
+    "binding": "controlled",
+    "trial_sha256": "82cc26c6b9f2d4aa66a6e619b16661faf05a84257fd670472f95bf07f32cb736",
+    "terminal": "answered",
+    "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture.",
+    "error_type": null,
+    "trace": [
+      {
+        "request": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "response": {
+          "body_sha256": "63f5ed719cbdb40410d4466e7375e5e20f357bd12c275f9fab38e2a9c7dc3bca",
+          "observed": true
+        }
+      }
+    ],
+    "turn_finish_reasons": [
+      "stop",
+      "stop"
+    ]
+  }
+]

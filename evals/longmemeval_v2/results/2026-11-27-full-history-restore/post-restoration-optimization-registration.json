@@ -1,0 +1,29 @@
+{
+  "schema": "full-history-post-restoration-candidate/v1",
+  "registered_before_candidate_outputs": true,
+  "baseline": "v3 reads-summary.json",
+  "baseline_sha256": "3315a43eb8ea68b1c145d3b65ab49d16cd8244c4848f189598685f6f31070403",
+  "baseline_support_review_sha256": "62daa535c3b485da21b26a7e47040b6be71c55c70f06645010ac3dfb87c0d4a4",
+  "hypothesis": "Eliminate demonstrably unused raw/URL-filtered index vocabulary construction while preserving every semantically required vocabulary and admission rule. No source formation or query/answer changes.",
+  "candidate_allowed_change": "owning admission dictionary demand/cache only; counter evidence and independent public controls before capture",
+  "source_snapshot": "data/eval-snapshots/full-history-2026-11-27/store",
+  "source_manifest_sha256": "b587ffa0ee5ec4585efc6b05ad352715ce607ff531576d170e8bb329e627a7fb",
+  "read_registration_sha256": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+  "scheduled": 7,
+  "read_seconds": 30,
+  "child_seconds": 45,
+  "budget": 5,
+  "compact": false,
+  "stop_rule": "one complete candidate capture after independent RED/GREEN and native gates; retain every case, no successful-retry selection",
+  "acceptance": {
+    "no_retrieval_deadlines": true,
+    "no_observer_faults": true,
+    "each_assembly_elapsed_ms_lte": 30000,
+    "strict_registered_span_minimum": 4,
+    "frozen_answer_source_support_minimum": 6,
+    "required_temporal_gate": "8/8 invalid0 regressions0",
+    "required_native_retrieval_gate": "37/37 invalid0 original six floors unchanged",
+    "independent_opposite_controls": "repeated-topic experience raw URL semantics remain correct; non-repeated/non-experience candidates do not build unused views"
+  },
+  "claims": "A completed deadline or lower dictionary count is not automatically a statistically established latency or memory-answer gain."
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "source-graph-local-execution/v1",
+  "frozen_at_utc": "2026-11-27T15:38:37.268281+00:00",
+  "architecture": "arm64",
+  "owned_server_pid": 81534,
+  "server_script_sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec",
+  "server_start_log": "/tmp/memory-quality-mlx-source-graph-start.log",
+  "server_startup_seconds": null,
+  "model_state": "Owned server restarted before capture after absent previous PID; no prior requests in this runtime; OS/weight caches unmeasured. Not proof of cold state or a latency comparison; all weights rehashed.",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "all_model_files_rehashed": 13,
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-lm": "0.32.2",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  },
+  "reader_source_sha256": "b17c63b3954ddc8f2637e396c44a4c61cacf1c677990f63623b4a9011e421b65",
+  "registration_sha256": "5a5e04637c3d800f6caf3362ec8ba573964838cdca919455b239c0b57e66fadf",
+  "acceptance_sha256": "2a52ea48c462167166465cb3349c6cfc72cabee7f80a7bc8189b1ed22bad41f9",
+  "source_review_sha256": "573c40cb47b7680aefa79879aa657995c687a9cded5ce49e4df36ad7ee28a036",
+  "prior_prompts_unchanged": 165,
+  "source_only_v7_gate_sha256": "08ebae552033b1db8321560f288d660ea6a299555ecab14b50e19b07c25b7840",
+  "final_readiness_checks_sha256": "17731bd92b749895a4873b3d234a394eda0baa8862448d2d53a619737546ee48",
+  "concurrent_owned_cargo_or_native_evals": false
+}

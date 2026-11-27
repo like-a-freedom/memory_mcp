@@ -1,0 +1,6 @@
+running 1 test
+test chat_completions_runner_never_executes_a_tool_outside_the_phase_allow_list ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.01s
+
+ledger: Task 8: complete (commits 4963685..4963685, tests: cargo test -p eval-harness --test chat_completions_runner chat_completions_runner_never_executes_a_tool_outside_the_phase_allow_list --locked → test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.01s)

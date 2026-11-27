@@ -1,0 +1,53 @@
+{
+  "schema": "reader-source-graph-final-semantic-review/v1",
+  "scope": "One final read-only code/source-label review. No model execution or code edits. No storage re-review. Model outputs not consulted for this review.",
+  "source_hashes": {
+    "evals/longmemeval_v2/reader_protocol.py": "b17c63b3954ddc8f2637e396c44a4c61cacf1c677990f63623b4a9011e421b65",
+    "evals/longmemeval_v2/test_reader_protocol.py": "f32dd43425c9fe119d10028d83b1d7ad69da35a6d7adfe30d26f5c4e3f69a57d",
+    "docs/superpowers/specs/2026-11-27-reader-source-graph-design.md": "cc581ff6d1e4f9f7369019c773c32bb87e72385aeeb0d360bf1896dd23dba156",
+    "docs/superpowers/plans/2026-11-27-reader-source-graph.md": "5b0367b35d4a6198e01f57325e60aad79c24ed4da19ab154930c378f266a6f29"
+  },
+  "registration_hashes": {
+    "registration.json": "5a5e04637c3d800f6caf3362ec8ba573964838cdca919455b239c0b57e66fadf",
+    "acceptance.json": "2a52ea48c462167166465cb3349c6cfc72cabee7f80a7bc8189b1ed22bad41f9",
+    "rows.jsonl": "bf01b7b7c07ca94149f85a564b39b985a6a2acadc9b0fcd615f436e9973cc892",
+    "truth.json": "0ecefe5195496bd14ecbf5fcea942fc85891282d5565f9bbf43aa909b1a77951",
+    "prompts.json": "2d8c982a5946f15cf77c9d8e7fa553efadb752a84d35cc2718449e8cf104b31a",
+    "source-review.json": "573c40cb47b7680aefa79879aa657995c687a9cded5ce49e4df36ad7ee28a036"
+  },
+  "findings": [],
+  "important_or_critical_findings": 0,
+  "verified": {
+    "old_frozen_prompts_recomputed_identically": 165,
+    "all24_graph_raw_locations_decoded_and_matched": 243,
+    "raw_location_mismatches": 0,
+    "new_source_labels_reviewed": 8,
+    "new_source_label_corrections": 0,
+    "roles_and_scopes": "Per-parent groups and (role,name) repetition keys preserve separation. No first-duplicate answer selection.",
+    "repeated_values": "All occurrence lines retained; equal successor names deduplicated only in value summary, conflicting or unresolved occurrences retained.",
+    "opaque_and_partial": "Opaque slots prevent bridging; incomplete tail lacks end; virtualized hints withhold adjacency/end; membership_complete requires proven terminal.",
+    "escapes": "Decoded literal Crème and raw escaped ranges remain consistent; graph strings are separately marked nonquotable.",
+    "question_independence": "project_sources/_source_graph receive delivered items/parsed groups only; no question/truth/accepted-answer input.",
+    "new8_answers": {
+      "graph-equal-links": "Lagoon",
+      "graph-conflicting-links": "UNKNOWN",
+      "graph-opaque-repeat": "UNKNOWN",
+      "graph-scope-count": "4",
+      "graph-role-selection": "Lagoon",
+      "graph-virtualized-last": "UNKNOWN",
+      "graph-escaped-name": "Crème",
+      "graph-single-closed-end": "None"
+    }
+  },
+  "limits": [
+    "Bounded parser/control verification is not proof for every arbitrary malformed tree. Conservative unresolved relations are intentional.",
+    "No claim of model adherence, full quote entailment, autonomous-agent success, or memory benefit; live48-call qualification decides only its frozen gate.",
+    "Frozen literal substring criterion does not imply semantic quote entailment or requested-source binding."
+  ],
+  "prior32_review": {
+    "path": "../2026-11-27-source-ledger-qualification/semantic-review-v1.json",
+    "sha256": "c1d3b1cf329a9ba57860090d29260d453bcabb9d5c76495b0f4e0bff616b887f",
+    "gate": "FAIL, retained"
+  },
+  "conclusion": "No actionable Important/Critical code or source-label defect found within requested focus. Do not infer qualification before actual48 results and frozen acceptance."
+}

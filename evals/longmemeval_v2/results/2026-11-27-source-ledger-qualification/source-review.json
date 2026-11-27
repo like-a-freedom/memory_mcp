@@ -1,0 +1,36 @@
+{
+  "schema": "source-ledger-pre-inference-source-review/v1",
+  "reviewed_at_utc": "2026-11-27T14:51:52.760079+00:00",
+  "status": "no_substantive_source_issue_found; qualification still pending",
+  "reviewer": "semantic_review",
+  "reviewer_boundary": "This agent authored the source-ledger intervention earlier; this is a fresh read-only audit and replay, not an independently authored or blinded protocol review.",
+  "before_capture": true,
+  "runner_sha256": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+  "frozen_sha256": {
+    "registration.json": "3522269fa86549afeda59ccdad838015c61c4b49de87679de02fe13b02373252",
+    "acceptance.json": "a325375b148f2fc3be2fc2735b3850d8a2096e0304dd7a91b91c90d2d23b07f7",
+    "rows.jsonl": "599b418b118e65d8463ff45dd473c42eae0bff44394e68794255ae2c9e58f742",
+    "truth.json": "f1ce54629e64e002e8fb74371094dc422823511077d25e76dbd934f66b2e1089",
+    "prompts.json": "dead33faa2116d577068b8c29423adcf307ebe60725b200bbc54978d5a3411be",
+    "projection.json": "9bc7381cbaefd4f15ffbb0cbe128a2252bb0f3fed79ee29ff664ca16583dc501",
+    "runner.source.py": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+    "deterministic-verification.json": "3bcb201e707906d3d91c8476087bc87ebe6845c007a18e296f5b41f29a90a4a3"
+  },
+  "checks": {
+    "frozen_identity": "Current and archived runner match registration SHA; rows/truth and acceptance registration hashes verified.",
+    "gold_boundary": "protocol_messages receives row only; evidence parsing receives memory_context only. Capture sends archived messages, model and fixed sampling, not truth. Truth is used for validation/scoring outside messages.",
+    "source_projection": "All 16 cases replayed: perturbing question_text leaves navigation and raw-source blocks unchanged. Adding gold/accepted-answer canaries to the row leaves them out of model messages. All delivered text items remain present in the raw-source channel.",
+    "quote_channel": "Candidate has three messages: system instruction, derived navigation explicitly marked NOT QUOTABLE, then question and decoded raw-source text with source indices/raw hashes. Instructions require short literal source quotes and distinguish unresolved duplicate matches from consistent repetitions.",
+    "generic_ledger": "Repeated names are enumerated per parsed parent scope with roles, line locations and raw ranges, independent of question/gold. No answer value is computed or selected. Clipping/opaque-content caution remains explicit.",
+    "old_prompts": "Recomputed and compared 119 registered old-variant prompts across all seven deterministic-verification registrations; all exactly equal their archived prompts.",
+    "unchanged_cohorts": "Combined rows and truth objects match their original 10 exposed regression and 6 newly source-reviewed fixture rows exactly.",
+    "scheduled_and_acceptance": "16 cases x 2 declared variants x 1 repetition = 32 calls. All 16 candidate cases require correct frozen value, no length truncation, registered format, literal raw/decoded-source quote and no transport/protocol error. None and UNKNOWN remain distinct; zero retries and one capture are retained."
+  },
+  "findings": [],
+  "limits": [
+    "No Cargo, model inference or capture was run; no frozen input/prompt/acceptance file was changed.",
+    "Literal presence alone does not establish source-ID binding or entailment; acceptance explicitly does not claim that.",
+    "The new six are authored/source-reviewed development controls, not blind independent confirmation.",
+    "Source review does not predict model success, qualify a default reader or establish a memory-treatment effect."
+  ]
+}

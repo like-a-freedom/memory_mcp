@@ -1,0 +1,42 @@
+suite 1/1: memory-decisions started (8 expected cases)
+suite 1/1: memory-decisions finished (8 cases, 36 ms)
+# Evaluation Report — nightly
+
+**Verdict:** INVALID
+**Schema:** `memory-mcp-eval/v2`
+**Run ID:** `run-1795787506`
+**Duration:** 298ms
+**Budget:** passed
+
+## Coverage
+
+**Expected cases:** 8
+**Outcomes:** 8 (failed: 0, invalid: 8)
+
+**Gates:** 0 (failed: 0, invalid: 0)
+
+| Status | Count |
+|--------|-------|
+| Passed | 0 |
+| Quality Failed | 0 |
+| Invalid | 8 |
+
+## Suite Metrics
+
+| Suite | Total | Passed | Failed | Invalid | Metrics |
+|-------|-------|--------|--------|---------|--------|
+| memory-decisions | 8 | 0 | 0 | 8 | decision_success_rate=0.0000, evidence_success_rate=0.0000, probe_success_rate=0.0000 |
+
+## Invalid Cases
+
+- **v10-absent-target**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-current-snapshot**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-ordinary-location**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-peer-conflict**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-prior-knowledge**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-similar-name**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-unverified-correction**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+- **v10-valid-boundary**: MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required
+
+profile=nightly total=8 passed=0 quality_failed=0 invalid=8 duration_ms=298
+RESULT: INVALID

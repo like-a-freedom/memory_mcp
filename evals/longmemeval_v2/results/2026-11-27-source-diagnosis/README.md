@@ -1,0 +1,11 @@
+# Source-stage diagnosis, 27 November 2026
+
+Registration preceded predictions. `snapshot-audit.json` corrects a preregistration assumption: the surviving store has **18 episodes**, not the adjacent cohort's 100 trajectories. The original full snapshot was removed in earlier cleanup. This capture cannot pass full-history acceptance or establish historical speed gains.
+
+Before/after use isolated whole copies of that same 18-episode store, a pinned optimized test executable, identical queries, budget 5, 30-second read / 45-second process deadlines. `integrity.json` verifies the source store did not change. There are 3/3 completed reads, 2/3 exact registered spans in both versions. `922a0c56` retains its source through selection but packages another state of that source. Its delivered Reset/Create Order adjacency is relevant alternative evidence for refusing the false premise; the original exact-span result remains a failure. No product change was made to force that historical block into the result.
+
+The independently frozen 32-source synthetic counterexample is separate. Its exact source was fetched and ranked, then lost at admission: 1 → 0 → 0 packed. Recognized presentation instructions containing spelled-out number examples diluted lexical grounding. Extending the closed rendering vocabulary repairs that case: 1 → 1 → 1, 2048-byte cap unchanged. The mixed rendering/substantive-qualifier opposite control and existing policy/temporal controls remain required. This finite English grammar is not arbitrary language understanding.
+
+Candidate receipts now carry exact tracked-source fact IDs at the fetch boundary; source membership is observed rather than inferred from counts. No gold IDs influence production retrieval.
+
+`*.compact.json` retains all query duration/hash events, pool observations, stage identities/content hashes/exact-span predicates, and the actual bounded delivered items. Large raw stage bodies are outside the repository; `raw-manifest.json` pins the immutable originals. The driver, binary hash and registration hash are retained in each phase's identity receipt. Reproduction requires rehydrating the exact registered source snapshot; that prerequisite is explicit rather than silently substituting a reduced history.

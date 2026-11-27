@@ -1,0 +1,35 @@
+test_completed_read_above_internal_30_second_budget_is_a_fault (__main__.ReadClassification.test_completed_read_above_internal_30_second_budget_is_a_fault) ... ok
+test_controlled_child_timeout_is_killed_and_frames_still_parsed (__main__.ReadClassification.test_controlled_child_timeout_is_killed_and_frames_still_parsed) ... ok
+test_cooperative_timeout_preserves_partial_elapsed_and_missing_delivery (__main__.ReadClassification.test_cooperative_timeout_preserves_partial_elapsed_and_missing_delivery) ... ok
+test_duplicate_receipt_is_a_fault (__main__.ReadClassification.test_duplicate_receipt_is_a_fault) ... ok
+test_failed_one_arm_keeps_all_fourteen_attempts_and_later_pairs (__main__.ReadClassification.test_failed_one_arm_keeps_all_fourteen_attempts_and_later_pairs) ... 0c6b0c60 legacy 0 31.0 items 1
+0c6b0c60 candidate 0 31.0 items 1
+6d975a08 candidate 0 31.0 items 1
+6d975a08 legacy 0 31.0 items 1
+89a20f48 legacy 0 31.0 items 1
+89a20f48 candidate 0 31.0 items 1
+922a0c56 candidate None None items 0
+922a0c56 legacy 0 31.0 items 1
+d6da3938 legacy 0 31.0 items 1
+d6da3938 candidate 0 31.0 items 1
+f43926d9 candidate 0 31.0 items 1
+f43926d9 legacy 0 31.0 items 1
+f61a096f legacy 0 31.0 items 1
+f61a096f candidate 0 31.0 items 1
+ok
+test_full_span_and_exit_zero_delivers_context (__main__.ReadClassification.test_full_span_and_exit_zero_delivers_context) ... ok
+test_known_101_strict_span_failure_has_a_delivered_context (__main__.ReadClassification.test_known_101_strict_span_failure_has_a_delivered_context) ... ok
+test_malformed_receipt_is_a_fault (__main__.ReadClassification.test_malformed_receipt_is_a_fault) ... ok
+test_missing_receipt_does_not_turn_exit_zero_into_success (__main__.ReadClassification.test_missing_receipt_does_not_turn_exit_zero_into_success) ... ok
+test_natural_late_exit_is_a_process_deadline_fault (__main__.ReadClassification.test_natural_late_exit_is_a_process_deadline_fault) ... ok
+test_nonfinite_json_is_a_malformed_frame_with_later_events_retained (__main__.ReadClassification.test_nonfinite_json_is_a_malformed_frame_with_later_events_retained) ... ok
+test_raw_child_parser_retains_later_lines_after_truncated_utf8 (__main__.ReadClassification.test_raw_child_parser_retains_later_lines_after_truncated_utf8) ... ok
+test_strict_match_must_come_from_registered_source (__main__.ReadClassification.test_strict_match_must_come_from_registered_source) ... ok
+test_timeout_is_a_fault_even_when_a_receipt_was_printed (__main__.ReadClassification.test_timeout_is_a_fault_even_when_a_receipt_was_printed) ... ok
+test_unexplained_101_preserves_observation_without_delivered_context (__main__.ReadClassification.test_unexplained_101_preserves_observation_without_delivered_context) ... ok
+test_wrong_case_receipt_is_a_fault (__main__.ReadClassification.test_wrong_case_receipt_is_a_fault) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.715s
+
+OK

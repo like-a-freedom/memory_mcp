@@ -200,3 +200,52 @@ class ScoredCoverageTests(unittest.TestCase):
                                       generate_all_reader_outputs=None, score_prediction=None)
             with patch.dict(os.environ, {"OPENAI_API_KEY": "ambient-cloud-key"}, clear=True):
                 run_observed(harness, [], ["a"], Path(directory))
+
+    def test_observed_transport_keeps_finish_reason_and_missing_usage_without_changing_score(self):
+        from evals.longmemeval_v2.inference_attempts import ACTIVE_CALL, AttemptRecorder
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            attempts = AttemptRecorder(output, max_retries=0, timeout_seconds=1)
+
+            async def reader(_client, _args, _messages):
+                self.assertEqual(ACTIVE_CALL.get(), ('a', 'reader'))
+                await attempts.call_async('a', 'reader', completed)
+                return 'answer', {'total_tokens': 0}
+
+            async def completed():
+                return {'choices': [{'message':{'content':'answer'}, 'finish_reason': 'length'}]}
+
+            async def generate(args, rows):
+                await harness.call_reader_model_async(None, args, rows[0]['messages'])
+
+            def main():
+                asyncio.run(harness.generate_all_reader_outputs(None, [
+                    {'question_id': 'a', 'messages': [], 'memory_context': []},
+                ]))
+                (output / 'per_question.jsonl').write_text('{"question_id":"a","score":1}\n')
+
+            harness = SimpleNamespace(main=main, call_reader_model_async=reader,
+                                      generate_all_reader_outputs=generate,
+                                      score_prediction=None, LLM_EVAL_FUNCTIONS=set())
+            self.assertEqual(run_observed(harness, [], ['a'], output, attempts=attempts), 0)
+            captured = json.loads((output / 'reader_outputs.jsonl').read_text())
+            self.assertEqual(captured['finish_reason'], 'length')
+            self.assertIsNone(captured['usage'])
+            self.assertIsNone(ACTIVE_CALL.get())
+
+    def test_complete_seven_case_artifact_replays_original_three_correct(self):
+        # Saved native output is an evaluator input: replay, not a new model run.
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            def main():
+                rows = [{'question_id':str(i),'score':int(i < 3)} for i in range(7)]
+                (output/'per_question.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+                (output/'aggregated_metrics.json').write_text(json.dumps({'overall':{
+                    'count_all_questions':7,'overall_full_set':3/7}}))
+            harness = SimpleNamespace(main=main, call_reader_model_async=None,
+                                      generate_all_reader_outputs=None, score_prediction=None)
+            self.assertEqual(run_observed(harness, [], list(map(str,range(7))), output), 0)
+            report = json.loads((output/'score-coverage.json').read_text())
+            self.assertEqual(report['coverage_adjusted_success_rate'], 3/7)
+            self.assertEqual(report['covered_case_count'], 7)
+            self.assertTrue(report['official_overall_recomputed_matches'])

@@ -1,0 +1,1830 @@
+{
+  "case_id": "0c6b0c60",
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 32.59973662500852,
+  "copy_seconds": 0.5924479580135085,
+  "raw_sha256": "3c66f0f2a9f8b5067c447b766f99ece301897578afe8ee098f9d970a273241e6",
+  "raw_bytes": 6334183,
+  "process_deadline_exceeded": false,
+  "delivered_items": [
+    {
+      "confidence": 0.0,
+      "content": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+      "fact_id": "fact:72dae2359d272b755a877236",
+      "grounding": 0.63,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 118806,
+          "original_bytes": 382024,
+          "start_byte": 116758
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "by",
+          "dropdown",
+          "forum",
+          "option",
+          "sorted",
+          "time",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 118806,
+          "original_bytes": 382024,
+          "start_byte": 116758
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "forum",
+            "sorted",
+            "by",
+            "top",
+            "time",
+            "dropdown"
+          ],
+          "matched_index_key_terms": [
+            "forum",
+            "by",
+            "top"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "forum",
+              "by",
+              "top"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10",
+              "1005",
+              "1015",
+              "1017"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:3db6a5029ccd91f7457e68bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:b7251c28ec4f05f58c39e113"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+        "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+      "rationale": "tier=fallback fts=21.48 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+    },
+    {
+      "confidence": 0.0,
+      "content": "TORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main ''\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '1/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '12/31/2022'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button ",
+      "fact_id": "fact:fe6ba23116a9aa827b8d73c4",
+      "grounding": 0.24,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 27902,
+          "original_bytes": 977101,
+          "start_byte": 25854
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "by",
+          "option",
+          "range",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 27902,
+          "original_bytes": 977101,
+          "start_byte": 25854
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "our",
+            "website",
+            "by",
+            "top",
+            "range"
+          ],
+          "matched_index_key_terms": [
+            "website",
+            "top"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "website",
+              "top"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10",
+              "1017"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:3db6a5029ccd91f7457e68bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:b7251c28ec4f05f58c39e113"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:1792f596667d76ba4316a5a9",
+        "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "TORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main ''\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '1/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '12/31/2022'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button ",
+      "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.24 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:1792f596667d76ba4316a5a9"
+    },
+    {
+      "confidence": 0.0,
+      "content": "e', selected=False\\n\\t\\t\\t[1389] option 'Price', selected=True\\n\\t\\t[1390] link '\\\\ue613 Set Descending Direction', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue613'\\n\\t\\t\\tStaticText 'Set Descending Direction'\\n\\t\\t[1393] list ''\\n\\t\\t\\t[1394] listitem '', visible\\n\\t\\t\\t\\t[1396] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1399] image 'Image', visible\\n\\t\\t\\t\\t[1403] strong ''\\n\\t\\t\\t\\t\\t[1404] link 'Klipsch R-12SW Subwoofer (Renewed)', clickable\\n\\t\\t\\t\\t[1405] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '64%'\\n\\t\\t\\t\\t\\t[1414] link '11 \\\\xa0Reviews', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Reviews'\\n\\t\\t\\t\\tStaticText '$5.83'\\n\\t\\t\\t\\t[1423] Section ''\\n\\t\\t\\t\\t\\t[1427] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1430] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1432] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1434] listitem '', visible\\n\\t\\t\\t\\t[1436] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1439] image 'Image', visible\\n\\t\\t\\t\\t[1443] strong ''\\n\\t\\t\\t\\t\\t[1444] link 'Beach Speaker Bag', clickable\\n\\t\\t\\t\\t[1445] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '100%'\\n\\t\\t\\t\\t\\t[1454] link '1 \\\\xa0Review', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Review'\\n\\t\\t\\t\\tStaticText '$5.84'\\n\\t\\t\\t\\t[1463] Section ''\\n\\t\\t\\t\\t\\t[1467] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1470] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1472] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1474] listitem '', visible\\n\\",
+      "fact_id": "fact:af939d49360893985edd68e4",
+      "grounding": 0.43,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 104106,
+          "original_bytes": 307356,
+          "start_byte": 102058
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "by",
+          "option",
+          "range",
+          "sorted",
+          "time",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 104106,
+          "original_bytes": 307356,
+          "start_byte": 102058
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "our",
+            "sorted",
+            "by",
+            "top",
+            "time",
+            "range"
+          ],
+          "matched_index_key_terms": [
+            "our",
+            "by",
+            "top",
+            "time",
+            "range"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "our",
+              "by",
+              "top",
+              "time",
+              "range"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10",
+              "1005",
+              "1015",
+              "1017"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:3db6a5029ccd91f7457e68bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:b7251c28ec4f05f58c39e113"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:950b622a4a319557ac0d9317",
+        "source_id": "longmemeval_v2_trajectory_0dcde76de2813ae3d3d1ac41409cbb1bd8513f4bb69eb0fb816f536316d2f968_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "e', selected=False\\n\\t\\t\\t[1389] option 'Price', selected=True\\n\\t\\t[1390] link '\\\\ue613 Set Descending Direction', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue613'\\n\\t\\t\\tStaticText 'Set Descending Direction'\\n\\t\\t[1393] list ''\\n\\t\\t\\t[1394] listitem '', visible\\n\\t\\t\\t\\t[1396] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1399] image 'Image', visible\\n\\t\\t\\t\\t[1403] strong ''\\n\\t\\t\\t\\t\\t[1404] link 'Klipsch R-12SW Subwoofer (Renewed)', clickable\\n\\t\\t\\t\\t[1405] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '64%'\\n\\t\\t\\t\\t\\t[1414] link '11 \\\\xa0Reviews', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Reviews'\\n\\t\\t\\t\\tStaticText '$5.83'\\n\\t\\t\\t\\t[1423] Section ''\\n\\t\\t\\t\\t\\t[1427] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1430] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1432] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1434] listitem '', visible\\n\\t\\t\\t\\t[1436] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1439] image 'Image', visible\\n\\t\\t\\t\\t[1443] strong ''\\n\\t\\t\\t\\t\\t[1444] link 'Beach Speaker Bag', clickable\\n\\t\\t\\t\\t[1445] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '100%'\\n\\t\\t\\t\\t\\t[1454] link '1 \\\\xa0Review', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Review'\\n\\t\\t\\t\\tStaticText '$5.84'\\n\\t\\t\\t\\t[1463] Section ''\\n\\t\\t\\t\\t\\t[1467] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1470] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1472] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1474] listitem '', visible\\n\\",
+      "rationale": "tier=fallback fts=11.18 access_count=0 confidence=0.00 relevance=0.00 grounding=0.43 alignment=0.98 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:950b622a4a319557ac0d9317"
+    },
+    {
+      "confidence": 0.0,
+      "content": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+      "fact_id": "fact:c82dcfb33cc2a386347450a6",
+      "grounding": 0.35,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 49152,
+          "original_bytes": 59676,
+          "start_byte": 47104
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "sorted",
+          "by",
+          "top",
+          "option",
+          "appear"
+        ],
+        "quote_excerpt": {
+          "end_byte": 49152,
+          "original_bytes": 59676,
+          "start_byte": 47104
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "using",
+            "our",
+            "website",
+            "sorted",
+            "by",
+            "top",
+            "appear"
+          ],
+          "matched_index_key_terms": [
+            "top"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "top"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:3db6a5029ccd91f7457e68bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:b7251c28ec4f05f58c39e113"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:ec03490ff27b058f0a75e1a1",
+        "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+      "rationale": "tier=fallback fts=25.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.35 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:ec03490ff27b058f0a75e1a1"
+    },
+    {
+      "confidence": 0.0,
+      "content": "isible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[74] image '', visible\\n\\t\\t\\t\\t\\t[75] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[116] main ''\\n\\t\\t[117] heading '/f/books', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[119] strong '', visible\\n\\t\\t\\t\\tStaticText 'books'\\n\\t\\t[120] navigation '', visible\\n\\t\\t\\t[121] list '', visible\\n\\t\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t\\t[123] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t\\t[125] link 'Comments', clickable, visible\\n\\t\\t\\t[126] list '', visible\\n\\t\\t\\t\\t[127] listitem '', visible\\n\\t\\t\\t\\t\\t[128] button 'Sort by: Hot', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[130] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Hot'\\n\\t\\t\\t\\t\\t[133] list '', visible\\n\\t\\t\\t\\t\\t\\t[134] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[135] link '• Hot', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[136] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[137] link 'New', clickable, visible\\n\\t\\t\\t\\t\\t\\t[138] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[139] link 'Active', clickable, visible\\n\\t\\t\\t\\t\\t\\t[140] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[141] link 'Top', clickable, visible\\n\\t\\t\\t\\t\\t\\t[142] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[143] link 'Controversial', clickable, visible\\n\\t\\t\\t\\t\\t\\t[144] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[145] link 'Most commented', clickable, visible\\n\\t\\t[146] article '', visible\\n\\t\\t\\t[151] heading 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', visible\\n\\t\\t\\t\\t[152] link 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', clickable, visible\\n\\t\\t\\tStaticText ''\\n\\t\\t\\t[153] link 'tseliot.com', clickable, visible\\n\\t\\t\\t[154] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Submitted by'\\n\\t\\t\\t\\t[156] link 'RunDNA', clickable, visible, expanded=False\\n\\t\\t\\t\\t\\t[157] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'RunDNA'\\n\\t\\t\\t\\tStaticText ''\\n\\",
+      "fact_id": "fact:b3c3e5c9eb3313a1517e4582",
+      "grounding": 0.41,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 43712,
+          "original_bytes": 157709,
+          "start_byte": 41664
+        },
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "by",
+          "forum",
+          "option",
+          "sorted",
+          "time",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 43712,
+          "original_bytes": 157709,
+          "start_byte": 41664
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "forum",
+            "sorted",
+            "by",
+            "top",
+            "time"
+          ],
+          "matched_index_key_terms": [
+            "forum",
+            "top",
+            "time"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "forum",
+              "top",
+              "time"
+            ],
+            "matched_repeated_topics": [
+              "00000000",
+              "01",
+              "10",
+              "1005",
+              "1015",
+              "1017"
+            ],
+            "supporting_fact_ids": [
+              "fact:02ad603d2dc9bea756406115",
+              "fact:3ce62d140ddd252ba309a9bf",
+              "fact:3db6a5029ccd91f7457e68bf",
+              "fact:6260279fe2edac6b9087873e",
+              "fact:b7251c28ec4f05f58c39e113"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:ca55a1e9ea1872cfc86f6aa3",
+        "source_id": "longmemeval_v2_trajectory_7b5a5b3e56c1b2926d70a2c506c69020907e251b1775c7625748d8a07654b8e1_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "isible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[74] image '', visible\\n\\t\\t\\t\\t\\t[75] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[116] main ''\\n\\t\\t[117] heading '/f/books', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[119] strong '', visible\\n\\t\\t\\t\\tStaticText 'books'\\n\\t\\t[120] navigation '', visible\\n\\t\\t\\t[121] list '', visible\\n\\t\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t\\t[123] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t\\t[125] link 'Comments', clickable, visible\\n\\t\\t\\t[126] list '', visible\\n\\t\\t\\t\\t[127] listitem '', visible\\n\\t\\t\\t\\t\\t[128] button 'Sort by: Hot', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[130] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Hot'\\n\\t\\t\\t\\t\\t[133] list '', visible\\n\\t\\t\\t\\t\\t\\t[134] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[135] link '• Hot', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[136] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[137] link 'New', clickable, visible\\n\\t\\t\\t\\t\\t\\t[138] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[139] link 'Active', clickable, visible\\n\\t\\t\\t\\t\\t\\t[140] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[141] link 'Top', clickable, visible\\n\\t\\t\\t\\t\\t\\t[142] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[143] link 'Controversial', clickable, visible\\n\\t\\t\\t\\t\\t\\t[144] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[145] link 'Most commented', clickable, visible\\n\\t\\t[146] article '', visible\\n\\t\\t\\t[151] heading 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', visible\\n\\t\\t\\t\\t[152] link 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', clickable, visible\\n\\t\\t\\tStaticText ''\\n\\t\\t\\t[153] link 'tseliot.com', clickable, visible\\n\\t\\t\\t[154] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Submitted by'\\n\\t\\t\\t\\t[156] link 'RunDNA', clickable, visible, expanded=False\\n\\t\\t\\t\\t\\t[157] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'RunDNA'\\n\\t\\t\\t\\tStaticText ''\\n\\",
+      "rationale": "tier=fallback fts=10.20 access_count=0 confidence=0.00 relevance=0.00 grounding=0.41 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:ca55a1e9ea1872cfc86f6aa3"
+    }
+  ],
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2.3254170000000003,
+        "duration_us": 2270,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 4.748417,
+        "duration_us": 347,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "carrier_span_present": true,
+        "case_id": "0c6b0c60",
+        "episode_count": 151,
+        "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 5.151584,
+        "duration_us": 350,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 11.385042,
+        "duration_us": 5420,
+        "sql_sha256": "386d16fa71dc034946d6634b810b394292e0767f94842c9f9a655099ee4c7530"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 6.627125,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 6.634583,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 283.475375,
+        "duration_us": 271979,
+        "sql_sha256": "90827cd8e971be3ddb99b23478921b7e86ec83ed03612c3f50826981c5b7403f"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 779.1097500000001,
+        "duration_us": 493014,
+        "sql_sha256": "ee151f7c60b54dd9b6cd155fc2316e292c9e8a63dbdb26cde968fe73a38d8776"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 1427.815334,
+        "duration_us": 646411,
+        "sql_sha256": "c7ee030e8782ac1e2f27b71133144061733c44a4c1c4809bc37dbd92e93f811a"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 1456.861375,
+        "records": 239,
+        "content_bytes": 116459185,
+        "max_content_bytes": 1048542,
+        "index_keys": 2023336,
+        "index_key_bytes": 45353939,
+        "max_index_key_bytes": 266,
+        "unique_contents": 95,
+        "unique_sources": 95,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 1488.577708,
+        "records": 239,
+        "content_bytes": 116459185,
+        "max_content_bytes": 1048542,
+        "index_keys": 2023336,
+        "index_key_bytes": 45353939,
+        "max_index_key_bytes": 266,
+        "unique_contents": 95,
+        "unique_sources": 95,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 2878.562583,
+        "records": 239,
+        "content_dictionaries": 95,
+        "index_dictionaries": 95
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 2969.5915419999997,
+        "duration_us": 11767,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3024.9935840000003,
+        "duration_us": 1567,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3026.8795,
+        "duration_us": 1595,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3028.282792,
+        "duration_us": 913,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3030.384334,
+        "duration_us": 1929,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3033.3862090000002,
+        "duration_us": 2523,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 3314.794209,
+        "duration_us": 258168,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6226.620084,
+        "duration_us": 2167,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6649.757834,
+        "duration_us": 13715,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6701.95,
+        "duration_us": 50848,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6705.4481670000005,
+        "duration_us": 44562,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6707.003417,
+        "duration_us": 41482,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6709.404125,
+        "duration_us": 43914,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6760.219292000001,
+        "duration_us": 48946,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6764.5962500000005,
+        "duration_us": 45664,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6774.196959,
+        "duration_us": 50870,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6778.058584,
+        "duration_us": 54761,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6844.872959,
+        "duration_us": 55333,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6853.127292,
+        "duration_us": 59190,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6856.823667000001,
+        "duration_us": 62858,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6859.617166999999,
+        "duration_us": 79473,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6912.895292,
+        "duration_us": 41899,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6924.265667000001,
+        "duration_us": 62340,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6927.873292,
+        "duration_us": 52551,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6932.0190840000005,
+        "duration_us": 56666,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6986.695834,
+        "duration_us": 52672,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 6998.554167,
+        "duration_us": 54382,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7009.575374999999,
+        "duration_us": 69968,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7013.458834,
+        "duration_us": 69257,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7071.737459,
+        "duration_us": 41733,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7079.544125,
+        "duration_us": 54070,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7082.975542,
+        "duration_us": 52945,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7085.100459,
+        "duration_us": 68736,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7134.888709,
+        "duration_us": 36046,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7141.115042,
+        "duration_us": 53702,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7143.24625,
+        "duration_us": 49273,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7148.0925,
+        "duration_us": 49220,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7193.347167,
+        "duration_us": 34725,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7200.582084,
+        "duration_us": 37670,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7204.484667,
+        "duration_us": 41542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7207.808917,
+        "duration_us": 57771,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7257.149792,
+        "duration_us": 37106,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7268.404624999999,
+        "duration_us": 48335,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7272.117584,
+        "duration_us": 62401,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7276.336709,
+        "duration_us": 60971,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7341.899625,
+        "duration_us": 49524,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7345.096791999999,
+        "duration_us": 57320,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7349.353292,
+        "duration_us": 57012,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7352.943792,
+        "duration_us": 74142,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7403.459374999999,
+        "duration_us": 41664,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7411.464084,
+        "duration_us": 44650,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7416.893334,
+        "duration_us": 50118,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7421.013959,
+        "duration_us": 65707,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7483.111542,
+        "duration_us": 46041,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7487.003167,
+        "duration_us": 54846,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7490.111083999999,
+        "duration_us": 66780,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7493.035625,
+        "duration_us": 56004,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7554.578459,
+        "duration_us": 54230,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7560.467917000001,
+        "duration_us": 55494,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7563.181709,
+        "duration_us": 58177,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7565.610792,
+        "duration_us": 70472,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7622.203959,
+        "duration_us": 42712,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7628.869959000001,
+        "duration_us": 49353,
+        "sql_sha256": "4cf5d0ab41805377aeb8e32dfb79bbfa7ef4d6e81f7d9914b201d97d5afb7ed2"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7633.049292,
+        "duration_us": 65622,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7637.006625,
+        "duration_us": 61893,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 7772.366,
+        "duration_us": 51362,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 9911.744209,
+        "duration_us": 1086,
+        "sql_sha256": "026469bf6c2f59bbaa1a36db7d6614c1bf8ff124f6d92ff3ab850d9ce0746cdf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9910.606583,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 9941.598584,
+        "duration_us": 25970,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9936.856125,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 9980.537083,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 12963.438125,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 15522.947166,
+        "records": 114,
+        "content_dictionaries": 114,
+        "index_dictionaries": 228
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 15641.003083,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15752.562584,
+        "duration_us": 106245,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 15882.03725,
+        "duration_us": 129404,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16007.194292000002,
+        "duration_us": 125090,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 16127.731209,
+        "duration_us": 120453,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 16135.900791000002,
+        "records": 63,
+        "content_bytes": 27938534,
+        "max_content_bytes": 1047521,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 63,
+        "unique_sources": 63,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 17783.553541,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 17871.685333999998,
+        "duration_us": 4702,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 17873.087084000003,
+        "duration_us": 1006,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19504.20975,
+        "duration_us": 155394,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19506.463459,
+        "duration_us": 1633258,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19541.017792000002,
+        "duration_us": 192221,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19550.351875,
+        "duration_us": 1650459,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "elapsed_ms": 19575.400417,
+        "duration_us": 25025,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "0c6b0c60",
+        "elapsed_ms": 19718.707792,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "fact_id": "fact:72dae2359d272b755a877236",
+              "grounding": 0.63,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "dropdown",
+                  "forum",
+                  "option",
+                  "sorted",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "forum",
+                    "sorted",
+                    "by",
+                    "top",
+                    "time",
+                    "dropdown"
+                  ],
+                  "matched_index_key_terms": [
+                    "forum",
+                    "by",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "forum",
+                      "by",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10",
+                      "1005",
+                      "1015",
+                      "1017"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:3db6a5029ccd91f7457e68bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:b7251c28ec4f05f58c39e113"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '＼(°ロ＼)'\\n\\t\\tStaticText \\\"There's nothing here…\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "rationale": "tier=fallback fts=21.48 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+            },
+            {
+              "confidence": 0.0,
+              "content": "TORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main ''\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '1/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '12/31/2022'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button ",
+              "fact_id": "fact:fe6ba23116a9aa827b8d73c4",
+              "grounding": 0.24,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 27902,
+                  "original_bytes": 977101,
+                  "start_byte": 25854
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "option",
+                  "range",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 27902,
+                  "original_bytes": 977101,
+                  "start_byte": 25854
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "website",
+                    "by",
+                    "top",
+                    "range"
+                  ],
+                  "matched_index_key_terms": [
+                    "website",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "website",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10",
+                      "1017"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:3db6a5029ccd91f7457e68bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:b7251c28ec4f05f58c39e113"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:1792f596667d76ba4316a5a9",
+                "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "TORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main ''\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '1/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '12/31/2022'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button ",
+              "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.24 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:1792f596667d76ba4316a5a9"
+            },
+            {
+              "confidence": 0.0,
+              "content": "e', selected=False\\n\\t\\t\\t[1389] option 'Price', selected=True\\n\\t\\t[1390] link '\\\\ue613 Set Descending Direction', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue613'\\n\\t\\t\\tStaticText 'Set Descending Direction'\\n\\t\\t[1393] list ''\\n\\t\\t\\t[1394] listitem '', visible\\n\\t\\t\\t\\t[1396] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1399] image 'Image', visible\\n\\t\\t\\t\\t[1403] strong ''\\n\\t\\t\\t\\t\\t[1404] link 'Klipsch R-12SW Subwoofer (Renewed)', clickable\\n\\t\\t\\t\\t[1405] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '64%'\\n\\t\\t\\t\\t\\t[1414] link '11 \\\\xa0Reviews', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Reviews'\\n\\t\\t\\t\\tStaticText '$5.83'\\n\\t\\t\\t\\t[1423] Section ''\\n\\t\\t\\t\\t\\t[1427] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1430] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1432] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1434] listitem '', visible\\n\\t\\t\\t\\t[1436] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1439] image 'Image', visible\\n\\t\\t\\t\\t[1443] strong ''\\n\\t\\t\\t\\t\\t[1444] link 'Beach Speaker Bag', clickable\\n\\t\\t\\t\\t[1445] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '100%'\\n\\t\\t\\t\\t\\t[1454] link '1 \\\\xa0Review', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Review'\\n\\t\\t\\t\\tStaticText '$5.84'\\n\\t\\t\\t\\t[1463] Section ''\\n\\t\\t\\t\\t\\t[1467] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1470] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1472] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1474] listitem '', visible\\n\\",
+              "fact_id": "fact:af939d49360893985edd68e4",
+              "grounding": 0.43,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 104106,
+                  "original_bytes": 307356,
+                  "start_byte": 102058
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "option",
+                  "range",
+                  "sorted",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 104106,
+                  "original_bytes": 307356,
+                  "start_byte": 102058
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "our",
+                    "sorted",
+                    "by",
+                    "top",
+                    "time",
+                    "range"
+                  ],
+                  "matched_index_key_terms": [
+                    "our",
+                    "by",
+                    "top",
+                    "time",
+                    "range"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "our",
+                      "by",
+                      "top",
+                      "time",
+                      "range"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10",
+                      "1005",
+                      "1015",
+                      "1017"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:3db6a5029ccd91f7457e68bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:b7251c28ec4f05f58c39e113"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:950b622a4a319557ac0d9317",
+                "source_id": "longmemeval_v2_trajectory_0dcde76de2813ae3d3d1ac41409cbb1bd8513f4bb69eb0fb816f536316d2f968_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "e', selected=False\\n\\t\\t\\t[1389] option 'Price', selected=True\\n\\t\\t[1390] link '\\\\ue613 Set Descending Direction', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue613'\\n\\t\\t\\tStaticText 'Set Descending Direction'\\n\\t\\t[1393] list ''\\n\\t\\t\\t[1394] listitem '', visible\\n\\t\\t\\t\\t[1396] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1399] image 'Image', visible\\n\\t\\t\\t\\t[1403] strong ''\\n\\t\\t\\t\\t\\t[1404] link 'Klipsch R-12SW Subwoofer (Renewed)', clickable\\n\\t\\t\\t\\t[1405] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '64%'\\n\\t\\t\\t\\t\\t[1414] link '11 \\\\xa0Reviews', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Reviews'\\n\\t\\t\\t\\tStaticText '$5.83'\\n\\t\\t\\t\\t[1423] Section ''\\n\\t\\t\\t\\t\\t[1427] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1430] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1432] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1434] listitem '', visible\\n\\t\\t\\t\\t[1436] link 'Image', clickable\\n\\t\\t\\t\\t\\t[1439] image 'Image', visible\\n\\t\\t\\t\\t[1443] strong ''\\n\\t\\t\\t\\t\\t[1444] link 'Beach Speaker Bag', clickable\\n\\t\\t\\t\\t[1445] LayoutTable ''\\n\\t\\t\\t\\t\\tStaticText 'Rating:'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '\\\\ue605\\\\ue605\\\\ue605\\\\ue605\\\\ue605'\\n\\t\\t\\t\\t\\tStaticText '100%'\\n\\t\\t\\t\\t\\t[1454] link '1 \\\\xa0Review', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Review'\\n\\t\\t\\t\\tStaticText '$5.84'\\n\\t\\t\\t\\t[1463] Section ''\\n\\t\\t\\t\\t\\t[1467] button 'Add to Cart', clickable\\n\\t\\t\\t\\t\\t\\tStaticText 'Add to Cart'\\n\\t\\t\\t\\t[1470] button 'Add to Wish List', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue601'\\n\\t\\t\\t\\t\\tStaticText 'Add to Wish List'\\n\\t\\t\\t\\t[1472] button 'Add to Compare', clickable\\n\\t\\t\\t\\t\\tStaticText '\\\\ue61f'\\n\\t\\t\\t\\t\\tStaticText 'Add to Compare'\\n\\t\\t\\t[1474] listitem '', visible\\n\\",
+              "rationale": "tier=fallback fts=11.18 access_count=0 confidence=0.00 relevance=0.00 grounding=0.43 alignment=0.98 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:950b622a4a319557ac0d9317"
+            },
+            {
+              "confidence": 0.0,
+              "content": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+              "fact_id": "fact:c82dcfb33cc2a386347450a6",
+              "grounding": 0.35,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 49152,
+                  "original_bytes": 59676,
+                  "start_byte": 47104
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "sorted",
+                  "by",
+                  "top",
+                  "option",
+                  "appear"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 49152,
+                  "original_bytes": 59676,
+                  "start_byte": 47104
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "using",
+                    "our",
+                    "website",
+                    "sorted",
+                    "by",
+                    "top",
+                    "appear"
+                  ],
+                  "matched_index_key_terms": [
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:3db6a5029ccd91f7457e68bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:b7251c28ec4f05f58c39e113"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:ec03490ff27b058f0a75e1a1",
+                "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "='false'\\n\\t\\t\\t\\t\\t\\t\\t[907] LabelText '', clickable\\n\\t\\t\\t\\t\\t[908] gridcell 'hollister'\\n\\t\\t\\t\\t\\t[909] gridcell 'Main Website \\\\xa0\\\\xa0\\\\xa0Main Website Store \\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0\\\\xa0Default Store View'\\n\\t\\t\\t\\t\\t[913] gridcell '1'\\n\\t\\t\\t\\t\\t[914] gridcell '19'\\n\\t\\t\\t\\t\\t[915] gridcell ''\\n\\t\\t\\t\\t\\t[916] gridcell 'Yes'\\n\\t\\t\\t\\t\\t[917] gridcell 'Edit'\\n\\t\\t\\t\\t\\t\\t[918] link 'Edit', clickable\\n\\t[920] contentinfo ''\\n\\t\\t[923] paragraph ''\\n\\t\\t\\t[924] link '\\\\ue606', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue606'\\n\\t\\t\\tStaticText 'Copyright © 2026 Magento Commerce Inc. All rights reserved.'\\n\\t\\t[926] paragraph ''\\n\\t\\t\\t[927] strong ''\\n\\t\\t\\t\\tStaticText 'Magento'\\n\\t\\t\\tStaticText 'ver. 2.4.6'\\n\\t\\t[928] link 'Privacy Policy', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[929] link 'Account Activity', clickable\\n\\t\\tStaticText '|'\\n\\t\\t[930] link 'Report an Issue', clickable\", \"action\": \"click('763')\", \"screenshot\": \"screenshots/ac3ecf96/3.png\", \"state_index\": 3, \"step\": 3, \"thought\": \"<action>\\nsend_msg_to_user(\\\"From the top search terms sorted by Uses, the only clear brand names are **hollister** and **nike**—each appears **once**. So the most frequent brands are **Hollister and Nike (tie)**.\\\")\\n</action>\", \"url\": \"http://localhost:9083/admin/search/term/index/sort/popularity/dir/asc/internal_search//form_key/YdH8LQdlKcYGRDsj/\"}, {\"accessibility_tree\": \"RootWebArea 'Search Terms / SEO & Search / Marketing / Magento Admin', focused\\n\\t[146] link 'Magento Admin Panel', clickable, visible\\n\\t\\t[147] image 'Magento Admin Panel', visible\\n\\t[148] navigation '', visible\\n\\t\\t[149] menubar '', visible, orientation='horizontal'\\n\\t\\t\\t[151] link '\\\\ue604 DASHBOARD', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue604'\\n\\t\\t\\t\\tStaticText 'DASHBOARD'\\n\\t\\t\\t[154] link '\\\\ue60b SALES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60b'\\n\\t\\t\\t\\tStaticText 'SALES'\\n\\t\\t\\t[187] link '\\\\ue608 CATALOG', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue608'\\n\\t\\t\\t\\tStaticText 'CATALOG'\\n\\t\\t\\t[205] link '\\\\ue603 CUSTOMERS', c",
+              "rationale": "tier=fallback fts=25.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.35 alignment=0.95 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:ec03490ff27b058f0a75e1a1"
+            },
+            {
+              "confidence": 0.0,
+              "content": "isible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[74] image '', visible\\n\\t\\t\\t\\t\\t[75] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[116] main ''\\n\\t\\t[117] heading '/f/books', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[119] strong '', visible\\n\\t\\t\\t\\tStaticText 'books'\\n\\t\\t[120] navigation '', visible\\n\\t\\t\\t[121] list '', visible\\n\\t\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t\\t[123] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t\\t[125] link 'Comments', clickable, visible\\n\\t\\t\\t[126] list '', visible\\n\\t\\t\\t\\t[127] listitem '', visible\\n\\t\\t\\t\\t\\t[128] button 'Sort by: Hot', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[130] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Hot'\\n\\t\\t\\t\\t\\t[133] list '', visible\\n\\t\\t\\t\\t\\t\\t[134] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[135] link '• Hot', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[136] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[137] link 'New', clickable, visible\\n\\t\\t\\t\\t\\t\\t[138] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[139] link 'Active', clickable, visible\\n\\t\\t\\t\\t\\t\\t[140] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[141] link 'Top', clickable, visible\\n\\t\\t\\t\\t\\t\\t[142] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[143] link 'Controversial', clickable, visible\\n\\t\\t\\t\\t\\t\\t[144] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[145] link 'Most commented', clickable, visible\\n\\t\\t[146] article '', visible\\n\\t\\t\\t[151] heading 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', visible\\n\\t\\t\\t\\t[152] link 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', clickable, visible\\n\\t\\t\\tStaticText ''\\n\\t\\t\\t[153] link 'tseliot.com', clickable, visible\\n\\t\\t\\t[154] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Submitted by'\\n\\t\\t\\t\\t[156] link 'RunDNA', clickable, visible, expanded=False\\n\\t\\t\\t\\t\\t[157] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'RunDNA'\\n\\t\\t\\t\\tStaticText ''\\n\\",
+              "fact_id": "fact:b3c3e5c9eb3313a1517e4582",
+              "grounding": 0.41,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 43712,
+                  "original_bytes": 157709,
+                  "start_byte": 41664
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "forum",
+                  "option",
+                  "sorted",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 43712,
+                  "original_bytes": 157709,
+                  "start_byte": 41664
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "forum",
+                    "sorted",
+                    "by",
+                    "top",
+                    "time"
+                  ],
+                  "matched_index_key_terms": [
+                    "forum",
+                    "top",
+                    "time"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "forum",
+                      "top",
+                      "time"
+                    ],
+                    "matched_repeated_topics": [
+                      "00000000",
+                      "01",
+                      "10",
+                      "1005",
+                      "1015",
+                      "1017"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:02ad603d2dc9bea756406115",
+                      "fact:3ce62d140ddd252ba309a9bf",
+                      "fact:3db6a5029ccd91f7457e68bf",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:b7251c28ec4f05f58c39e113"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:ca55a1e9ea1872cfc86f6aa3",
+                "source_id": "longmemeval_v2_trajectory_7b5a5b3e56c1b2926d70a2c506c69020907e251b1775c7625748d8a07654b8e1_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "isible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[74] image '', visible\\n\\t\\t\\t\\t\\t[75] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t[116] main ''\\n\\t\\t[117] heading '/f/books', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[119] strong '', visible\\n\\t\\t\\t\\tStaticText 'books'\\n\\t\\t[120] navigation '', visible\\n\\t\\t\\t[121] list '', visible\\n\\t\\t\\t\\t[122] listitem '', visible\\n\\t\\t\\t\\t\\t[123] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[124] listitem '', visible\\n\\t\\t\\t\\t\\t[125] link 'Comments', clickable, visible\\n\\t\\t\\t[126] list '', visible\\n\\t\\t\\t\\t[127] listitem '', visible\\n\\t\\t\\t\\t\\t[128] button 'Sort by: Hot', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[130] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Hot'\\n\\t\\t\\t\\t\\t[133] list '', visible\\n\\t\\t\\t\\t\\t\\t[134] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[135] link '• Hot', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[136] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[137] link 'New', clickable, visible\\n\\t\\t\\t\\t\\t\\t[138] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[139] link 'Active', clickable, visible\\n\\t\\t\\t\\t\\t\\t[140] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[141] link 'Top', clickable, visible\\n\\t\\t\\t\\t\\t\\t[142] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[143] link 'Controversial', clickable, visible\\n\\t\\t\\t\\t\\t\\t[144] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[145] link 'Most commented', clickable, visible\\n\\t\\t[146] article '', visible\\n\\t\\t\\t[151] heading 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', visible\\n\\t\\t\\t\\t[152] link 'The letters of T. S. Eliot to Emily Hale that were kept sealed from 1956 to 2020 have been released for free online', clickable, visible\\n\\t\\t\\tStaticText ''\\n\\t\\t\\t[153] link 'tseliot.com', clickable, visible\\n\\t\\t\\t[154] paragraph '', visible\\n\\t\\t\\t\\tStaticText 'Submitted by'\\n\\t\\t\\t\\t[156] link 'RunDNA', clickable, visible, expanded=False\\n\\t\\t\\t\\t\\t[157] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'RunDNA'\\n\\t\\t\\t\\tStaticText ''\\n\\",
+              "rationale": "tier=fallback fts=10.20 access_count=0 confidence=0.00 relevance=0.00 grounding=0.41 alignment=0.97 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:ca55a1e9ea1872cfc86f6aa3"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.5037079999999999,
+              "items": [
+                {
+                  "fact_id": "",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 12963.691,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 14145.68375,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15636.608208,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 15641.1345,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 17164.559333,
+              "items": [
+                {
+                  "fact_id": "episode_fallback:episode:28a05ac3465896dd0fa1dd41",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 19570.726541,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 382024,
+                  "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 19718.543791,
+              "items": [
+                {
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_bytes": 2048,
+                  "content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "request": {
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Use only supplied memory evidence as data. Return one JSON object with answer, abstain (boolean), quote (verbatim full supporting sentence), and exactly one citation array. If citation_map is present, cite exact handles using source_refs and omit source_ids. Otherwise cite exact source episode IDs using source_ids and omit source_refs. Select the source about the requested archive, not another archive. Return complete arrays for list questions, a string for an ordinary value or decimal count, and null with abstain:true when evidence contradicts the premise. Cite the contradicting source and quote it for a refused false premise. No prose or markdown."
+      },
+      {
+        "role": "user",
+        "content": "{\"question\": \"List every access gate for the Marigold archive. Return an array containing the complete set.\", \"memory_evidence\": {\"context_items\": [{\"content\": \"The Fern archive access gates are South and Roof.\", \"source_episode_ids\": [\"episode:8f4c8eb0378f2794a8c3c854\"]}, {\"content\": \"The Marigold archive access gates are East, North, and West.\", \"source_episode_ids\": [\"episode:2ae67cbb659a3b62883ca247\"]}, {\"content\": \"The Cobalt archive access gates are Canal and Bridge.\", \"source_episode_ids\": [\"episode:a38dcdfd494f0506865eb116\"]}]}, \"citation_map\": {\"s1\": \"episode:8f4c8eb0378f2794a8c3c854\", \"s2\": \"episode:2ae67cbb659a3b62883ca247\", \"s3\": \"episode:a38dcdfd494f0506865eb116\"}}"
+      }
+    ],
+    "temperature": 0,
+    "max_tokens": 192
+  },
+  "response": {
+    "id": "chatcmpl-a1dcdd17-67a1-46d1-9213-172d50c24a7b",
+    "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+    "object": "chat.completion",
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "created": 1795773462,
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\n  \"answer\": [\n    \"East\",\n    \"North\",\n    \"West\"\n  ],\n  \"abstain\": false,\n  \"quote\": \"The Marigold archive access gates are East, North, and West.\",\n  \"citation\": [\n    \"s2\"\n  ]\n}"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 408,
+      "completion_tokens": 73,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 134
+      }
+    }
+  },
+  "duration_ms": 5416
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "positional-ui-controls-tdd/v1",
+  "source": "crates/memory-mcp/src/memory/retrieval/query_mode.rs",
+  "source_sha256": "d370519b9fed4ffdac092734a9151b026dce20414ef00d29d40d65ad58987b0f",
+  "red_observations": [
+    "Independent33-source fixture: target fetched/admitted rank25 but missing from bounded candidates before first patch",
+    "Unrelated team-dispute between quotes incorrectly gained control priority before second patch"
+  ],
+  "green": {
+    "stage_integration_passed": 50,
+    "query_mode_lib_passed": 7
+  },
+  "retained_attempts": [
+    {
+      "name": "source_rank_red",
+      "original_log": "/tmp/memory-quality-positional-toolbar-red.log",
+      "retained_log": "evals/results/fact-access-isolation-implementation-2026-11-27/source_rank_red.log",
+      "sha256": "7a7791df3b740e9f95c0b26f4b9fe8608c58a03697a77ede7346877ffcc3245a",
+      "exit_code": 101
+    },
+    {
+      "name": "source_rank_green",
+      "original_log": "/tmp/memory-quality-positional-toolbar-green.log",
+      "retained_log": "evals/results/fact-access-isolation-implementation-2026-11-27/source_rank_green.log",
+      "sha256": "93f3c7543f5b068301f800b6d1e0c4924c71c28d50904e7d3fc06bd5c0cb2e4e",
+      "exit_code": 0
+    },
+    {
+      "name": "quote_dispute_red",
+      "original_log": "/tmp/memory-quality-positional-quote-dispute-red.log",
+      "retained_log": "evals/results/fact-access-isolation-implementation-2026-11-27/quote_dispute_red.log",
+      "sha256": "b9fa1fcd66c8247ed7f3aef662c482f50510d58ce5ddb95ad8fcd7fdccaf3812",
+      "exit_code": 101
+    },
+    {
+      "name": "quote_dispute_green",
+      "original_log": "/tmp/memory-quality-positional-quote-dispute-green.log",
+      "retained_log": "evals/results/fact-access-isolation-implementation-2026-11-27/quote_dispute_green.log",
+      "sha256": "e05814c7f9fab81c25f5032300fdc7cb3d09dd0a9a17b0bdf4a477cd48c0f51f",
+      "exit_code": 0
+    },
+    {
+      "name": "query_mode_green",
+      "original_log": "/tmp/memory-quality-positional-quote-dispute-query-mode.log",
+      "retained_log": "evals/results/fact-access-isolation-implementation-2026-11-27/query_mode_green.log",
+      "sha256": "c19ae797d485f609af3e199d0e66cdbc88cac7bcb5abbe728a5104ca0c1597c5",
+      "exit_code": 0
+    }
+  ],
+  "scope": "Public observable result/provenance and actual candidate-stage integration; full history/natives have separate gates; no generic before/after or temporal grammar expansion"
+}

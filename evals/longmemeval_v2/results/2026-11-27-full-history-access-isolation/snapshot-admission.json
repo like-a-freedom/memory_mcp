@@ -1,0 +1,37 @@
+{
+  "source_verification": {
+    "episode_count": 151,
+    "complete": true
+  },
+  "source_segments": 151,
+  "source_snapshot_unchanged": true,
+  "upgraded_file_sha256": {
+    "LOCK": "bd573dd073f4cb734d365f38b7d81b33fc12fbbfda21b3b1f2b954989fe07ade",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+    "vlog/00000000000000000002.vlog": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+    "vlog/00000000000000000003.vlog": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+    "wal/00000000000000000303.wal": "a2525edd58d9f047ee2abcaddee4381d67f7703b8e36df282081d63d3e224753"
+  },
+  "audit_execution": {
+    "copy_seconds": 0.7847416670119856,
+    "command": [
+      "/tmp/memory-quality-history-v5-2026-11-27",
+      "full_history_formation_inventory",
+      "--exact",
+      "--ignored",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "external_timeout": false,
+    "elapsed_seconds": 12.61212520900881,
+    "process_fault": null,
+    "malformed_events": [],
+    "strict_span_assertion": false,
+    "raw_log": "/tmp/memory-quality-full-100-2026-11-27/observations-heat-isolation/audit.log",
+    "raw_sha256": "52b2f268918ec67df0c283ead0f710a9031cfb204595250077b5926349b0847a",
+    "raw_bytes": 55322
+  },
+  "historical_read_manifest_reference_sha256": "c5304d2cb0cfb9520d2b4da3a5ef37e5f993fd71f731b8d4cf916a2f8990b3b5",
+  "verified_build_registration_sha256": "5250cf54623bc65f1c8ea60a7eb74241078cdd8238b7598e9a9de925283f17ee"
+}

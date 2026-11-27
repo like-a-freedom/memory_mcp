@@ -1,0 +1,9 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.45s
+     Running tests/fact_access_upgrade.rs (target/debug/build/memory_mcp/c72d0629d6d5881b/out/fact_access_upgrade-c72d0629d6d5881b)
+
+running 1 test
+test decay_heat_read_failure_leaves_cold_fact_valid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.19s
+

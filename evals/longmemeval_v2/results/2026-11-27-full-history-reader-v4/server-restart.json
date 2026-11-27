@@ -1,0 +1,10 @@
+{
+  "schema": "local-reader-server-restart/v1",
+  "pid": 96170,
+  "port": 18767,
+  "health_status": 200,
+  "ready_wait_seconds": 0.0745061670022551,
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "cause": "Release model memory for full-history native reads; same model/template/runtime restarted before both frozen reader captures. No new nonstudy inference probe.",
+  "launch_source_sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec"
+}

@@ -1,0 +1,2110 @@
+{
+  "rows": [
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 52.60594670899445,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 1,
+      "identity": "memory-mcp-1-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4548,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4563
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5368,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4563,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5447
+        },
+        {
+          "completion_tokens": 52,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5545,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5447,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5597
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 49.67669929200201,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 1,
+      "identity": "memory-mcp-1-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4449,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4464
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5315,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4464,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5394
+        },
+        {
+          "completion_tokens": 52,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5492,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5394,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5544
+        }
+      ]
+    },
+    {
+      "answer": "Решение по индексации: Cedar Index использует еженедельную инкрементальную индексацию (weekly incremental indexing). Источник: протокол/конверсация «cedar-index-minutes-2026-11-18» (episode:8c90974a77ca34d60351fbfd, t_ref 2026-11-18T09:00:00Z), факт fact:32d8fb4d13b97c2e2a6cae96. Цитата из источника: «Decision: The Cedar Index uses weekly incremental indexing.» (окно цитаты покрывает весь источник, citation_context_exact=true). Ничего не записывалось — только чтение/воспоминание.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 46.106741416995646,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 2,
+      "identity": "memory-mcp-2-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4382,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4397
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5248,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4397,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5263
+        },
+        {
+          "completion_tokens": 30,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6824,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5263,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6854
+        },
+        {
+          "completion_tokens": 82,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7231,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 6854,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7313
+        },
+        {
+          "completion_tokens": 189,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7872,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 7313,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 8061
+        }
+      ]
+    },
+    {
+      "answer": "Решение по индексации: Cedar Index использует еженедельную инкрементальную индексацию (weekly incremental indexing). Источник: протокол/конверсация «cedar-index-minutes-2026-11-18» (episode:8c90974a77ca34d60351fbfd, t_ref 2026-11-18T09:00:00Z), факт fact:32d8fb4d13b97c2e2a6cae96. Цитата из источника: «Decision: The Cedar Index uses weekly incremental indexing.» Ничего не записывалось — только чтение/воспоминание.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 40.80725920799887,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 2,
+      "identity": "memory-mcp-2-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4481,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4496
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5301,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4496,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5316
+        },
+        {
+          "completion_tokens": 30,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6844,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5316,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6874
+        },
+        {
+          "completion_tokens": 82,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7251,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 6874,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7333
+        },
+        {
+          "completion_tokens": 172,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7892,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 7333,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 8064
+        }
+      ]
+    },
+    {
+      "answer": "Алиасы Alice Smith и A. Smith объединены в одну сущность типа person. Возвращенный canonical entity_id: entity:9eab641bf3e76cdbc3225b18. Статус операции: success. Используйте этот ID для привязки фактов и отношений.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 18.068300165992696,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 3,
+      "identity": "memory-mcp-3-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 69,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4483,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4552
+        },
+        {
+          "completion_tokens": 80,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4621,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4552,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4701
+        }
+      ]
+    },
+    {
+      "answer": "Алиасы Alice Smith и A. Smith объединены в одну сущность типа person. Возвращенный canonical entity_id: entity:9eab641bf3e76cdbc3225b18. Статус операции: success. Используйте этот ID для привязки фактов и отношений.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 16.855085583985783,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 3,
+      "identity": "memory-mcp-3-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 69,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4384,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4453
+        },
+        {
+          "completion_tokens": 80,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4522,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4453,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4602
+        }
+      ]
+    },
+    {
+      "answer": "Ссылка и путь сохранены как литеральный текст, без открытия. Источник: source_id=literal-spec-references-2026-11-23, source_type=note, t_ref=2026-11-23T11:15:00Z (дата события указана; t_ingested намеренно не передаётся — время транзакции присваивает сервер, а не прошлый месяц). Эпизод: episode:b3e00093312f27a9ee2fe929. Извлечение завершено успешно, но устойчивых фактов не извлечено (состояние episode-only): содержимое хранится как текст, но не превращено в recallable-факты. Если нужно, чтобы ссылка и путь были доступны при поиске, могу дополнительно записать структурированное резюме (например, строки вида `Fact: …`) с новым source_id.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 34.107380999979796,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": "episode-only",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 4,
+      "identity": "memory-mcp-4-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4459,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4474
+        },
+        {
+          "completion_tokens": 78,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5325,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4474,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5403
+        },
+        {
+          "completion_tokens": 51,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5500,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5403,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5551
+        },
+        {
+          "completion_tokens": 217,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5749,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5551,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5966
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 56.909610624978086,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 4,
+      "identity": "memory-mcp-4-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4558,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4573
+        },
+        {
+          "completion_tokens": 78,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5378,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4573,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5456
+        },
+        {
+          "completion_tokens": 51,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5553,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5456,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5604
+        },
+        {
+          "completion_tokens": 142,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5802,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5604,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5944
+        },
+        {
+          "completion_tokens": 53,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6043,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5944,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6096
+        }
+      ]
+    },
+    {
+      "answer": "При уточнении повторного исторического чтения передавать: query=\"Cedar Index retention window\", valid_at=\"2026-10-20T12:00:00Z\", known_revision=17, budget=3, fact_types=[\"decision\"], view_mode=\"current\". Не передавать known_at (взаимоисключается с known_revision) и не передавать as_of. Сохранить snapshot: valid_at и known_revision из предыдущего ответа. Guidance разрешает не более одного уточнения; пустой partial результат не означает глобальное отсутствие факта.",
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 26.60718370799441,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 5,
+      "identity": "memory-mcp-5-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4695,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4720
+        },
+        {
+          "completion_tokens": 147,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5525,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4720,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5672
+        }
+      ]
+    },
+    {
+      "answer": "При уточнении повторного исторического чтения передавать: query=\"Cedar Index retention window\", budget=3, fact_types=[\"decision\"], valid_at=\"2026-10-20T12:00:00Z\", known_revision=17, view_mode=\"current\". Не передавать known_at и as_of: guidance требует сохранить возвращённые snapshot valid_at и known_revision, а known_at и known_revision взаимоисключающи. Это единственное допустимое уточнение; результат остаётся partial и не может быть интерпретирован как полное отсутствие фактов.",
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 23.670096791000105,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 5,
+      "identity": "memory-mcp-5-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4596,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4621
+        },
+        {
+          "completion_tokens": 148,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5472,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4621,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5620
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 104.0204190420045,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 6,
+      "identity": "memory-mcp-6-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4453,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4468
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5319,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4468,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5334
+        },
+        {
+          "completion_tokens": 49,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6895,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5334,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6944
+        },
+        {
+          "completion_tokens": 66,
+          "completion_tokens_details": null,
+          "prompt_tokens": 10774,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 6944,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 10840
+        },
+        {
+          "completion_tokens": 64,
+          "completion_tokens_details": null,
+          "prompt_tokens": 11238,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 10840,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 11302
+        },
+        {
+          "completion_tokens": 66,
+          "completion_tokens_details": null,
+          "prompt_tokens": 15150,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 11302,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 15216
+        },
+        {
+          "completion_tokens": 56,
+          "completion_tokens_details": null,
+          "prompt_tokens": 15914,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 15216,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 15970
+        },
+        {
+          "completion_tokens": 57,
+          "completion_tokens_details": null,
+          "prompt_tokens": 19800,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 15970,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 19857
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 80.59787387499819,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 6,
+      "identity": "memory-mcp-6-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4552,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4567
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5372,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4567,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5387
+        },
+        {
+          "completion_tokens": 49,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6915,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5387,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6964
+        },
+        {
+          "completion_tokens": 66,
+          "completion_tokens_details": null,
+          "prompt_tokens": 10794,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 6964,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 10860
+        },
+        {
+          "completion_tokens": 64,
+          "completion_tokens_details": null,
+          "prompt_tokens": 11258,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 10860,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 11322
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 39.94018674999825,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 7,
+      "identity": "memory-mcp-7-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4568,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4583
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 29.266895417007618,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 7,
+      "identity": "memory-mcp-7-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4469,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4484
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 39.81175137500395,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 8,
+      "identity": "memory-mcp-8-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4474,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4329,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4499
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 29.75953662500251,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 8,
+      "identity": "memory-mcp-8-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4573,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4428,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4598
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 62.07778474999941,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 1,
+      "identity": "memory-cli-1-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1696,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1721
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2673,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1721,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2697
+        },
+        {
+          "completion_tokens": 124,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3912,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2697,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4036
+        },
+        {
+          "completion_tokens": 67,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4456,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4036,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4523
+        },
+        {
+          "completion_tokens": 50,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5484,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4523,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5534
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 64.28224791600951,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 1,
+      "identity": "memory-cli-1-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1748,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1773
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2821,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1773,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2845
+        },
+        {
+          "completion_tokens": 124,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4060,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2845,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4184
+        },
+        {
+          "completion_tokens": 67,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4309,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4184,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4376
+        },
+        {
+          "completion_tokens": 50,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5295,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4376,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5345
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 38.55963366600918,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 2,
+      "identity": "memory-cli-2-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1684,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1709
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2757,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1709,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2781
+        },
+        {
+          "completion_tokens": 48,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3996,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2781,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4044
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 39.88825433299644,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 2,
+      "identity": "memory-cli-2-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1632,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1657
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2609,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1657,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2633
+        },
+        {
+          "completion_tokens": 48,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3848,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2633,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3896
+        }
+      ]
+    },
+    {
+      "answer": "Reembed was started after the embedding model change with fail-fast behavior (`--max-failures 0`) per the operator preference. The process was interrupted by the operator (exit status 130). Terminal status is `interrupted`, with 2 of 5 facts processed and 1 failed fact recorded: `fact:cedar-vector-4`. Per the instruction, the work is not reported as completed because the process was interrupted; `interrupted` is an unfinished state. The failed fact identifier is preserved for a future `--retry-failed` run if the operator chooses to resume.",
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 22.047191290999763,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 3,
+      "identity": "memory-cli-3-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1653,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1677
+        },
+        {
+          "completion_tokens": 47,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2892,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1677,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2939
+        },
+        {
+          "completion_tokens": 140,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3025,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2939,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3165
+        }
+      ]
+    },
+    {
+      "answer": "Reembed was started after the embedding model change with fail-fast behavior (--max-failures 0). The process was interrupted by the operator and exited with status 130. Terminal status is \"interrupted\", not completed: 2 of 5 facts processed, 1 failed fact (fact:cedar-vector-4). Per the operator preference and the skill's completion criteria, an interrupted job is an unfinished state and must not be reported as completed. The failed fact identifier fact:cedar-vector-4 is preserved for a future --retry-failed run.",
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 17.301354333001655,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 3,
+      "identity": "memory-cli-3-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1705,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1729
+        },
+        {
+          "completion_tokens": 47,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2944,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1729,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2991
+        },
+        {
+          "completion_tokens": 134,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3077,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2991,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3211
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 48.9243860830029,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 4,
+      "identity": "memory-cli-4-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1758,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1783
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2831,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1783,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2855
+        },
+        {
+          "completion_tokens": 123,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4070,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2855,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4193
+        },
+        {
+          "completion_tokens": 66,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4317,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4193,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4383
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 47.880277999996906,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 4,
+      "identity": "memory-cli-4-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1706,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1731
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2683,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1731,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2707
+        },
+        {
+          "completion_tokens": 123,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3922,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2707,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4045
+        },
+        {
+          "completion_tokens": 66,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4506,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4045,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4572
+        }
+      ]
+    },
+    {
+      "answer": "Use exactly these two authorized explicit imports, then extract each returned episode separately. Do not add namespace/scope/project flags, credentials, redirects, file traversal, or any other source.\n\n1) Import /work/notes/doc.md:\nmemory_mcp import file --root /work/notes --path doc.md --source-type document --t-ref 2026-11-19T08:00:00Z\n\n2) Import the public page:\nmemory_mcp import url --url https://example.org/cedar/public-notes --source-type web --t-ref 2026-11-21T08:00:00Z\n\nFor each successful import, capture stdout/stderr/exit status separately, parse the returned episode_id, then run:\nmemory_mcp extract --episode-id <episode_id>\n\nInspect the extraction result and warnings; do not treat exit 0 as verified fact capture. No additional access is granted.",
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 22.762724000000162,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 5,
+      "identity": "memory-cli-5-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1725,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1749
+        },
+        {
+          "completion_tokens": 218,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2964,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1749,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3182
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 41.12146708299406,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md",
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 5,
+      "identity": "memory-cli-5-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1777,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1791
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3006,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1791,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3021
+        },
+        {
+          "completion_tokens": 61,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4069,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3021,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4130
+        },
+        {
+          "completion_tokens": 60,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4213,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4130,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4273
+        },
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4355,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4273,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4380
+        },
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4469,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4380,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4494
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 52.728328208002495,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 6,
+      "identity": "memory-cli-6-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5850,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5864
+        },
+        {
+          "completion_tokens": 74,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7079,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5864,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7153
+        },
+        {
+          "completion_tokens": 120,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7312,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 7153,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7432
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 55.31147691598744,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 6,
+      "identity": "memory-cli-6-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5798,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5812
+        },
+        {
+          "completion_tokens": 74,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7027,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5812,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7101
+        },
+        {
+          "completion_tokens": 120,
+          "completion_tokens_details": null,
+          "prompt_tokens": 7260,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 7101,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 7380
+        }
+      ]
+    },
+    {
+      "answer": "Компактный повторный extract выполнен: memory_mcp extract --episode-id episode:cedar-long-report --compact завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Теперь fact_evidence_omitted отсутствует, т.к. --compact отключает evidence pairs. Для произвольного текста: если extract вернёт пустые facts, это не означает, что фактов нет — free-form extraction эвристична и может вернуть facts, fallback note или ничего. Нужно инспектировать результат, а не полагаться на exit 0. Для явных решений предпочтительны verified structured summaries. Если нужен компактный результат без evidence, используйте --compact.",
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 29.986742167006014,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 7,
+      "identity": "memory-cli-7-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1719,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1743
+        },
+        {
+          "completion_tokens": 54,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2958,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1743,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3012
+        },
+        {
+          "completion_tokens": 207,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3106,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3012,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3313
+        }
+      ]
+    },
+    {
+      "answer": "Компактный результат получен: `memory_mcp extract --episode-id episode:cedar-long-report --compact` завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Флаг --compact отключает включение evidence-пар, поэтому `fact_evidence_omitted` больше не появляется. Если на произвольном тексте результат пуст (нет facts), это не означает, что фактов нет — free-form extraction эвристична; пустой результат классифицируется как `episode-only` (эпизод сохранён, но устойчивых фактов не извлечено). Для проверки/цитирования отдельных фактов используйте `memory_mcp explain --context-items ...` с JSON-массивом из assembly, а не полагайтесь на exit code.",
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 23.94885258298018,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 7,
+      "identity": "memory-cli-7-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1771,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1795
+        },
+        {
+          "completion_tokens": 54,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3010,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1795,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3064
+        },
+        {
+          "completion_tokens": 232,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3158,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3064,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3390
+        }
+      ]
+    },
+    {
+      "answer": "No, capture is not finished. The structured response has status=partial, empty facts, and guidance that extraction is pending and retry is safe. Per the memory contract, a zero exit code is not the completion criterion; partial/pending extraction must be classified as pending, not verified or episode-only. Report the capture as pending and preserve the returned episode_id (episode:pending-cedar-295). Next, retry extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the new structured status, facts, and warnings. Only after a completed successful extraction with inspected facts (or a completed successful extraction with no facts, which would be episode-only) can the capture be reported as finished.",
+      "arm": "current",
+      "binding": "controlled",
+      "elapsed_seconds": 15.745065750001231,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 8,
+      "identity": "memory-cli-8-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1779,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1634,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1804
+        },
+        {
+          "completion_tokens": 172,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2852,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1804,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3024
+        }
+      ]
+    },
+    {
+      "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture.",
+      "arm": "previous",
+      "binding": "controlled",
+      "elapsed_seconds": 18.348430624988396,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 8,
+      "identity": "memory-cli-8-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1727,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1582,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1752
+        },
+        {
+          "completion_tokens": 192,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2704,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1752,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2896
+        }
+      ]
+    }
+  ],
+  "scheduled": 32
+}

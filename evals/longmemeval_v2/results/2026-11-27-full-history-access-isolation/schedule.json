@@ -1,0 +1,188 @@
+{
+  "scheduled": 14,
+  "paired_cases": 7,
+  "attempts": [
+    {
+      "ordinal": 0,
+      "case_id": "0c6b0c60",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 0,
+      "case_id": "0c6b0c60",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 1,
+      "case_id": "6d975a08",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 1,
+      "case_id": "6d975a08",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "case_id": "89a20f48",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "case_id": "89a20f48",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "case_id": "922a0c56",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "case_id": "922a0c56",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "case_id": "d6da3938",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "case_id": "d6da3938",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "case_id": "f43926d9",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "case_id": "f43926d9",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "case_id": "f61a096f",
+      "arm": "legacy",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-heatdiag-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "case_id": "f61a096f",
+      "arm": "candidate",
+      "child_seconds": 45,
+      "command": [
+        "/tmp/memory-quality-history-v5-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    }
+  ]
+}

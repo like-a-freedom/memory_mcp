@@ -1,0 +1,13 @@
+{
+  "schema": "full-history-reader-v7-activation/v1",
+  "at_utc": "2026-11-27T15:27:47.959839+00:00",
+  "admitted": false,
+  "status": "NOT_ACTIVATED",
+  "source_gate_sha256": "08ebae552033b1db8321560f288d660ea6a299555ecab14b50e19b07c25b7840",
+  "qualification_decision_sha256": "d5dbcadf081eac19ab8553efd05d39ff12d31bb4ba9b1f0abd4028190e1c2d1b",
+  "acceptance_sha256": "868eea807f8511e5334b1cd28eb335f41247a2333515d1d04a5124e2f8903c54",
+  "owned_server_pid": 66845,
+  "model_execution_identity_sha256": "3dfa0e68924fb3277be0278b4594920699d836fd89fbc5ade05dcfcec63ee42f",
+  "warm_state": "Same model process after the registered32-call capture; not a cold-start experiment",
+  "default_change": false
+}

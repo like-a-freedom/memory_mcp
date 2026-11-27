@@ -1,0 +1,76 @@
+{
+  "scheduled": 7,
+  "rows": [
+    {
+      "case_id": "0c6b0c60",
+      "exit_code": 0,
+      "external_timeout": false,
+      "elapsed_seconds": 33.154665708018,
+      "copy_seconds": 0.5193889589863829,
+      "raw_sha256": "cc50a8dfa8da46c446c047bb41d7cee1f341b0346fed2b5dd2f94cccd9e5aa4e",
+      "raw_bytes": 6334171,
+      "process_deadline_exceeded": false
+    },
+    {
+      "case_id": "6d975a08",
+      "exit_code": 101,
+      "external_timeout": false,
+      "elapsed_seconds": 31.272577416995773,
+      "copy_seconds": 0.5949191249965224,
+      "raw_sha256": "94186377df0b5eab8a35e62860eb0b638f694575912f56ea9f2444e296713175",
+      "raw_bytes": 1237820,
+      "process_deadline_exceeded": false
+    },
+    {
+      "case_id": "89a20f48",
+      "exit_code": 0,
+      "external_timeout": false,
+      "elapsed_seconds": 31.05457654199563,
+      "copy_seconds": 0.6448178330028895,
+      "raw_sha256": "e43116d6095263e2062f2383c40d4082cec8a236cf9ac437349900dd608ec0b2",
+      "raw_bytes": 6327071,
+      "process_deadline_exceeded": false
+    },
+    {
+      "case_id": "922a0c56",
+      "exit_code": -9,
+      "external_timeout": true,
+      "elapsed_seconds": 45.117616250005085,
+      "copy_seconds": 0.7942160829843488,
+      "raw_sha256": "5a2351c2b3d09f7f9307f1d5788f2351787ddafaa64952287597a9d628833a92",
+      "raw_bytes": 665286,
+      "process_deadline_exceeded": true
+    },
+    {
+      "case_id": "d6da3938",
+      "exit_code": 101,
+      "external_timeout": false,
+      "elapsed_seconds": 38.63331454098807,
+      "copy_seconds": 1.071451875002822,
+      "raw_sha256": "618f9b18e0b7b30a27a8658a006f03406fb657d16d26f6c7cf9a7d8914cee8b7",
+      "raw_bytes": 13548564,
+      "process_deadline_exceeded": false
+    },
+    {
+      "case_id": "f43926d9",
+      "exit_code": 0,
+      "external_timeout": false,
+      "elapsed_seconds": 32.642664624989266,
+      "copy_seconds": 0.9451024169975426,
+      "raw_sha256": "4e2544a229308214873760337388c4534b49beae0c8524d1279d3e3e5369fce3",
+      "raw_bytes": 1669221,
+      "process_deadline_exceeded": false
+    },
+    {
+      "case_id": "f61a096f",
+      "exit_code": 0,
+      "external_timeout": false,
+      "elapsed_seconds": 37.349310999998124,
+      "copy_seconds": 0.8587630830006674,
+      "raw_sha256": "b5c9db32231a3d0c54d0f5e8856eeb84d678bd2176d10530dd9ad02feff5dc1e",
+      "raw_bytes": 13415847,
+      "process_deadline_exceeded": false
+    }
+  ],
+  "source_snapshot_unchanged": true
+}

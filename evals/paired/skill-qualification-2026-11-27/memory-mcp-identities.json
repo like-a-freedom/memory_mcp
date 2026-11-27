@@ -1,0 +1,21 @@
+{
+  "previous_revision": "aef5f772^",
+  "files": [
+    {
+      "path": "skills/memory-mcp/SKILL.md",
+      "current_sha256": "988ab9c26c9ab25e7065ed20de968357c31d7ae243c512ab6f54f75d85503eb2",
+      "previous_sha256": "814acc1a3b194f96fad49b0066ff2d6f7d02d15f63410dc8e2e6a87239a11557"
+    },
+    {
+      "path": "skills/memory-mcp/references/mcp-tools.md",
+      "current_sha256": "324ad4275b04ecd5ba3f4ffb2db658485a886f51266f7f41940ea976f4a71b7d",
+      "previous_sha256": "74acf6ce6f64751e4c203c271bed99d6070e0e1daade1853c5a69fc040b5c90e"
+    },
+    {
+      "path": "skills/memory-mcp/references/memory-contract.md",
+      "current_sha256": "c3251209f2355534d08a0dc75f4f524c9b87318217b1f7a2d367c2b40fc0d70e",
+      "previous_sha256": "461173ecea1370d018973ab7a73273c33b36d316940bbcec75e05bbfe943c2a9"
+    }
+  ],
+  "prompts_sha256": "4058a3c619b66e58f82ad8f21b4524183ff16b28dd2afb30a345fda0996cccc9"
+}

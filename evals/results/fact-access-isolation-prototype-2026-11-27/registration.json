@@ -1,0 +1,50 @@
+{
+  "acceptance": {
+    "deterministic": "Preflight and reopen pass, exact pre-write and persisted counts/times/source IDs, no absent-row creation, unchanged fact fields.",
+    "performance": "Median combined isolated wall / median legacy write wall <= 0.50 in both AB and BA strata for 8192 keys. Publish cold-first and low-key observations separately.",
+    "scope": "One test-only temporary schema comparison. No production deployment, migration, model, full-history retest, or inferred end-to-end gain.",
+    "start_complete_rows": 120
+  },
+  "arms": {
+    "first_access": "Separately timed existence and create-or-increment transaction; verification and reset outside timer.",
+    "isolated": "Awaited exact-key side-record projection then narrow UPDATE on existing side record.",
+    "legacy": "Existing production writer, awaited single UPDATE on fact returning NONE."
+  },
+  "benchmark_dispatches": 1,
+  "binary": "/private/tmp/memory-quality-heat-prototype-2026-11-27",
+  "binary_sha256": "e994315c337ed3916c0518101e9c2749ce510cc6e97dac55f4e77a8dd341bace",
+  "body_bytes": 27,
+  "build_command": "CARGO_PROFILE_TEST_OPT_LEVEL=3 cargo test -p memory_mcp --features eval-support --test fact_access_payload --no-run --locked --message-format=json",
+  "command": [
+    "/private/tmp/memory-quality-heat-prototype-2026-11-27",
+    "--exact",
+    "isolation_prototype::fact_access_storage_isolation_prototype",
+    "--ignored",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "deterministic_preflight_log": "/private/tmp/memory-quality-heat-prototype-contract.log",
+  "deterministic_preflight_sha256": "9b3849be1380e383804ececa47235d62f5571826c154cd0ad53d80d97ac7f08b",
+  "engine": "SurrealDB 4.0.1 embedded SurrealKV on native Darwin arm64",
+  "failure_policy": "Stop on deterministic runtime fault or external cap, retain all observed phase rows and raw log, do not replace a failed attempt.",
+  "fixed_order": "1-key then 8192-key. Pairs 0..19; legacy/isolated for even pairs, isolated/legacy for odd pairs. First access follows each pair.",
+  "key_counts": [
+    1,
+    8192
+  ],
+  "key_template": "cobalt-dimension-{n}",
+  "metrics": "Arm wall-clock and combined DB-call microseconds; logical queries and API-boundary SQL+JSON requests/JSON responses, not engine byte counters.",
+  "pairs_per_case": 20,
+  "process_timeout_seconds": 120,
+  "profile": "CARGO_PROFILE_TEST_OPT_LEVEL=3",
+  "registered_before_timed_dispatch": true,
+  "runtime_retry_policy": "Existing SurrealDbClient only. No test-run retries.",
+  "schema": "memory-fact-access-isolation-prototype/v1",
+  "source_input_sha256": {
+    "/private/tmp/memory-quality-heat-prototype-run.py": "70738d24dff107330f94bbafb12fb1aaf6615b1139d3347b07b587d36b7f8254",
+    "Cargo.lock": "d1e3d0192a4956c092811070da84a7b7b5864f6042c8d12d71f2d1f8a03ea6e2",
+    "crates/memory-mcp/src/memory/fact_access_store.rs": "287689f5e73463a747d819d29675195c202ce8d942b3cb7f8cf9b7a4558c4477",
+    "crates/memory-mcp/tests/fact_access_payload.rs": "132f49b5f469f69f97e6b5caaa075023a067e07fca0947c6a639cea68cd854f1",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md": "9126afd525137cbe3bfbc90625e5102f0e59e495c847dd0f70dc04b6ec157bb3"
+  }
+}

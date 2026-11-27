@@ -1,0 +1,5 @@
+{
+  "executed": false,
+  "reason": "A valid literal MCP capture may ingest then extract its returned episode; the v2 exact-operation grader falsely rejected this. RED/GREEN with unrelated-episode negative before any outputs. Prompts, labels, budgets unchanged.",
+  "replacement": "../skill-qualification-2026-11-27-dynamic-v3"
+}

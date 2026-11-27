@@ -1,0 +1,13 @@
+{
+  "observer_binary": "/tmp/memory-quality-history-registered-2026-11-27",
+  "observer_sha256": "247e2a33cf12c6217d2c2b9f49e0d36ab0fd59ab82f41f66452aa8a01a4b4648",
+  "driver_sha256": "c621b926128dc321fb76ad9e1fe565def3b6fa4a9a6b75bb3ed7cf1d7fbfb28f",
+  "audit_seconds_each": 300,
+  "audit_reopens": 2,
+  "source_only": true,
+  "cases": 7,
+  "read_seconds": 30,
+  "child_seconds": 45,
+  "profile": "test opt-level=3; native arm64",
+  "registered_before_source_audit_and_reads": true
+}

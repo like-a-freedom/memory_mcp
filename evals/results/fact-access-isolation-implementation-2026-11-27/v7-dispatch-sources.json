@@ -1,0 +1,17 @@
+{
+  "before_dispatch": true,
+  "sources": [
+    {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/memory-quality-v7-native-and-history.py",
+      "sha256": "1779e8a895b3836988d21ed51782adf334efb705a9a574cef45f97d617d99db6"
+    },
+    {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/memory-quality-v7-registered-gates.py",
+      "sha256": "2a3a0d04d2367a21a1faaa3d214b14737b2a213bd49c35202b4b65d13fbe0b8e"
+    },
+    {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/memory-quality-pin-v7.py",
+      "sha256": "89ade918b70985a3aa6746d6d33c628ab9a4b102031c8b9f26530946a0ad05af"
+    }
+  ]
+}

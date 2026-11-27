@@ -1,0 +1,3 @@
+# Ordered relations regression controls
+
+Ten new authored development cases frozen after the initial independent short/long protocol comparison, before any predictions for this set. These are regression controls, not blinded confirmation or ten independent benefit-study families. Each of four source items is at most2048bytes; three unrelated complete UI views remain present and target position rotates. Scopes, nested labels, mixed roles, duplicate/missing anchors and a clipped boundary have explicit labels. UNKNOWN is distinct from a source-supported empty relation (None). No original LongMemEval source or answer is used.

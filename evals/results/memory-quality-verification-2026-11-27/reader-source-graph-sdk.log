@@ -1,0 +1,11 @@
+test_judge_sdk_bypasses_environment_proxy (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_judge_sdk_bypasses_environment_proxy) ... ok
+test_judge_sdk_refuses_redirected_evidence (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_judge_sdk_refuses_redirected_evidence) ... ok
+test_reader_sdk_bypasses_environment_proxy (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_reader_sdk_bypasses_environment_proxy) ... ok
+test_reader_sdk_refuses_redirected_evidence (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_reader_sdk_refuses_redirected_evidence) ... ok
+test_reader_sdk_retries_disabled_and_deadline_observed (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_reader_sdk_retries_disabled_and_deadline_observed) ... ok
+test_synchronous_judge_uses_bounded_async_transport (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_synchronous_judge_uses_bounded_async_transport) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 4.950s
+
+OK

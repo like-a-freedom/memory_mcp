@@ -1,0 +1,27 @@
+{
+  "schema": "memory-access-heat-phase-diagnostic/v1",
+  "registered_before_outputs": true,
+  "scheduled": 1,
+  "case": "922a0c56",
+  "hypothesis": "Distinguish awaited access-heat work from downstream packaging; marker settled means helper finished under existing error semantics, not proof of all durable writes successful.",
+  "observer_sha256": "f0b4ef69b7fd492fe704f3c97930cb4edc6ae121a989506e9a61bc3ea48a5ca1",
+  "observer_profile": "test opt-level3 arm64, same v4 observer with only cfg eval-support phase markers",
+  "read_registration_sha256": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+  "snapshot_file_sha256": {
+    "LOCK": "5bbd6ccf096f4833f96079544d4902e8428d28fb70d45ce735d344613da971e0",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+    "vlog/00000000000000000002.vlog": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+    "vlog/00000000000000000003.vlog": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+    "wal/00000000000000000302.wal": "9f0a3daba46f3dca49186692682c7838ded5720cdd8d53c1e36c5cb6b576061c"
+  },
+  "read_seconds": 30,
+  "child_seconds": 45,
+  "no_reruns": true,
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/retrieval.rs": "f7f63a9cf62b7ab43bb8b6ebee837d9152314ae0f36a19dffbd27b77e4d451ab",
+    "crates/memory-mcp/tests/fact_access_concurrency.rs": "90edfa5dfb85f7370a233f031a08dae12c582bbeb4f4fc92d5f9052ce37e8bdf",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "c913b8f84d0ca7ebaf3acb9c74e9464a4a896619ad71e1a4f813682d9365de89"
+  },
+  "acceptance": "Diagnostic phase observation only. Does not replace failed v4 or admit memory candidate. No model or deadline change."
+}

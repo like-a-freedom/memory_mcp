@@ -1,0 +1,244 @@
+{
+  "structured-final-first": {
+    "0c6b0c60": {
+      "response_raw": "\\boxed{Past 24 hours, Past week, Past month, Past year, All time}\n\nQUOTE: [151] list '', visible\n\t\t\t\t\t\t[152] listitem '', visible\n\t\t\t\t\t\t\t[153] link '\u2022 Past 24 hours', clickable, visible\n\t\t\t\t\t\t\t\tStaticText '\u2022'\n\t\t\t\t\t\t[154] listitem '', visible\n\t\t\t\t\t\t\t[155] link 'Past week', clickable, visible\n\t\t\t\t\t\t[156] listitem '', visible\n\t\t\t\t\t\t\t[157] link 'Past month', clickable, visible\n\t\t\t\t\t\t[158] listitem '', visible\n\t\t\t\t\t\t\t[159] link 'Past year', clickable, visible\n\t\t\t\t\t\t[160] listitem '', visible\n\t\t\t\t\t\t\t[161] link 'All time', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 185,
+        "prompt_tokens": 5226,
+        "total_tokens": 5411,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "6d975a08": {
+      "response_raw": "\\boxed{Forums, Tags, Alphabetical}\nQUOTE: [111] list '', visible\n\t\t\t\t[112] listitem '', visible\n\t\t\t\t\t[113] link 'Forums', clickable, visible\n\t\t\t\t[114] listitem '', visible\n\t\t\t\t\t[115] link 'Tags', clickable, visible\n\t\t\t\t[116] listitem '', visible\n\t\t\t\t\t[117] link 'Alphabetical', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 107,
+        "prompt_tokens": 4752,
+        "total_tokens": 4859,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "89a20f48": {
+      "response_raw": "\\boxed{All time}\n\nQUOTE: [161] link 'All time', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 23,
+        "prompt_tokens": 4348,
+        "total_tokens": 4371,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "922a0c56": {
+      "response_raw": "\\boxed{UNKNOWN}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 6,
+        "prompt_tokens": 277,
+        "total_tokens": 283,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "d6da3938": {
+      "response_raw": "\\boxed{Reset Password}\nQUOTE: [747] button 'Create Order', clickable, visible\n[749] button 'Reset Password', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 37,
+        "prompt_tokens": 1653,
+        "total_tokens": 1690,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "f43926d9": {
+      "response_raw": "\\boxed{Forums}\n\nQUOTE: [110] link 'Forums', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 23,
+        "prompt_tokens": 3856,
+        "total_tokens": 3879,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "f61a096f": {
+      "response_raw": "\\boxed{nine}\nQUOTE: [733] main '', visible\n\t\t[739] button '\\ue626 Back', clickable, visible\n\t\t\tStaticText '\\ue626'\n\t\t\tStaticText 'Back'\n\t\t[741] button 'Login as Customer', clickable, visible\n\t\t\tStaticText 'Login as Customer'\n\t\t[743] button 'Delete Customer', clickable, visible\n\t\t\tStaticText 'Delete Customer'\n\t\t[745] button 'Reset', clickable, visible\n\t\t\tStaticText 'Reset'\n\t\t[747] button 'Create Order', clickable, visible\n\t\t\tStaticText 'Create Order'\n\t\t[749] button 'Reset Password', clickable, visible\n\t\t\tStaticText 'Reset Password'\n\t\t[751] button 'Force Sign-In', clickable, visible\n\t\t\tStaticText 'Force Sign-In'\n\t\t[753] button 'Save and Continue Edit', clickable, visible\n\t\t\tStaticText 'Save and Continue Edit'\n\t\t[755] button 'Save Customer', clickable, visible\n\t\t\tStaticText",
+      "finish_reason": "length",
+      "usage": {
+        "completion_tokens": 256,
+        "prompt_tokens": 5357,
+        "total_tokens": 5613,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  },
+  "ordered-relations-final-first": {
+    "0c6b0c60": {
+      "response_raw": "\\boxed{Past 24 hours, Past week, Past month, Past year, All time}\n\nQUOTE: [153] link '\u2022 Past 24 hours', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 42,
+        "prompt_tokens": 6040,
+        "total_tokens": 6082,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "6d975a08": {
+      "response_raw": "\\boxed{Forums, Tags, Alphabetical}\n\nQUOTE: [111] list '', visible\n\t\t\t\t[112] listitem '', visible\n\t\t\t\t\t[113] link 'Forums', clickable, visible\n\t\t\t\t[114] listitem '', visible\n\t\t\t\t\t[115] link 'Tags', clickable, visible\n\t\t\t\t[116] listitem '', visible\n\t\t\t\t\t[117] link 'Alphabetical', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 107,
+        "prompt_tokens": 5399,
+        "total_tokens": 5506,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "89a20f48": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [161] link 'All time', clickable, visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 4899,
+        "total_tokens": 4921,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "922a0c56": {
+      "response_raw": "\\boxed{UNKNOWN}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 6,
+        "prompt_tokens": 336,
+        "total_tokens": 342,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "d6da3938": {
+      "response_raw": "\\boxed{Reset Password}\nQUOTE: [747] button 'Create Order', clickable, visible -> [749] button 'Reset Password', clickable, visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 41,
+        "prompt_tokens": 2210,
+        "total_tokens": 2251,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "f43926d9": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: [112] link 'Tags', clickable, visible -> [114] link 'Alphabetical', clickable, visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 40,
+        "prompt_tokens": 4422,
+        "total_tokens": 4462,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "f61a096f": {
+      "response_raw": "\\boxed{nine}\nQUOTE: [733] main '', visible\n\t\t[739] button '\\ue626 Back', clickable, visible\n\t\t\tStaticText '\\ue626'\n\t\t\tStaticText 'Back'\n\t\t[741] button 'Login as Customer', clickable, visible\n\t\t\tStaticText 'Login as Customer'\n\t\t[743] button 'Delete Customer', clickable, visible\n\t\t\tStaticText 'Delete Customer'\n\t\t[745] button 'Reset', clickable, visible\n\t\t\tStaticText 'Reset'\n\t\t[747] button 'Create Order', clickable, visible\n\t\t\tStaticText 'Create Order'\n\t\t[749] button 'Reset Password', clickable, visible\n\t\t\tStaticText 'Reset Password'\n\t\t[751] button 'Force Sign-In', clickable, visible\n\t\t\tStaticText 'Force Sign-In'\n\t\t[753] button 'Save and Continue Edit', clickable, visible\n\t\t\tStaticText 'Save and Continue Edit'\n\t\t[755] button 'Save Customer', clickable, visible\n\t\t\tStaticText",
+      "finish_reason": "length",
+      "usage": {
+        "completion_tokens": 256,
+        "prompt_tokens": 6464,
+        "total_tokens": 6720,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  }
+}

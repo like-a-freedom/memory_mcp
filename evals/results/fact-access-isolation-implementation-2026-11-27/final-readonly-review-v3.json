@@ -1,0 +1,94 @@
+{
+  "schema_version": "fact-access-final-readonly-review-v3",
+  "reviewed_at_utc": "2026-11-27T15:16:03.498767+00:00",
+  "reviewer": "reader_diagnosis",
+  "scope": "Current access store, migration and readiness, retrieval hydration, lifecycle consumers, operator upgrade and rollback. This reviewer contributed the access store and native fixtures. Positional query intent changes are excluded.",
+  "method": "Read-only production-source and retained-test review; only this receipt and the separately authorized index regression fixture were added. No Cargo, inference, native rerun, or production edit was made in this pass.",
+  "previous_receipt": {
+    "path": "evals/results/fact-access-isolation-implementation-2026-11-27/source-review-v2.json",
+    "sha256": "a92c73ea7d258e5ad41f6334cc93590ec6224f3adc8642a49a928dabc1ffa93c"
+  },
+  "source_sha256": {
+    "crates/memory-mcp/migrations/057_fact_access_isolation.surql": "29f1ac9f38f69859f85c0cc0b0fe2cddbbe3b96c24c44b715ddf484575fe00bb",
+    "crates/memory-mcp/operations/fact_access_rollback_batch.surql": "31b049ec073904453ee65e4cbdf2a08863d32638a0b947656a5f11c765e08b48",
+    "crates/memory-mcp/src/http/composition.rs": "8d733c4785853f6658bcc91d4469139882495478f9a01d9d62b8692c6c1e32a0",
+    "crates/memory-mcp/src/http/leases/migration.rs": "00477eb9e247bacb8bd4e9a90a65257dc9f5e964dd6e1d5ee45fcf782318eacc",
+    "crates/memory-mcp/src/memory/explanation.rs": "1a8b0d7c60ac2200fa057cd4138c139951f048400197643e8a1957440a386f4c",
+    "crates/memory-mcp/src/memory/fact_access_store.rs": "332523d22066c4a495a48fd334d74b636e50298271fc1b1eb08e19ed172cb6a2",
+    "crates/memory-mcp/src/memory/lifecycle_workers/archival.rs": "e3fc2ae5217834b187484a044b884ee4245c2f813e45aedc52bd62890b308aff",
+    "crates/memory-mcp/src/memory/lifecycle_workers/decay.rs": "7e8aa064023f6cec460737d91507a6e3ea72a183df51d0c4652bb62d4a501e91",
+    "crates/memory-mcp/src/memory/retrieval.rs": "2c551af34045954df963780de6ec55c39ca2d4a032ebe8359dfe4770e34c8a8e",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "8201933ee4ebfdf0b21c04e4127ae84758d10a2bc505999c18d73429c4f9c6e2",
+    "crates/memory-mcp/src/memory/retrieval/ranking.rs": "6e9564974e588f3e715df1ec74e80aa566d7bf2fb77d7583a3dd95ec60864daf",
+    "crates/memory-mcp/src/platform/persistence/db_errors.rs": "2211db0ff38991e5981b6a451298ee13874372e3c1c2a51c59411d49365c1ed9",
+    "crates/memory-mcp/src/platform/persistence/transactions.rs": "80e6160100e28ed6b167928d49b1c61b9234f15c97421325844203087b411e6c",
+    "crates/memory-mcp/src/storage/client.rs": "5c2d76867de1d9b525abde286aa23f5bf1166f2714d10dea752ad4b5e932bf4f",
+    "crates/memory-mcp/src/storage/migrations.rs": "66bb404d7510ea00c4380aa9dc74f1cce6f70862ac54c7bb10cbaa150155fffc",
+    "crates/memory-mcp/src/storage/table_scope.rs": "fa82f24ae92f4b3d576a2e80d2c3540bead2de0e5120cc5a4134944f13002687",
+    "crates/memory-mcp/tests/explain_provenance.rs": "558d14bc101ff7144780bf36fed741eb2c889f6b8b9e57e62f1409a1453f1b0c",
+    "crates/memory-mcp/tests/fact_access_concurrency.rs": "651c162fbb8b2e91995be50aeb4533853390bd67dfbb72d0c0ad457d9f40a06f",
+    "crates/memory-mcp/tests/fact_access_native_upgrade.rs": "45d1de2ff7d88e83579469a5e227ffe655b6c58ae1d8490c7271f010792480bc",
+    "crates/memory-mcp/tests/fact_access_payload.rs": "2f2c08730cdaa9903a925b16f66e3ebcbbbbdd5e3700e87bef9524b6e6e9bfd7",
+    "crates/memory-mcp/tests/fact_access_upgrade.rs": "772bc10a2dfef559d6dfbdfd5d91e95611f0e222ccb2ab34eabc1a029b48b629",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "310c1c952e9e84a55a24060df7bf3d1bb93ab47134b0fbfe02dbee5e22a68249",
+    "crates/memory-mcp/tests/lifecycle_archival.rs": "5264ebc258c639bfa594fb729a1fc131947425886fe7cfc63b51695c7ea5879e",
+    "crates/memory-mcp/tests/lifecycle_decay.rs": "c8b8578499b708efa14f958a56d842cc9642f41a124e66b2faf94df0faadb6d1",
+    "crates/memory-mcp/tests/service_integration.rs": "890381471e9eb31c9f0fb3b476db705ca83c194bd55a7ce3155061ced7632b9c",
+    "docs/operations/FACT_ACCESS_UPGRADE.md": "b01ed4bcc618b290aa6749879e2d2517804223c077cde8048a3a44a2999c1b81",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md": "a87e5ae52d53556f87053f1a713538d80cf625ca27a99f243323f53ceb63b8d6"
+  },
+  "changed_paths_relative_to_v2": [
+    "crates/memory-mcp/src/memory/retrieval.rs",
+    "crates/memory-mcp/tests/fact_access_upgrade.rs",
+    "crates/memory-mcp/tests/fact_access_concurrency.rs",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md"
+  ],
+  "review_findings": [
+    {
+      "id": "fact-access-readiness-accepts-unique-index",
+      "type": "actionable schema-drift readiness gap",
+      "source": [
+        "crates/memory-mcp/migrations/057_fact_access_isolation.surql:6",
+        "crates/memory-mcp/src/storage/migrations.rs:573-589,628-633,665-677,731-739"
+      ],
+      "basis": "The migration defines the index IF NOT EXISTS. The readiness matcher checks containment of table, name, and the two leading fields. It also accepts an incompatible UNIQUE suffix. Same-episode rows are allowed to share a timestamp. A pre-existing unique index can pass on empty or non-colliding data, then block colliding backfill or access writes.",
+      "static_predicate_check": {
+        "ordinary_definition": "DEFINE INDEX fact_access_source_recent ON fact_access FIELDS source_episode, last_accessed",
+        "unique_definition": "DEFINE INDEX fact_access_source_recent ON fact_access FIELDS source_episode, last_accessed UNIQUE",
+        "accepted_by_existing_predicate": [
+          true,
+          true
+        ]
+      },
+      "regression": "crates/memory-mcp/tests/fact_access_upgrade.rs:24 exercises public apply_migrations against a real embedded engine with a pre-existing UNIQUE index and requires the specific incompatible-definition error. Added but unexecuted in this pass.",
+      "observed_scope": "Source-level proof of validator acceptance for these definitions. No claim of an affected snapshot or remote installation."
+    },
+    {
+      "id": "backfill-retry-comment-overstates-policy",
+      "type": "comment accuracy",
+      "source": [
+        "crates/memory-mcp/src/storage/migrations.rs:897-898",
+        "crates/memory-mcp/src/storage/client.rs:1729-1745",
+        "crates/memory-mcp/src/platform/persistence/transactions.rs:169-227"
+      ],
+      "basis": "The local adapter retries transient errors and applies a separate timeout retry budget. The comment says only transaction conflicts are retried. The guarded exact assignments and cursor in one commit make replay idempotent without that assumption."
+    }
+  ],
+  "contracts_rechecked": {
+    "migration_and_ownership": "057 DDL is additive. Signed nonzero or timestamp-only legacy rows are copied in bound 128-key pages, checking exact pre-existing values and committing the owner-guarded cursor in the same transaction. Entire eligible coverage is reconciled before application marking. Failed/applied terminal updates compare applying status and owner. 057 is in the tenant digest; the runbook fences old binaries operationally through readiness.",
+    "write_and_retry": "The predecessor app SQL already used atomic UPDATE RETURN NONE; the isolation changes physical write targets, rather than removing any predecessor full-record application retry. First access projects persisted source_episode only. Existing rows write only the side table. Both signed saturation branches guard addition, zero boost still stamps, one timestamp is bound across retries, and absent fact with no side row is a no-op. This does not establish increment exactly-once under ambiguous commit acknowledgement.",
+    "read_and_usage": "Missing rows become zero/empty. Database and invalid row-shape, key, count or timestamp errors propagate through exact bounded reads into all seven pre-fusion channels and decay preflight. Decay performs its heat reads before mutation; archival separates active-fact and recent-access decisions. Revision-bounded historical recall bypasses mutable heat.",
+    "await_and_failure": "Warm and cold tracking await four-wide waves with repeated IDs ordered. Explain awaits its boost. Successful issued writes are awaited before return; failed attempts are logged and sibling/later writes settle, potentially with successful recall. A settled marker describes completion of attempts, not proof every write committed. Controlled cancellation proves ownership of application futures, not rollback of arbitrary in-flight engine work."
+  },
+  "retained_native_evidence": {
+    "log": "evals/results/fact-access-isolation-implementation-2026-11-27/native-upgrade-verification.log",
+    "sha256": "98d70c64969c5c8ecad5b7b3db698c93bb0c0c0e9146aee6c374798ce4c2b4e5",
+    "result": "3 passed; retained local native SurrealKV run",
+    "coverage": "Closed byte-manifest backup, exact signed/zero-with-timestamp migration, cold sparsity, post-cutover write and reopen, replayable bounded 128+2 rollback, inconsistent identity and oversized-page rejection, restore from separate verified backup copy.",
+    "limit": "The fixture simulates predecessor data on the pinned native engine. No predecessor binary boot or remote deployment was exercised."
+  },
+  "limits": [
+    "This pass did not rerun native, inference, or timed gates and confers no new latency or evidence-quality result.",
+    "The new index regression was awaiting its first controlled RED run when this receipt was frozen."
+  ]
+}

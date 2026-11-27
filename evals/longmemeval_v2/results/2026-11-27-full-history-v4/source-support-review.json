@@ -1,0 +1,294 @@
+{
+  "schema": "memory-mcp-reader-delivered-source-support/v1",
+  "scope": "Read-only independent source adjudication of all seven preregistered v4 development questions. The adjudicator read frozen source criteria/truth and each actual delivered candidate context, without reader predictions. Original v3 support decisions are linked only for explicit comparison; quoted ranges were verified again in the delivered v4 strings.",
+  "decision_rule": "Supported means the reader can establish the affirmative answer. Contradicted means the delivered source positively disproves a false premise and thereby supports its registered refusal. Unknown means delivered evidence is insufficient. Counts and full lists need a bounded relevant group; adjacent actions require contiguous same-scope peers excluding nested text. A delivery fault gives no quotation.",
+  "item_index_origin": 0,
+  "quote_offsets": "Zero-based Python Unicode string indices into the raw delivered value; ranges are half-open. Literal backslashes in a serialized accessibility tree are retained.",
+  "strict_rule": "Exact registered serialized span in an item bound to the source episode from the formation audit. Alternative evidence cannot pass this check. This field describes content; elapsed time and exit status are reported in retrieval receipts.",
+  "related_cases": "Seven questions concern three related UI states. These counts describe the selected questions and are not seven independent evidence sources.",
+  "reads_registration_sha256": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+  "reviewed_truth_sha256": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+  "reader_rows_sha256": "512202b6d6710cf613a19d2a02328b98c150276c1a8495ae81ed5e519520ccca",
+  "summary": {
+    "selected": 7,
+    "premise_verdicts": {
+      "supported": 4,
+      "contradicted": 2,
+      "unknown": 1
+    },
+    "frozen_labels_supported": 6,
+    "strict_registered_source_and_span_delivered": 4,
+    "delivered_contexts": 6,
+    "delivery_faults": 1
+  },
+  "cases": {
+    "0c6b0c60": {
+      "question": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Past 24 hours, Past week, Past month, Past year, All time"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 459,
+          "end_character_exclusive": 1408,
+          "exact_quote": "[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000"
+        }
+      ],
+      "decision_basis": "The exposed Top menu contains five selectable list entries, and the following image is outside the menu at a shallower indentation.",
+      "limitations": "Selection marking and nested StaticText do not add an option.",
+      "read_receipt_sha256": "7006ab84911a1fe2cd17cd6b1b71fd1565aa98c6029d733b071e380dcec5af33",
+      "retrieval_fault": null
+    },
+    "6d975a08": {
+      "question": "I am using our reddit-based custom forum website. On the All forums directory page, what are the three browse tabs shown above the forum list? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Forums, Tags, Alphabetical"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [
+        0,
+        3
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 1236,
+          "end_character_exclusive": 1853,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000"
+        },
+        {
+          "context_item_index": 3,
+          "start_character": 1240,
+          "end_character_exclusive": 1857,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000"
+        }
+      ],
+      "decision_basis": "Each item independently shows three linked peers in the first navigation list inside the directory main region. The following sort list and directory heading close and identify the group.",
+      "limitations": "Alternative directory snapshots say List of forums and contain different node IDs. They support the answer independently of the registered snapshot.",
+      "read_receipt_sha256": "d77147f75d643088bc1ce2a01900d59572adb7e85095e69166f7298c7a41f7a8",
+      "retrieval_fault": null
+    },
+    "89a20f48": {
+      "question": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "There is no such option. All time is the last time-range entry.",
+        "None",
+        "No such option"
+      ],
+      "premise_verdict": "contradicted",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 1227,
+          "end_character_exclusive": 1408,
+          "exact_quote": "[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000"
+        }
+      ],
+      "decision_basis": "All time is the final selectable list entry in this expanded menu. The next element is an image outside the list.",
+      "limitations": "The contradiction concerns this observed Top time-range menu.",
+      "read_receipt_sha256": "f036a8e37e600d8e3ee50f55a0b8fde52f49e6964adab1c934d57e03fa03d418",
+      "retrieval_fault": null
+    },
+    "922a0c56": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action between \"Reset\" and \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "there is no such button because Reset and Create Order are next to each other",
+        "None",
+        "No such button"
+      ],
+      "premise_verdict": "unknown",
+      "frozen_label_supported": false,
+      "delivered_item_count": 0,
+      "reader_context_observed": false,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [],
+      "evidence": [],
+      "decision_basis": "The observer process was killed at its unchanged 45-second external deadline. No context items were delivered for this case; adjacency cannot be established.",
+      "limitations": "Diagnostic or another case source text is not reader-delivered evidence and cannot be borrowed.",
+      "read_receipt_sha256": "6a086c91163eef5635e959daea8d67b779b4ae3d8171911020cb5ef50dad10dc",
+      "retrieval_fault": {
+        "exit_code": -9,
+        "external_timeout": true,
+        "elapsed_seconds": 45.117616250005085
+      }
+    },
+    "d6da3938": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action immediately to the right of \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Reset Password"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 1,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 819,
+          "end_character_exclusive": 1115,
+          "exact_quote": "[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004"
+        }
+      ],
+      "decision_basis": "The customer action group includes Create Order followed immediately by Reset Password; intervening StaticText is the label of Create Order.",
+      "limitations": "The different state after Save Customer does not affect this local adjacency. Accessibility-tree order supplies the registered interpretation of right.",
+      "read_receipt_sha256": "22a83591303ffd5b70f3d339ac6ae54feb75999a2a8e89b23faa08c3631587bf",
+      "retrieval_fault": null
+    },
+    "f43926d9": {
+      "question": "I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "There is no browse tab between Tags and Alphabetical there.",
+        "None",
+        "No such tab"
+      ],
+      "premise_verdict": "contradicted",
+      "frozen_label_supported": true,
+      "delivered_item_count": 4,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        2
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        2,
+        1
+      ],
+      "evidence": [
+        {
+          "context_item_index": 2,
+          "start_character": 1254,
+          "end_character_exclusive": 1598,
+          "exact_quote": "[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible",
+          "source_episode": "episode:3fd1796a0f590ac946fedf12",
+          "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000"
+        },
+        {
+          "context_item_index": 1,
+          "start_character": 1240,
+          "end_character_exclusive": 1857,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000"
+        }
+      ],
+      "decision_basis": "Under the directory main region, Tags and Alphabetical are consecutive list entries. The second independently sufficient excerpt shows the same adjacency in a different directory view.",
+      "limitations": "The exact registered block and the structurally equivalent alternative are different evidence paths.",
+      "read_receipt_sha256": "51300c7c1265bc4284745ed88c46bd9d124cc9a9e3efe025cd003eaf3463430b",
+      "retrieval_fault": null
+    },
+    "f61a096f": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 568,
+          "end_character_exclusive": 1482,
+          "exact_quote": "[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004"
+        }
+      ],
+      "decision_basis": "The first controls in the customer main region are nine consecutive buttons, Back through Save Customer. Personal Information and a table follow. Nested StaticText repeats accessible labels and supplies no additional controls.",
+      "limitations": "The region is identified by order, the customer-specific button labels and the boundary with personal information; other items contain controls from different pages.",
+      "read_receipt_sha256": "d6f282f392712490777693b8be3b9472b72c5560cd14d3b99335844abf9d6b2a",
+      "retrieval_fault": null
+    }
+  },
+  "baseline_support_review_sha256": "62daa535c3b485da21b26a7e47040b6be71c55c70f06645010ac3dfb87c0d4a4",
+  "source_formation_readback_sha256": "3e7a89f8d06fac9c455b96bc2e91e510cbda7cf03507b8552d24a709c99831f5",
+  "comparison_with_v3": {
+    "0c6b0c60": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "6d975a08": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "89a20f48": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "922a0c56": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "d6da3938": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "f43926d9": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    },
+    "f61a096f": {
+      "delivered_content_equal": true,
+      "strict_span_equal": true,
+      "source_support_equal": true
+    }
+  }
+}

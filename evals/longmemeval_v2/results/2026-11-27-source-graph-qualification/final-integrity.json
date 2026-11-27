@@ -1,0 +1,17 @@
+{
+  "schema": "memory-quality-final-integrity/v1",
+  "at_utc": "2026-11-27T15:47:32.434701+00:00",
+  "checks": {
+    "all_frozen_prompts_identical": 213,
+    "report_replayed_exactly_from_raw_outputs": true,
+    "candidate_decision_input_hashes_verified": 9,
+    "reviewed_code_unchanged": true,
+    "reviewed_documents_status_addenda": "Spec and plan have actual-result/checklist updates after review; frozen registration/code unchanged.",
+    "reviewed_current_rust_files_unchanged": 25,
+    "verification_log_hashes_match": true,
+    "local_document_links_resolve": 33,
+    "negative_gates_and_cleanup_retained": true,
+    "git_diff_check": true
+  },
+  "qualification": "Reader FAIL retained; C2 NO_GO. These are integrity/verification checks, not additional production scenario counts."
+}

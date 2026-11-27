@@ -1,0 +1,624 @@
+{
+  "rows": [
+    {
+      "class": "currency",
+      "elapsed_ms": 12.780958,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "currency-en",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:fed1dcbf894753d819da6f0c",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "currency",
+      "elapsed_ms": 3.911709,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "currency-ru",
+      "language": "ru",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:ed10ea4c68d19d720ee2e29b",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "unit",
+      "elapsed_ms": 4.009708,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "unit-en",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:c18bef9b52b6ef7e8ab40a14",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "unit",
+      "elapsed_ms": 8.112625,
+      "expected": [],
+      "fn": 0,
+      "fp": 1,
+      "id": "unit-de",
+      "language": "de",
+      "link_fn": 0,
+      "link_fp": 1,
+      "link_tp": 0,
+      "linked": [
+        "Das Paket"
+      ],
+      "passed": false,
+      "predicted": [
+        "Das Paket"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "Das Paket",
+            "entity_id": "entity:0a1aa6b2c9e6f47f911c4eb4",
+            "type": "person"
+          }
+        ],
+        "episode_id": "episode:dad69026c7c3ef26e709d26b",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:0a1aa6b2c9e6f47f911c4eb4",
+            "episode_id": "episode:dad69026c7c3ef26e709d26b"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "metric",
+      "elapsed_ms": 3.8423749999999997,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "metric-en",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:2b2c303852acd3f69f58f1d5",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "metric",
+      "elapsed_ms": 3.8013339999999998,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "metric-fr",
+      "language": "fr",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:d490b4cdf5069a010127fc34",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "metric",
+      "elapsed_ms": 3.8655410000000003,
+      "expected": [],
+      "fn": 0,
+      "fp": 0,
+      "id": "metric-ru",
+      "language": "ru",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": true,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:c2dae8ab403eb1c890c04174",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "name",
+      "elapsed_ms": 4.18125,
+      "expected": [
+        "3M"
+      ],
+      "fn": 1,
+      "fp": 0,
+      "id": "name-digits",
+      "language": "en",
+      "link_fn": 1,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": false,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:5c83b118d38455c6b3eb9caa",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "name",
+      "elapsed_ms": 3.805917,
+      "expected": [
+        "Studio 54"
+      ],
+      "fn": 1,
+      "fp": 0,
+      "id": "name-number",
+      "language": "en",
+      "link_fn": 1,
+      "link_fp": 0,
+      "link_tp": 0,
+      "linked": [],
+      "passed": false,
+      "predicted": [],
+      "raw": {
+        "entities": [],
+        "episode_id": "episode:6e87b7410a2c2aed5b0ca1a9",
+        "facts": [],
+        "links": [],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "organization",
+      "elapsed_ms": 8.129917,
+      "expected": [
+        "NASA"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "organization",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "NASA"
+      ],
+      "passed": true,
+      "predicted": [
+        "NASA"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "NASA",
+            "entity_id": "entity:106fcd61cd42302abf21154b",
+            "type": "company"
+          }
+        ],
+        "episode_id": "episode:917995acb985ce27c5db4952",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:106fcd61cd42302abf21154b",
+            "episode_id": "episode:917995acb985ce27c5db4952"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    },
+    {
+      "class": "organization",
+      "elapsed_ms": 7.664167,
+      "expected": [
+        "NASA"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "organization-age",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "NASA"
+      ],
+      "passed": true,
+      "predicted": [
+        "NASA"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "NASA",
+            "entity_id": "entity:106fcd61cd42302abf21154b",
+            "type": "company"
+          }
+        ],
+        "episode_id": "episode:31e3d878fdb929767b6d8527",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:106fcd61cd42302abf21154b",
+            "episode_id": "episode:31e3d878fdb929767b6d8527"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    },
+    {
+      "class": "person",
+      "elapsed_ms": 7.742500000000001,
+      "expected": [
+        "Mira Bennett"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "person-en",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "Mira Bennett"
+      ],
+      "passed": true,
+      "predicted": [
+        "Mira Bennett"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "Mira Bennett",
+            "entity_id": "entity:22d364fdd82f37e6d8e9c890",
+            "type": "person"
+          }
+        ],
+        "episode_id": "episode:27867f3c74fac2dbcbbbda0d",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:22d364fdd82f37e6d8e9c890",
+            "episode_id": "episode:27867f3c74fac2dbcbbbda0d"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    },
+    {
+      "class": "person",
+      "elapsed_ms": 7.733375,
+      "expected": [
+        "Марина Соколова"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "person-ru",
+      "language": "ru",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "Марина Соколова"
+      ],
+      "passed": true,
+      "predicted": [
+        "Марина Соколова"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "Марина Соколова",
+            "entity_id": "entity:33313ba0eaa6af8614008519",
+            "type": "person"
+          }
+        ],
+        "episode_id": "episode:7e147993b99211d07c8c8d41",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:33313ba0eaa6af8614008519",
+            "episode_id": "episode:7e147993b99211d07c8c8d41"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    },
+    {
+      "class": "person",
+      "elapsed_ms": 7.896625000000001,
+      "expected": [
+        "Lucie Moreau"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "person-fr",
+      "language": "fr",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "Lucie Moreau"
+      ],
+      "passed": true,
+      "predicted": [
+        "Lucie Moreau"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "Lucie Moreau",
+            "entity_id": "entity:bc76c789f5d53d1f0d88f60e",
+            "type": "person"
+          }
+        ],
+        "episode_id": "episode:6aa98d52043f40ea3e79a80e",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:bc76c789f5d53d1f0d88f60e",
+            "episode_id": "episode:6aa98d52043f40ea3e79a80e"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    },
+    {
+      "class": "project",
+      "elapsed_ms": 7.696625,
+      "expected": [
+        "Cedar"
+      ],
+      "fn": 1,
+      "fp": 1,
+      "id": "project-en",
+      "language": "en",
+      "link_fn": 1,
+      "link_fp": 1,
+      "link_tp": 0,
+      "linked": [
+        "Project Cedar"
+      ],
+      "passed": false,
+      "predicted": [
+        "Project Cedar"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "Project Cedar",
+            "entity_id": "entity:d1b58bd7107e9938abd80c93",
+            "type": "person"
+          }
+        ],
+        "episode_id": "episode:47f903331ac31cd347453ad0",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:d1b58bd7107e9938abd80c93",
+            "episode_id": "episode:47f903331ac31cd347453ad0"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 0
+    },
+    {
+      "class": "manual",
+      "elapsed_ms": 7.538666,
+      "expected": [
+        "SLO"
+      ],
+      "fn": 0,
+      "fp": 0,
+      "id": "manual-ambiguous",
+      "language": "en",
+      "link_fn": 0,
+      "link_fp": 0,
+      "link_tp": 1,
+      "linked": [
+        "SLO"
+      ],
+      "passed": true,
+      "predicted": [
+        "SLO"
+      ],
+      "raw": {
+        "entities": [
+          {
+            "canonical_name": "SLO",
+            "entity_id": "entity:02d2520741388fce829b8912",
+            "type": "company"
+          }
+        ],
+        "episode_id": "episode:01255f6246750c9bcb583930",
+        "facts": [],
+        "links": [
+          {
+            "entity_id": "entity:02d2520741388fce829b8912",
+            "episode_id": "episode:01255f6246750c9bcb583930"
+          }
+        ],
+        "reconciliation": {
+          "active_relations": 0,
+          "claims_projected": 0,
+          "reason_codes": [],
+          "status": "complete"
+        },
+        "warnings": []
+      },
+      "status": "completed",
+      "tp": 1
+    }
+  ],
+  "scheduled": 16,
+  "schema": "entity-admission-capture/v1"
+}

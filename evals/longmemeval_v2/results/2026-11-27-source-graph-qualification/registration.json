@@ -1,0 +1,70 @@
+{
+  "schema": "memory-mcp-reader-protocol/v1",
+  "rows_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/fixtures/source-graph-independent-v1/qualification/rows.jsonl",
+  "rows_sha256": "bf01b7b7c07ca94149f85a564b39b985a6a2acadc9b0fcd615f436e9973cc892",
+  "truth_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/fixtures/source-graph-independent-v1/qualification/truth.json",
+  "truth_sha256": "0ecefe5195496bd14ecbf5fcea942fc85891282d5565f9bbf43aa909b1a77951",
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "endpoint": "http://127.0.0.1:18767/v1",
+  "variants": [
+    "source-ledger-final-first",
+    "source-graph-final-first"
+  ],
+  "sampling": {
+    "temperature": 0,
+    "max_completion_tokens": 256
+  },
+  "timeout_seconds": 60,
+  "max_retries": 0,
+  "capture_budget_seconds": 1800,
+  "repetitions": 1,
+  "order": "case-major then declared variant order; no repeat or best output selection",
+  "hypothesis": "reader protocol only, fixed evidence; no retrieval or general memory benefit claim",
+  "runner_sha256": "b17c63b3954ddc8f2637e396c44a4c61cacf1c677990f63623b4a9011e421b65",
+  "attempt_recorder_sha256": "1c1f7fb78bc68858f01c2e7dd8ab7d1890413c734bd509246b0818a3f1e61e49",
+  "variant_treatments": {
+    "source-ledger-final-first": [
+      "evidence_structure",
+      "ordered_peer_relations",
+      "anchor_occurrences",
+      "quote_channel_separation",
+      "reasoning_instruction"
+    ],
+    "source-graph-final-first": [
+      "source_graph",
+      "typed_source_locations",
+      "quote_channel_separation",
+      "reasoning_instruction"
+    ]
+  },
+  "cohorts": {
+    "previously_exposed_sixteen": [
+      "middle-positive",
+      "adjacent-negative",
+      "terminal-negative",
+      "button-count-mixed",
+      "missing-anchor-unknown",
+      "duplicate-anchor-unknown",
+      "clipped-terminal-unknown",
+      "heterogeneous-positive",
+      "named-scope-positive",
+      "complete-list-positive",
+      "ledger-conflicting-repeat",
+      "ledger-consistent-repeat",
+      "ledger-named-scope-repeat",
+      "ledger-role-selected-repeat",
+      "ledger-opaque-intervening",
+      "ledger-clipped-repeat"
+    ],
+    "new_source_reviewed_eight": [
+      "graph-equal-links",
+      "graph-conflicting-links",
+      "graph-opaque-repeat",
+      "graph-scope-count",
+      "graph-role-selection",
+      "graph-virtualized-last",
+      "graph-escaped-name",
+      "graph-single-closed-end"
+    ]
+  }
+}

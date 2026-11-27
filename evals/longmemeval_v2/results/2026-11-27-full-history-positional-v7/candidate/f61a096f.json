@@ -1,0 +1,2350 @@
+{
+  "ordinal": 6,
+  "case_id": "f61a096f",
+  "arm": "candidate",
+  "command": [
+    "/tmp/memory-quality-history-v7-2026-11-27",
+    "full_history_registered_case_retains_reviewed_source",
+    "--exact",
+    "--ignored",
+    "--nocapture"
+  ],
+  "raw_log": "/tmp/memory-quality-full-100-2026-11-27/observations-positional-v7/f61a096f.log",
+  "copy_seconds": 0.7078014590078965,
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 33.30002570900251,
+  "process_fault": null,
+  "malformed_events": [],
+  "strict_span_assertion": false,
+  "raw_sha256": "9d92d4e065ab32cd0b4d480c994528a982f797ec091554db900556c06f5a274a",
+  "raw_bytes": 13419150,
+  "receipt_observed": true,
+  "assembly_elapsed_ms": 20424.923583000003,
+  "partial_elapsed_ms": null,
+  "assembly_within_30": true,
+  "strict_original_source_span": true,
+  "process_deadline_exceeded": false,
+  "runtime_completed": true,
+  "retrieval_fault": null,
+  "delivered_items": [
+    {
+      "confidence": 0.0,
+      "content": " '\\\\ue623'\\n\\tStaticText 'One or more'\\n\\tlink 'indexers are invalid'\\n\\tStaticText '. Make sure your'\\n\\tlink 'Magento cron job'\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible\\n\\t\\t\\t[778] rowgroup '', visible\\n\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t[780] rowheader 'Last Logged In:', visible\\n\\t\\t\\t\\t\\t[781] gridcell 'Apr 19, 2023, 7:36:10 PM (Online)', visible\\n\\t\\t\\t\\t[782] row '', visible\\n\\t\\t\\t\\t\\t[783] rowheader 'Account Lock:', visible\\n\\t\\t\\t\\t\\t[784] gridcell 'Unlocked', visible\\n\\t\\t\\t\\t[785] row '', visible\\n\\t\\t\\t\\t\\t[786] rowheader 'Confirmed email:', visible\\n\\t\\t\\t\\t\\t[787] gridcell 'Confirmation Not Required', visible\\n\\t\\t\\t\\t[788] row '', visible\\n\\t\\t\\t\\t\\t[789] rowheader 'Account Created:', visible\\n\\t\\t\\t\\t\\t",
+      "fact_id": "fact:07f50ea549db79b8a856800e",
+      "grounding": 0.44,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 432290,
+          "original_bytes": 804658,
+          "start_byte": 430242
+        },
+        "control_label_coverage": 1.0,
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "action",
+          "back",
+          "button",
+          "customer",
+          "detail",
+          "page",
+          "save",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 432290,
+          "original_bytes": 804658,
+          "start_byte": 430242
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "magento",
+            "shopping",
+            "admin",
+            "dashboard",
+            "customer",
+            "detail",
+            "page",
+            "action",
+            "top",
+            "back",
+            "save",
+            "button"
+          ],
+          "matched_index_key_terms": [
+            "magento",
+            "shopping",
+            "admin",
+            "dashboard",
+            "customer",
+            "action",
+            "back",
+            "save"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "magento",
+              "shopping",
+              "admin",
+              "dashboard",
+              "customer",
+              "action",
+              "back",
+              "save"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10",
+              "100",
+              "10009",
+              "1007"
+            ],
+            "supporting_fact_ids": [
+              "fact:3a6f79c58ab67cb161af204f",
+              "fact:4eff59b2930ed4b383322cf0",
+              "fact:9dfc4dd01b28ce5fa083a3fc",
+              "fact:c47325fdd147ad91b06ca365",
+              "fact:fe522668a3845f4cebc2358a"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:751dce326043631881f9bf3b",
+        "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+        "source_type": "other"
+      },
+      "quote": " '\\\\ue623'\\n\\tStaticText 'One or more'\\n\\tlink 'indexers are invalid'\\n\\tStaticText '. Make sure your'\\n\\tlink 'Magento cron job'\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible\\n\\t\\t\\t[778] rowgroup '', visible\\n\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t[780] rowheader 'Last Logged In:', visible\\n\\t\\t\\t\\t\\t[781] gridcell 'Apr 19, 2023, 7:36:10 PM (Online)', visible\\n\\t\\t\\t\\t[782] row '', visible\\n\\t\\t\\t\\t\\t[783] rowheader 'Account Lock:', visible\\n\\t\\t\\t\\t\\t[784] gridcell 'Unlocked', visible\\n\\t\\t\\t\\t[785] row '', visible\\n\\t\\t\\t\\t\\t[786] rowheader 'Confirmed email:', visible\\n\\t\\t\\t\\t\\t[787] gridcell 'Confirmation Not Required', visible\\n\\t\\t\\t\\t[788] row '', visible\\n\\t\\t\\t\\t\\t[789] rowheader 'Account Created:', visible\\n\\t\\t\\t\\t\\t",
+      "rationale": "tier=fallback fts=15.73 access_count=0 confidence=0.00 relevance=0.00 grounding=0.44 alignment=0.98 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:751dce326043631881f9bf3b"
+    },
+    {
+      "confidence": 0.0,
+      "content": "t\\t[1732] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1734] list ''\\n\\t\\t\\t[1735] listitem ''\\n\\t\\t\\t\\t[1736] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1737] listitem ''\\n\\t\\t\\t\\t[1738] link 'Search Terms', clickable\\n\\t\\t\\t[1739] listitem ''\\n\\t\\t\\t\\t[1740] link 'Advanced Search', clickable\\n\\t\\t\\t[1741] listitem ''\\n\\t\\t\\t\\t[1742] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright \u00a9 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1747] link 'Report All Bugs', clickable\", \"action\": \"click('1581')\", \"screenshot\": \"screenshots/a5a78494/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"We\u2019re currently on orders history page 3 showing 2022 orders, but we need Jan 2023. The best next action is to go to Page 2, which should contain earlier 2023 orders (including January).\", \"url\": \"http://localhost:9082/sales/order/history/?p=3\"}, {\"accessibility_tree\": \"RootWebArea 'My Orders', focused\\n\\t[216] banner '', visible\\n\\t\\t[219] list '', visible\\n\\t\\t\\t[220] listitem '', visible\\n\\t\\t\\t\\t[221] link 'My Account', clickable, visible\\n\\t\\t\\t[222] listitem '', visible\\n\\t\\t\\t\\t[223] link 'My Wish List', clickable, visible\\n\\t\\t\\t[224] listitem '', visible\\n\\t\\t\\t\\t[225] link 'Sign Out', clickable, visible\\n\\t\\t\\t[226] listitem '', visible\\n\\t\\t\\t[229] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Welcome, Emma Lopez!'\\n\\t\\t[231] link 'Skip to Content', clickable\\n\\t\\t\\tStaticText 'Skip to Content'\\n\\t\\t[236] link 'store logo', clickable, visible\\n\\t\\t\\t[237] image 'one_stop_market_logo', visible\\n\\t\\t[239] link '\\\\ue611 My Cart 3 3items', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue611'\\n\\t\\t\\tStaticText 'My Cart'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText 'items'\\n\\t\\t[375] Section '', visible\\n\\t\\t\\t[377] LabelText '', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue615'\\n\\t\\t\\t\\tStaticText 'Search'\\n\\t\\t\\t[380] combobox '\\\\ue615 Search', clickable, visible, autocomplete='both', hasPopup='listbox', expanded=Fals",
+      "fact_id": "fact:f7a90d85ce8a5a24afda86fb",
+      "grounding": 0.4,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 71680,
+          "original_bytes": 478492,
+          "start_byte": 69632
+        },
+        "control_label_coverage": 0.5,
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "customer",
+          "detail",
+          "page",
+          "action",
+          "top",
+          "including",
+          "back",
+          "button"
+        ],
+        "quote_excerpt": {
+          "end_byte": 71680,
+          "original_bytes": 478492,
+          "start_byte": 69632
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "our",
+            "magento",
+            "shopping",
+            "dashboard",
+            "detail",
+            "page",
+            "action",
+            "top",
+            "including",
+            "back",
+            "button"
+          ],
+          "matched_index_key_terms": [
+            "our",
+            "magento",
+            "page",
+            "action",
+            "top"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "our",
+              "magento",
+              "customer",
+              "page",
+              "action",
+              "top"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10",
+              "1007"
+            ],
+            "supporting_fact_ids": [
+              "fact:3a6f79c58ab67cb161af204f",
+              "fact:4eff59b2930ed4b383322cf0",
+              "fact:9dfc4dd01b28ce5fa083a3fc",
+              "fact:c47325fdd147ad91b06ca365",
+              "fact:fe522668a3845f4cebc2358a"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:e92506fa30379e53f1cb8ae9",
+        "source_id": "longmemeval_v2_trajectory_12eeba3c56fa7a0cd79ba692ad3ac02226d37b3cfc380e3daa7f532a0763c53b_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "t\\t[1732] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1734] list ''\\n\\t\\t\\t[1735] listitem ''\\n\\t\\t\\t\\t[1736] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1737] listitem ''\\n\\t\\t\\t\\t[1738] link 'Search Terms', clickable\\n\\t\\t\\t[1739] listitem ''\\n\\t\\t\\t\\t[1740] link 'Advanced Search', clickable\\n\\t\\t\\t[1741] listitem ''\\n\\t\\t\\t\\t[1742] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright \u00a9 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1747] link 'Report All Bugs', clickable\", \"action\": \"click('1581')\", \"screenshot\": \"screenshots/a5a78494/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"We\u2019re currently on orders history page 3 showing 2022 orders, but we need Jan 2023. The best next action is to go to Page 2, which should contain earlier 2023 orders (including January).\", \"url\": \"http://localhost:9082/sales/order/history/?p=3\"}, {\"accessibility_tree\": \"RootWebArea 'My Orders', focused\\n\\t[216] banner '', visible\\n\\t\\t[219] list '', visible\\n\\t\\t\\t[220] listitem '', visible\\n\\t\\t\\t\\t[221] link 'My Account', clickable, visible\\n\\t\\t\\t[222] listitem '', visible\\n\\t\\t\\t\\t[223] link 'My Wish List', clickable, visible\\n\\t\\t\\t[224] listitem '', visible\\n\\t\\t\\t\\t[225] link 'Sign Out', clickable, visible\\n\\t\\t\\t[226] listitem '', visible\\n\\t\\t\\t[229] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Welcome, Emma Lopez!'\\n\\t\\t[231] link 'Skip to Content', clickable\\n\\t\\t\\tStaticText 'Skip to Content'\\n\\t\\t[236] link 'store logo', clickable, visible\\n\\t\\t\\t[237] image 'one_stop_market_logo', visible\\n\\t\\t[239] link '\\\\ue611 My Cart 3 3items', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue611'\\n\\t\\t\\tStaticText 'My Cart'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText 'items'\\n\\t\\t[375] Section '', visible\\n\\t\\t\\t[377] LabelText '', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue615'\\n\\t\\t\\t\\tStaticText 'Search'\\n\\t\\t\\t[380] combobox '\\\\ue615 Search', clickable, visible, autocomplete='both', hasPopup='listbox', expanded=Fals",
+      "rationale": "tier=fallback fts=32.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.40 alignment=0.97 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:e92506fa30379e53f1cb8ae9"
+    },
+    {
+      "confidence": 0.0,
+      "content": ":'\\n\\t\\tStaticText '2'\\n\\tStaticText '\\\\ue623'\\n\\tStaticText 'One or more of the Cache Types are invalidated: Page Cache, Blocks HTML output, Collections Data. Please go to'\\n\\t[690] link 'Cache Management', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[705] banner '', visible\\n\\t\\t[708] heading '#000000300', visible\\n\\t\\t[711] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[723] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[731] textbox '\\\\ue60c', clickable, visible\\n\\t[737] main ''\\n\\t\\t[743] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[745] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[747] button 'Edit', clickable, visible\\n\\t\\t\\tStaticText 'Edit'\\n\\t\\t[749] button 'Cancel', visible\\n\\t\\t\\tStaticText 'Cancel'\\n\\t\\t[751] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[753] button 'Hold', visible\\n\\t\\t\\tStaticText 'Hold'\\n\\t\\t[755] button 'Invoice', clickable, visible\\n\\t\\t\\tStaticText 'Invoice'\\n\\t\\t[757] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[763] tabpanel 'Information'\\n\\t\\t\\t[765] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000300 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[774] table '', visible\\n\\t\\t\\t\\t\\t[775] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[776] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[777] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[778] gridcell 'Apr 19, 2023, 7:41:07 PM', visible\\n\\t\\t\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[780] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[781] gridcell 'Processing', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Processing'\\n\\t\\t\\t\\t\\t\\t[783] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[784] rowheader 'Purchased ",
+      "fact_id": "fact:91641897abb792f416953a33",
+      "grounding": 0.4,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 36945,
+          "original_bytes": 614491,
+          "start_byte": 34897
+        },
+        "control_label_coverage": 0.5,
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "action",
+          "back",
+          "button",
+          "customer",
+          "detail",
+          "page",
+          "top"
+        ],
+        "quote_excerpt": {
+          "end_byte": 36945,
+          "original_bytes": 614491,
+          "start_byte": 34897
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "our",
+            "magento",
+            "admin",
+            "dashboard",
+            "customer",
+            "detail",
+            "page",
+            "action",
+            "top",
+            "back",
+            "button"
+          ],
+          "matched_index_key_terms": [
+            "magento",
+            "admin",
+            "dashboard",
+            "customer",
+            "page",
+            "action",
+            "top",
+            "back"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "magento",
+              "admin",
+              "dashboard",
+              "customer",
+              "page",
+              "action",
+              "top",
+              "back"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10",
+              "100",
+              "10009",
+              "1007"
+            ],
+            "supporting_fact_ids": [
+              "fact:3a6f79c58ab67cb161af204f",
+              "fact:4eff59b2930ed4b383322cf0",
+              "fact:9dfc4dd01b28ce5fa083a3fc",
+              "fact:c47325fdd147ad91b06ca365",
+              "fact:fe522668a3845f4cebc2358a"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:edc93d08cde3e2ed63c0697d",
+        "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": ":'\\n\\t\\tStaticText '2'\\n\\tStaticText '\\\\ue623'\\n\\tStaticText 'One or more of the Cache Types are invalidated: Page Cache, Blocks HTML output, Collections Data. Please go to'\\n\\t[690] link 'Cache Management', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[705] banner '', visible\\n\\t\\t[708] heading '#000000300', visible\\n\\t\\t[711] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[723] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[731] textbox '\\\\ue60c', clickable, visible\\n\\t[737] main ''\\n\\t\\t[743] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[745] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[747] button 'Edit', clickable, visible\\n\\t\\t\\tStaticText 'Edit'\\n\\t\\t[749] button 'Cancel', visible\\n\\t\\t\\tStaticText 'Cancel'\\n\\t\\t[751] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[753] button 'Hold', visible\\n\\t\\t\\tStaticText 'Hold'\\n\\t\\t[755] button 'Invoice', clickable, visible\\n\\t\\t\\tStaticText 'Invoice'\\n\\t\\t[757] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[763] tabpanel 'Information'\\n\\t\\t\\t[765] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000300 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[774] table '', visible\\n\\t\\t\\t\\t\\t[775] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[776] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[777] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[778] gridcell 'Apr 19, 2023, 7:41:07 PM', visible\\n\\t\\t\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[780] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[781] gridcell 'Processing', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Processing'\\n\\t\\t\\t\\t\\t\\t[783] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[784] rowheader 'Purchased ",
+      "rationale": "tier=fallback fts=11.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.40 alignment=0.97 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:edc93d08cde3e2ed63c0697d"
+    },
+    {
+      "confidence": 0.0,
+      "content": "'\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[799] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[831] banner '', visible\\n\\t\\t[834] heading 'Olivia 1/4 Zip Light Jacket', visible\\n\\t\\t[837] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[849] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[851] Section '', visible\\n\\t\\t\\t[853] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[857] textbox '\\\\ue60c', clickable, visible\\n\\t[863] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[874] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[885] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[892] button 'Save', clickable, visible\\n\\t\\t\\tStaticText 'Save'\\n\\t\\t[894] button 'Save options', clickable, visible\\n\\t\\t[903] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[905] button 'Add Attribute', clickable, visible\\n\\t\\t\\tStaticText 'Add Attribute'\\n\\t\\t[924] group ''\\n\\t\\t\\t[927] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[website]'\\n\\t\\t\\t\\tStaticText 'Enable Product'\\n\\t\\t\\t[931] checkbox '[website] Enable Product Yes', clickable, checked='true'\\n\\t\\t\\t[932] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Yes'\\n\\t\\t\\t[936] LabelText '', visible\\n\\t\\t\\t\\tStaticText 'Attribute Set'\\n\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t[981] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[store view]'\\n\\t\\t\\t\\tStaticText 'Product Name'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[984] textbox '[store view] Product Name *' value='Olivia 1/4 Zip Light Jacket', clickable, visible\\n\\t\\t\\t\\tStaticText 'Olivia 1/4 Zip Light Jacket'\\n\\t\\t\\t[987] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[global]'\\n\\t\\t\\t\\tStaticText 'SKU'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[990] textbox '[global] SKU *' value='WJ12', clickable, visible\\",
+      "fact_id": "fact:9ca6612a0192da77933a51c5",
+      "grounding": 0.44,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 736802,
+          "original_bytes": 896372,
+          "start_byte": 734754
+        },
+        "control_label_coverage": 0.5,
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "customer",
+          "detail",
+          "page",
+          "action",
+          "top",
+          "back",
+          "save",
+          "button"
+        ],
+        "quote_excerpt": {
+          "end_byte": 736802,
+          "original_bytes": 896372,
+          "start_byte": 734754
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "our",
+            "magento",
+            "based",
+            "admin",
+            "dashboard",
+            "customer",
+            "detail",
+            "page",
+            "action",
+            "top",
+            "back",
+            "save",
+            "button"
+          ],
+          "matched_index_key_terms": [
+            "magento",
+            "admin",
+            "dashboard",
+            "customer",
+            "action",
+            "top",
+            "back",
+            "save"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "magento",
+              "admin",
+              "dashboard",
+              "customer",
+              "action",
+              "top",
+              "back",
+              "save"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10",
+              "100",
+              "10009"
+            ],
+            "supporting_fact_ids": [
+              "fact:3a6f79c58ab67cb161af204f",
+              "fact:4eff59b2930ed4b383322cf0",
+              "fact:9dfc4dd01b28ce5fa083a3fc",
+              "fact:c47325fdd147ad91b06ca365",
+              "fact:fe522668a3845f4cebc2358a"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:bf814bfd62e0d0fccc752eb7",
+        "source_id": "longmemeval_v2_trajectory_d1acede0fa655e1e57defc42d511007fd09039d1180cafeb788a346e46d4c924_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "'\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[799] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[831] banner '', visible\\n\\t\\t[834] heading 'Olivia 1/4 Zip Light Jacket', visible\\n\\t\\t[837] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[849] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[851] Section '', visible\\n\\t\\t\\t[853] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[857] textbox '\\\\ue60c', clickable, visible\\n\\t[863] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[874] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[885] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[892] button 'Save', clickable, visible\\n\\t\\t\\tStaticText 'Save'\\n\\t\\t[894] button 'Save options', clickable, visible\\n\\t\\t[903] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[905] button 'Add Attribute', clickable, visible\\n\\t\\t\\tStaticText 'Add Attribute'\\n\\t\\t[924] group ''\\n\\t\\t\\t[927] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[website]'\\n\\t\\t\\t\\tStaticText 'Enable Product'\\n\\t\\t\\t[931] checkbox '[website] Enable Product Yes', clickable, checked='true'\\n\\t\\t\\t[932] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Yes'\\n\\t\\t\\t[936] LabelText '', visible\\n\\t\\t\\t\\tStaticText 'Attribute Set'\\n\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t[981] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[store view]'\\n\\t\\t\\t\\tStaticText 'Product Name'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[984] textbox '[store view] Product Name *' value='Olivia 1/4 Zip Light Jacket', clickable, visible\\n\\t\\t\\t\\tStaticText 'Olivia 1/4 Zip Light Jacket'\\n\\t\\t\\t[987] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[global]'\\n\\t\\t\\t\\tStaticText 'SKU'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[990] textbox '[global] SKU *' value='WJ12', clickable, visible\\",
+      "rationale": "tier=fallback fts=40.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.44 alignment=0.98 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:bf814bfd62e0d0fccc752eb7"
+    },
+    {
+      "confidence": 0.0,
+      "content": "nk '\\\\ue60d STORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[578] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[661] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[691] banner '', visible\\n\\t\\t[694] heading '#000000260', visible\\n\\t\\t[697] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[709] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[711] Section '', visible\\n\\t\\t\\t[713] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[717] textbox '\\\\ue60c', clickable, visible\\n\\t[723] main ''\\n\\t\\t[729] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[731] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[733] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[735] button 'Ship', clickable, visible\\n\\t\\t\\tStaticText 'Ship'\\n\\t\\t[737] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[743] tabpanel 'Information'\\n\\t\\t\\t[745] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000260 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[754] table '', visible\\n\\t\\t\\t\\t\\t[755] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[756] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[757] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[758] gridcell 'Jan 8, 2022, 2:26:01 AM', visible\\n\\t\\t\\t\\t\\t\\t[759] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[760] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[761] gridcell 'Complete', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t\\t[763] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[764] rowheader 'Purchased From', visible\\n\\t\\t\\t\\t\\t\\t\\t[765] gridcell 'Main Website Main Website Store Default Store View', visib",
+      "fact_id": "fact:37f2974c09fc83ab98421ce5",
+      "grounding": 0.37,
+      "provenance": {
+        "content_excerpt": {
+          "end_byte": 565868,
+          "original_bytes": 831631,
+          "start_byte": 563820
+        },
+        "control_label_coverage": 0.5,
+        "extraction_strategy": "episode_heuristic",
+        "ingestion_method": "extraction",
+        "matched_query_terms": [
+          "customer",
+          "detail",
+          "page",
+          "action",
+          "top",
+          "back",
+          "button"
+        ],
+        "quote_excerpt": {
+          "end_byte": 565868,
+          "original_bytes": 831631,
+          "start_byte": 563820
+        },
+        "retrieval_admission": {
+          "basis": "lexical",
+          "community": null,
+          "explicit_date_admitted": false,
+          "graph_anchor_origin": null,
+          "hop_count": null,
+          "matched_content_terms": [
+            "am",
+            "using",
+            "our",
+            "magento",
+            "admin",
+            "dashboard",
+            "customer",
+            "detail",
+            "page",
+            "action",
+            "top",
+            "back",
+            "button"
+          ],
+          "matched_index_key_terms": [
+            "magento",
+            "admin",
+            "dashboard",
+            "customer",
+            "action",
+            "top",
+            "back"
+          ],
+          "matched_references": [],
+          "policy_version": "retrieval-admission-v1",
+          "repeated_topic": {
+            "matched_query_index_terms": [
+              "magento",
+              "admin",
+              "dashboard",
+              "customer",
+              "action",
+              "top",
+              "back"
+            ],
+            "matched_repeated_topics": [
+              "00",
+              "01",
+              "10",
+              "100",
+              "10009",
+              "1007"
+            ],
+            "supporting_fact_ids": [
+              "fact:3a6f79c58ab67cb161af204f",
+              "fact:4eff59b2930ed4b383322cf0",
+              "fact:9dfc4dd01b28ce5fa083a3fc",
+              "fact:c47325fdd147ad91b06ca365",
+              "fact:fe522668a3845f4cebc2358a"
+            ]
+          },
+          "resolved_entity_ids": [],
+          "semantic_similarity": null
+        },
+        "source_episode_id": "episode:de6c79531ee685f614e42767",
+        "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000000",
+        "source_type": "other"
+      },
+      "quote": "nk '\\\\ue60d STORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[578] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[661] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[691] banner '', visible\\n\\t\\t[694] heading '#000000260', visible\\n\\t\\t[697] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[709] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[711] Section '', visible\\n\\t\\t\\t[713] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[717] textbox '\\\\ue60c', clickable, visible\\n\\t[723] main ''\\n\\t\\t[729] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[731] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[733] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[735] button 'Ship', clickable, visible\\n\\t\\t\\tStaticText 'Ship'\\n\\t\\t[737] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[743] tabpanel 'Information'\\n\\t\\t\\t[745] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000260 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[754] table '', visible\\n\\t\\t\\t\\t\\t[755] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[756] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[757] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[758] gridcell 'Jan 8, 2022, 2:26:01 AM', visible\\n\\t\\t\\t\\t\\t\\t[759] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[760] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[761] gridcell 'Complete', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t\\t[763] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[764] rowheader 'Purchased From', visible\\n\\t\\t\\t\\t\\t\\t\\t[765] gridcell 'Main Website Main Website Store Default Store View', visib",
+      "rationale": "tier=fallback fts=45.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.37 alignment=0.96 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+      "relevance": 0.0,
+      "retrieval_evidence": {
+        "admission_basis": "lexical",
+        "policy_version": "retrieval-admission-v1"
+      },
+      "retrieval_tier": "fallback",
+      "semantic_available": false,
+      "source_episode": "episode:de6c79531ee685f614e42767"
+    }
+  ],
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2319,
+        "elapsed_ms": 2.350917,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 275,
+        "elapsed_ms": 4.2862919999999995,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "carrier_span_present": true,
+        "case_id": "f61a096f",
+        "episode_count": 151,
+        "source_episode": "episode:751dce326043631881f9bf3b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 335,
+        "elapsed_ms": 4.643959,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3656,
+        "elapsed_ms": 8.856124999999999,
+        "sql_sha256": "d78233c12e08d24441738abfa19412ad101b7b9a89dd5dbd7ce4735ba64ec625"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 4.573125,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 4.580166999999999,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 418223,
+        "elapsed_ms": 427.136167,
+        "sql_sha256": "4943846d75be71dc4340bc6491c4e55defa47f17737f014e8388e359013a0fa5"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 458136,
+        "elapsed_ms": 888.429709,
+        "sql_sha256": "93e38e9f81b722b5793797fc40656afb19fe4b55c0d9082c8ee1e416a4ec34a3"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 624739,
+        "elapsed_ms": 1514.727959,
+        "sql_sha256": "f50eb8f009545c699957c8df4ba93a06df04fcf5bbd18661e1d7d2b745c614e5"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 575925,
+        "elapsed_ms": 2091.228459,
+        "sql_sha256": "747e1f7c1b62850c7c3db29b8aad8cacd141f90e33a92c52c17c70e3e2ddc9a5"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 2117.8185,
+        "records": 249,
+        "content_bytes": 100200359,
+        "max_content_bytes": 1048542,
+        "index_keys": 1817482,
+        "index_key_bytes": 38516461,
+        "max_index_key_bytes": 266,
+        "unique_contents": 96,
+        "unique_sources": 96,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e",
+          "fact:4eff59b2930ed4b383322cf0",
+          "fact:9dfc4dd01b28ce5fa083a3fc"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 2148.134208,
+        "records": 249,
+        "content_bytes": 100200359,
+        "max_content_bytes": 1048542,
+        "index_keys": 1817482,
+        "index_key_bytes": 38516461,
+        "max_index_key_bytes": 266,
+        "unique_contents": 96,
+        "unique_sources": 96,
+        "tracked_source_fact_ids": [
+          "fact:07f50ea549db79b8a856800e",
+          "fact:4eff59b2930ed4b383322cf0",
+          "fact:9dfc4dd01b28ce5fa083a3fc"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 3294.6387499999996,
+        "records": 249,
+        "content_dictionaries": 96,
+        "index_dictionaries": 96
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13456,
+        "elapsed_ms": 3380.457292,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1367,
+        "elapsed_ms": 3381.891959,
+        "sql_sha256": "7a17c2d526b2e16cc7a9ccf5aadd990617782f9fa12b2fccc46495b28d24e2f1"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 4239,
+        "elapsed_ms": 3445.34625,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1856,
+        "elapsed_ms": 3448.4771250000003,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1337,
+        "elapsed_ms": 3450.316834,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1639,
+        "elapsed_ms": 3452.339125,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2047,
+        "elapsed_ms": 3454.838417,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 251534,
+        "elapsed_ms": 3756.849959,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2151,
+        "elapsed_ms": 6859.990792,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19378,
+        "elapsed_ms": 7238.551,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40291,
+        "elapsed_ms": 7280.425792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35649,
+        "elapsed_ms": 7287.829917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 44254,
+        "elapsed_ms": 7292.070459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42547,
+        "elapsed_ms": 7294.754834,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34684,
+        "elapsed_ms": 7339.469125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 32325,
+        "elapsed_ms": 7341.468584,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47509,
+        "elapsed_ms": 7343.930875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 36426,
+        "elapsed_ms": 7345.598083999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34888,
+        "elapsed_ms": 7381.44275,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48180,
+        "elapsed_ms": 7402.1594589999995,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46186,
+        "elapsed_ms": 7404.608167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 49172,
+        "elapsed_ms": 7407.6239590000005,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 38857,
+        "elapsed_ms": 7453.811917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42703,
+        "elapsed_ms": 7462.115500000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48708,
+        "elapsed_ms": 7468.0938750000005,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 63626,
+        "elapsed_ms": 7472.920459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37249,
+        "elapsed_ms": 7520.873,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 35245,
+        "elapsed_ms": 7523.398249999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42538,
+        "elapsed_ms": 7530.66275,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 59194,
+        "elapsed_ms": 7533.968667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 38175,
+        "elapsed_ms": 7585.158375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 57073,
+        "elapsed_ms": 7592.993084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 52043,
+        "elapsed_ms": 7599.051292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 60325,
+        "elapsed_ms": 7602.834917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 54423,
+        "elapsed_ms": 7659.3539169999995,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 51382,
+        "elapsed_ms": 7672.171209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 59021,
+        "elapsed_ms": 7673.989792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 55009,
+        "elapsed_ms": 7675.761459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 94433,
+        "elapsed_ms": 7772.139375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 91114,
+        "elapsed_ms": 7775.7715,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 92870,
+        "elapsed_ms": 7782.70625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 97608,
+        "elapsed_ms": 7787.474084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47819,
+        "elapsed_ms": 7848.152334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 50513,
+        "elapsed_ms": 7858.314667000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 56889,
+        "elapsed_ms": 7864.728666999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 78375,
+        "elapsed_ms": 7868.594209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46253,
+        "elapsed_ms": 7937.485459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 70459,
+        "elapsed_ms": 7942.068625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 56368,
+        "elapsed_ms": 7947.640209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 67532,
+        "elapsed_ms": 7951.1428750000005,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 57335,
+        "elapsed_ms": 8020.552542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 80166,
+        "elapsed_ms": 8033.76625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 69880,
+        "elapsed_ms": 8039.225333999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 75096,
+        "elapsed_ms": 8044.4767919999995,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 59377,
+        "elapsed_ms": 8125.655959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 62146,
+        "elapsed_ms": 8128.473334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 74216,
+        "elapsed_ms": 8132.097334000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 88378,
+        "elapsed_ms": 8135.124334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47356,
+        "elapsed_ms": 8195.410417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48529,
+        "elapsed_ms": 8203.140041999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 69627,
+        "elapsed_ms": 8206.929417,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 56912,
+        "elapsed_ms": 8211.56125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 40889,
+        "elapsed_ms": 8260.902292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37398,
+        "elapsed_ms": 8262.494959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 60133,
+        "elapsed_ms": 8273.282959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 51214,
+        "elapsed_ms": 8276.348458999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 47216,
+        "elapsed_ms": 8332.987334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 56670,
+        "elapsed_ms": 8347.566917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 60452,
+        "elapsed_ms": 8351.315166999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 76505,
+        "elapsed_ms": 8354.94175,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42712,
+        "elapsed_ms": 8406.279042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39021,
+        "elapsed_ms": 8408.287667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 61917,
+        "elapsed_ms": 8419.065292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 53302,
+        "elapsed_ms": 8422.60575,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 33549,
+        "elapsed_ms": 8464.22325,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46684,
+        "elapsed_ms": 8471.147875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37382,
+        "elapsed_ms": 8472.740792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 38862,
+        "elapsed_ms": 8474.256167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 46871,
+        "elapsed_ms": 8533.520209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 56276,
+        "elapsed_ms": 8537.779999999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 53089,
+        "elapsed_ms": 8539.701541999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 67660,
+        "elapsed_ms": 8542.854042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 39859,
+        "elapsed_ms": 8593.719167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 58592,
+        "elapsed_ms": 8603.197042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48213,
+        "elapsed_ms": 8606.911709,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 50579,
+        "elapsed_ms": 8609.308625000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 37167,
+        "elapsed_ms": 8661.011292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 42048,
+        "elapsed_ms": 8665.920542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 51046,
+        "elapsed_ms": 8670.196458999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 62918,
+        "elapsed_ms": 8674.061792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31837,
+        "elapsed_ms": 8719.371374999999,
+        "sql_sha256": "1af1503ca5ae6a31dfd1f00123ce41b44a2995055ded51e9cf49e39da16887d5"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 34457,
+        "elapsed_ms": 8721.96775,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 45323,
+        "elapsed_ms": 8727.835375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 55324,
+        "elapsed_ms": 8731.427083999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 62001,
+        "elapsed_ms": 8901.188209,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1065,
+        "elapsed_ms": 11005.479334,
+        "sql_sha256": "ab93d62f31bcabc42f319a7b9f5058db4bd936b9752147fa0a4ede65eda29ac4"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 11006.0435,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 41762,
+        "elapsed_ms": 11052.534083999999,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 11048.2805,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 11126.584375,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1235,
+        "elapsed_ms": 11132.205709000002,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 543,
+        "elapsed_ms": 11132.774917,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 405,
+        "elapsed_ms": 11133.195416999999,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 367,
+        "elapsed_ms": 11133.573584,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 361,
+        "elapsed_ms": 11133.94325,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 232,
+        "elapsed_ms": 11134.18275,
+        "sql_sha256": "2efd64f3db35d10745ad23acf6515a9103c2b6419e2b4d961fa40b7e6fce9c40"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 14858.136,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 17004.355499999998,
+        "records": 150,
+        "content_dictionaries": 150,
+        "index_dictionaries": 296
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 17186.296583,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 113552,
+        "elapsed_ms": 17304.956084,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 129556,
+        "elapsed_ms": 17434.569959,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 140586,
+        "elapsed_ms": 17575.204041999998,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 137324,
+        "elapsed_ms": 17712.594167,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 123110,
+        "elapsed_ms": 17835.784084,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 17851.474333,
+        "records": 76,
+        "content_bytes": 38816745,
+        "max_content_bytes": 1047521,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 76,
+        "unique_sources": 76,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 19965.009458,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 4557,
+        "elapsed_ms": 20132.075249999998,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1114,
+        "elapsed_ms": 20133.604125,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 20129.499,
+        "stage": "access_heat.started"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13380,
+        "elapsed_ms": 20147.198,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15967,
+        "elapsed_ms": 20150.827042,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16186,
+        "elapsed_ms": 20151.054459000003,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16359,
+        "elapsed_ms": 20151.230209,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 7860,
+        "elapsed_ms": 20159.106709,
+        "sql_sha256": "d4dded53840aa7447f1a7bcea4595e9a93233ffa0669f8355702212042968028"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 20154.825917000002,
+        "stage": "access_heat.settled"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "f61a096f",
+        "elapsed_ms": 20424.923583000003,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": " '\\\\ue623'\\n\\tStaticText 'One or more'\\n\\tlink 'indexers are invalid'\\n\\tStaticText '. Make sure your'\\n\\tlink 'Magento cron job'\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible\\n\\t\\t\\t[778] rowgroup '', visible\\n\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t[780] rowheader 'Last Logged In:', visible\\n\\t\\t\\t\\t\\t[781] gridcell 'Apr 19, 2023, 7:36:10 PM (Online)', visible\\n\\t\\t\\t\\t[782] row '', visible\\n\\t\\t\\t\\t\\t[783] rowheader 'Account Lock:', visible\\n\\t\\t\\t\\t\\t[784] gridcell 'Unlocked', visible\\n\\t\\t\\t\\t[785] row '', visible\\n\\t\\t\\t\\t\\t[786] rowheader 'Confirmed email:', visible\\n\\t\\t\\t\\t\\t[787] gridcell 'Confirmation Not Required', visible\\n\\t\\t\\t\\t[788] row '', visible\\n\\t\\t\\t\\t\\t[789] rowheader 'Account Created:', visible\\n\\t\\t\\t\\t\\t",
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "grounding": 0.44,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 432290,
+                  "original_bytes": 804658,
+                  "start_byte": 430242
+                },
+                "control_label_coverage": 1.0,
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "action",
+                  "back",
+                  "button",
+                  "customer",
+                  "detail",
+                  "page",
+                  "save",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 432290,
+                  "original_bytes": 804658,
+                  "start_byte": 430242
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "magento",
+                    "shopping",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "detail",
+                    "page",
+                    "action",
+                    "top",
+                    "back",
+                    "save",
+                    "button"
+                  ],
+                  "matched_index_key_terms": [
+                    "magento",
+                    "shopping",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "action",
+                    "back",
+                    "save"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "magento",
+                      "shopping",
+                      "admin",
+                      "dashboard",
+                      "customer",
+                      "action",
+                      "back",
+                      "save"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10",
+                      "100",
+                      "10009",
+                      "1007"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:3a6f79c58ab67cb161af204f",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:9dfc4dd01b28ce5fa083a3fc",
+                      "fact:c47325fdd147ad91b06ca365",
+                      "fact:fe522668a3845f4cebc2358a"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:751dce326043631881f9bf3b",
+                "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+                "source_type": "other"
+              },
+              "quote": " '\\\\ue623'\\n\\tStaticText 'One or more'\\n\\tlink 'indexers are invalid'\\n\\tStaticText '. Make sure your'\\n\\tlink 'Magento cron job'\\n\\tStaticText 'is running.'\\n\\t[701] banner '', visible\\n\\t\\t[704] heading 'Jane Smith', visible\\n\\t\\t[707] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[719] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[721] Section '', visible\\n\\t\\t\\t[723] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[727] textbox '\\\\ue60c', clickable, visible\\n\\t[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible\\n\\t\\t\\t[778] rowgroup '', visible\\n\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t[780] rowheader 'Last Logged In:', visible\\n\\t\\t\\t\\t\\t[781] gridcell 'Apr 19, 2023, 7:36:10 PM (Online)', visible\\n\\t\\t\\t\\t[782] row '', visible\\n\\t\\t\\t\\t\\t[783] rowheader 'Account Lock:', visible\\n\\t\\t\\t\\t\\t[784] gridcell 'Unlocked', visible\\n\\t\\t\\t\\t[785] row '', visible\\n\\t\\t\\t\\t\\t[786] rowheader 'Confirmed email:', visible\\n\\t\\t\\t\\t\\t[787] gridcell 'Confirmation Not Required', visible\\n\\t\\t\\t\\t[788] row '', visible\\n\\t\\t\\t\\t\\t[789] rowheader 'Account Created:', visible\\n\\t\\t\\t\\t\\t",
+              "rationale": "tier=fallback fts=15.73 access_count=0 confidence=0.00 relevance=0.00 grounding=0.44 alignment=0.98 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:751dce326043631881f9bf3b"
+            },
+            {
+              "confidence": 0.0,
+              "content": "t\\t[1732] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1734] list ''\\n\\t\\t\\t[1735] listitem ''\\n\\t\\t\\t\\t[1736] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1737] listitem ''\\n\\t\\t\\t\\t[1738] link 'Search Terms', clickable\\n\\t\\t\\t[1739] listitem ''\\n\\t\\t\\t\\t[1740] link 'Advanced Search', clickable\\n\\t\\t\\t[1741] listitem ''\\n\\t\\t\\t\\t[1742] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright \u00a9 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1747] link 'Report All Bugs', clickable\", \"action\": \"click('1581')\", \"screenshot\": \"screenshots/a5a78494/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"We\u2019re currently on orders history page 3 showing 2022 orders, but we need Jan 2023. The best next action is to go to Page 2, which should contain earlier 2023 orders (including January).\", \"url\": \"http://localhost:9082/sales/order/history/?p=3\"}, {\"accessibility_tree\": \"RootWebArea 'My Orders', focused\\n\\t[216] banner '', visible\\n\\t\\t[219] list '', visible\\n\\t\\t\\t[220] listitem '', visible\\n\\t\\t\\t\\t[221] link 'My Account', clickable, visible\\n\\t\\t\\t[222] listitem '', visible\\n\\t\\t\\t\\t[223] link 'My Wish List', clickable, visible\\n\\t\\t\\t[224] listitem '', visible\\n\\t\\t\\t\\t[225] link 'Sign Out', clickable, visible\\n\\t\\t\\t[226] listitem '', visible\\n\\t\\t\\t[229] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Welcome, Emma Lopez!'\\n\\t\\t[231] link 'Skip to Content', clickable\\n\\t\\t\\tStaticText 'Skip to Content'\\n\\t\\t[236] link 'store logo', clickable, visible\\n\\t\\t\\t[237] image 'one_stop_market_logo', visible\\n\\t\\t[239] link '\\\\ue611 My Cart 3 3items', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue611'\\n\\t\\t\\tStaticText 'My Cart'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText 'items'\\n\\t\\t[375] Section '', visible\\n\\t\\t\\t[377] LabelText '', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue615'\\n\\t\\t\\t\\tStaticText 'Search'\\n\\t\\t\\t[380] combobox '\\\\ue615 Search', clickable, visible, autocomplete='both', hasPopup='listbox', expanded=Fals",
+              "fact_id": "fact:f7a90d85ce8a5a24afda86fb",
+              "grounding": 0.4,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 71680,
+                  "original_bytes": 478492,
+                  "start_byte": 69632
+                },
+                "control_label_coverage": 0.5,
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "customer",
+                  "detail",
+                  "page",
+                  "action",
+                  "top",
+                  "including",
+                  "back",
+                  "button"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 71680,
+                  "original_bytes": 478492,
+                  "start_byte": 69632
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "our",
+                    "magento",
+                    "shopping",
+                    "dashboard",
+                    "detail",
+                    "page",
+                    "action",
+                    "top",
+                    "including",
+                    "back",
+                    "button"
+                  ],
+                  "matched_index_key_terms": [
+                    "our",
+                    "magento",
+                    "page",
+                    "action",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "our",
+                      "magento",
+                      "customer",
+                      "page",
+                      "action",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10",
+                      "1007"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:3a6f79c58ab67cb161af204f",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:9dfc4dd01b28ce5fa083a3fc",
+                      "fact:c47325fdd147ad91b06ca365",
+                      "fact:fe522668a3845f4cebc2358a"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:e92506fa30379e53f1cb8ae9",
+                "source_id": "longmemeval_v2_trajectory_12eeba3c56fa7a0cd79ba692ad3ac02226d37b3cfc380e3daa7f532a0763c53b_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "t\\t[1732] button 'Subscribe', clickable\\n\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t[1734] list ''\\n\\t\\t\\t[1735] listitem ''\\n\\t\\t\\t\\t[1736] link 'Privacy and Cookie Policy', clickable\\n\\t\\t\\t[1737] listitem ''\\n\\t\\t\\t\\t[1738] link 'Search Terms', clickable\\n\\t\\t\\t[1739] listitem ''\\n\\t\\t\\t\\t[1740] link 'Advanced Search', clickable\\n\\t\\t\\t[1741] listitem ''\\n\\t\\t\\t\\t[1742] link 'Contact Us', clickable\\n\\t\\tStaticText 'Copyright \u00a9 2013-present Magento, Inc. All rights reserved.'\\n\\t\\tStaticText 'Help Us Keep Magento Healthy'\\n\\t\\tStaticText ''\\n\\t\\t[1747] link 'Report All Bugs', clickable\", \"action\": \"click('1581')\", \"screenshot\": \"screenshots/a5a78494/4.png\", \"state_index\": 4, \"step\": 4, \"thought\": \"We\u2019re currently on orders history page 3 showing 2022 orders, but we need Jan 2023. The best next action is to go to Page 2, which should contain earlier 2023 orders (including January).\", \"url\": \"http://localhost:9082/sales/order/history/?p=3\"}, {\"accessibility_tree\": \"RootWebArea 'My Orders', focused\\n\\t[216] banner '', visible\\n\\t\\t[219] list '', visible\\n\\t\\t\\t[220] listitem '', visible\\n\\t\\t\\t\\t[221] link 'My Account', clickable, visible\\n\\t\\t\\t[222] listitem '', visible\\n\\t\\t\\t\\t[223] link 'My Wish List', clickable, visible\\n\\t\\t\\t[224] listitem '', visible\\n\\t\\t\\t\\t[225] link 'Sign Out', clickable, visible\\n\\t\\t\\t[226] listitem '', visible\\n\\t\\t\\t[229] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Welcome, Emma Lopez!'\\n\\t\\t[231] link 'Skip to Content', clickable\\n\\t\\t\\tStaticText 'Skip to Content'\\n\\t\\t[236] link 'store logo', clickable, visible\\n\\t\\t\\t[237] image 'one_stop_market_logo', visible\\n\\t\\t[239] link '\\\\ue611 My Cart 3 3items', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue611'\\n\\t\\t\\tStaticText 'My Cart'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText '3'\\n\\t\\t\\tStaticText 'items'\\n\\t\\t[375] Section '', visible\\n\\t\\t\\t[377] LabelText '', clickable\\n\\t\\t\\t\\tStaticText '\\\\ue615'\\n\\t\\t\\t\\tStaticText 'Search'\\n\\t\\t\\t[380] combobox '\\\\ue615 Search', clickable, visible, autocomplete='both', hasPopup='listbox', expanded=Fals",
+              "rationale": "tier=fallback fts=32.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.40 alignment=0.97 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:e92506fa30379e53f1cb8ae9"
+            },
+            {
+              "confidence": 0.0,
+              "content": ":'\\n\\t\\tStaticText '2'\\n\\tStaticText '\\\\ue623'\\n\\tStaticText 'One or more of the Cache Types are invalidated: Page Cache, Blocks HTML output, Collections Data. Please go to'\\n\\t[690] link 'Cache Management', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[705] banner '', visible\\n\\t\\t[708] heading '#000000300', visible\\n\\t\\t[711] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[723] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[731] textbox '\\\\ue60c', clickable, visible\\n\\t[737] main ''\\n\\t\\t[743] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[745] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[747] button 'Edit', clickable, visible\\n\\t\\t\\tStaticText 'Edit'\\n\\t\\t[749] button 'Cancel', visible\\n\\t\\t\\tStaticText 'Cancel'\\n\\t\\t[751] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[753] button 'Hold', visible\\n\\t\\t\\tStaticText 'Hold'\\n\\t\\t[755] button 'Invoice', clickable, visible\\n\\t\\t\\tStaticText 'Invoice'\\n\\t\\t[757] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[763] tabpanel 'Information'\\n\\t\\t\\t[765] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000300 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[774] table '', visible\\n\\t\\t\\t\\t\\t[775] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[776] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[777] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[778] gridcell 'Apr 19, 2023, 7:41:07 PM', visible\\n\\t\\t\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[780] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[781] gridcell 'Processing', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Processing'\\n\\t\\t\\t\\t\\t\\t[783] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[784] rowheader 'Purchased ",
+              "fact_id": "fact:91641897abb792f416953a33",
+              "grounding": 0.4,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 36945,
+                  "original_bytes": 614491,
+                  "start_byte": 34897
+                },
+                "control_label_coverage": 0.5,
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "action",
+                  "back",
+                  "button",
+                  "customer",
+                  "detail",
+                  "page",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 36945,
+                  "original_bytes": 614491,
+                  "start_byte": 34897
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "magento",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "detail",
+                    "page",
+                    "action",
+                    "top",
+                    "back",
+                    "button"
+                  ],
+                  "matched_index_key_terms": [
+                    "magento",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "page",
+                    "action",
+                    "top",
+                    "back"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "magento",
+                      "admin",
+                      "dashboard",
+                      "customer",
+                      "page",
+                      "action",
+                      "top",
+                      "back"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10",
+                      "100",
+                      "10009",
+                      "1007"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:3a6f79c58ab67cb161af204f",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:9dfc4dd01b28ce5fa083a3fc",
+                      "fact:c47325fdd147ad91b06ca365",
+                      "fact:fe522668a3845f4cebc2358a"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:edc93d08cde3e2ed63c0697d",
+                "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": ":'\\n\\t\\tStaticText '2'\\n\\tStaticText '\\\\ue623'\\n\\tStaticText 'One or more of the Cache Types are invalidated: Page Cache, Blocks HTML output, Collections Data. Please go to'\\n\\t[690] link 'Cache Management', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[705] banner '', visible\\n\\t\\t[708] heading '#000000300', visible\\n\\t\\t[711] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[723] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[725] Section '', visible\\n\\t\\t\\t[727] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[731] textbox '\\\\ue60c', clickable, visible\\n\\t[737] main ''\\n\\t\\t[743] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[745] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[747] button 'Edit', clickable, visible\\n\\t\\t\\tStaticText 'Edit'\\n\\t\\t[749] button 'Cancel', visible\\n\\t\\t\\tStaticText 'Cancel'\\n\\t\\t[751] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[753] button 'Hold', visible\\n\\t\\t\\tStaticText 'Hold'\\n\\t\\t[755] button 'Invoice', clickable, visible\\n\\t\\t\\tStaticText 'Invoice'\\n\\t\\t[757] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[763] tabpanel 'Information'\\n\\t\\t\\t[765] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000300 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[774] table '', visible\\n\\t\\t\\t\\t\\t[775] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[776] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[777] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[778] gridcell 'Apr 19, 2023, 7:41:07 PM', visible\\n\\t\\t\\t\\t\\t\\t[779] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[780] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[781] gridcell 'Processing', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Processing'\\n\\t\\t\\t\\t\\t\\t[783] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[784] rowheader 'Purchased ",
+              "rationale": "tier=fallback fts=11.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.40 alignment=0.97 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:edc93d08cde3e2ed63c0697d"
+            },
+            {
+              "confidence": 0.0,
+              "content": "'\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[799] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[831] banner '', visible\\n\\t\\t[834] heading 'Olivia 1/4 Zip Light Jacket', visible\\n\\t\\t[837] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[849] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[851] Section '', visible\\n\\t\\t\\t[853] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[857] textbox '\\\\ue60c', clickable, visible\\n\\t[863] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[874] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[885] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[892] button 'Save', clickable, visible\\n\\t\\t\\tStaticText 'Save'\\n\\t\\t[894] button 'Save options', clickable, visible\\n\\t\\t[903] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[905] button 'Add Attribute', clickable, visible\\n\\t\\t\\tStaticText 'Add Attribute'\\n\\t\\t[924] group ''\\n\\t\\t\\t[927] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[website]'\\n\\t\\t\\t\\tStaticText 'Enable Product'\\n\\t\\t\\t[931] checkbox '[website] Enable Product Yes', clickable, checked='true'\\n\\t\\t\\t[932] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Yes'\\n\\t\\t\\t[936] LabelText '', visible\\n\\t\\t\\t\\tStaticText 'Attribute Set'\\n\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t[981] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[store view]'\\n\\t\\t\\t\\tStaticText 'Product Name'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[984] textbox '[store view] Product Name *' value='Olivia 1/4 Zip Light Jacket', clickable, visible\\n\\t\\t\\t\\tStaticText 'Olivia 1/4 Zip Light Jacket'\\n\\t\\t\\t[987] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[global]'\\n\\t\\t\\t\\tStaticText 'SKU'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[990] textbox '[global] SKU *' value='WJ12', clickable, visible\\",
+              "fact_id": "fact:9ca6612a0192da77933a51c5",
+              "grounding": 0.44,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 736802,
+                  "original_bytes": 896372,
+                  "start_byte": 734754
+                },
+                "control_label_coverage": 0.5,
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "customer",
+                  "detail",
+                  "page",
+                  "action",
+                  "top",
+                  "back",
+                  "save",
+                  "button"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 736802,
+                  "original_bytes": 896372,
+                  "start_byte": 734754
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "magento",
+                    "based",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "detail",
+                    "page",
+                    "action",
+                    "top",
+                    "back",
+                    "save",
+                    "button"
+                  ],
+                  "matched_index_key_terms": [
+                    "magento",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "action",
+                    "top",
+                    "back",
+                    "save"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "magento",
+                      "admin",
+                      "dashboard",
+                      "customer",
+                      "action",
+                      "top",
+                      "back",
+                      "save"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10",
+                      "100",
+                      "10009"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:3a6f79c58ab67cb161af204f",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:9dfc4dd01b28ce5fa083a3fc",
+                      "fact:c47325fdd147ad91b06ca365",
+                      "fact:fe522668a3845f4cebc2358a"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:bf814bfd62e0d0fccc752eb7",
+                "source_id": "longmemeval_v2_trajectory_d1acede0fa655e1e57defc42d511007fd09039d1180cafeb788a346e46d4c924_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "'\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[799] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[831] banner '', visible\\n\\t\\t[834] heading 'Olivia 1/4 Zip Light Jacket', visible\\n\\t\\t[837] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[849] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[851] Section '', visible\\n\\t\\t\\t[853] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[857] textbox '\\\\ue60c', clickable, visible\\n\\t[863] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[874] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[885] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[892] button 'Save', clickable, visible\\n\\t\\t\\tStaticText 'Save'\\n\\t\\t[894] button 'Save options', clickable, visible\\n\\t\\t[903] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[905] button 'Add Attribute', clickable, visible\\n\\t\\t\\tStaticText 'Add Attribute'\\n\\t\\t[924] group ''\\n\\t\\t\\t[927] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[website]'\\n\\t\\t\\t\\tStaticText 'Enable Product'\\n\\t\\t\\t[931] checkbox '[website] Enable Product Yes', clickable, checked='true'\\n\\t\\t\\t[932] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText 'Yes'\\n\\t\\t\\t[936] LabelText '', visible\\n\\t\\t\\t\\tStaticText 'Attribute Set'\\n\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t[981] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[store view]'\\n\\t\\t\\t\\tStaticText 'Product Name'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[984] textbox '[store view] Product Name *' value='Olivia 1/4 Zip Light Jacket', clickable, visible\\n\\t\\t\\t\\tStaticText 'Olivia 1/4 Zip Light Jacket'\\n\\t\\t\\t[987] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '[global]'\\n\\t\\t\\t\\tStaticText 'SKU'\\n\\t\\t\\t\\tStaticText '*'\\n\\t\\t\\t[990] textbox '[global] SKU *' value='WJ12', clickable, visible\\",
+              "rationale": "tier=fallback fts=40.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.44 alignment=0.98 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:bf814bfd62e0d0fccc752eb7"
+            },
+            {
+              "confidence": 0.0,
+              "content": "nk '\\\\ue60d STORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[578] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[661] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[691] banner '', visible\\n\\t\\t[694] heading '#000000260', visible\\n\\t\\t[697] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[709] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[711] Section '', visible\\n\\t\\t\\t[713] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[717] textbox '\\\\ue60c', clickable, visible\\n\\t[723] main ''\\n\\t\\t[729] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[731] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[733] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[735] button 'Ship', clickable, visible\\n\\t\\t\\tStaticText 'Ship'\\n\\t\\t[737] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[743] tabpanel 'Information'\\n\\t\\t\\t[745] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000260 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[754] table '', visible\\n\\t\\t\\t\\t\\t[755] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[756] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[757] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[758] gridcell 'Jan 8, 2022, 2:26:01 AM', visible\\n\\t\\t\\t\\t\\t\\t[759] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[760] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[761] gridcell 'Complete', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t\\t[763] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[764] rowheader 'Purchased From', visible\\n\\t\\t\\t\\t\\t\\t\\t[765] gridcell 'Main Website Main Website Store Default Store View', visib",
+              "fact_id": "fact:37f2974c09fc83ab98421ce5",
+              "grounding": 0.37,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 565868,
+                  "original_bytes": 831631,
+                  "start_byte": 563820
+                },
+                "control_label_coverage": 0.5,
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "customer",
+                  "detail",
+                  "page",
+                  "action",
+                  "top",
+                  "back",
+                  "button"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 565868,
+                  "original_bytes": 831631,
+                  "start_byte": 563820
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "magento",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "detail",
+                    "page",
+                    "action",
+                    "top",
+                    "back",
+                    "button"
+                  ],
+                  "matched_index_key_terms": [
+                    "magento",
+                    "admin",
+                    "dashboard",
+                    "customer",
+                    "action",
+                    "top",
+                    "back"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "magento",
+                      "admin",
+                      "dashboard",
+                      "customer",
+                      "action",
+                      "top",
+                      "back"
+                    ],
+                    "matched_repeated_topics": [
+                      "00",
+                      "01",
+                      "10",
+                      "100",
+                      "10009",
+                      "1007"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:3a6f79c58ab67cb161af204f",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:9dfc4dd01b28ce5fa083a3fc",
+                      "fact:c47325fdd147ad91b06ca365",
+                      "fact:fe522668a3845f4cebc2358a"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:de6c79531ee685f614e42767",
+                "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "nk '\\\\ue60d STORES', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[578] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[661] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[691] banner '', visible\\n\\t\\t[694] heading '#000000260', visible\\n\\t\\t[697] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[709] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[711] Section '', visible\\n\\t\\t\\t[713] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[717] textbox '\\\\ue60c', clickable, visible\\n\\t[723] main ''\\n\\t\\t[729] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[731] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[733] button 'Send Email', clickable, visible\\n\\t\\t\\tStaticText 'Send Email'\\n\\t\\t[735] button 'Ship', clickable, visible\\n\\t\\t\\tStaticText 'Ship'\\n\\t\\t[737] button 'Reorder', clickable, visible\\n\\t\\t\\tStaticText 'Reorder'\\n\\t\\t[743] tabpanel 'Information'\\n\\t\\t\\t[745] Section '', visible\\n\\t\\t\\t\\tStaticText 'Order & Account Information'\\n\\t\\t\\t\\tStaticText 'Order # 000000260 ('\\n\\t\\t\\t\\tStaticText 'The order confirmation email was sent'\\n\\t\\t\\t\\tStaticText ')'\\n\\t\\t\\t\\t[754] table '', visible\\n\\t\\t\\t\\t\\t[755] rowgroup '', visible\\n\\t\\t\\t\\t\\t\\t[756] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[757] rowheader 'Order Date', visible\\n\\t\\t\\t\\t\\t\\t\\t[758] gridcell 'Jan 8, 2022, 2:26:01 AM', visible\\n\\t\\t\\t\\t\\t\\t[759] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[760] rowheader 'Order Status', visible\\n\\t\\t\\t\\t\\t\\t\\t[761] gridcell 'Complete', visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t\\t[763] row '', visible\\n\\t\\t\\t\\t\\t\\t\\t[764] rowheader 'Purchased From', visible\\n\\t\\t\\t\\t\\t\\t\\t[765] gridcell 'Main Website Main Website Store Default Store View', visib",
+              "rationale": "tier=fallback fts=45.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.37 alignment=0.96 semantic=disabled matched lexical query=\"I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:de6c79531ee685f614e42767"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.48575,
+              "items": [
+                {
+                  "fact_id": "",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 14858.561125,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 14860.102667,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 17178.410167,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 17186.645708,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 19343.694583,
+              "items": [
+                {
+                  "fact_id": "episode_fallback:episode:751dce326043631881f9bf3b",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 20155.011625,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 804658,
+                  "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 20424.708042,
+              "items": [
+                {
+                  "fact_id": "fact:07f50ea549db79b8a856800e",
+                  "source_episode": "episode:751dce326043631881f9bf3b",
+                  "content_bytes": 2048,
+                  "content_sha256": "4afcbf5d2b16fd191c8f3486931dbf9b3c42fadf43c5f85d4aaeb7e37a614eec",
+                  "registered_span_present": true
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

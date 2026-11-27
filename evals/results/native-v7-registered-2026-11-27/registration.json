@@ -1,0 +1,69 @@
+{
+  "schema": "native-v7-regression/v1",
+  "registered_before_outputs": true,
+  "no_reruns": true,
+  "runner_sha256": "28c7faa06144c23d359980740495d12aad5618b0a93d3a13fa64619f7ac93092",
+  "product_sha256": "6d5f0382547f1e2f99e978cd80083f23b6cfb4f8f14ebf27264660dbcce0dd66",
+  "source_admission_sha256": "d370519b9fed4ffdac092734a9151b026dce20414ef00d29d40d65ad58987b0f",
+  "formation_unchanged": "anno|identity-admission=v3; source-only r29 not relabelled or regenerated",
+  "expected_temporal": 8,
+  "expected_retrieval": 37,
+  "required_invalid": 0,
+  "floors": "unchanged original six 1.0",
+  "commands": [
+    {
+      "name": "temporal",
+      "argv": [
+        "/tmp/memory-quality-eval-v7-2026-11-27",
+        "run",
+        "--profile",
+        "evals/profiles/memory_decisions_current.json",
+        "--artifact",
+        "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/run.json"
+      ],
+      "deadline_seconds": 180,
+      "env": {
+        "MEMORY_DECISIONS_SERVER_BIN": "/tmp/memory-quality-product-v7-2026-11-27",
+        "MEMORY_DECISIONS_PRODUCT_REVISION": "496368549d856957e5fa317c7adea462d925288b+quoted-controls-sha:d370519b9fed4ffdac092734a9151b026dce20414ef00d29d40d65ad58987b0f",
+        "MEMORY_DECISIONS_ARTIFACT_ROOT": "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/current"
+      }
+    },
+    {
+      "name": "comparison",
+      "argv": [
+        "/tmp/memory-quality-eval-v7-2026-11-27",
+        "compare-current-memory",
+        "--baseline",
+        "evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+        "--candidate",
+        "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/current/index.json",
+        "--corpus",
+        "evals/corpora/memory-decisions-v10",
+        "--output",
+        "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/comparison.json"
+      ],
+      "deadline_seconds": 30,
+      "env": {}
+    },
+    {
+      "name": "retrieval",
+      "argv": [
+        "/tmp/memory-quality-eval-v7-2026-11-27",
+        "run",
+        "--profile",
+        "evals/profiles/retrieval_quality.json",
+        "--artifact",
+        "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/retrieval.json"
+      ],
+      "deadline_seconds": 600,
+      "env": {
+        "EMBEDDINGS_ENABLED": "true",
+        "EMBEDDINGS_PROVIDER": "local-candle",
+        "EMBEDDINGS_MODEL_DIR": "/Users/solovey/Documents/dev/memory_mcp/target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3",
+        "RETRIEVAL_RERANKER_MODEL_DIR": "/Users/solovey/Documents/dev/memory_mcp/target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825",
+        "RETRIEVAL_RERANKER_ADMISSION_FLOOR": "0",
+        "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence"
+      }
+    }
+  ]
+}

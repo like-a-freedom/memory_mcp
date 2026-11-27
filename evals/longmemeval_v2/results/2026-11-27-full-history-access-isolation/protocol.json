@@ -1,0 +1,46 @@
+{
+  "schema": "full-history-heat-isolation/v1",
+  "registered_before_outputs": true,
+  "hypothesis": "Isolate mutable heat from immutable fact post-images; preserve value/source/temporal/policy/ranking contracts and awaited attempt semantics.",
+  "input": "data/eval-snapshots/full-history-2026-11-27/store",
+  "source_registration": "evals/longmemeval_v2/results/2026-11-27-full-history-restore/registration.json",
+  "read_registration": "evals/longmemeval_v2/results/2026-11-27-full-history-restore/reads-registration.json",
+  "source_trajectories": 100,
+  "source_segments": 151,
+  "cases": [
+    "0c6b0c60",
+    "6d975a08",
+    "89a20f48",
+    "922a0c56",
+    "d6da3938",
+    "f43926d9",
+    "f61a096f"
+  ],
+  "scheduled_pairs": 7,
+  "scheduled_reads": 14,
+  "order": "case-major alternating legacy/candidate and candidate/legacy; fresh clone per arm/case; no inference or concurrent heavy Cargo",
+  "legacy_observer": "/tmp/memory-quality-history-heatdiag-2026-11-27",
+  "legacy_observer_sha256": "f0b4ef69b7fd492fe704f3c97930cb4edc6ae121a989506e9a61bc3ea48a5ca1",
+  "limits": {
+    "read_seconds": 30,
+    "child_seconds": 45,
+    "budget": 5,
+    "compact": false,
+    "upgrade_seconds": 300,
+    "audit_seconds": 300
+  },
+  "upgrade": "Run approved057 once on a fresh disposable source clone, outside steady-read clock. Verify151 exact source bodies afterward; clone closed upgraded state for candidate arms. Original source never opened or mutated.",
+  "stop_rule": "One complete paired capture only after deterministic/native gates. Preserve all14 outcomes including legacy timeout. No successful retry replacement, deadline increase, label/gold edits or source selection based on answers.",
+  "acceptance": {
+    "candidate_delivered_contexts": 7,
+    "candidate_runtime_deadlines": 0,
+    "candidate_each_assembly_ms_lte": 30000,
+    "strict_original_source_span_at_least": 4,
+    "sufficient_delivered_source_at_least": 7,
+    "native_temporal": "8/8 invalid0, no regressions",
+    "native_retrieval": "37/37 invalid0, original six floors unchanged"
+  },
+  "latency_claim_boundary": "Single paired observations and censored timeouts; describe per-case results, do not infer population latency effect, RSS or isolated engine substage shares.",
+  "model": "none; local native Apple Silicon only",
+  "execution_identity": "To be frozen with product/evaluator/observer/source hashes before dispatch; never run an unpinned build."
+}

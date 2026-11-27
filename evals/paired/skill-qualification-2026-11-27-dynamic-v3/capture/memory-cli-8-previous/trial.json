@@ -1,0 +1,188 @@
+{
+  "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture.",
+  "arm": "previous",
+  "binding": "controlled",
+  "elapsed_seconds": 18.348430624988396,
+  "grade": {
+    "operation_and_exact_arguments": true,
+    "pending_vs_completed_oracle": "pending",
+    "process_faults": [],
+    "reference_reads": [
+      "references/memory-contract.md"
+    ],
+    "source_binding_observed": null,
+    "unnecessary_reference_loading": false
+  },
+  "id": 8,
+  "identity": "memory-cli-8-previous",
+  "result": {
+    "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture.",
+    "elapsed_seconds": 18.348430624988396,
+    "terminal": "answered",
+    "turns": [
+      {
+        "action": {
+          "action": "read_reference",
+          "path": "references/memory-contract.md"
+        },
+        "request_messages": [
+          {
+            "content": "You are operating in an isolated Memory skill evaluation. Use the supplied skill below.\nReply with exactly one JSON object per turn, without Markdown, preamble or extra keys.\nThe next message will contain the actual response to the action. Read results before deciding what to do.\nActions:\n{\"action\":\"read_reference\",\"path\":\"references/...\"} reads a relative skill reference.\n{\"action\":\"finish\",\"answer\":\"Your substantive final answer, with results and evidence.\"} finishes the task.\n{\"action\":\"run\",\"argv\":[\"memory_mcp\",\"command\",\"--flag\",\"value\"],\"stdin\":\"optional exact text\"} runs one bound CLI command.\nNo shell parsing or external commands. The response contains stdout, stderr and exit_status separately.\n\nSkill:\n---\nname: memory-cli\ndescription: \"Use when invoking the `memory_mcp` binary from a shell, script, hook, or terminal to capture or recall memory, canonicalize entities, start the stdio server (with optional filesystem ingestion), or re-embed facts.\"\ncompatibility: Requires the `memory_mcp` binary in the current environment. This skill is CLI-only; use `memory-mcp` when the server is already connected as MCP tools.\n---\n\n# Memory CLI\n\nUse the CLI for shell scripts, one-shot automation, hooks, server operation,\nfilesystem ingestion, and re-embedding. Do not route an MCP-connected agent\nthrough the shell merely because the CLI exposes equivalent memory operations.\n\nChoose one branch — capture, canonicalize, recall, serve, or re-embed —\nbefore running a command.\n\n## Principles\n\n1. **Verified before claimed.** `ingest` alone records an episode; `extract`\n   establishes the durable-fact outcome.\n2. **Storage boundary is server config.** The Active Namespace is chosen once at\n   server startup; commands never pass, invent, or probe a namespace, scope, or\n   project.\n3. **Bi-temporal truth.** Use the source's time for `--t-ref`; use `--as-of` for\n   historical recall only when both time axes should agree. Prefer independent\n   `--valid-at` and `--known-at`/`--known-revision`; omit `--t-ingested`.\n4. **Append, then invalidate.** Preserve source identity and the audit trail.\n5. **Machine-readable boundary.** Parse stdout as JSON and use the process exit\n   status. Keep logs and diagnostics separate from persisted content.\n6. **Read back mutations.** A command invocation is not evidence of persisted\n   state; verify its response or a subsequent read.\n\nRead the [memory contract](references/memory-contract.md) before\nthe first write, when choosing time fields, or when interpreting an\nempty, failed, or conflicting result.\n\nRead the [CLI command reference](references/commands.md) before constructing a\ncommand, automating exit handling, or running `serve` or `reembed`.\nExact flags remain behind that pointer; this file owns behavior and order.\n\n## Workflow: one-shot capture\n\n1. **Frame the source.** Establish the authoritative source, stable\n   `source_id`, truthful reference time, and bounded, secret-free content.\n\n   *Completion:* every required value is traceable and safe to place on the\n   command line or stdin in the current environment.\n\n2. **Ingest once.** Run `memory_mcp ingest` with explicit flags. Capture stdout,\n   stderr, and exit status separately. Use `--content-stdin` for multiline\n   content; a URL/path supplied as content remains literal. Explicit file/URL\n   imports require operator authorization and the separate `import` command.\n\n   *Completion:* parse a returned `episode_id`, or report `pending` while\n   preserving the intended source handles.\n\n3. **Extract and inspect.** Run `memory_mcp extract --episode-id ...`. Inspect\n   facts and warnings rather than treating exit zero as fact capture. Free-form\n   extraction is heuristic, not guaranteed empty or guaranteed successful.\n   Prefer verified structured summaries for explicit decisions. Evidence pairs\n   default on, with a shared 4 KiB JSON budget; `--compact` omits them.\n\n   *Completion:* classify the result as `verified`, `episode-only`, or\n   `pending`.\n\n4. **Reconcile supersession when required.** Run `memory_mcp invalidate` for an\n   outdated active fact after the replacement has been verified.\n\n   *Completion:* the invalidation response names the fact, reason, and time; a\n   subsequent recall no longer treats it as current.\n\n## Workflow: canonicalize\n\nUse after extraction when evidence-backed aliases must converge on one durable\nentity. `memory_mcp resolve` is a write command: it may create the canonical\nentity or persist aliases.\n\n1. Establish the entity type, canonical name, and source-backed aliases.\n2. Run `memory_mcp resolve` once and parse its response.\n3. Retain the returned `entity_id` for later linking.\n\n*Completion:* report the canonical ID and persisted reconciliation outcome, or\nleave the operation `pending`.\n\n## Workflow: one-shot recall\n\n1. Frame the query and time boundary.\n2. Run `memory_mcp assemble-context` and parse the complete JSON envelope.\n3. Run `memory_mcp explain` for every item used as evidence.\n\n*Completion:* all used claims have provenance; empty results and failures are\nreported explicitly; no capture/canonicalization command ran during recall.\nAssembly is a logical read and may durably update fact-access heat.\n\n## Workflow: serve\n\n1. Validate required configuration without printing credentials.\n2. Start `memory_mcp serve` and preserve stdio for MCP framing.\n3. Treat unexpected stdout as a protocol defect; route diagnostics to stderr.\n4. Confirm readiness through the MCP client's initialization handshake.\n\n*Completion:* a client completes initialization and can list the expected tools,\nor startup is reported failed with the process status and diagnostic.\n\n## Workflow: filesystem ingestion\n\n1. Confirm filesystem ingestion is intended and that `MEMORY_INGESTION_INBOX`\n   points at an existing absolute directory.\n2. Start `memory_mcp serve` with `MEMORY_INGESTION_INBOX` set (the `fs-watch`\n   feature is required; official release binaries include it).\n3. Observe per-file results through the episode/fact store; distinguish\n   successful revision processing, skipped files, and failures.\n4. Report revision outcomes; failures are retried once per startup and never\n   stop MCP.\n\n*Completion:* the inbox boundary and processed-revision counts are known;\nfailures remain actionable and no directory outside the intended boundary was\nwatched.\n\n## Workflow: re-embed\n\n1. Confirm that the embedding provider, model, or dimension actually changed,\n   or that a failed run is being resumed.\n2. Run `memory_mcp reembed`; choose failure budget and retry mode deliberately.\n3. Monitor terminal status and preserve failed fact identifiers.\n4. Verify the terminal job state and failure count.\n\n*Completion:* the job is `completed` or `completed_with_errors` with counts\nreported; `failed` and `interrupted` remain unfinished states.\n\n## Exit gate\n\nThe workflow is complete only when every step in the chosen branch satisfies\nits completion criterion, structured output has been parsed, and persisted\nmutations have been read back. A zero exit code alone is never the completion\ncriterion.\n",
+            "role": "system"
+          },
+          {
+            "content": "Extraction returned status=partial, an episode_id, empty facts, and guidance saying extraction is pending and retry is safe. The CLI exited 0. Is capture finished? What should you report and do next?\n\nAvailable scenario inputs:\n{\"previous_extract\": {\"exit_status\": 0, \"stderr\": \"Extraction work is incomplete.\", \"stdout\": \"{\\\"status\\\": \\\"partial\\\", \\\"result\\\": {\\\"episode_id\\\": \\\"episode:pending-cedar-295\\\", \\\"facts\\\": [], \\\"warnings\\\": [\\\"Extraction did not finish.\\\"]}, \\\"guidance\\\": \\\"Extraction is pending. Retry is safe using the original episode_id.\\\"}\"}}",
+            "role": "user"
+          }
+        ],
+        "response_raw": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "logprobs": null,
+              "message": {
+                "annotations": null,
+                "audio": null,
+                "content": "{\n  \"action\": \"read_reference\",\n  \"path\": \"references/memory-contract.md\"\n}",
+                "function_call": null,
+                "refusal": null,
+                "role": "assistant",
+                "tool_calls": null
+              }
+            }
+          ],
+          "created": 1795787483,
+          "id": "chatcmpl-732652d9-103c-424e-bcb6-61c301ccbb0b",
+          "metadata": null,
+          "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+          "moderation": null,
+          "object": "chat.completion",
+          "service_tier": null,
+          "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+          "usage": {
+            "completion_tokens": 25,
+            "completion_tokens_details": null,
+            "prompt_tokens": 1727,
+            "prompt_tokens_details": {
+              "audio_tokens": null,
+              "cache_write_tokens": null,
+              "cached_tokens": 1582,
+              "image_tokens": null,
+              "text_tokens": null
+            },
+            "total_tokens": 1752
+          }
+        },
+        "tool_response": {
+          "text": "# Memory Contract\n\nLoad this reference before a write, when choosing time boundaries, or\nwhen recovering from a non-success result. Live CLI help remains authoritative\nfor accepted flags and values.\n\n## Source\n\n- `source_id` is stable and round-trippable. Same ID and content is idempotent;\n  same ID with different content is a conflict.\n- `content` is bounded, source-linked, verified, and safe to pass through the\n  current shell environment. URL/path content is literal; only an explicitly\n  authorized `import` reads/fetches external source material.\n- `source_type` uses a value accepted by live command help.\n- `--t-ref` is the source's valid time in ISO 8601. Omit `--t-ingested`: the public tool rejects caller transaction-time\n  overrides. Use `--t-ref` for the source/event date.\n- Changed evidence gets a new source identity. Superseded facts are invalidated,\n  never deleted.\n\n## Storage boundary\n\nOne Active Namespace is bound at server startup (environment configuration, not\nper-command input). No ordinary command accepts a `--scope`, `--project`, or\n`--namespace` flag, and none should be invented or probed. Use repeatable\n`--policy-tag` on ingest for content governance so recall-time policy filtering\nhas evidence to work with. Empty recall is not authority to widen a boundary.\n\nCredentials never enter arguments or persisted content. Sensitive business data\nis eligible only when the server's configured policy explicitly permits it.\n\n## Filesystem ingestion\n\n- Filesystem ingestion is an optional capability of `serve`, activated only by\n  `MEMORY_INGESTION_INBOX` (an existing absolute directory, not a symlink).\n- Files are ordinary source-labeled data: no elevated trust, no privileged\n  policy tags.\n- Each distinct set of bytes at a path is one immutable revision; renaming a\n  file starts a new lineage; deleting a file never invalidates memory.\n- A revision is `processed` only after `ingest → extract` succeeds. Failures are\n  retried once per startup; a failed file never stops MCP.\n- Supported formats: PDF, DOCX, XLSX, PPTX, Markdown, plain text, and EML.\n  Symlinks and unsupported files are skipped silently.\n- The `fs-watch` feature is required; official release binaries include it.\n\n## Time and results\n\nUse `--valid-at` for world-valid time and either `--known-at` for committed\nknowledge by a timestamp or `--known-revision` for an exact server checkpoint.\nThe knowledge flags are mutually exclusive. Legacy `--as-of` sets both axes and\ncannot accompany a new axis. Omitted axes capture a new request snapshot.\nTo refine within one snapshot, copy `context.snapshot.valid_at` and\n`context.snapshot.known_revision` to the corresponding flags; omit `--as-of` and\n`--known-at`. Tokens belong to this namespace/history.\n\nHistorical reads support `--view-mode current` only and may be partial. Inspect\ncompleteness, omitted channels, scan truncation and guidance: an empty partial\nresult or refinement does not establish global absence. Current assembly is a\nlogical read that can persist access heat.\n\nClassify capture as `verified` (facts inspected), `episode-only` (empty fact\nset), or `pending` (nonzero exit or unresolved failure). Classify recall as\n`assembled`, and as `cited` only after every used claim has provenance.\n\nAn empty extraction confirms no canonical fact capture; source fallback may\nstill return the episode text. Never treat exit zero, an episode ID, or an empty\nresult as stronger evidence than the structured response provides.\n\n## Recovery\n\n- Invalid time: correct it to the source's actual ISO 8601 time.\n- Source conflict: retain the original and use a new identity for changed\n  evidence.\n- Empty extraction: report `episode-only`.\n- Nonzero exit or invalid structured output: preserve identifiers and report\n  `pending`.\n- Empty recall: reframe terms within the same authorized boundary.\n\nAfter a mutation, require structured output or a subsequent read that\ndemonstrates persisted state before reporting completion.\n"
+        }
+      },
+      {
+        "action": {
+          "action": "finish",
+          "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture."
+        },
+        "request_messages": [
+          {
+            "content": "You are operating in an isolated Memory skill evaluation. Use the supplied skill below.\nReply with exactly one JSON object per turn, without Markdown, preamble or extra keys.\nThe next message will contain the actual response to the action. Read results before deciding what to do.\nActions:\n{\"action\":\"read_reference\",\"path\":\"references/...\"} reads a relative skill reference.\n{\"action\":\"finish\",\"answer\":\"Your substantive final answer, with results and evidence.\"} finishes the task.\n{\"action\":\"run\",\"argv\":[\"memory_mcp\",\"command\",\"--flag\",\"value\"],\"stdin\":\"optional exact text\"} runs one bound CLI command.\nNo shell parsing or external commands. The response contains stdout, stderr and exit_status separately.\n\nSkill:\n---\nname: memory-cli\ndescription: \"Use when invoking the `memory_mcp` binary from a shell, script, hook, or terminal to capture or recall memory, canonicalize entities, start the stdio server (with optional filesystem ingestion), or re-embed facts.\"\ncompatibility: Requires the `memory_mcp` binary in the current environment. This skill is CLI-only; use `memory-mcp` when the server is already connected as MCP tools.\n---\n\n# Memory CLI\n\nUse the CLI for shell scripts, one-shot automation, hooks, server operation,\nfilesystem ingestion, and re-embedding. Do not route an MCP-connected agent\nthrough the shell merely because the CLI exposes equivalent memory operations.\n\nChoose one branch — capture, canonicalize, recall, serve, or re-embed —\nbefore running a command.\n\n## Principles\n\n1. **Verified before claimed.** `ingest` alone records an episode; `extract`\n   establishes the durable-fact outcome.\n2. **Storage boundary is server config.** The Active Namespace is chosen once at\n   server startup; commands never pass, invent, or probe a namespace, scope, or\n   project.\n3. **Bi-temporal truth.** Use the source's time for `--t-ref`; use `--as-of` for\n   historical recall only when both time axes should agree. Prefer independent\n   `--valid-at` and `--known-at`/`--known-revision`; omit `--t-ingested`.\n4. **Append, then invalidate.** Preserve source identity and the audit trail.\n5. **Machine-readable boundary.** Parse stdout as JSON and use the process exit\n   status. Keep logs and diagnostics separate from persisted content.\n6. **Read back mutations.** A command invocation is not evidence of persisted\n   state; verify its response or a subsequent read.\n\nRead the [memory contract](references/memory-contract.md) before\nthe first write, when choosing time fields, or when interpreting an\nempty, failed, or conflicting result.\n\nRead the [CLI command reference](references/commands.md) before constructing a\ncommand, automating exit handling, or running `serve` or `reembed`.\nExact flags remain behind that pointer; this file owns behavior and order.\n\n## Workflow: one-shot capture\n\n1. **Frame the source.** Establish the authoritative source, stable\n   `source_id`, truthful reference time, and bounded, secret-free content.\n\n   *Completion:* every required value is traceable and safe to place on the\n   command line or stdin in the current environment.\n\n2. **Ingest once.** Run `memory_mcp ingest` with explicit flags. Capture stdout,\n   stderr, and exit status separately. Use `--content-stdin` for multiline\n   content; a URL/path supplied as content remains literal. Explicit file/URL\n   imports require operator authorization and the separate `import` command.\n\n   *Completion:* parse a returned `episode_id`, or report `pending` while\n   preserving the intended source handles.\n\n3. **Extract and inspect.** Run `memory_mcp extract --episode-id ...`. Inspect\n   facts and warnings rather than treating exit zero as fact capture. Free-form\n   extraction is heuristic, not guaranteed empty or guaranteed successful.\n   Prefer verified structured summaries for explicit decisions. Evidence pairs\n   default on, with a shared 4 KiB JSON budget; `--compact` omits them.\n\n   *Completion:* classify the result as `verified`, `episode-only`, or\n   `pending`.\n\n4. **Reconcile supersession when required.** Run `memory_mcp invalidate` for an\n   outdated active fact after the replacement has been verified.\n\n   *Completion:* the invalidation response names the fact, reason, and time; a\n   subsequent recall no longer treats it as current.\n\n## Workflow: canonicalize\n\nUse after extraction when evidence-backed aliases must converge on one durable\nentity. `memory_mcp resolve` is a write command: it may create the canonical\nentity or persist aliases.\n\n1. Establish the entity type, canonical name, and source-backed aliases.\n2. Run `memory_mcp resolve` once and parse its response.\n3. Retain the returned `entity_id` for later linking.\n\n*Completion:* report the canonical ID and persisted reconciliation outcome, or\nleave the operation `pending`.\n\n## Workflow: one-shot recall\n\n1. Frame the query and time boundary.\n2. Run `memory_mcp assemble-context` and parse the complete JSON envelope.\n3. Run `memory_mcp explain` for every item used as evidence.\n\n*Completion:* all used claims have provenance; empty results and failures are\nreported explicitly; no capture/canonicalization command ran during recall.\nAssembly is a logical read and may durably update fact-access heat.\n\n## Workflow: serve\n\n1. Validate required configuration without printing credentials.\n2. Start `memory_mcp serve` and preserve stdio for MCP framing.\n3. Treat unexpected stdout as a protocol defect; route diagnostics to stderr.\n4. Confirm readiness through the MCP client's initialization handshake.\n\n*Completion:* a client completes initialization and can list the expected tools,\nor startup is reported failed with the process status and diagnostic.\n\n## Workflow: filesystem ingestion\n\n1. Confirm filesystem ingestion is intended and that `MEMORY_INGESTION_INBOX`\n   points at an existing absolute directory.\n2. Start `memory_mcp serve` with `MEMORY_INGESTION_INBOX` set (the `fs-watch`\n   feature is required; official release binaries include it).\n3. Observe per-file results through the episode/fact store; distinguish\n   successful revision processing, skipped files, and failures.\n4. Report revision outcomes; failures are retried once per startup and never\n   stop MCP.\n\n*Completion:* the inbox boundary and processed-revision counts are known;\nfailures remain actionable and no directory outside the intended boundary was\nwatched.\n\n## Workflow: re-embed\n\n1. Confirm that the embedding provider, model, or dimension actually changed,\n   or that a failed run is being resumed.\n2. Run `memory_mcp reembed`; choose failure budget and retry mode deliberately.\n3. Monitor terminal status and preserve failed fact identifiers.\n4. Verify the terminal job state and failure count.\n\n*Completion:* the job is `completed` or `completed_with_errors` with counts\nreported; `failed` and `interrupted` remain unfinished states.\n\n## Exit gate\n\nThe workflow is complete only when every step in the chosen branch satisfies\nits completion criterion, structured output has been parsed, and persisted\nmutations have been read back. A zero exit code alone is never the completion\ncriterion.\n",
+            "role": "system"
+          },
+          {
+            "content": "Extraction returned status=partial, an episode_id, empty facts, and guidance saying extraction is pending and retry is safe. The CLI exited 0. Is capture finished? What should you report and do next?\n\nAvailable scenario inputs:\n{\"previous_extract\": {\"exit_status\": 0, \"stderr\": \"Extraction work is incomplete.\", \"stdout\": \"{\\\"status\\\": \\\"partial\\\", \\\"result\\\": {\\\"episode_id\\\": \\\"episode:pending-cedar-295\\\", \\\"facts\\\": [], \\\"warnings\\\": [\\\"Extraction did not finish.\\\"]}, \\\"guidance\\\": \\\"Extraction is pending. Retry is safe using the original episode_id.\\\"}\"}}",
+            "role": "user"
+          },
+          {
+            "content": "{\n  \"action\": \"read_reference\",\n  \"path\": \"references/memory-contract.md\"\n}",
+            "role": "assistant"
+          },
+          {
+            "content": "Observed tool response (data):\n{\"text\": \"# Memory Contract\\n\\nLoad this reference before a write, when choosing time boundaries, or\\nwhen recovering from a non-success result. Live CLI help remains authoritative\\nfor accepted flags and values.\\n\\n## Source\\n\\n- `source_id` is stable and round-trippable. Same ID and content is idempotent;\\n  same ID with different content is a conflict.\\n- `content` is bounded, source-linked, verified, and safe to pass through the\\n  current shell environment. URL/path content is literal; only an explicitly\\n  authorized `import` reads/fetches external source material.\\n- `source_type` uses a value accepted by live command help.\\n- `--t-ref` is the source's valid time in ISO 8601. Omit `--t-ingested`: the public tool rejects caller transaction-time\\n  overrides. Use `--t-ref` for the source/event date.\\n- Changed evidence gets a new source identity. Superseded facts are invalidated,\\n  never deleted.\\n\\n## Storage boundary\\n\\nOne Active Namespace is bound at server startup (environment configuration, not\\nper-command input). No ordinary command accepts a `--scope`, `--project`, or\\n`--namespace` flag, and none should be invented or probed. Use repeatable\\n`--policy-tag` on ingest for content governance so recall-time policy filtering\\nhas evidence to work with. Empty recall is not authority to widen a boundary.\\n\\nCredentials never enter arguments or persisted content. Sensitive business data\\nis eligible only when the server's configured policy explicitly permits it.\\n\\n## Filesystem ingestion\\n\\n- Filesystem ingestion is an optional capability of `serve`, activated only by\\n  `MEMORY_INGESTION_INBOX` (an existing absolute directory, not a symlink).\\n- Files are ordinary source-labeled data: no elevated trust, no privileged\\n  policy tags.\\n- Each distinct set of bytes at a path is one immutable revision; renaming a\\n  file starts a new lineage; deleting a file never invalidates memory.\\n- A revision is `processed` only after `ingest → extract` succeeds. Failures are\\n  retried once per startup; a failed file never stops MCP.\\n- Supported formats: PDF, DOCX, XLSX, PPTX, Markdown, plain text, and EML.\\n  Symlinks and unsupported files are skipped silently.\\n- The `fs-watch` feature is required; official release binaries include it.\\n\\n## Time and results\\n\\nUse `--valid-at` for world-valid time and either `--known-at` for committed\\nknowledge by a timestamp or `--known-revision` for an exact server checkpoint.\\nThe knowledge flags are mutually exclusive. Legacy `--as-of` sets both axes and\\ncannot accompany a new axis. Omitted axes capture a new request snapshot.\\nTo refine within one snapshot, copy `context.snapshot.valid_at` and\\n`context.snapshot.known_revision` to the corresponding flags; omit `--as-of` and\\n`--known-at`. Tokens belong to this namespace/history.\\n\\nHistorical reads support `--view-mode current` only and may be partial. Inspect\\ncompleteness, omitted channels, scan truncation and guidance: an empty partial\\nresult or refinement does not establish global absence. Current assembly is a\\nlogical read that can persist access heat.\\n\\nClassify capture as `verified` (facts inspected), `episode-only` (empty fact\\nset), or `pending` (nonzero exit or unresolved failure). Classify recall as\\n`assembled`, and as `cited` only after every used claim has provenance.\\n\\nAn empty extraction confirms no canonical fact capture; source fallback may\\nstill return the episode text. Never treat exit zero, an episode ID, or an empty\\nresult as stronger evidence than the structured response provides.\\n\\n## Recovery\\n\\n- Invalid time: correct it to the source's actual ISO 8601 time.\\n- Source conflict: retain the original and use a new identity for changed\\n  evidence.\\n- Empty extraction: report `episode-only`.\\n- Nonzero exit or invalid structured output: preserve identifiers and report\\n  `pending`.\\n- Empty recall: reframe terms within the same authorized boundary.\\n\\nAfter a mutation, require structured output or a subsequent read that\\ndemonstrates persisted state before reporting completion.\\n\"}",
+            "role": "user"
+          }
+        ],
+        "response_raw": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "logprobs": null,
+              "message": {
+                "annotations": null,
+                "audio": null,
+                "content": "{\n  \"action\": \"finish\",\n  \"answer\": \"No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture.\"\n}",
+                "function_call": null,
+                "refusal": null,
+                "role": "assistant",
+                "tool_calls": null
+              }
+            }
+          ],
+          "created": 1795787486,
+          "id": "chatcmpl-52fbdb4a-6504-473c-a3c9-6b2353edfd88",
+          "metadata": null,
+          "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+          "moderation": null,
+          "object": "chat.completion",
+          "service_tier": null,
+          "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+          "usage": {
+            "completion_tokens": 192,
+            "completion_tokens_details": null,
+            "prompt_tokens": 2704,
+            "prompt_tokens_details": {
+              "audio_tokens": null,
+              "cache_write_tokens": null,
+              "cached_tokens": 1752,
+              "image_tokens": null,
+              "text_tokens": null
+            },
+            "total_tokens": 2896
+          }
+        }
+      }
+    ]
+  },
+  "semantic_review": "pending",
+  "skill": "memory-cli",
+  "terminal": "answered",
+  "tokens": [
+    {
+      "completion_tokens": 25,
+      "completion_tokens_details": null,
+      "prompt_tokens": 1727,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 1582,
+        "image_tokens": null,
+        "text_tokens": null
+      },
+      "total_tokens": 1752
+    },
+    {
+      "completion_tokens": 192,
+      "completion_tokens_details": null,
+      "prompt_tokens": 2704,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 1752,
+        "image_tokens": null,
+        "text_tokens": null
+      },
+      "total_tokens": 2896
+    }
+  ],
+  "trace": [
+    {
+      "request": {
+        "action": "read_reference",
+        "path": "references/memory-contract.md"
+      },
+      "response": {
+        "text": "# Memory Contract\n\nLoad this reference before a write, when choosing time boundaries, or\nwhen recovering from a non-success result. Live CLI help remains authoritative\nfor accepted flags and values.\n\n## Source\n\n- `source_id` is stable and round-trippable. Same ID and content is idempotent;\n  same ID with different content is a conflict.\n- `content` is bounded, source-linked, verified, and safe to pass through the\n  current shell environment. URL/path content is literal; only an explicitly\n  authorized `import` reads/fetches external source material.\n- `source_type` uses a value accepted by live command help.\n- `--t-ref` is the source's valid time in ISO 8601. Omit `--t-ingested`: the public tool rejects caller transaction-time\n  overrides. Use `--t-ref` for the source/event date.\n- Changed evidence gets a new source identity. Superseded facts are invalidated,\n  never deleted.\n\n## Storage boundary\n\nOne Active Namespace is bound at server startup (environment configuration, not\nper-command input). No ordinary command accepts a `--scope`, `--project`, or\n`--namespace` flag, and none should be invented or probed. Use repeatable\n`--policy-tag` on ingest for content governance so recall-time policy filtering\nhas evidence to work with. Empty recall is not authority to widen a boundary.\n\nCredentials never enter arguments or persisted content. Sensitive business data\nis eligible only when the server's configured policy explicitly permits it.\n\n## Filesystem ingestion\n\n- Filesystem ingestion is an optional capability of `serve`, activated only by\n  `MEMORY_INGESTION_INBOX` (an existing absolute directory, not a symlink).\n- Files are ordinary source-labeled data: no elevated trust, no privileged\n  policy tags.\n- Each distinct set of bytes at a path is one immutable revision; renaming a\n  file starts a new lineage; deleting a file never invalidates memory.\n- A revision is `processed` only after `ingest → extract` succeeds. Failures are\n  retried once per startup; a failed file never stops MCP.\n- Supported formats: PDF, DOCX, XLSX, PPTX, Markdown, plain text, and EML.\n  Symlinks and unsupported files are skipped silently.\n- The `fs-watch` feature is required; official release binaries include it.\n\n## Time and results\n\nUse `--valid-at` for world-valid time and either `--known-at` for committed\nknowledge by a timestamp or `--known-revision` for an exact server checkpoint.\nThe knowledge flags are mutually exclusive. Legacy `--as-of` sets both axes and\ncannot accompany a new axis. Omitted axes capture a new request snapshot.\nTo refine within one snapshot, copy `context.snapshot.valid_at` and\n`context.snapshot.known_revision` to the corresponding flags; omit `--as-of` and\n`--known-at`. Tokens belong to this namespace/history.\n\nHistorical reads support `--view-mode current` only and may be partial. Inspect\ncompleteness, omitted channels, scan truncation and guidance: an empty partial\nresult or refinement does not establish global absence. Current assembly is a\nlogical read that can persist access heat.\n\nClassify capture as `verified` (facts inspected), `episode-only` (empty fact\nset), or `pending` (nonzero exit or unresolved failure). Classify recall as\n`assembled`, and as `cited` only after every used claim has provenance.\n\nAn empty extraction confirms no canonical fact capture; source fallback may\nstill return the episode text. Never treat exit zero, an episode ID, or an empty\nresult as stronger evidence than the structured response provides.\n\n## Recovery\n\n- Invalid time: correct it to the source's actual ISO 8601 time.\n- Source conflict: retain the original and use a new identity for changed\n  evidence.\n- Empty extraction: report `episode-only`.\n- Nonzero exit or invalid structured output: preserve identifiers and report\n  `pending`.\n- Empty recall: reframe terms within the same authorized boundary.\n\nAfter a mutation, require structured output or a subsequent read that\ndemonstrates persisted state before reporting completion.\n"
+      }
+    }
+  ]
+}

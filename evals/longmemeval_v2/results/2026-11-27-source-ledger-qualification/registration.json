@@ -1,0 +1,61 @@
+{
+  "schema": "memory-mcp-reader-protocol/v1",
+  "rows_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-ledger-qualification/rows.jsonl",
+  "rows_sha256": "599b418b118e65d8463ff45dd473c42eae0bff44394e68794255ae2c9e58f742",
+  "truth_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-ledger-qualification/truth.json",
+  "truth_sha256": "f1ce54629e64e002e8fb74371094dc422823511077d25e76dbd934f66b2e1089",
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "endpoint": "http://127.0.0.1:18767/v1",
+  "variants": [
+    "ordered-relations-final-first",
+    "source-ledger-final-first"
+  ],
+  "sampling": {
+    "temperature": 0,
+    "max_completion_tokens": 256
+  },
+  "timeout_seconds": 60,
+  "max_retries": 0,
+  "capture_budget_seconds": 1800,
+  "repetitions": 1,
+  "order": "case-major then declared variant order; no repeat or best output selection",
+  "hypothesis": "reader protocol only, fixed evidence; no retrieval or general memory benefit claim",
+  "runner_sha256": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+  "attempt_recorder_sha256": "1c1f7fb78bc68858f01c2e7dd8ab7d1890413c734bd509246b0818a3f1e61e49",
+  "variant_treatments": {
+    "ordered-relations-final-first": [
+      "evidence_structure",
+      "ordered_peer_relations",
+      "reasoning_instruction"
+    ],
+    "source-ledger-final-first": [
+      "evidence_structure",
+      "ordered_peer_relations",
+      "anchor_occurrences",
+      "quote_channel_separation",
+      "reasoning_instruction"
+    ]
+  },
+  "cohorts": {
+    "exposed_ordered_regressions": [
+      "middle-positive",
+      "adjacent-negative",
+      "terminal-negative",
+      "button-count-mixed",
+      "missing-anchor-unknown",
+      "duplicate-anchor-unknown",
+      "clipped-terminal-unknown",
+      "heterogeneous-positive",
+      "named-scope-positive",
+      "complete-list-positive"
+    ],
+    "new_source_reviewed_controls": [
+      "ledger-conflicting-repeat",
+      "ledger-consistent-repeat",
+      "ledger-named-scope-repeat",
+      "ledger-role-selected-repeat",
+      "ledger-opaque-intervening",
+      "ledger-clipped-repeat"
+    ]
+  }
+}

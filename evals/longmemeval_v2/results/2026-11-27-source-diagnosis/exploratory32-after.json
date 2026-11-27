@@ -1,0 +1,150 @@
+{
+  "EXPLORATORY32_POOLS": [
+    {
+      "stage": "facts.initial_fetched",
+      "elapsed_ms": 4.785834,
+      "records": 31,
+      "content_bytes": 404519,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 1,
+      "unique_sources": 31,
+      "tracked_source_fact_ids": []
+    },
+    {
+      "stage": "facts.term_groups_fetched",
+      "elapsed_ms": 66.358292,
+      "records": 32,
+      "content_bytes": 408002,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 32,
+      "tracked_source_fact_ids": [
+        "fact:competing32_31"
+      ]
+    },
+    {
+      "stage": "facts.term_groups_deduplicated",
+      "elapsed_ms": 66.920542,
+      "records": 32,
+      "content_bytes": 408002,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 32,
+      "tracked_source_fact_ids": [
+        "fact:competing32_31"
+      ]
+    },
+    {
+      "stage": "episodes.fetched",
+      "elapsed_ms": 236.182667,
+      "records": 21,
+      "content_bytes": 264463,
+      "max_content_bytes": 13049,
+      "index_keys": 0,
+      "index_key_bytes": 0,
+      "max_index_key_bytes": 0,
+      "unique_contents": 2,
+      "unique_sources": 21,
+      "tracked_source_fact_ids": []
+    }
+  ],
+  "EXPLORATORY32_STAGES": [
+    {
+      "stage": "formation",
+      "elapsed_ms": 0.392,
+      "items": [
+        {
+          "fact_id": "",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "ranked_fact_candidates",
+      "elapsed_ms": 199.43175,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "subject_scoped_fact_candidates",
+      "elapsed_ms": 201.016042,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "admitted_fact_candidates",
+      "elapsed_ms": 216.23662499999998,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "bounded_fact_candidates",
+      "elapsed_ms": 216.258959,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "episode_candidates",
+      "elapsed_ms": 292.034042,
+      "items": [
+        {
+          "fact_id": "episode_fallback:episode:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "selected_pre_packaging",
+      "elapsed_ms": 315.907459,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 3483
+        }
+      ]
+    },
+    {
+      "stage": "packed_context",
+      "elapsed_ms": 340.48033399999997,
+      "items": [
+        {
+          "fact_id": "fact:competing32_31",
+          "source_episode": "episode:competing32_31",
+          "bytes": 2048
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,235 @@
+{
+  "schema": "source-graph-qualification-decision/v1",
+  "decision": "FAIL",
+  "qualified_for_frozen24case_criterion": false,
+  "scheduled_calls": 48,
+  "scheduled_case_families": 24,
+  "actual_started_requests": 48,
+  "finished_attempts": 48,
+  "response_bodies": 48,
+  "request_ids_unique": true,
+  "variants": [
+    {
+      "variant": "source-ledger-final-first",
+      "selected": 24,
+      "completed_format_literal_quote": 19,
+      "failed_cases": {
+        "adjacent-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "terminal-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "ledger-consistent-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "UNKNOWN"
+        },
+        "graph-equal-links": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "UNKNOWN"
+        },
+        "graph-opaque-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "Lagoon"
+        }
+      },
+      "cohorts": {
+        "previously_exposed_sixteen": {
+          "selected": 16,
+          "completed_value": 15,
+          "completed_format_literal_quote": 13,
+          "value": 15,
+          "format": 16,
+          "literal_quote": 14,
+          "truncated": 0,
+          "errors": 0
+        },
+        "new_source_reviewed_eight": {
+          "selected": 8,
+          "completed_value": 6,
+          "completed_format_literal_quote": 6,
+          "value": 6,
+          "format": 8,
+          "literal_quote": 8,
+          "truncated": 0,
+          "errors": 0
+        }
+      },
+      "unchanged_report_counts": {
+        "selected": 24,
+        "completed_correct": 21,
+        "value_correct": 21,
+        "format_valid": 24,
+        "quote_exact": 22,
+        "false_premise_selected": 3,
+        "false_premise_correct": 3,
+        "unobserved": 0,
+        "errors": 0
+      }
+    },
+    {
+      "variant": "source-graph-final-first",
+      "selected": 24,
+      "completed_format_literal_quote": 19,
+      "failed_cases": {
+        "ledger-conflicting-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "ledger-opaque-intervening": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "ledger-clipped-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "graph-opaque-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "length",
+          "format_valid": false,
+          "truncated": true,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "completed_correct": false,
+          "answer": null
+        },
+        "graph-virtualized-last": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "None"
+        }
+      },
+      "cohorts": {
+        "previously_exposed_sixteen": {
+          "selected": 16,
+          "completed_value": 16,
+          "completed_format_literal_quote": 13,
+          "value": 16,
+          "format": 16,
+          "literal_quote": 13,
+          "truncated": 0,
+          "errors": 0
+        },
+        "new_source_reviewed_eight": {
+          "selected": 8,
+          "completed_value": 6,
+          "completed_format_literal_quote": 6,
+          "value": 6,
+          "format": 7,
+          "literal_quote": 7,
+          "truncated": 1,
+          "errors": 0
+        }
+      },
+      "unchanged_report_counts": {
+        "selected": 24,
+        "completed_correct": 22,
+        "value_correct": 22,
+        "format_valid": 23,
+        "quote_exact": 20,
+        "false_premise_selected": 3,
+        "false_premise_correct": 3,
+        "unobserved": 0,
+        "errors": 0
+      }
+    }
+  ],
+  "source_binding_and_entailment": "Literal quote presence only; this gate does not establish full source binding, quote entailment, autonomous-agent qualification or memory-treatment benefit.",
+  "input_sha256": {
+    "registration.json": "5a5e04637c3d800f6caf3362ec8ba573964838cdca919455b239c0b57e66fadf",
+    "acceptance.json": "2a52ea48c462167166465cb3349c6cfc72cabee7f80a7bc8189b1ed22bad41f9",
+    "prompts.json": "2d8c982a5946f15cf77c9d8e7fa553efadb752a84d35cc2718449e8cf104b31a",
+    "outputs.json": "2c3452dc1b27ab5bca2df6e94ee923c989bd18c30cb28c3003f23bf597aba465",
+    "report.json": "3ab4b7ca3e60b336757311e30a2dc2abb5fabc78bcc6e5a5b5b33326f01b3296",
+    "rows.jsonl": "bf01b7b7c07ca94149f85a564b39b985a6a2acadc9b0fcd615f436e9973cc892",
+    "truth.json": "0ecefe5195496bd14ecbf5fcea942fc85891282d5565f9bbf43aa909b1a77951",
+    "inference-attempts.jsonl": "42b973e6d2d3bfaa0896c9d5b1bc4ff2ecfd25b18f0764e1d8e034db9e2ea67f",
+    "inference-events.jsonl": "c8165456ef888082a6d0bdede9f0b8384ef657d151e929b53d5e1cc3ea80d837"
+  }
+}

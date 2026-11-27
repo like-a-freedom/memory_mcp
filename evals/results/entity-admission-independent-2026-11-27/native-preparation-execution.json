@@ -1,0 +1,22 @@
+{
+  "exit_code": 0,
+  "timeout": false,
+  "elapsed_seconds": 132.11025491700275,
+  "command": [
+    "/tmp/memory-quality-eval-2026-11-27",
+    "prepare-retrieval-quality",
+    "--sources",
+    "evals/corpora/retrieval-quality-v1/sources.json",
+    "--output",
+    "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/retrieval-quality-v1/native-preparation-r29.json"
+  ],
+  "model_env": {
+    "EMBEDDINGS_ENABLED": "true",
+    "EMBEDDINGS_PROVIDER": "local-candle",
+    "EMBEDDINGS_MODEL": "intfloat/multilingual-e5-small",
+    "EMBEDDINGS_MODEL_DIR": "/Users/solovey/Documents/dev/memory_mcp/target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3",
+    "RETRIEVAL_RERANKER_MODEL_DIR": "/Users/solovey/Documents/dev/memory_mcp/target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825",
+    "RETRIEVAL_RERANKER_ADMISSION_FLOOR": "0",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence"
+  }
+}

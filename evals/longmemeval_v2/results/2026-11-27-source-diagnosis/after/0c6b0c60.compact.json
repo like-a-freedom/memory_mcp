@@ -1,0 +1,2007 @@
+{
+  "case_id": "0c6b0c60",
+  "command": [
+    "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-quality-pinned-otzfxw54/full_history_evidence",
+    "full_history_dropdown_retains_reviewed_source",
+    "--ignored",
+    "--nocapture"
+  ],
+  "copy_seconds": 0.043313417001627386,
+  "elapsed_seconds": 6.759414750005817,
+  "external_timeout": false,
+  "process_deadline_exceeded": false,
+  "exit_code": 0,
+  "events": [
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 10534,
+        "elapsed_ms": 10.689250000000001,
+        "sql_sha256": "8633c76c65f189afb3c1f68477c50ca771311f5a4ae5bdf0f1358b79a7f1e97c"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 470,
+        "elapsed_ms": 13.500584,
+        "sql_sha256": "144c47d26101ab9de63a80f6b9c5c98c60075364996df0135c9167604ad62838"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_START",
+      "data": {
+        "case_id": "0c6b0c60",
+        "episode_count": 18,
+        "formation_complete": true,
+        "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 337,
+        "elapsed_ms": 13.875416999999999,
+        "sql_sha256": "31f99214e3614be1653d6d7c126af8371345fc1d390931e088985801d1978699"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3011,
+        "elapsed_ms": 17.567125,
+        "sql_sha256": "386d16fa71dc034946d6634b810b394292e0767f94842c9f9a655099ee4c7530"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.initial_fetched",
+        "elapsed_ms": 4.0659160000000005,
+        "records": 0,
+        "content_bytes": 0,
+        "max_content_bytes": 0,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 0,
+        "unique_sources": 0,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 4.0807910000000005,
+        "records": 0,
+        "content_dictionaries": 0,
+        "index_dictionaries": 0
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 43454,
+        "elapsed_ms": 61.116167,
+        "sql_sha256": "90827cd8e971be3ddb99b23478921b7e86ec83ed03612c3f50826981c5b7403f"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 92538,
+        "elapsed_ms": 154.06537500000002,
+        "sql_sha256": "ee151f7c60b54dd9b6cd155fc2316e292c9e8a63dbdb26cde968fe73a38d8776"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 57167,
+        "elapsed_ms": 212.014667,
+        "sql_sha256": "c7ee030e8782ac1e2f27b71133144061733c44a4c1c4809bc37dbd92e93f811a"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_fetched",
+        "elapsed_ms": 206.43308299999998,
+        "records": 53,
+        "content_bytes": 28068923,
+        "max_content_bytes": 1040517,
+        "index_keys": 351060,
+        "index_key_bytes": 5860869,
+        "max_index_key_bytes": 216,
+        "unique_contents": 18,
+        "unique_sources": 18,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "facts.term_groups_deduplicated",
+        "elapsed_ms": 214.531625,
+        "records": 53,
+        "content_bytes": 28068923,
+        "max_content_bytes": 1040517,
+        "index_keys": 351060,
+        "index_key_bytes": 5860869,
+        "max_index_key_bytes": 216,
+        "unique_contents": 18,
+        "unique_sources": 18,
+        "tracked_source_fact_ids": [
+          "fact:6260279fe2edac6b9087873e",
+          "fact:72dae2359d272b755a877236"
+        ]
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "lexical.pool",
+        "elapsed_ms": 464.897916,
+        "records": 53,
+        "content_dictionaries": 18,
+        "index_dictionaries": 18
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3365,
+        "elapsed_ms": 495.269,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1586,
+        "elapsed_ms": 630.871584,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3467,
+        "elapsed_ms": 634.635,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3435,
+        "elapsed_ms": 639.43975,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2817,
+        "elapsed_ms": 643.499375,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2754,
+        "elapsed_ms": 647.316292,
+        "sql_sha256": "4e8e787ffd81571162e00dc193ace8b5a6867a534e448f90b9658386261b7065"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20872,
+        "elapsed_ms": 715.300417,
+        "sql_sha256": "6edee64996940a903cbe597e1c44562a39ba0dd32c50f87682d9d92bc6b73c8b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1827,
+        "elapsed_ms": 723.0887499999999,
+        "sql_sha256": "dde5933c4d2a82a76d6cc55372086c7ef6438aa9ef2c40e4de40f46341ff37df"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 3185,
+        "elapsed_ms": 1019.6099999999999,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 22910,
+        "elapsed_ms": 1044.480459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14555,
+        "elapsed_ms": 1045.946459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 17023,
+        "elapsed_ms": 1048.386459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 21890,
+        "elapsed_ms": 1049.14925,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 21037,
+        "elapsed_ms": 1070.580084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13320,
+        "elapsed_ms": 1072.055459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14524,
+        "elapsed_ms": 1073.2282500000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19303,
+        "elapsed_ms": 1073.7836670000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 11700,
+        "elapsed_ms": 1096.241292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19817,
+        "elapsed_ms": 1099.909125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 26676,
+        "elapsed_ms": 1100.801459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18514,
+        "elapsed_ms": 1103.087167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14507,
+        "elapsed_ms": 1126.566042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19067,
+        "elapsed_ms": 1127.185125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15785,
+        "elapsed_ms": 1127.818209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 25827,
+        "elapsed_ms": 1129.320209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14013,
+        "elapsed_ms": 1152.168042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19125,
+        "elapsed_ms": 1153.30725,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15855,
+        "elapsed_ms": 1153.983209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 25210,
+        "elapsed_ms": 1154.876542,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 21381,
+        "elapsed_ms": 1176.6023750000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13357,
+        "elapsed_ms": 1177.607459,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18886,
+        "elapsed_ms": 1179.158917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16466,
+        "elapsed_ms": 1180.744917,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 24423,
+        "elapsed_ms": 1205.545167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 17037,
+        "elapsed_ms": 1207.363042,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 21689,
+        "elapsed_ms": 1207.923209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18055,
+        "elapsed_ms": 1208.409667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 17097,
+        "elapsed_ms": 1231.132959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 23158,
+        "elapsed_ms": 1231.94975,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15077,
+        "elapsed_ms": 1233.271084,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16106,
+        "elapsed_ms": 1234.328625,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20570,
+        "elapsed_ms": 1255.2313749999998,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13612,
+        "elapsed_ms": 1256.917375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14440,
+        "elapsed_ms": 1257.721667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19590,
+        "elapsed_ms": 1259.033209,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 9327,
+        "elapsed_ms": 1277.756709,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 12733,
+        "elapsed_ms": 1281.189167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18147,
+        "elapsed_ms": 1282.740167,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 24873,
+        "elapsed_ms": 1284.2437499999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 17050,
+        "elapsed_ms": 1306.772959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 22797,
+        "elapsed_ms": 1307.43375,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14573,
+        "elapsed_ms": 1308.644334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15882,
+        "elapsed_ms": 1309.984,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20570,
+        "elapsed_ms": 1330.9389170000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13355,
+        "elapsed_ms": 1332.419334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15024,
+        "elapsed_ms": 1334.058875,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19901,
+        "elapsed_ms": 1335.116334,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16775,
+        "elapsed_ms": 1357.5243750000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 23195,
+        "elapsed_ms": 1358.6902089999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15687,
+        "elapsed_ms": 1360.4805840000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16764,
+        "elapsed_ms": 1361.584959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 11282,
+        "elapsed_ms": 1382.1478339999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 22503,
+        "elapsed_ms": 1384.4626250000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15334,
+        "elapsed_ms": 1386.2259999999999,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20900,
+        "elapsed_ms": 1387.844292,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 17635,
+        "elapsed_ms": 1410.9615,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 23417,
+        "elapsed_ms": 1411.684667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15819,
+        "elapsed_ms": 1413.426125,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16840,
+        "elapsed_ms": 1414.4785,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20578,
+        "elapsed_ms": 1435.3689590000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13234,
+        "elapsed_ms": 1436.8539170000001,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 15017,
+        "elapsed_ms": 1438.6112500000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 20324,
+        "elapsed_ms": 1439.858792,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 14791,
+        "elapsed_ms": 1464.2077920000002,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19387,
+        "elapsed_ms": 1464.9095,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 16951,
+        "elapsed_ms": 1466.3438339999998,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 26522,
+        "elapsed_ms": 1466.797959,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 2360,
+        "elapsed_ms": 1478.219542,
+        "sql_sha256": "d78e081fb6023d0148b1d0287c794bab92c574efb4d7a3949d882657af70821b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 12449,
+        "elapsed_ms": 1479.635834,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 9349,
+        "elapsed_ms": 1481.191667,
+        "sql_sha256": "1e18de714733ab0959ceaf8c012a0a51646d68a29affab923048d7655260f6e6"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 26529,
+        "elapsed_ms": 1521.918084,
+        "sql_sha256": "b49799ed4a29738b7caf61b27725841f5eefda762bfaff0abe25a21fc21698cf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1142,
+        "elapsed_ms": 1898.085125,
+        "sql_sha256": "026469bf6c2f59bbaa1a36db7d6614c1bf8ff124f6d92ff3ab850d9ce0746cdf"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 1886.344333,
+        "stage": "channels.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 6537,
+        "elapsed_ms": 1906.6727919999998,
+        "sql_sha256": "8e8e5d482b4a1a0d11850ec5510d2757afa8713bb376b12718b33128b0a9ad4b"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 1893.193166,
+        "stage": "subject.resolved"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 1991.286166,
+        "stage": "topics.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 2357.4179160000003,
+        "stage": "fusion.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_WORK",
+      "data": {
+        "stage": "admission.topics",
+        "elapsed_ms": 2614.780333,
+        "records": 12,
+        "content_dictionaries": 12,
+        "index_dictionaries": 24
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 2626.9466660000003,
+        "stage": "admission.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 13631,
+        "elapsed_ms": 2654.408084,
+        "sql_sha256": "013712abdee364642f79b53dba3385558b33c9221437552987461218efd03557"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 19434,
+        "elapsed_ms": 2673.8955,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18277,
+        "elapsed_ms": 2692.232334,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 18930,
+        "elapsed_ms": 2711.220042,
+        "sql_sha256": "cc10f0d3ce419c5ce6a2c0aee5672b926aff9376c9d1b6d31fd41df7b7661c21"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_CANDIDATES",
+      "data": {
+        "stage": "episodes.fetched",
+        "elapsed_ms": 2701.821333,
+        "records": 18,
+        "content_bytes": 9483649,
+        "max_content_bytes": 1040517,
+        "index_keys": 0,
+        "index_key_bytes": 0,
+        "max_index_key_bytes": 0,
+        "unique_contents": 18,
+        "unique_sources": 18,
+        "tracked_source_fact_ids": []
+      }
+    },
+    {
+      "event": "FULL_HISTORY_PHASE",
+      "data": {
+        "elapsed_ms": 3306.668791,
+        "stage": "selection.completed"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 1491,
+        "elapsed_ms": 3419.038167,
+        "sql_sha256": "4b70e3fa792ae356241815e4bc328ff4f0b2201d13f1825521b44de3f7fe6064"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 928,
+        "elapsed_ms": 3420.219917,
+        "sql_sha256": "e35ee74798a60263022fd0c356417f16bcb31e5fabcd7b728905dac32de96745"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 31916,
+        "elapsed_ms": 3943.958167,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 540498,
+        "elapsed_ms": 3960.85325,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 48851,
+        "elapsed_ms": 3960.905375,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 521062,
+        "elapsed_ms": 3969.4245,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_QUERY",
+      "data": {
+        "duration_us": 302253,
+        "elapsed_ms": 4271.700792,
+        "sql_sha256": "9e5fb83aaf67404d2ce0cd9edcf20a0fccf92686afcc07cc5cbdb52cdee0a444"
+      }
+    },
+    {
+      "event": "FULL_HISTORY_RECEIPT",
+      "data": {
+        "case_id": "0c6b0c60",
+        "elapsed_ms": 4417.898499999999,
+        "receipt": {
+          "items": [
+            {
+              "confidence": 0.0,
+              "content": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '\u2022 Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '\u2022'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '\uff3c(\u00b0\u30ed\uff3c)'\\n\\t\\tStaticText \\\"There's nothing here\u2026\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "fact_id": "fact:72dae2359d272b755a877236",
+              "grounding": 0.63,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "dropdown",
+                  "forum",
+                  "option",
+                  "sorted",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 118806,
+                  "original_bytes": 382024,
+                  "start_byte": 116758
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "forum",
+                    "sorted",
+                    "by",
+                    "top",
+                    "time",
+                    "dropdown"
+                  ],
+                  "matched_index_key_terms": [
+                    "am",
+                    "forum",
+                    "by",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "am",
+                      "forum",
+                      "by",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "01",
+                      "02",
+                      "04",
+                      "05",
+                      "06",
+                      "07"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:2b84e8b18bd3a49b851aaf2e",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:689b82ea029d612eff967e9d",
+                      "fact:9dfc4dd01b28ce5fa083a3fc"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "'', visible\\n\\t\\t[116] heading '/f/movies', visible\\n\\t\\t\\tStaticText '/f/'\\n\\t\\t\\t[118] strong '', visible\\n\\t\\t\\t\\tStaticText 'movies'\\n\\t\\t[119] navigation '', visible\\n\\t\\t\\t[120] list '', visible\\n\\t\\t\\t\\t[121] listitem '', visible\\n\\t\\t\\t\\t\\t[122] link 'Submissions', clickable, visible\\n\\t\\t\\t\\t[123] listitem '', visible\\n\\t\\t\\t\\t\\t[124] link 'Comments', clickable, visible\\n\\t\\t\\t[125] list '', visible\\n\\t\\t\\t\\t[126] listitem '', visible\\n\\t\\t\\t\\t\\t[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '\u2022 Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '\u2022'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible\\n\\t\\t\\tStaticText '\uff3c(\u00b0\u30ed\uff3c)'\\n\\t\\tStaticText \\\"There's nothing here\u2026\\\"\\n\\t[165] complementary '', visible\\n\\t\\t[166] Section '', visible\\n\\t\\t\\t[167] heading 'movies', visible\\n\\t\\t\\t\\t[168] link 'movies', clickable, visible\\n\\t\\t\\t[169] Section '', visible\\n\\t\\t\\t\\t[172] button 'Subscribe No subscribers', clickable, visible\\n\\t\\t\\t\\t\\tStaticText 'Subscribe'\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t\\t[179] paragraph '', visible\\n\\t\\t\\t\\tStaticText 't5_2qh3s'\\n\\t\\t\\t[180] separator '', visible, orientation='horizontal'\\n\\t\\t\\t[181] list '', visible\\n\\t\\t\\t\\t[182] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Created'\\n\\t\\t\\t\\t\\t[183]",
+              "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:28a05ac3465896dd0fa1dd41"
+            },
+            {
+              "confidence": 0.0,
+              "content": "00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t[992] gridcell '0%'\\n\\t\\t\\t\\t\\t\\t\\t[993] gridcell '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t[995] gridcell '$52.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$52.00'\\n\\t\\t\\t[997] Section ''\\n\\t\\t\\t\\tStaticText 'Order Total'\\n\\t\\t\\t\\tStaticText 'Notes for this Order'\\n\\t\\t\\t\\t[1007] LabelText ''\\n\\t\\t\\t\\t\\tStaticText 'Status'\\n\\t\\t\\t\\t[1009] combobox 'Status' value='Canceled', hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[1010] option 'Canceled', selected=True\\n\\t\\t\\t\\t[1012] LabelText ''\\n\\t\\t\\t\\t\\tStaticText 'Comment'\\n\\t\\t\\t\\t[1014] textbox 'Comment'\\n\\t\\t\\t\\t[1018] checkbox 'Notify Customer by Email', clickable, checked='false'\\n\\t\\t\\t\\t[1019] LabelText '', clickable\\n\\t\\t\\t\\t\\tStaticText 'Notify Customer by Email'\\n\\t\\t\\t\\t[1021] checkbox 'Visible on Storefront', clickable, checked='false'\\n\\t\\t\\t\\t[1022] LabelText '', clickable\\n\\t\\t\\t\\t\\tStaticText 'Visible on Storefront'\\n\\t\\t\\t\\t[1024] button 'Submit Comment', clickable\\n\\t\\t\\t\\t\\tStaticText 'Submit Comment'\\n\\t\\t\\t\\t[1026] list ''\\n\\t\\t\\t\\tStaticText 'Order Totals'\\n\\t\\t\\t\\t[1030] table ''\\n\\t\\t\\t\\t\\t[1056] rowgroup ''\\n\\t\\t\\t\\t\\t\\t[1057] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1058] gridcell 'Subtotal'\\n\\t\\t\\t\\t\\t\\t\\t[1059] gridcell '$165.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$165.00'\\n\\t\\t\\t\\t\\t\\t[1062] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1063] gridcell 'Shipping & Handling'\\n\\t\\t\\t\\t\\t\\t\\t[1064] gridcell '$20.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$20.00'\\n\\t\\t\\t\\t\\t[1031] rowgroup ''\\n\\t\\t\\t\\t\\t\\t[1032] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1033] gridcell 'Grand Total'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1034] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Grand Total'\\n\\t\\t\\t\\t\\t\\t\\t[1035] gridcell '$185.00'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1036] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$185.00'\\n\\t\\t\\t\\t\\t\\t[1038] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1039] gridcell 'Total Paid'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1040] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Total Paid'\\n\\t\\t\\t\\t\\t\\t\\t[1041] gridcell '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1042] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t[1044] row ''\\n\\t\\t\\t\\t\\",
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "grounding": 0.27,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 425938,
+                  "original_bytes": 804658,
+                  "start_byte": 423890
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "option",
+                  "sorted",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 425938,
+                  "original_bytes": 804658,
+                  "start_byte": 423890
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "website",
+                    "sorted",
+                    "by",
+                    "top"
+                  ],
+                  "matched_index_key_terms": [
+                    "am",
+                    "website"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "am",
+                      "website"
+                    ],
+                    "matched_repeated_topics": [
+                      "01",
+                      "02",
+                      "04",
+                      "05",
+                      "06",
+                      "07"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:2b84e8b18bd3a49b851aaf2e",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:689b82ea029d612eff967e9d",
+                      "fact:9dfc4dd01b28ce5fa083a3fc"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:751dce326043631881f9bf3b",
+                "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+                "source_type": "other"
+              },
+              "quote": "00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t[992] gridcell '0%'\\n\\t\\t\\t\\t\\t\\t\\t[993] gridcell '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t[995] gridcell '$52.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$52.00'\\n\\t\\t\\t[997] Section ''\\n\\t\\t\\t\\tStaticText 'Order Total'\\n\\t\\t\\t\\tStaticText 'Notes for this Order'\\n\\t\\t\\t\\t[1007] LabelText ''\\n\\t\\t\\t\\t\\tStaticText 'Status'\\n\\t\\t\\t\\t[1009] combobox 'Status' value='Canceled', hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t[1010] option 'Canceled', selected=True\\n\\t\\t\\t\\t[1012] LabelText ''\\n\\t\\t\\t\\t\\tStaticText 'Comment'\\n\\t\\t\\t\\t[1014] textbox 'Comment'\\n\\t\\t\\t\\t[1018] checkbox 'Notify Customer by Email', clickable, checked='false'\\n\\t\\t\\t\\t[1019] LabelText '', clickable\\n\\t\\t\\t\\t\\tStaticText 'Notify Customer by Email'\\n\\t\\t\\t\\t[1021] checkbox 'Visible on Storefront', clickable, checked='false'\\n\\t\\t\\t\\t[1022] LabelText '', clickable\\n\\t\\t\\t\\t\\tStaticText 'Visible on Storefront'\\n\\t\\t\\t\\t[1024] button 'Submit Comment', clickable\\n\\t\\t\\t\\t\\tStaticText 'Submit Comment'\\n\\t\\t\\t\\t[1026] list ''\\n\\t\\t\\t\\tStaticText 'Order Totals'\\n\\t\\t\\t\\t[1030] table ''\\n\\t\\t\\t\\t\\t[1056] rowgroup ''\\n\\t\\t\\t\\t\\t\\t[1057] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1058] gridcell 'Subtotal'\\n\\t\\t\\t\\t\\t\\t\\t[1059] gridcell '$165.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$165.00'\\n\\t\\t\\t\\t\\t\\t[1062] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1063] gridcell 'Shipping & Handling'\\n\\t\\t\\t\\t\\t\\t\\t[1064] gridcell '$20.00'\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$20.00'\\n\\t\\t\\t\\t\\t[1031] rowgroup ''\\n\\t\\t\\t\\t\\t\\t[1032] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1033] gridcell 'Grand Total'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1034] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Grand Total'\\n\\t\\t\\t\\t\\t\\t\\t[1035] gridcell '$185.00'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1036] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$185.00'\\n\\t\\t\\t\\t\\t\\t[1038] row ''\\n\\t\\t\\t\\t\\t\\t\\t[1039] gridcell 'Total Paid'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1040] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText 'Total Paid'\\n\\t\\t\\t\\t\\t\\t\\t[1041] gridcell '$0.00'\\n\\t\\t\\t\\t\\t\\t\\t\\t[1042] strong ''\\n\\t\\t\\t\\t\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t\\t\\t\\t[1044] row ''\\n\\t\\t\\t\\t\\",
+              "rationale": "tier=fallback fts=5.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.27 alignment=0.93 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:751dce326043631881f9bf3b"
+            },
+            {
+              "confidence": 0.0,
+              "content": "n '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t\\t\\t\\t[68] list '', visible\\n\\t\\t\\t\\t\\t[74] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[75] link 'Profile', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[77] image '', visible\\n\\t\\t\\t\\t\\t[78] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[79] link 'My account', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[81] image '', visible\\n\\t\\t\\t\\t\\t[82] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[83] link 'User settings', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[85] image '', visible\\n\\t\\t\\t\\t\\t[86] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[87] link 'Block list', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[89] image '', visible\\n\\t\\t\\t\\t\\t[90] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[91] separator '', visible, orientation='horizontal'\\n\\t\\t\\t\\t\\t[92] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[93] Section '', visible\\n\\t\\t\\t\\t\\t\\t\\t[95] button 'Dark mode', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\t[97] image '', visible\\n\\t\\t\\t\\t\\t[101] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[102] Section '', visible\\n\\t\\t\\t\\t\\t\\t\\t[103] button 'Log out', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\t[105] image '', visible\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '",
+              "fact_id": "fact:93814dfb3aee835f9f3b0149",
+              "grounding": 0.37,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 13788,
+                  "original_bytes": 86868,
+                  "start_byte": 11740
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "appear",
+                  "by",
+                  "forum",
+                  "option",
+                  "time",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 13788,
+                  "original_bytes": 86868,
+                  "start_byte": 11740
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "reddit",
+                    "forum",
+                    "by",
+                    "top",
+                    "time",
+                    "appear"
+                  ],
+                  "matched_index_key_terms": [
+                    "am",
+                    "reddit",
+                    "forum"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "am",
+                      "reddit",
+                      "forum"
+                    ],
+                    "matched_repeated_topics": [
+                      "01",
+                      "02",
+                      "04",
+                      "05",
+                      "07"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:2b84e8b18bd3a49b851aaf2e",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:689b82ea029d612eff967e9d",
+                      "fact:9dfc4dd01b28ce5fa083a3fc"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:3fd1796a0f590ac946fedf12",
+                "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "n '', visible\\n\\t\\t\\t[48] searchbox 'Search query', clickable, visible\\n\\t\\t[49] list '', visible\\n\\t\\t\\t[50] listitem '', visible\\n\\t\\t\\t\\t[51] link 'Notifications (0)', clickable, visible\\n\\t\\t\\t\\t\\t[54] image '', visible\\n\\t\\t\\t[55] listitem '', visible\\n\\t\\t\\t\\t[56] link 'Submit', clickable, visible\\n\\t\\t\\t\\t\\t[59] image '', visible\\n\\t\\t\\t\\t\\tStaticText 'Submit'\\n\\t\\t\\t[61] listitem '', visible\\n\\t\\t\\t\\t[62] button 'MarvelsGrantMan136', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t[65] image '', visible\\n\\t\\t\\t\\t\\t[66] strong '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'MarvelsGrantMan136'\\n\\t\\t\\t\\t[68] list '', visible\\n\\t\\t\\t\\t\\t[74] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[75] link 'Profile', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[77] image '', visible\\n\\t\\t\\t\\t\\t[78] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[79] link 'My account', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[81] image '', visible\\n\\t\\t\\t\\t\\t[82] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[83] link 'User settings', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[85] image '', visible\\n\\t\\t\\t\\t\\t[86] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[87] link 'Block list', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t[89] image '', visible\\n\\t\\t\\t\\t\\t[90] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[91] separator '', visible, orientation='horizontal'\\n\\t\\t\\t\\t\\t[92] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[93] Section '', visible\\n\\t\\t\\t\\t\\t\\t\\t[95] button 'Dark mode', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\t[97] image '', visible\\n\\t\\t\\t\\t\\t[101] listitem '', visible\\n\\t\\t\\t\\t\\t\\t[102] Section '', visible\\n\\t\\t\\t\\t\\t\\t\\t[103] button 'Log out', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\t[105] image '', visible\\n\\t[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible\\n\\t\\t[118] heading 'A', visible\\n\\t\\t[119] list '', visible\\n\\t\\t\\t[120] listitem '",
+              "rationale": "tier=fallback fts=4.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.37 alignment=0.96 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:3fd1796a0f590ac946fedf12"
+            },
+            {
+              "confidence": 0.0,
+              "content": "agement', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[670] banner '', visible\\n\\t\\t[673] heading 'Dashboard', visible\\n\\t\\t[676] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[688] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[690] Section '', visible\\n\\t\\t\\t[692] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[696] textbox '\\\\ue60c', clickable, visible\\n\\t[702] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[713] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[724] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[729] Section '', visible\\n\\t\\t\\t[731] button 'Reload Data', clickable, visible\\n\\t\\t[735] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[740] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[747] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[750] list '', visible\\n\\t\\t\\t[751] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[753] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[756] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[758] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[761] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[763] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[766] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[768] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[772] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[773] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve thi",
+              "fact_id": "fact:9d5736342f3a53a692206167",
+              "grounding": 0.31,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 4096,
+                  "original_bytes": 198687,
+                  "start_byte": 2048
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "appear",
+                  "by",
+                  "option",
+                  "range",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 4096,
+                  "original_bytes": 198687,
+                  "start_byte": 2048
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "using",
+                    "our",
+                    "website",
+                    "by",
+                    "top",
+                    "range",
+                    "appear"
+                  ],
+                  "matched_index_key_terms": [
+                    "website",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "website",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "01",
+                      "02"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:2b84e8b18bd3a49b851aaf2e",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:689b82ea029d612eff967e9d",
+                      "fact:9dfc4dd01b28ce5fa083a3fc"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:5815c66b67752facab63e530",
+                "source_id": "longmemeval_v2_trajectory_0359e840308699f68c92c03dab2eebefaffdcfa7a7ddca8be8b316d01bad4b65_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "agement', clickable, visible\\n\\tStaticText 'and refresh cache types.'\\n\\t[670] banner '', visible\\n\\t\\t[673] heading 'Dashboard', visible\\n\\t\\t[676] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[688] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[690] Section '', visible\\n\\t\\t\\t[692] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[696] textbox '\\\\ue60c', clickable, visible\\n\\t[702] main ''\\n\\t\\tStaticText 'Scope:'\\n\\t\\t[713] button 'All Store Views', clickable, visible, hasPopup='menu'\\n\\t\\t[724] link '\\\\ue633 What is this?', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue633'\\n\\t\\t\\tStaticText 'What is this?'\\n\\t\\t[729] Section '', visible\\n\\t\\t\\t[731] button 'Reload Data', clickable, visible\\n\\t\\t[735] Section '', visible\\n\\t\\t\\tStaticText 'Advanced Reporting'\\n\\t\\t\\tStaticText \\\"Gain new insights and take command of your business' performance, using our dynamic product, order, and customer reports tailored to your customer data.\\\"\\n\\t\\t\\t[740] link 'Go to Advanced Reporting \\\\ue644', clickable, visible\\n\\t\\t\\t\\tStaticText 'Go to Advanced Reporting'\\n\\t\\t\\t\\tStaticText '\\\\ue644'\\n\\t\\tStaticText 'Chart is disabled. To enable the chart, click'\\n\\t\\t[747] link 'here', clickable, visible\\n\\t\\tStaticText '.'\\n\\t\\t[750] list '', visible\\n\\t\\t\\t[751] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Revenue'\\n\\t\\t\\t\\t[753] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[756] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Tax'\\n\\t\\t\\t\\t[758] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[761] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Shipping'\\n\\t\\t\\t\\t[763] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '$0.00'\\n\\t\\t\\t[766] listitem '', visible\\n\\t\\t\\t\\tStaticText 'Quantity'\\n\\t\\t\\t\\t[768] strong '', visible\\n\\t\\t\\t\\t\\tStaticText '0'\\n\\t\\t[772] tablist '', visible, multiselectable=False, orientation='horizontal'\\n\\t\\t\\t[773] tab 'The information in this tab has been changed. This tab contains invalid data. Please resolve thi",
+              "rationale": "tier=fallback fts=3.00 access_count=0 confidence=0.00 relevance=0.00 grounding=0.31 alignment=0.94 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:5815c66b67752facab63e530"
+            },
+            {
+              "confidence": 0.0,
+              "content": "lickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main '', visible\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '11/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '11/30/2022'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button",
+              "fact_id": "fact:8df1abfdf9e100c49ce9a0b2",
+              "grounding": 0.24,
+              "provenance": {
+                "content_excerpt": {
+                  "end_byte": 27868,
+                  "original_bytes": 1000500,
+                  "start_byte": 25820
+                },
+                "extraction_strategy": "episode_heuristic",
+                "ingestion_method": "extraction",
+                "matched_query_terms": [
+                  "by",
+                  "option",
+                  "range",
+                  "top"
+                ],
+                "quote_excerpt": {
+                  "end_byte": 27868,
+                  "original_bytes": 1000500,
+                  "start_byte": 25820
+                },
+                "retrieval_admission": {
+                  "basis": "lexical",
+                  "community": null,
+                  "explicit_date_admitted": false,
+                  "graph_anchor_origin": null,
+                  "hop_count": null,
+                  "matched_content_terms": [
+                    "am",
+                    "using",
+                    "our",
+                    "website",
+                    "by",
+                    "top",
+                    "range"
+                  ],
+                  "matched_index_key_terms": [
+                    "am",
+                    "website",
+                    "top"
+                  ],
+                  "matched_references": [],
+                  "policy_version": "retrieval-admission-v1",
+                  "repeated_topic": {
+                    "matched_query_index_terms": [
+                      "am",
+                      "website",
+                      "top"
+                    ],
+                    "matched_repeated_topics": [
+                      "01",
+                      "02",
+                      "04",
+                      "05",
+                      "06",
+                      "07"
+                    ],
+                    "supporting_fact_ids": [
+                      "fact:2b84e8b18bd3a49b851aaf2e",
+                      "fact:4eff59b2930ed4b383322cf0",
+                      "fact:6260279fe2edac6b9087873e",
+                      "fact:689b82ea029d612eff967e9d",
+                      "fact:9dfc4dd01b28ce5fa083a3fc"
+                    ]
+                  },
+                  "resolved_entity_ids": [],
+                  "semantic_similarity": null
+                },
+                "source_episode_id": "episode:9d6c045f723f6e7fa8125886",
+                "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000000",
+                "source_type": "other"
+              },
+              "quote": "lickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60d'\\n\\t\\t\\t\\tStaticText 'STORES'\\n\\t\\t\\t[563] link '\\\\ue610 SYSTEM', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\t\\tStaticText 'SYSTEM'\\n\\t\\t\\t[646] link '\\\\ue612 FIND PARTNERS & EXTENSIONS', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue612'\\n\\t\\t\\t\\tStaticText 'FIND PARTNERS & EXTENSIONS'\\n\\t[676] banner '', visible\\n\\t\\t[679] heading 'Orders', visible\\n\\t\\t[682] link '\\\\ue600 admin', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue600'\\n\\t\\t\\tStaticText 'admin'\\n\\t\\t[694] link '\\\\ue607', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue607'\\n\\t\\t[696] Section '', visible\\n\\t\\t\\t[698] LabelText '', clickable, visible\\n\\t\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t\\t[702] textbox '\\\\ue60c', clickable, visible\\n\\t[708] main '', visible\\n\\t\\t[714] button 'Create New Order', clickable, visible\\n\\t\\t\\tStaticText 'Create New Order'\\n\\t\\t[734] button '\\\\ue60f Default View', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60f'\\n\\t\\t\\tStaticText 'Default View'\\n\\t\\t[748] button '\\\\ue610 Columns', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue610'\\n\\t\\t\\tStaticText 'Columns'\\n\\t\\t[825] button '\\\\ue635 Export', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue635'\\n\\t\\t\\tStaticText 'Export'\\n\\t\\t[840] textbox 'Search by keyword', clickable, visible\\n\\t\\t[841] button 'Search', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue60c'\\n\\t\\t[845] button '\\\\ue605Filters', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue605'\\n\\t\\t[846] LayoutTable '', visible\\n\\t\\t\\tStaticText 'Active filters:'\\n\\t\\t\\t[850] list '', visible\\n\\t\\t\\t\\t[851] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Purchase Date:'\\n\\t\\t\\t\\t\\tStaticText '11/01/2022'\\n\\t\\t\\t\\t\\tStaticText '-'\\n\\t\\t\\t\\t\\tStaticText '11/30/2022'\\n\\t\\t\\t\\t\\t[854] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t\\t[856] listitem '', visible\\n\\t\\t\\t\\t\\tStaticText 'Status:'\\n\\t\\t\\t\\t\\tStaticText 'Complete'\\n\\t\\t\\t\\t\\t[859] button '\\\\ue620', clickable, visible\\n\\t\\t\\t\\t\\t\\tStaticText '\\\\ue620'\\n\\t\\t\\t[862] button 'Clear all', clickable, visible\\n\\t\\t[1075] button",
+              "rationale": "tier=fallback fts=4.55 access_count=0 confidence=0.00 relevance=0.00 grounding=0.24 alignment=0.92 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+              "relevance": 0.0,
+              "retrieval_evidence": {
+                "admission_basis": "lexical",
+                "policy_version": "retrieval-admission-v1"
+              },
+              "retrieval_tier": "fallback",
+              "semantic_available": false,
+              "source_episode": "episode:9d6c045f723f6e7fa8125886"
+            }
+          ],
+          "stages": [
+            {
+              "elapsed_ms": 0.399,
+              "items": [
+                {
+                  "confidence": 1.0,
+                  "fact_id": "",
+                  "provenance": {
+                    "diagnostic_boundary": "persisted_source_episode"
+                  },
+                  "rationale": "Persisted source carrier; atomic extraction completeness is unobserved",
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "formation"
+            },
+            {
+              "elapsed_ms": 2357.594,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "eval_candidate_position": {
+                      "candidate_rank": 0,
+                      "first_source_rank": 0,
+                      "pool_size": 18
+                    },
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "retrieval_admission": {
+                      "basis": null,
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [],
+                      "matched_index_key_terms": [],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": null,
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "ranked_fact_candidates"
+            },
+            {
+              "elapsed_ms": 2507.806125,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "eval_candidate_position": {
+                      "candidate_rank": 0,
+                      "first_source_rank": 0,
+                      "pool_size": 12
+                    },
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "retrieval_admission": {
+                      "basis": null,
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [],
+                      "matched_index_key_terms": [],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": null,
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "subject_scoped_fact_candidates"
+            },
+            {
+              "elapsed_ms": 2626.944125,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "eval_candidate_position": {
+                      "candidate_rank": 0,
+                      "first_source_rank": 0,
+                      "pool_size": 12
+                    },
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "retrieval_admission": {
+                      "basis": "lexical",
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [
+                        "am",
+                        "using",
+                        "forum",
+                        "sorted",
+                        "by",
+                        "top",
+                        "time",
+                        "dropdown"
+                      ],
+                      "matched_index_key_terms": [
+                        "am",
+                        "forum",
+                        "by",
+                        "top"
+                      ],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": {
+                        "matched_query_index_terms": [
+                          "am",
+                          "forum",
+                          "by",
+                          "top"
+                        ],
+                        "matched_repeated_topics": [
+                          "01",
+                          "02",
+                          "04",
+                          "05",
+                          "06",
+                          "07"
+                        ],
+                        "supporting_fact_ids": [
+                          "fact:2b84e8b18bd3a49b851aaf2e",
+                          "fact:4eff59b2930ed4b383322cf0",
+                          "fact:6260279fe2edac6b9087873e",
+                          "fact:689b82ea029d612eff967e9d",
+                          "fact:9dfc4dd01b28ce5fa083a3fc"
+                        ]
+                      },
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_evidence": {
+                    "admission_basis": "lexical",
+                    "policy_version": "retrieval-admission-v1"
+                  },
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "admitted_fact_candidates"
+            },
+            {
+              "elapsed_ms": 2627.055375,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "eval_candidate_position": {
+                      "candidate_rank": 0,
+                      "first_source_rank": 0,
+                      "pool_size": 12
+                    },
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "retrieval_admission": {
+                      "basis": "lexical",
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [
+                        "am",
+                        "using",
+                        "forum",
+                        "sorted",
+                        "by",
+                        "top",
+                        "time",
+                        "dropdown"
+                      ],
+                      "matched_index_key_terms": [
+                        "am",
+                        "forum",
+                        "by",
+                        "top"
+                      ],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": {
+                        "matched_query_index_terms": [
+                          "am",
+                          "forum",
+                          "by",
+                          "top"
+                        ],
+                        "matched_repeated_topics": [
+                          "01",
+                          "02",
+                          "04",
+                          "05",
+                          "06",
+                          "07"
+                        ],
+                        "supporting_fact_ids": [
+                          "fact:2b84e8b18bd3a49b851aaf2e",
+                          "fact:4eff59b2930ed4b383322cf0",
+                          "fact:6260279fe2edac6b9087873e",
+                          "fact:689b82ea029d612eff967e9d",
+                          "fact:9dfc4dd01b28ce5fa083a3fc"
+                        ]
+                      },
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_evidence": {
+                    "admission_basis": "lexical",
+                    "policy_version": "retrieval-admission-v1"
+                  },
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "bounded_fact_candidates"
+            },
+            {
+              "elapsed_ms": 3113.874708,
+              "items": [
+                {
+                  "confidence": 0.65,
+                  "fact_id": "episode_fallback:episode:28a05ac3465896dd0fa1dd41",
+                  "grounding": 1.0,
+                  "provenance": {
+                    "episode_fallback": true,
+                    "reference_time": "2000-01-01T00:00:00Z",
+                    "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=16.00 access_count=0 confidence=0.65 grounding=1.00 semantic=disabled matched episode content query=\"forum sorted by top time range option appear dropdown\" and active at 2026-11-27",
+                  "relevance": 1.0,
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "episode_candidates"
+            },
+            {
+              "elapsed_ms": 4258.351000000001,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "retrieval_admission": {
+                      "basis": "lexical",
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [
+                        "am",
+                        "using",
+                        "forum",
+                        "sorted",
+                        "by",
+                        "top",
+                        "time",
+                        "dropdown"
+                      ],
+                      "matched_index_key_terms": [
+                        "am",
+                        "forum",
+                        "by",
+                        "top"
+                      ],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": {
+                        "matched_query_index_terms": [
+                          "am",
+                          "forum",
+                          "by",
+                          "top"
+                        ],
+                        "matched_repeated_topics": [
+                          "01",
+                          "02",
+                          "04",
+                          "05",
+                          "06",
+                          "07"
+                        ],
+                        "supporting_fact_ids": [
+                          "fact:2b84e8b18bd3a49b851aaf2e",
+                          "fact:4eff59b2930ed4b383322cf0",
+                          "fact:6260279fe2edac6b9087873e",
+                          "fact:689b82ea029d612eff967e9d",
+                          "fact:9dfc4dd01b28ce5fa083a3fc"
+                        ]
+                      },
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_evidence": {
+                    "admission_basis": "lexical",
+                    "policy_version": "retrieval-admission-v1"
+                  },
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+                    "bytes": 382024,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "selected_pre_packaging"
+            },
+            {
+              "elapsed_ms": 4417.772583,
+              "items": [
+                {
+                  "confidence": 0.0,
+                  "fact_id": "fact:72dae2359d272b755a877236",
+                  "grounding": 0.63,
+                  "provenance": {
+                    "content_excerpt": {
+                      "end_byte": 118806,
+                      "original_bytes": 382024,
+                      "start_byte": 116758
+                    },
+                    "extraction_strategy": "episode_heuristic",
+                    "ingestion_method": "extraction",
+                    "matched_query_terms": [
+                      "by",
+                      "dropdown",
+                      "forum",
+                      "option",
+                      "sorted",
+                      "time",
+                      "top"
+                    ],
+                    "quote_excerpt": {
+                      "end_byte": 118806,
+                      "original_bytes": 382024,
+                      "start_byte": 116758
+                    },
+                    "retrieval_admission": {
+                      "basis": "lexical",
+                      "community": null,
+                      "explicit_date_admitted": false,
+                      "graph_anchor_origin": null,
+                      "hop_count": null,
+                      "matched_content_terms": [
+                        "am",
+                        "using",
+                        "forum",
+                        "sorted",
+                        "by",
+                        "top",
+                        "time",
+                        "dropdown"
+                      ],
+                      "matched_index_key_terms": [
+                        "am",
+                        "forum",
+                        "by",
+                        "top"
+                      ],
+                      "matched_references": [],
+                      "policy_version": "retrieval-admission-v1",
+                      "repeated_topic": {
+                        "matched_query_index_terms": [
+                          "am",
+                          "forum",
+                          "by",
+                          "top"
+                        ],
+                        "matched_repeated_topics": [
+                          "01",
+                          "02",
+                          "04",
+                          "05",
+                          "06",
+                          "07"
+                        ],
+                        "supporting_fact_ids": [
+                          "fact:2b84e8b18bd3a49b851aaf2e",
+                          "fact:4eff59b2930ed4b383322cf0",
+                          "fact:6260279fe2edac6b9087873e",
+                          "fact:689b82ea029d612eff967e9d",
+                          "fact:9dfc4dd01b28ce5fa083a3fc"
+                        ]
+                      },
+                      "resolved_entity_ids": [],
+                      "semantic_similarity": null
+                    },
+                    "source_episode_id": "episode:28a05ac3465896dd0fa1dd41",
+                    "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+                    "source_type": "other"
+                  },
+                  "rationale": "tier=fallback fts=21.58 access_count=0 confidence=0.00 relevance=0.00 grounding=0.63 alignment=1.04 semantic=disabled matched lexical query=\"I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.\" and active at 2026-11-27",
+                  "relevance": 0.0,
+                  "retrieval_evidence": {
+                    "admission_basis": "lexical",
+                    "policy_version": "retrieval-admission-v1"
+                  },
+                  "retrieval_tier": "fallback",
+                  "semantic_available": false,
+                  "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+                  "content_observation": {
+                    "sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+                    "bytes": 2048,
+                    "required_span_present": true
+                  },
+                  "quote_observation": {
+                    "sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+                    "bytes": 2048,
+                    "required_span_present": true
+                  }
+                }
+              ],
+              "stage": "packed_context"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "terminal_tail": [],
+  "raw_artifact": {
+    "sha256": "5bc97a76a796ac1942f51d85edbf5206bbb53db36577aca5c106ab1c7acc6f68",
+    "path": "/tmp/memory-quality-source-diagnosis-2026-11-27-raw/after/0c6b0c60.json",
+    "note": "immutable original, compact stage bodies refer to source hashes; delivered bounded items retained"
+  }
+}

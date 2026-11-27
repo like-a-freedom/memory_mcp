@@ -1,0 +1,165 @@
+"""Explicit retry accounting for the local, non-streaming evaluation protocol.
+
+The callback must perform exactly one transport attempt (SDK retries disabled).
+First observed request is not proof of cold model state. Server startup and warmup
+are recorded by the launching protocol, never inferred from request latency.
+"""
+import asyncio
+from contextlib import contextmanager
+from contextvars import ContextVar
+import json
+import math
+import threading
+import time
+from urllib.error import URLError
+from unittest.mock import patch
+
+
+ACTIVE_CALL = ContextVar('longmemeval_active_call', default=None)
+
+
+def classify(error):
+    name = type(error).__name__
+    if isinstance(error, asyncio.CancelledError):
+        return 'cancelled', False
+    if isinstance(error, TimeoutError) or name in {'APITimeoutError', 'ReadTimeout', 'ConnectTimeout'}:
+        return 'timeout', True
+    status = getattr(error, 'status_code', getattr(error, 'code', None))
+    if status is not None:
+        return 'http_error', status in {408, 409, 429} or status >= 500
+    if isinstance(error, (ConnectionError, URLError, OSError)) or name in {'APIConnectionError', 'RemoteDisconnected'}:
+        return 'transport_error', True
+    return 'invalid_response', False
+
+
+class AttemptRecorder:
+    def __init__(self, output, *, max_retries, timeout_seconds):
+        if (type(max_retries) is not int or not 0 <= max_retries <= 10
+                or isinstance(timeout_seconds, bool) or not math.isfinite(timeout_seconds)
+                or timeout_seconds <= 0):
+            raise ValueError('finite positive timeout and retry budget in [0,10] required')
+        self.output = output
+        self.max_retries = max_retries
+        self.timeout_seconds = timeout_seconds
+        self.lock = threading.Lock()
+        self.logical_counts = {}
+        self.requests = 0
+        self.responses = {}
+
+    def begin(self, case, role):
+        if role not in {'reader', 'judge', 'selector'} or not isinstance(case, str) or not case:
+            raise ValueError('registered case and reader/judge/selector role required')
+        with self.lock:
+            key = (case, role)
+            count = self.logical_counts.get(key, 0) + 1
+            self.logical_counts[key] = count
+        return f'{role}:{case}:{count}'
+
+    def start(self):
+        with self.lock:
+            self.requests += 1
+            return 'first_observed_request' if self.requests == 1 else 'subsequent_request'
+
+    def finish(self, case, role, logical, attempt, started, state, result=None, error=None):
+        outcome, retryable = classify(error) if error else ('success', False)
+        terminal = not retryable or attempt > self.max_retries
+        body = result.model_dump(mode='json') if hasattr(result, 'model_dump') else result
+        body = body if isinstance(body, dict) else {}
+        choices = body.get('choices') or [{}]
+        row = {
+            'schema': 'memory-mcp-inference-attempt/v1',
+            'question_id': case, 'role': role, 'logical_id': logical,
+            'request_id': f'{logical}:{attempt}', 'attempt': attempt,
+            'max_retries': self.max_retries, 'timeout_seconds': self.timeout_seconds,
+            'outcome': outcome, 'terminal': terminal,
+            'elapsed_seconds': time.monotonic() - started,
+            'temperature_state': state,
+            'server_startup_seconds': None, 'prefill_seconds': None, 'generation_seconds': None,
+            'usage': body.get('usage'), 'finish_reason': choices[0].get('finish_reason'),
+            'error_type': type(error).__name__ if error else None,
+            'http_status': getattr(error, 'status_code', getattr(error, 'code', None)),
+        }
+        with self.lock:
+            with (self.output / 'inference-attempts.jsonl').open('a', encoding='utf-8') as stream:
+                stream.write(json.dumps(row, sort_keys=True) + '\n')
+                stream.flush()
+            if result is not None:
+                self.responses[(case, role)] = row
+        return terminal
+
+    def call(self, case, role, request):
+        logical = self.begin(case, role)
+        for attempt in range(1, self.max_retries + 2):
+            state, started = self.start(), time.monotonic()
+            try:
+                result = request()
+            except Exception as error:
+                if self.finish(case, role, logical, attempt, started, state, error=error):
+                    raise
+            else:
+                self.finish(case, role, logical, attempt, started, state, result=result)
+                return result
+
+    async def call_async(self, case, role, request):
+        logical = self.begin(case, role)
+        for attempt in range(1, self.max_retries + 2):
+            state, started = self.start(), time.monotonic()
+            try:
+                async with asyncio.timeout(self.timeout_seconds):
+                    result = await request()
+            except asyncio.CancelledError as error:
+                self.finish(case, role, logical, attempt, started, state, error=error)
+                raise
+            except Exception as error:
+                if self.finish(case, role, logical, attempt, started, state, error=error):
+                    raise
+            else:
+                self.finish(case, role, logical, attempt, started, state, result=result)
+                return result
+
+
+@contextmanager
+def observed_sdk_clients(harness, recorder):
+    """Adapt existing upstream clients without altering the pinned upstream files."""
+    from evaluation import qa_eval_metrics
+    async_factory = harness.create_async_client
+    sync_factory = qa_eval_metrics._create_openai_client
+
+    def wrap(client, asynchronous):
+        client.max_retries = 0
+        create = client.chat.completions.create
+
+        def parameters(kwargs):
+            identity = ACTIVE_CALL.get()
+            if identity is None:
+                raise ValueError('inference request lacks case/role identity')
+            kwargs['timeout'] = recorder.timeout_seconds
+            return identity, kwargs
+
+        async def async_create(**kwargs):
+            (case, role), kwargs = parameters(kwargs)
+            return await recorder.call_async(case, role, lambda: create(**kwargs))
+
+        def sync_create(**kwargs):
+            (case, role), kwargs = parameters(kwargs)
+            # The upstream judge is synchronous. Run its one completion through
+            # the async transport so the deadline bounds the whole response,
+            # including a peer that keeps trickling bytes within read timeouts.
+            from openai import AsyncOpenAI
+
+            async def complete():
+                async with AsyncOpenAI(base_url=str(client.base_url), api_key=client.api_key,
+                                       max_retries=0) as transport:
+                    return await recorder.call_async(
+                        case, role, lambda: transport.chat.completions.create(**kwargs))
+            try:
+                return asyncio.run(complete())
+            finally:
+                client.close()
+
+        client.chat.completions.create = async_create if asynchronous else sync_create
+        return client
+
+    with (patch.object(harness, 'create_async_client', lambda *a, **kw: wrap(async_factory(*a, **kw), True)),
+          patch.object(qa_eval_metrics, '_create_openai_client', lambda *a, **kw: wrap(sync_factory(*a, **kw), False))):
+        yield

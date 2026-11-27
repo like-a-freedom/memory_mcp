@@ -1,0 +1,12 @@
+{
+  "schema": "full-history-reader-acceptance/v1",
+  "registered_before_outputs": true,
+  "scheduled_per_arm": 7,
+  "source_support_sha256": "b4f345c396994db51abb19c4f2cc298a095dac137b3174f33f80e00525870619",
+  "source_faults": [
+    "922a0c56"
+  ],
+  "full_acceptance": "all7 delivered sufficiently supported contexts plus value/format/quote correct, no retrieval/reader faults; missing retrieval is never a successful end-to-end answer even if model guesses gold",
+  "reader_only_hypothesis": "Query-independent ordered relations may fix adjacency/terminal reasoning on actually delivered evidence. Conditional source-supported6-case score is separate and does not reduce7-case denominator.",
+  "limits": "Same fixed model,256 completion tokens,60s/call,0retries,1800s/capture; one capture per arm, no success selection."
+}

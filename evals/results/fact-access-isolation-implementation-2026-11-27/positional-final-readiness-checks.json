@@ -1,0 +1,56 @@
+[
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 17.415595917002065,
+    "log": "/tmp/memory-quality-final-readiness-clippy.log",
+    "sha256": "9949674fd484a02e80cd65d12b08db1cd5f3ccb941897a9a2c217ac4a647ebed"
+  },
+  {
+    "name": "eval-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "memory_mcp",
+      "-p",
+      "eval-harness",
+      "--all-targets",
+      "--features",
+      "eval-support,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 13.064740500005428,
+    "log": "/tmp/memory-quality-final-readiness-eval-clippy.log",
+    "sha256": "df70cb315f3009b51afc4e3b8b9dbbe2fce7454e9e9fc892b034802dcc75fd9a"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.725321375008207,
+    "log": "/tmp/memory-quality-final-readiness-fmt.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

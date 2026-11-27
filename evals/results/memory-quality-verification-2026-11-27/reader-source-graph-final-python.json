@@ -1,0 +1,92 @@
+{
+  "schema": "reader-source-graph-verification/v1",
+  "checks": [
+    {
+      "name": "longmem",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/longmemeval_v2",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.402566291973926,
+      "log": "/Users/solovey/Documents/dev/memory_mcp/evals/results/memory-quality-verification-2026-11-27/reader-source-graph-longmem.log",
+      "sha256": "94e012a0f4c5a7a0d3864b9234974041da3d158d28788eacd5700b5805543ad9",
+      "tail": [
+        "................................................ssssss....................................................................sssss",
+        "----------------------------------------------------------------------",
+        "Ran 127 tests in 5.020s",
+        "",
+        "OK (skipped=11)"
+      ]
+    },
+    {
+      "name": "paired",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/paired",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 27.687508083006833,
+      "log": "/Users/solovey/Documents/dev/memory_mcp/evals/results/memory-quality-verification-2026-11-27/reader-source-graph-paired.log",
+      "sha256": "1db1229af8d8033d0ca4365f1436911633bb3a2362925ce0415180d4405b7613",
+      "tail": [
+        "memory-cli-1-current",
+        "  client_error operations=False",
+        "...........................",
+        "----------------------------------------------------------------------",
+        "Ran 80 tests in 27.274s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "sdk",
+      "command": [
+        "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+        "-m",
+        "unittest",
+        "evals.longmemeval_v2.test_observed_sdk",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.6680275830149185,
+      "log": "/Users/solovey/Documents/dev/memory_mcp/evals/results/memory-quality-verification-2026-11-27/reader-source-graph-sdk.log",
+      "sha256": "ee14810d982a97cb4e3805dffeb1bf915883cc5180fd149192a14d5a287c9a1b",
+      "tail": [
+        "test_reader_sdk_retries_disabled_and_deadline_observed (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_reader_sdk_retries_disabled_and_deadline_observed) ... ok",
+        "test_synchronous_judge_uses_bounded_async_transport (evals.longmemeval_v2.test_observed_sdk.ObservedSdkTests.test_synchronous_judge_uses_bounded_async_transport) ... ok",
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 6 tests in 4.950s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0670722079812549,
+      "log": "/Users/solovey/Documents/dev/memory_mcp/evals/results/memory-quality-verification-2026-11-27/reader-source-graph-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tail": []
+    }
+  ],
+  "scope": "Affected portable Python suites and optional SDK-controlled tests; no model calls. Heavy Cargo/native gates already completed before actual local inference; no Rust changes in this graph work."
+}

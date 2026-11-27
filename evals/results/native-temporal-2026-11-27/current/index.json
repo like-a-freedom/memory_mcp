@@ -1,0 +1,453 @@
+{
+  "schema_version": "memory-decisions-replay/v1",
+  "identity": {
+    "suite_id": "memory-decisions",
+    "product_revision": "49636854+memory-quality-v3",
+    "product_binary_sha256": "d12239c5162717811426eae15be6794fbdee94b19eb7d92c13d6e6e6250e313c",
+    "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+    "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+    "input_schema_sha256": "26b6baee64d4b206d628b86ff64d7fbcf5478d37f2e906c7c21c82f44cd15c0f"
+  },
+  "cases": [
+    {
+      "case_id": "v10-absent-target",
+      "source_order": [],
+      "roles": [],
+      "disposition": "unknown",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No sufficient matching context was found. Refine the query or verify primary sources.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_observation": {
+        "budget_used": 0,
+        "disposition": "unknown",
+        "guidance": "No matching items were returned from this partial historical snapshot. You may retry once with a more specific query. Preserve the exact snapshot by setting `valid_at` and `known_revision` from the returned `context.snapshot`, leaving all other selectors unchanged and omitting `as_of` and `known_at`. A second empty result still does not establish absence because some selector channels were omitted; verify against the source.",
+        "item_count": 0,
+        "relation_outcomes": [],
+        "sources": []
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-absent-target.json",
+      "receipt_sha256": "103827b46f264cfd9f4d4eec4dec89c10ab469c65b6dba527cb5aa10b3bed38f"
+    },
+    {
+      "case_id": "v10-similar-name",
+      "source_order": [
+        "v10-mica-east"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-mica-east",
+            "role": "current",
+            "text": "subject: Mica Terminal East\ndimension: capacity\nvalue: 1174 crates for Mica Terminal East"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-mica-east",
+            "role": "current",
+            "text": "subject: Mica Terminal East\ndimension: capacity\nvalue: 1174 crates for Mica Terminal East"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-similar-name.json",
+      "receipt_sha256": "3ca9831d31b6f68d80e840f99160beb64260bd205dca368456b14d2d6d70ef3e"
+    },
+    {
+      "case_id": "v10-current-snapshot",
+      "source_order": [
+        "v10-fern-current"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-fern-current",
+            "role": "current",
+            "text": "subject: Fern Lift\ndimension: capacity\nvalue: 1168 crates for Fern Lift"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-fern-current",
+            "role": "current",
+            "text": "subject: Fern Lift\ndimension: capacity\nvalue: 1168 crates for Fern Lift"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-current-snapshot.json",
+      "receipt_sha256": "79ad62f6a61b58fbfc71d3133e2443a4d0a508fc820f1610a2347280fea13da9"
+    },
+    {
+      "case_id": "v10-peer-conflict",
+      "source_order": [
+        "v10-orchid-a",
+        "v10-orchid-b"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "v10-orchid-a",
+            "role": "conflicting",
+            "text": "subject: Orchid Pump\ndimension: pressure\nvalue: 1281 kPa for Orchid Pump"
+          },
+          {
+            "event_id": "v10-orchid-b",
+            "role": "conflicting",
+            "text": "subject: Orchid Pump\ndimension: pressure\nvalue: 1287 kPa for Orchid Pump"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "v10-orchid-a",
+            "role": "conflicting",
+            "text": "subject: Orchid Pump\ndimension: pressure\nvalue: 1281 kPa for Orchid Pump"
+          },
+          {
+            "event_id": "v10-orchid-b",
+            "role": "conflicting",
+            "text": "subject: Orchid Pump\ndimension: pressure\nvalue: 1287 kPa for Orchid Pump"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-peer-conflict.json",
+      "receipt_sha256": "9f061d9718d21f4ad64613555f3dd4216ac6b99820d309ccfa4de9b57c9cb900"
+    },
+    {
+      "case_id": "v10-unverified-correction",
+      "source_order": [
+        "v10-larch-ledger",
+        "v10-larch-forum"
+      ],
+      "roles": [
+        "conflicting",
+        "conflicting"
+      ],
+      "disposition": "conflict",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "v10-larch-ledger",
+            "role": "conflicting",
+            "text": "subject: Larch Valve House\ndimension: dwell\nvalue: 14 seconds verified for Larch Valve House"
+          },
+          {
+            "event_id": "v10-larch-forum",
+            "role": "conflicting",
+            "text": "subject: Larch Valve House\ndimension: dwell\nvalue: unverified correction of 19 seconds reported on a forum for Larch Valve House"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 2,
+        "disposition": "conflict",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 2,
+        "relation_outcomes": [
+          "contradiction"
+        ],
+        "sources": [
+          {
+            "event_id": "v10-larch-ledger",
+            "role": "conflicting",
+            "text": "subject: Larch Valve House\ndimension: dwell\nvalue: 14 seconds verified for Larch Valve House"
+          },
+          {
+            "event_id": "v10-larch-forum",
+            "role": "conflicting",
+            "text": "subject: Larch Valve House\ndimension: dwell\nvalue: unverified correction of 19 seconds reported on a forum for Larch Valve House"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-unverified-correction.json",
+      "receipt_sha256": "aaa77a88db2b648c7d646786a4896545c4ec4ae60ac7b864002b9137c12d96bc"
+    },
+    {
+      "case_id": "v10-prior-knowledge",
+      "source_order": [
+        "v10-pumice-before"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-pumice-before",
+            "role": "current",
+            "text": "subject: Pumice Jetty\ndimension: load\nvalue: 1097 tonnes for Pumice Jetty"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-pumice-before",
+            "role": "current",
+            "text": "subject: Pumice Jetty\ndimension: load\nvalue: 1097 tonnes for Pumice Jetty"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-prior-knowledge.json",
+      "receipt_sha256": "88e693e225493b80489ef3f43f6f37f2b026d1b445e1008a010ac165238ff0a9"
+    },
+    {
+      "case_id": "v10-valid-boundary",
+      "source_order": [
+        "v10-topaz-earlier"
+      ],
+      "roles": [
+        "current"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "temporal_revision",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-topaz-earlier",
+            "role": "current",
+            "text": "subject: Topaz Foundry\ndimension: pressure\nvalue: 1362 kPa for Topaz Foundry"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-topaz-earlier",
+            "role": "current",
+            "text": "subject: Topaz Foundry\ndimension: pressure\nvalue: 1362 kPa for Topaz Foundry"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-valid-boundary.json",
+      "receipt_sha256": "fa844e2ad88837b1bbad9a487dd63d03ba96d0a02354c8a90d8349d24e974bda"
+    },
+    {
+      "case_id": "v10-ordinary-location",
+      "source_order": [
+        "v10-wren-office"
+      ],
+      "roles": [
+        "unknown"
+      ],
+      "disposition": "supported",
+      "evidence_success": true,
+      "decision_success": true,
+      "probe_success": true,
+      "score_observation_source": "primary",
+      "score_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Call explain if you need provenance-ready citations for selected items.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-wren-office",
+            "role": "unknown",
+            "text": "subject: Wren Office\ndimension: location\nvalue: Alder Walk for Wren Office"
+          }
+        ]
+      },
+      "temporal_observation": {
+        "budget_used": 1,
+        "disposition": "supported",
+        "guidance": "Historical context is partial; use the returned snapshot and typed relation roles, then verify omitted selector channels before relying on an empty or reduced result.",
+        "item_count": 1,
+        "relation_outcomes": [],
+        "sources": [
+          {
+            "event_id": "v10-wren-office",
+            "role": "current",
+            "text": "subject: Wren Office\ndimension: location\nvalue: Alder Walk for Wren Office"
+          }
+        ]
+      },
+      "temporal_score": {
+        "decision_success": true,
+        "evidence_success": true,
+        "probe_success": true,
+        "reason_codes": []
+      },
+      "evidence_enabled_temporal_observation": null,
+      "evidence_enabled_temporal_score": null,
+      "reason_codes": [],
+      "receipt_path": "receipt-v10-ordinary-location.json",
+      "receipt_sha256": "0a805e7adda6047b0456b36679cf0259a59ca26e308d0628eb49e42720f4a6d7"
+    }
+  ]
+}

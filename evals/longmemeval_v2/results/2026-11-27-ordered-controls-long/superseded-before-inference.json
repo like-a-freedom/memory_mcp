@@ -1,0 +1,5 @@
+{
+  "executed": false,
+  "replacement": "2026-11-27-ordered-controls-long-v2",
+  "reason": "Valid escaped Unicode surrogate pairs must decode into one UTF-8 scalar before dispatch; public regression RED to GREEN. Frozen prompts, labels, context and budgets unchanged."
+}

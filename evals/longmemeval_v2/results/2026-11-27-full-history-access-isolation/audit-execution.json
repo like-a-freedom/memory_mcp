@@ -1,0 +1,21 @@
+{
+  "stage": "audit",
+  "admitted": true,
+  "copy_seconds": 0.7847416670119856,
+  "command": [
+    "/tmp/memory-quality-history-v5-2026-11-27",
+    "full_history_formation_inventory",
+    "--exact",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 12.61212520900881,
+  "process_fault": null,
+  "malformed_events": [],
+  "strict_span_assertion": false,
+  "raw_log": "/tmp/memory-quality-full-100-2026-11-27/observations-heat-isolation/audit.log",
+  "raw_sha256": "52b2f268918ec67df0c283ead0f710a9031cfb204595250077b5926349b0847a",
+  "raw_bytes": 55322
+}

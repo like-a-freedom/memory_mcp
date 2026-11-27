@@ -1,0 +1,15 @@
+{
+  "execution": {
+    "exit_code": 0,
+    "external_timeout": false,
+    "elapsed_seconds": 14.525312750018202,
+    "copy_seconds": 0.9121559589984827,
+    "raw_sha256": "d9489cc3b9a4501a248b7b801e6aba0f13238635cab3b70f8eb8caf4edd7d572",
+    "raw_bytes": 55321
+  },
+  "content_verified": true,
+  "verification": {
+    "episode_count": 151,
+    "complete": true
+  }
+}

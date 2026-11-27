@@ -1,0 +1,165 @@
+{
+  "schema": "memory-quality-verification/v3",
+  "architecture": "arm64",
+  "delivery": "uncommitted; no push; unrelated CI preserved",
+  "checks": [
+    {
+      "id": "production_after_storage_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support,test-fixtures",
+        "--lib",
+        "--test",
+        "fact_access_upgrade",
+        "--test",
+        "fact_access_native_upgrade",
+        "--test",
+        "fact_access_concurrency",
+        "--test",
+        "fact_access_payload",
+        "--test",
+        "retrieval_partial_evidence",
+        "--test",
+        "long_history_stage_evidence",
+        "--test",
+        "full_history_evidence",
+        "--test",
+        "service_integration",
+        "--test",
+        "explain_provenance",
+        "--test",
+        "lifecycle_decay",
+        "--test",
+        "lifecycle_archival",
+        "--test",
+        "query_scaling_regressions",
+        "--test",
+        "knowledge_read_scopes",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72.13282066601096,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt2-production_after_storage_isolation.log",
+      "log_sha256": "a05ab6b6827305130b61066c6d3cf474f87195a348f0661e5afce297e93dc574",
+      "test_targets": [
+        {
+          "passed": 2091,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 2
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 9
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 46,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 51,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "id": "harness_after_storage_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "eval-harness",
+        "--lib",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 29.19806337499176,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt2-harness_after_storage_isolation.log",
+      "log_sha256": "61d4fcc6fe2946aa977ea3f00efb18f4c5e3b90e302758050a6d8422198ff0b3",
+      "test_targets": [
+        {
+          "passed": 571,
+          "failed": 0,
+          "ignored": 3
+        }
+      ]
+    },
+    {
+      "id": "workspace_clippy_after_admission",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 29.320169832993997,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt2-workspace_clippy_after_admission.log",
+      "log_sha256": "0e6e6dfd61ddda943eab6a1cc2e55b90c98bec485e0d17d0a57c6d449140e1c4"
+    }
+  ],
+  "complete": false,
+  "all_passed": false
+}

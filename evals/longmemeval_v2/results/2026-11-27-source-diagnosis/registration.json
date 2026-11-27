@@ -1,0 +1,57 @@
+{
+  "schema": "full-history-diagnostic/v1",
+  "snapshot_path": "/tmp/memory-mcp-lme-postb5/candidate-build/working-store",
+  "snapshot_file_sha256": {
+    "LOCK": "fc17186734ccf6e76bfdd12275771ce71dcb0916268586239e3581d5a7f82b6a",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "49967c27e751173297103bb97f435e5f43353eec1a1df9617dfe36e2a9bde4b5",
+    "wal/00000000000000000036.wal": "e69c20506692ee54e5f3a12f14a5552911f6c7fb5b11e95321e4074101b314da"
+  },
+  "trajectory_count": 100,
+  "trajectory_file_sha256": "a56b68576c7cc496e3333f52fca6911701d357bd07213e1095f529b9c4b8811d",
+  "cases": {
+    "0c6b0c60": {
+      "trajectory_id": "4ae82e48",
+      "trajectory_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "trajectory_bytes": 382024,
+      "segment_index": 0,
+      "segment_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+      "query": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "required_serialized_span": "\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '\u2022 Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '\u2022'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible"
+    },
+    "f61a096f": {
+      "trajectory_id": "06c70de4",
+      "trajectory_sha256": "ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90",
+      "trajectory_bytes": 4677154,
+      "segment_index": 4,
+      "segment_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+      "query": "I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.",
+      "required_serialized_span": "\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'"
+    },
+    "922a0c56": {
+      "trajectory_id": "06c70de4",
+      "trajectory_sha256": "ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90",
+      "trajectory_bytes": 4677154,
+      "segment_index": 4,
+      "segment_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+      "query": "I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action between \"Reset\" and \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.",
+      "required_serialized_span": "\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'"
+    }
+  },
+  "limits": {
+    "read_seconds": 30,
+    "child_seconds": 45,
+    "models": false
+  },
+  "snapshot_status": "surviving older complete 100-trajectory store, distinct from removed 2026-11-26 snapshot; formation must be verified before interpretation",
+  "selectors": {
+    "budget": 5,
+    "compact": false,
+    "temporal": "default current read; exact t_ingested recorded in source"
+  },
+  "stop_rule": "one before capture for three listed cases; faults retained; after capture only after a demonstrated independent repair",
+  "revision": "496368549d856957e5fa317c7adea462d925288b"
+}

@@ -1,0 +1,814 @@
+{
+  "schema": "reader-source-graph-source-review/v1",
+  "before_outputs": true,
+  "author_review_limitation": "Author-created development controls, authored and reviewed by implementer; no blinded independent qualification claim.",
+  "original_sixteen_truth_sha256": "f1ce54629e64e002e8fb74371094dc422823511077d25e76dbd934f66b2e1089",
+  "original_sixteen_rows_sha256": "599b418b118e65d8463ff45dd473c42eae0bff44394e68794255ae2c9e58f742",
+  "original_sixteen_preserved": true,
+  "new_controls": [
+    {
+      "question_id": "graph-equal-links",
+      "source_sha256": "92af22230bd204bd1e45879a403840c05aff4549b063f3b0416feabaf0febbf2",
+      "answer": "Lagoon",
+      "rationale": "Both Dock occurrences have the same next link value; different source lines are not a conflict.",
+      "source_lines": [
+        "[1] menu 'Bay'",
+        "  [2] link 'Dock'",
+        "  [3] link 'Lagoon'",
+        "  [4] link 'Dock'",
+        "  [5] link 'Lagoon'",
+        "[6] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] menu 'Bay'",
+            "raw_range": [
+              1,
+              15
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] link 'Dock'",
+              "raw_range": [
+                19,
+                34
+              ],
+              "ordinal": 1,
+              "role": "link",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] link 'Lagoon'",
+              "raw_range": [
+                38,
+                55
+              ],
+              "ordinal": 2,
+              "role": "link",
+              "name": "Lagoon",
+              "successor": {
+                "state": "observed",
+                "source_line": 4,
+                "name": "Dock"
+              }
+            },
+            {
+              "line": 4,
+              "text": "[4] link 'Dock'",
+              "raw_range": [
+                59,
+                74
+              ],
+              "ordinal": 3,
+              "role": "link",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 5,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 5,
+              "text": "[5] link 'Lagoon'",
+              "raw_range": [
+                78,
+                95
+              ],
+              "ordinal": 4,
+              "role": "link",
+              "name": "Lagoon",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [
+            {
+              "role": "link",
+              "name": "Dock",
+              "occurrence_lines": [
+                2,
+                4
+              ],
+              "successor_values": [
+                "Lagoon"
+              ],
+              "unresolved_occurrence_lines": []
+            },
+            {
+              "role": "link",
+              "name": "Lagoon",
+              "occurrence_lines": [
+                3,
+                5
+              ],
+              "successor_values": [
+                "Dock",
+                null
+              ],
+              "unresolved_occurrence_lines": []
+            }
+          ],
+          "membership_complete": true
+        }
+      ]
+    },
+    {
+      "question_id": "graph-conflicting-links",
+      "source_sha256": "01202a827384c9d8db20c8d9b12380e58b77a44c3bbacd71faf969d30700d713",
+      "answer": "UNKNOWN",
+      "rationale": "Two selected-role Dock occurrences have different successors.",
+      "source_lines": [
+        "[1] menu 'Bay'",
+        "  [2] link 'Dock'",
+        "  [3] link 'Lagoon'",
+        "  [4] link 'Dock'",
+        "  [5] link 'Delta'",
+        "[6] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] menu 'Bay'",
+            "raw_range": [
+              1,
+              15
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] link 'Dock'",
+              "raw_range": [
+                19,
+                34
+              ],
+              "ordinal": 1,
+              "role": "link",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] link 'Lagoon'",
+              "raw_range": [
+                38,
+                55
+              ],
+              "ordinal": 2,
+              "role": "link",
+              "name": "Lagoon",
+              "successor": {
+                "state": "observed",
+                "source_line": 4,
+                "name": "Dock"
+              }
+            },
+            {
+              "line": 4,
+              "text": "[4] link 'Dock'",
+              "raw_range": [
+                59,
+                74
+              ],
+              "ordinal": 3,
+              "role": "link",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 5,
+                "name": "Delta"
+              }
+            },
+            {
+              "line": 5,
+              "text": "[5] link 'Delta'",
+              "raw_range": [
+                78,
+                94
+              ],
+              "ordinal": 4,
+              "role": "link",
+              "name": "Delta",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [
+            {
+              "role": "link",
+              "name": "Dock",
+              "occurrence_lines": [
+                2,
+                4
+              ],
+              "successor_values": [
+                "Lagoon",
+                "Delta"
+              ],
+              "unresolved_occurrence_lines": []
+            }
+          ],
+          "membership_complete": true
+        }
+      ]
+    },
+    {
+      "question_id": "graph-opaque-repeat",
+      "source_sha256": "cb996a4fd5bbfe0042168c77670f4d63ed261665c14bcc59dd1c78773cdd6266",
+      "answer": "UNKNOWN",
+      "rationale": "One selected anchor has an opaque group after it; do not skip the group to invent a peer successor.",
+      "source_lines": [
+        "[1] toolbar 'Bay'",
+        "  [2] button 'Dock'",
+        "  [3] button 'Lagoon'",
+        "  [4] button 'Dock'",
+        "  [5] group 'Nested'",
+        "    [6] button 'Delta'",
+        "  [7] button 'Lagoon'",
+        "[8] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay'",
+            "raw_range": [
+              1,
+              18
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Dock'",
+              "raw_range": [
+                22,
+                39
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] button 'Lagoon'",
+              "raw_range": [
+                43,
+                62
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "observed",
+                "source_line": 4,
+                "name": "Dock"
+              }
+            },
+            {
+              "line": 4,
+              "text": "[4] button 'Dock'",
+              "raw_range": [
+                66,
+                83
+              ],
+              "ordinal": 3,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "unresolved"
+              }
+            },
+            {
+              "line": 7,
+              "text": "[7] button 'Lagoon'",
+              "raw_range": [
+                133,
+                152
+              ],
+              "ordinal": 4,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "unresolved"
+              }
+            }
+          ],
+          "repeated_labels": [
+            {
+              "role": "button",
+              "name": "Dock",
+              "occurrence_lines": [
+                2,
+                4
+              ],
+              "successor_values": [
+                "Lagoon"
+              ],
+              "unresolved_occurrence_lines": [
+                4
+              ]
+            },
+            {
+              "role": "button",
+              "name": "Lagoon",
+              "occurrence_lines": [
+                3,
+                7
+              ],
+              "successor_values": [
+                "Dock"
+              ],
+              "unresolved_occurrence_lines": [
+                7
+              ]
+            }
+          ],
+          "membership_complete": false
+        }
+      ]
+    },
+    {
+      "question_id": "graph-scope-count",
+      "source_sha256": "5bd9bab8b4365b43e0ea23b0e76653326ad9149d7bee5442e5fda06ccba9080a",
+      "answer": "4",
+      "rationale": "Four distinct button nodes in Bay, including repeated names; Ridge belongs to another scope.",
+      "source_lines": [
+        "[1] toolbar 'Bay'",
+        "  [2] button 'Dock'",
+        "  [3] button 'Lagoon'",
+        "  [4] button 'Dock'",
+        "  [5] button 'Lagoon'",
+        "[6] toolbar 'Ridge'",
+        "  [7] button 'Peak'",
+        "  [8] button 'Slope'",
+        "[9] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay'",
+            "raw_range": [
+              1,
+              18
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Dock'",
+              "raw_range": [
+                22,
+                39
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] button 'Lagoon'",
+              "raw_range": [
+                43,
+                62
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "observed",
+                "source_line": 4,
+                "name": "Dock"
+              }
+            },
+            {
+              "line": 4,
+              "text": "[4] button 'Dock'",
+              "raw_range": [
+                66,
+                83
+              ],
+              "ordinal": 3,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 5,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 5,
+              "text": "[5] button 'Lagoon'",
+              "raw_range": [
+                87,
+                106
+              ],
+              "ordinal": 4,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [
+            {
+              "role": "button",
+              "name": "Dock",
+              "occurrence_lines": [
+                2,
+                4
+              ],
+              "successor_values": [
+                "Lagoon"
+              ],
+              "unresolved_occurrence_lines": []
+            },
+            {
+              "role": "button",
+              "name": "Lagoon",
+              "occurrence_lines": [
+                3,
+                5
+              ],
+              "successor_values": [
+                "Dock",
+                null
+              ],
+              "unresolved_occurrence_lines": []
+            }
+          ],
+          "membership_complete": true
+        },
+        {
+          "parent": {
+            "line": 6,
+            "text": "[6] toolbar 'Ridge'",
+            "raw_range": [
+              108,
+              127
+            ]
+          },
+          "peers": [
+            {
+              "line": 7,
+              "text": "[7] button 'Peak'",
+              "raw_range": [
+                131,
+                148
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Peak",
+              "successor": {
+                "state": "observed",
+                "source_line": 8,
+                "name": "Slope"
+              }
+            },
+            {
+              "line": 8,
+              "text": "[8] button 'Slope'",
+              "raw_range": [
+                152,
+                170
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Slope",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [],
+          "membership_complete": true
+        }
+      ]
+    },
+    {
+      "question_id": "graph-role-selection",
+      "source_sha256": "7feca83ad9498845399717c7082a3b65cb56ac05e18d40f3a636eb33c3a72e2b",
+      "answer": "Lagoon",
+      "rationale": "Requested anchor and successor are buttons; same-named link is outside selected anchor role.",
+      "source_lines": [
+        "[1] toolbar 'Bay'",
+        "  [2] button 'Dock'",
+        "  [3] button 'Lagoon'",
+        "  [4] link 'Dock'",
+        "  [5] link 'Delta'",
+        "[6] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay'",
+            "raw_range": [
+              1,
+              18
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Dock'",
+              "raw_range": [
+                22,
+                39
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Lagoon"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] button 'Lagoon'",
+              "raw_range": [
+                43,
+                62
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "observed",
+                "source_line": 4,
+                "name": "Dock"
+              }
+            },
+            {
+              "line": 4,
+              "text": "[4] link 'Dock'",
+              "raw_range": [
+                66,
+                81
+              ],
+              "ordinal": 3,
+              "role": "link",
+              "name": "Dock",
+              "successor": {
+                "state": "observed",
+                "source_line": 5,
+                "name": "Delta"
+              }
+            },
+            {
+              "line": 5,
+              "text": "[5] link 'Delta'",
+              "raw_range": [
+                85,
+                101
+              ],
+              "ordinal": 4,
+              "role": "link",
+              "name": "Delta",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [],
+          "membership_complete": true
+        }
+      ]
+    },
+    {
+      "question_id": "graph-virtualized-last",
+      "source_sha256": "3efa452a11442572084e0f387859ab467f030cc0dbb5731722035d11c950218c",
+      "answer": "UNKNOWN",
+      "rationale": "Virtualized membership cannot establish that the last rendered button has no successor.",
+      "source_lines": [
+        "[1] toolbar 'Bay', virtualized=true",
+        "  [2] button 'Dock'",
+        "  [3] button 'Lagoon'",
+        "[4] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay', virtualized=true",
+            "raw_range": [
+              1,
+              36
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Dock'",
+              "raw_range": [
+                40,
+                57
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "unresolved"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] button 'Lagoon'",
+              "raw_range": [
+                61,
+                80
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Lagoon",
+              "successor": {
+                "state": "unresolved"
+              }
+            }
+          ],
+          "repeated_labels": [],
+          "membership_complete": false
+        }
+      ]
+    },
+    {
+      "question_id": "graph-escaped-name",
+      "source_sha256": "b8fa4c8d3a0ee86072ad7836b2ed02cdaeeecb99f10f1356a3498cd9834f3ff4",
+      "answer": "Cr\u00e8me",
+      "rationale": "Literal source successor Cr\u00e8me is reversibly JSON escaped in the raw stored input.",
+      "source_lines": [
+        "[1] toolbar 'Bay'",
+        "  [2] button 'Quai'",
+        "  [3] button 'Cr\u00e8me'",
+        "[4] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay'",
+            "raw_range": [
+              1,
+              18
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Quai'",
+              "raw_range": [
+                22,
+                39
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Quai",
+              "successor": {
+                "state": "observed",
+                "source_line": 3,
+                "name": "Cr\u00e8me"
+              }
+            },
+            {
+              "line": 3,
+              "text": "[3] button 'Cr\u00e8me'",
+              "raw_range": [
+                43,
+                66
+              ],
+              "ordinal": 2,
+              "role": "button",
+              "name": "Cr\u00e8me",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [],
+          "membership_complete": true
+        }
+      ]
+    },
+    {
+      "question_id": "graph-single-closed-end",
+      "source_sha256": "aa904dc91b6feda332772bfed2959d7be2518c15743ece934cba99f0638a055d",
+      "answer": "None",
+      "rationale": "Single action in a closed complete toolbar has no following button.",
+      "source_lines": [
+        "[1] toolbar 'Bay'",
+        "  [2] button 'Dock'",
+        "[3] heading 'End'"
+      ],
+      "graph": [
+        {
+          "parent": {
+            "line": 1,
+            "text": "[1] toolbar 'Bay'",
+            "raw_range": [
+              1,
+              18
+            ]
+          },
+          "peers": [
+            {
+              "line": 2,
+              "text": "[2] button 'Dock'",
+              "raw_range": [
+                22,
+                39
+              ],
+              "ordinal": 1,
+              "role": "button",
+              "name": "Dock",
+              "successor": {
+                "state": "end"
+              }
+            }
+          ],
+          "repeated_labels": [],
+          "membership_complete": true
+        }
+      ]
+    }
+  ],
+  "prior_frozen_prompts": [
+    {
+      "directory": "2026-11-27-full-history-reader-v4",
+      "prompts": 14,
+      "sha256": "57f3772db795f4ea6b0535a06c5971835e50edee61458ae63cb69eaa0dd7e5a7"
+    },
+    {
+      "directory": "2026-11-27-full-history-reader-v7",
+      "prompts": 14,
+      "sha256": "23ba1e032d221d584f82a3c10ffcbdddab431b7b419469d774d43205f2cd22f0"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-independent",
+      "prompts": 16,
+      "sha256": "bdfbdc8c854bdedcfd905a718b19af97470f2b4b861f0c260926c83fce67d32c"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-independent-v2",
+      "prompts": 16,
+      "sha256": "bdfbdc8c854bdedcfd905a718b19af97470f2b4b861f0c260926c83fce67d32c"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-long",
+      "prompts": 16,
+      "sha256": "d19eb3ec95fef650c291c84a5a7db1ba4ccb6ff4d46c512854e97bffea073cbe"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-long-v2",
+      "prompts": 16,
+      "sha256": "d19eb3ec95fef650c291c84a5a7db1ba4ccb6ff4d46c512854e97bffea073cbe"
+    },
+    {
+      "directory": "2026-11-27-ordered-relations-regression",
+      "prompts": 20,
+      "sha256": "3e4914ce1dd77ba9ffa980e1b475add523f57c1a1a7c470711f2d7087cb69962"
+    },
+    {
+      "directory": "2026-11-27-reader-protocol",
+      "prompts": 21,
+      "sha256": "063bd6425e065b5734104e03f06f24e2f1082dfc7d524982e16b6781b0a3f4e7"
+    },
+    {
+      "directory": "2026-11-27-source-ledger-qualification",
+      "prompts": 32,
+      "sha256": "dead33faa2116d577068b8c29423adcf307ebe60725b200bbc54978d5a3411be"
+    }
+  ]
+}

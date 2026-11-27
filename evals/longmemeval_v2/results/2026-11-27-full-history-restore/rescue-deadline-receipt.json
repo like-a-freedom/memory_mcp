@@ -1,0 +1,7 @@
+{
+  "owned_build_pid": 91879,
+  "whole_build_ceiling_seconds": 5400,
+  "outcome": "exited_before_continuation_ceiling",
+  "original_gate_seconds": 1800,
+  "original_gate_assessed_separately": true
+}

@@ -1,0 +1,814 @@
+{
+  "schema": "memory-mcp-reader-delivered-source-support/v1",
+  "decision_rule": "Supported means the reader can establish the affirmative answer. Contradicted means the delivered source positively disproves a false premise and thereby supports its registered refusal. Unknown means delivered evidence is insufficient. Counts and full lists need a bounded relevant group; adjacent actions require contiguous same-scope peers excluding nested text. A delivery fault gives no quotation.",
+  "item_index_origin": 0,
+  "quote_offsets": "Zero-based Python Unicode string indices into the raw delivered value; ranges are half-open. Literal backslashes in a serialized accessibility tree are retained.",
+  "strict_rule": "Exact registered serialized span in an item bound to the source episode from the formation audit. Alternative evidence cannot pass this check. This field describes content; elapsed time and exit status are reported in retrieval receipts.",
+  "related_cases": "Seven questions concern three related UI states. These counts describe the selected questions and are not seven independent evidence sources.",
+  "scope": "Independent source-only adjudication of seven frozen V5 candidate delivered contexts, before any reader inference. All actual raw/decoded candidate sources were read case by case. No derived navigation, other-case evidence, reader answers or unreturned source bodies were used. Prior v4 receipt supplies comparison and literal quote templates only; every current quote and binding was verified in its own current case.",
+  "inputs": {
+    "evals/longmemeval_v2/results/2026-11-27-full-history-restore/reads-registration.json": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+    "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-v4/source-support-review.json": "b4f345c396994db51abb19c4f2cc298a095dac137b3174f33f80e00525870619",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/protocol.json": "27f0610373d253fe7a375992a4884b5aea9937f2c2eaa5ea2cee70491cc3291b",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/reads-summary.json": "37ea427e59eefb8addedcdc89d4bbee995121d2c4c1426513ec26d224c8a0c23",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/0c6b0c60.json": "3372f4ae62db990d52d9e8964dde95e41f9ff0d6709d81da16942280a7b27f3c",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/6d975a08.json": "e28d430b47284e719aa1339d3b96b2cebeb10fa5373beeaf6a3f1142af8f7d94",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/89a20f48.json": "3473fd0c40f3dd4475c3e02cd3a1fc7cff7452a7d7d8dad937ddc950651723de",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/922a0c56.json": "a19df81da1110d89551ec3368fb4f50b1e6cc8ebbe953b9663847eb3298a382b",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/d6da3938.json": "8fd46fd41a593ae2820660b3ee495cdd42cbfbef9a7572d42f45b84269f77c7f",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/f43926d9.json": "630920faddec0019c48e79f3b7bd704933a950a406279b14be43523e6fb1e7c7",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/f61a096f.json": "de47cf8698e4dd1a740264dd5290569a387cc3418b377edbd2f7e5b281228b40"
+  },
+  "decoded_offsets": "Zero-based half-open Python Unicode indices after literal serialization escape decoding only; raw offsets and exact raw quotes remain authoritative. The decoder adds no derived navigation in this review.",
+  "cases": {
+    "0c6b0c60": {
+      "question": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range options appear in the dropdown? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Past 24 hours, Past week, Past month, Past year, All time"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 459,
+          "end_character_exclusive": 1408,
+          "exact_quote": "[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[129] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Top'\\n\\t\\t\\t\\t[145] listitem '', visible\\n\\t\\t\\t\\t\\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\\n\\t\\t\\t\\t\\t\\t[148] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Past 24 hours'\\n\\t\\t\\t\\t\\t[151] list '', visible\\n\\t\\t\\t\\t\\t\\t[152] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[153] link '• Past 24 hours', clickable, visible\\n\\t\\t\\t\\t\\t\\t\\t\\tStaticText '•'\\n\\t\\t\\t\\t\\t\\t[154] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[155] link 'Past week', clickable, visible\\n\\t\\t\\t\\t\\t\\t[156] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[157] link 'Past month', clickable, visible\\n\\t\\t\\t\\t\\t\\t[158] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "84c037f8d2b66aa87ddcc69f0348a3cae8bb8014cf1a798cf1a7b5e5346eb04b",
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "raw_content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+          "decoded_start_character": 399,
+          "decoded_end_character_exclusive": 1216,
+          "decoded_exact_quote": "[127] button 'Sort by: Top', visible, hasPopup='menu', expanded=False\n\t\t\t\t\t\t[129] image '', visible\n\t\t\t\t\t\tStaticText 'Top'\n\t\t\t\t[145] listitem '', visible\n\t\t\t\t\t[146] button 'From: Past 24 hours', visible, focused, hasPopup='menu', expanded=True\n\t\t\t\t\t\t[148] image '', visible\n\t\t\t\t\t\tStaticText 'Past 24 hours'\n\t\t\t\t\t[151] list '', visible\n\t\t\t\t\t\t[152] listitem '', visible\n\t\t\t\t\t\t\t[153] link '• Past 24 hours', clickable, visible\n\t\t\t\t\t\t\t\tStaticText '•'\n\t\t\t\t\t\t[154] listitem '', visible\n\t\t\t\t\t\t\t[155] link 'Past week', clickable, visible\n\t\t\t\t\t\t[156] listitem '', visible\n\t\t\t\t\t\t\t[157] link 'Past month', clickable, visible\n\t\t\t\t\t\t[158] listitem '', visible\n\t\t\t\t\t\t\t[159] link 'Past year', clickable, visible\n\t\t\t\t\t\t[160] listitem '', visible\n\t\t\t\t\t\t\t[161] link 'All time', clickable, visible\n\t\t[163] image 'A tense emoji', visible",
+          "decoded_exact_quote_sha256": "542375ae90f50b2fac2ef96dfdd5cbbbcca97e97ebb52f3227efc9fa1872539a"
+        }
+      ],
+      "decision_basis": "The exposed Top menu contains five selectable list entries, and the following image is outside the menu at a shallower indentation.",
+      "limitations": "Selection marking and nested StaticText do not add an option.",
+      "read_receipt_sha256": "58a42c11fc8d682b709bffa34a924f66f4a2fffd5197ff21639e5c3bd94f31b1",
+      "retrieval_fault": null,
+      "support_path": "strict_registered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "raw_content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+          "raw_characters": 2035,
+          "decoded_characters": 1765,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:fe6ba23116a9aa827b8d73c4",
+          "source_episode": "episode:1792f596667d76ba4316a5a9",
+          "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000000",
+          "raw_content_sha256": "12dc917dbad8a78dcf68841227d324042aecb1ae719d35dc990be5f1c66e8aca",
+          "raw_characters": 2048,
+          "decoded_characters": 1798,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:af939d49360893985edd68e4",
+          "source_episode": "episode:950b622a4a319557ac0d9317",
+          "source_id": "longmemeval_v2_trajectory_0dcde76de2813ae3d3d1ac41409cbb1bd8513f4bb69eb0fb816f536316d2f968_ordered-segments-v1_00000000",
+          "raw_content_sha256": "df0e92d339915e0802f35a46ba679596817fb42315fe29436a0d889516e764fc",
+          "raw_characters": 2048,
+          "decoded_characters": 1747,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:c82dcfb33cc2a386347450a6",
+          "source_episode": "episode:ec03490ff27b058f0a75e1a1",
+          "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+          "raw_content_sha256": "ae551cfb17a2f56054f738aa6a02e8166bd11453e3cfb53268f780549d94cae8",
+          "raw_characters": 2045,
+          "decoded_characters": 1861,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 4,
+          "fact_id": "fact:b3c3e5c9eb3313a1517e4582",
+          "source_episode": "episode:ca55a1e9ea1872cfc86f6aa3",
+          "source_id": "longmemeval_v2_trajectory_7b5a5b3e56c1b2926d70a2c506c69020907e251b1775c7625748d8a07654b8e1_ordered-segments-v1_00000000",
+          "raw_content_sha256": "eefde2c8a4ab9680f49a531a7a63550fb5dcd3ba64981c20ac59e6fa49386bbd",
+          "raw_characters": 2044,
+          "decoded_characters": 1791,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 18547.817958,
+        "elapsed_seconds": 31.440267541009234,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 0,
+        "strict_span_assertion": false
+      }
+    },
+    "6d975a08": {
+      "question": "I am using our reddit-based custom forum website. On the All forums directory page, what are the three browse tabs shown above the forum list? Mark your final answer as a comma-separated list of short phrases in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Forums, Tags, Alphabetical"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [
+        0,
+        3
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 1236,
+          "end_character_exclusive": 1853,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "4cf032dbebdbc7dd5be604cf679050c27638fda95d22e256ed5f22d0e7888265",
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "raw_content_sha256": "0b3eab462282fd28dd921bbbb3054dc8dc0e7196d20508e369a8def49500ad78",
+          "decoded_start_character": 1122,
+          "decoded_end_character_exclusive": 1667,
+          "decoded_exact_quote": "[109] main ''\n\t\t[110] navigation '', visible\n\t\t\t[111] list '', visible\n\t\t\t\t[112] listitem '', visible\n\t\t\t\t\t[113] link 'Forums', clickable, visible\n\t\t\t\t[114] listitem '', visible\n\t\t\t\t\t[115] link 'Tags', clickable, visible\n\t\t\t\t[116] listitem '', visible\n\t\t\t\t\t[117] link 'Alphabetical', clickable, visible\n\t\t\t[118] list '', visible\n\t\t\t\t[119] listitem '', visible\n\t\t\t\t\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\n\t\t\t\t\t\t[122] image '', visible\n\t\t\t\t\t\tStaticText 'Submissions'\n\t\t[137] heading 'List of forums', visible",
+          "decoded_exact_quote_sha256": "5308d24a6eeaf9f5641beb0e4d663d270cdcc3f1eb1404e7d9dac48499519aa2"
+        },
+        {
+          "context_item_index": 3,
+          "start_character": 1240,
+          "end_character_exclusive": 1857,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "4cf032dbebdbc7dd5be604cf679050c27638fda95d22e256ed5f22d0e7888265",
+          "fact_id": "fact:05320c6893d56d323fc8f6fa",
+          "raw_content_sha256": "ee2f8532125829ac4a8f1d2ba7a30df3af477292f85349534e68c967fee6c866",
+          "decoded_start_character": 1126,
+          "decoded_end_character_exclusive": 1671,
+          "decoded_exact_quote": "[109] main ''\n\t\t[110] navigation '', visible\n\t\t\t[111] list '', visible\n\t\t\t\t[112] listitem '', visible\n\t\t\t\t\t[113] link 'Forums', clickable, visible\n\t\t\t\t[114] listitem '', visible\n\t\t\t\t\t[115] link 'Tags', clickable, visible\n\t\t\t\t[116] listitem '', visible\n\t\t\t\t\t[117] link 'Alphabetical', clickable, visible\n\t\t\t[118] list '', visible\n\t\t\t\t[119] listitem '', visible\n\t\t\t\t\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\n\t\t\t\t\t\t[122] image '', visible\n\t\t\t\t\t\tStaticText 'Submissions'\n\t\t[137] heading 'List of forums', visible",
+          "decoded_exact_quote_sha256": "5308d24a6eeaf9f5641beb0e4d663d270cdcc3f1eb1404e7d9dac48499519aa2"
+        }
+      ],
+      "decision_basis": "Each item independently shows three linked peers in the first navigation list inside the directory main region. The following sort list and directory heading close and identify the group.",
+      "limitations": "Alternative directory snapshots say List of forums and contain different node IDs. They support the answer independently of the registered snapshot.",
+      "read_receipt_sha256": "ebd79a0441ab4afc5cd20eccc263350b8d197b4e80e19694c44c8f86a1952c27",
+      "retrieval_fault": null,
+      "support_path": "alternate_delivered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "raw_content_sha256": "0b3eab462282fd28dd921bbbb3054dc8dc0e7196d20508e369a8def49500ad78",
+          "raw_characters": 2040,
+          "decoded_characters": 1839,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:e47c90015a947de79e21c3fa",
+          "source_episode": "episode:d2f4d8b53dd2179274260ced",
+          "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+          "raw_content_sha256": "e404fbdd920cc762193ab4790d96cfb621a1b6b28b161cbcdd41da30e4c56117",
+          "raw_characters": 2047,
+          "decoded_characters": 1826,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:91641897abb792f416953a33",
+          "source_episode": "episode:edc93d08cde3e2ed63c0697d",
+          "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+          "raw_content_sha256": "48704e6bd8bbef9cfaf078019d9d608d67148a4d33c519ae28917fb87c0695d4",
+          "raw_characters": 2048,
+          "decoded_characters": 1847,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:05320c6893d56d323fc8f6fa",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+          "raw_content_sha256": "ee2f8532125829ac4a8f1d2ba7a30df3af477292f85349534e68c967fee6c866",
+          "raw_characters": 2044,
+          "decoded_characters": 1843,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 4,
+          "fact_id": "fact:e5b15f546dc3eb13c3a16356",
+          "source_episode": "episode:f3132a237811b717abc4ef2d",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000000",
+          "raw_content_sha256": "8465eaec0b06ba15a7d9bd3bddbb4f79a090f4b2bb832989f56c24455b77c46a",
+          "raw_characters": 2048,
+          "decoded_characters": 1845,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 18203.239083,
+        "elapsed_seconds": 31.427445667010034,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 101,
+        "strict_span_assertion": true
+      }
+    },
+    "89a20f48": {
+      "question": "I am using our reddit-based custom forum website. When a forum is sorted by Top, what time-range option appears below \"All time\" in the dropdown? Mark your final answer as a short phrase in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "There is no such option. All time is the last time-range entry.",
+        "None",
+        "No such option"
+      ],
+      "premise_verdict": "contradicted",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 1227,
+          "end_character_exclusive": 1408,
+          "exact_quote": "[159] link 'Past year', clickable, visible\\n\\t\\t\\t\\t\\t\\t[160] listitem '', visible\\n\\t\\t\\t\\t\\t\\t\\t[161] link 'All time', clickable, visible\\n\\t\\t[163] image 'A tense emoji', visible",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "9716f7a6bbc7b3eb899316771cdb0e20983b03930dbaab81f657775b3f4e9559",
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "raw_content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+          "decoded_start_character": 1053,
+          "decoded_end_character_exclusive": 1216,
+          "decoded_exact_quote": "[159] link 'Past year', clickable, visible\n\t\t\t\t\t\t[160] listitem '', visible\n\t\t\t\t\t\t\t[161] link 'All time', clickable, visible\n\t\t[163] image 'A tense emoji', visible",
+          "decoded_exact_quote_sha256": "f3277b71af4b059f5b5a6af4443bfe8bcd51ad122cd70fc7daf3fe2e4a96df07"
+        }
+      ],
+      "decision_basis": "All time is the final selectable list entry in this expanded menu. The next element is an image outside the list.",
+      "limitations": "The contradiction concerns this observed Top time-range menu.",
+      "read_receipt_sha256": "06984ed6c0ce255b10e3fcd1b2b71166c7f90315f58ab5ee03f76082b5586164",
+      "retrieval_fault": null,
+      "support_path": "strict_registered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:72dae2359d272b755a877236",
+          "source_episode": "episode:28a05ac3465896dd0fa1dd41",
+          "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+          "raw_content_sha256": "fdb45480db77e27fc9c1a25c2d5361a560e4bd4c798895e77eef8b8b0f6ce3bc",
+          "raw_characters": 2035,
+          "decoded_characters": 1765,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:c82dcfb33cc2a386347450a6",
+          "source_episode": "episode:ec03490ff27b058f0a75e1a1",
+          "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+          "raw_content_sha256": "ae551cfb17a2f56054f738aa6a02e8166bd11453e3cfb53268f780549d94cae8",
+          "raw_characters": 2045,
+          "decoded_characters": 1861,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:e47c90015a947de79e21c3fa",
+          "source_episode": "episode:d2f4d8b53dd2179274260ced",
+          "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+          "raw_content_sha256": "4713bd40433b71abb12ffb074d0e10dc785729823ad61341c40bab00734a2e1a",
+          "raw_characters": 2047,
+          "decoded_characters": 1886,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:e70983ac3e3424e1680f40c8",
+          "source_episode": "episode:d15c6332e98036e1b4cbe1a4",
+          "source_id": "longmemeval_v2_trajectory_0c4a214e66fb83ebb68e07357bfcaa3007b8dc71aca461d1d7ffa3f2f5abf64e_ordered-segments-v1_00000000",
+          "raw_content_sha256": "73a66666048f0b161206f9f87e88c6d2f454c6a4083e2ebce6546729583266ab",
+          "raw_characters": 2042,
+          "decoded_characters": 1863,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 4,
+          "fact_id": "episode_fallback:episode:c8c7809cd6bdec19b5c7b8a3",
+          "source_episode": "episode:c8c7809cd6bdec19b5c7b8a3",
+          "source_id": "longmemeval_v2_trajectory_f3a69bd9c2ddc7852026e0c3361711f3d961ef4c6e0386dc7ad07e63f8692c44_ordered-segments-v1_00000000",
+          "raw_content_sha256": "4b40a0ec5394f36d49922ab6675709f64389fcd19827bb7f25cc1e822597a94b",
+          "raw_characters": 2044,
+          "decoded_characters": 1878,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 18259.486834,
+        "elapsed_seconds": 32.18418254199787,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 0,
+        "strict_span_assertion": false
+      }
+    },
+    "922a0c56": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action between \"Reset\" and \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "there is no such button because Reset and Create Order are next to each other",
+        "None",
+        "No such button"
+      ],
+      "premise_verdict": "unknown",
+      "frozen_label_supported": false,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [],
+      "evidence": [],
+      "decision_basis": "All five returned raw snippets are unrelated order/customer grids or a storefront/navigation fragment; none contains Reset or Create Order. Their absence from these snippets cannot establish adjacency or support None. Actual delivered context is insufficient despite successful runtime completion.",
+      "limitations": "Unknown is an evidence/context failure, not proof that the frozen refusal label is wrong or a reader failed. No toolbar evidence is borrowed from d6da3938/f61a096f or an unreturned source.",
+      "read_receipt_sha256": "1f957e9ec8ec6139a314e0d5781a948cbaf9025cf57ee4c5fa635becb21b7ecd",
+      "retrieval_fault": null,
+      "support_path": "insufficient_delivered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:c18ff99622c341c623cc117e",
+          "source_episode": "episode:af97d4740044e06d0961c30b",
+          "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000001",
+          "raw_content_sha256": "f88d5af5403935f1548d595b1b883fdec6bfab6dcd7f3f8145bda2cb8ecd25e4",
+          "raw_characters": 2048,
+          "decoded_characters": 1837,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:59aa081485fb7f8266eb4ff1",
+          "source_episode": "episode:1be1fe2b7efc12eb06307dcf",
+          "source_id": "longmemeval_v2_trajectory_59fe58997fcb4d231a4e164ed513fdcc3d0d302cebc5478d54f95e5450896537_ordered-segments-v1_00000000",
+          "raw_content_sha256": "141d98c082b2c3e3d82a3fdda9e85ae3cecacb7ed6598c2deb73ef72f1577003",
+          "raw_characters": 2048,
+          "decoded_characters": 1839,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:dc65c807a7f2fa4c9014b304",
+          "source_episode": "episode:089e75aef1bbdb2953cc7988",
+          "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000000",
+          "raw_content_sha256": "4711999ae1cfa9c4f57b52dd0783314f703cc60aa46da806a528cc398657facf",
+          "raw_characters": 2048,
+          "decoded_characters": 1839,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:91641897abb792f416953a33",
+          "source_episode": "episode:edc93d08cde3e2ed63c0697d",
+          "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+          "raw_content_sha256": "bd66a0b28e5cad4b25fd87e2698b360aa1bb491c3d1791c7bd064defb6361654",
+          "raw_characters": 2048,
+          "decoded_characters": 1843,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 4,
+          "fact_id": "fact:e47c90015a947de79e21c3fa",
+          "source_episode": "episode:d2f4d8b53dd2179274260ced",
+          "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+          "raw_content_sha256": "4e14a471b20a1d6b8039c8838688f5254e9e4fe69a17f41b29a8a9adb449c857",
+          "raw_characters": 2047,
+          "decoded_characters": 1907,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 22950.712625,
+        "elapsed_seconds": 34.87701566598844,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 101,
+        "strict_span_assertion": true
+      }
+    },
+    "d6da3938": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, what is the name of the action immediately to the right of \"Create Order\" in the top toolbar? Your final answer should be wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "Reset Password"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 1,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [],
+      "strict_registered_source_and_span_delivered": false,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 819,
+          "end_character_exclusive": 1115,
+          "exact_quote": "[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+          "exact_quote_sha256": "947137a221353d47522279a56e59a2e5e9794309ad71699791e1c562804f6831",
+          "fact_id": "fact:07f50ea549db79b8a856800e",
+          "raw_content_sha256": "5472b38e21d7ff629692b6c55679431111931b953403932561f9351ac828f1ec",
+          "decoded_start_character": 738,
+          "decoded_end_character_exclusive": 1013,
+          "decoded_exact_quote": "[745] button 'Reset', clickable, visible\n\t\t\tStaticText 'Reset'\n\t\t[747] button 'Create Order', clickable, visible\n\t\t\tStaticText 'Create Order'\n\t\t[749] button 'Reset Password', clickable, visible\n\t\t\tStaticText 'Reset Password'\n\t\t[751] button 'Force Sign-In', clickable, visible",
+          "decoded_exact_quote_sha256": "57b8f96bd5af4fce7922bcde1c31765e4b7dc30de7ae2a84f26c06b40c054866"
+        }
+      ],
+      "decision_basis": "The customer action group includes Create Order followed immediately by Reset Password; intervening StaticText is the label of Create Order.",
+      "limitations": "This excerpt supports only the local same-main-region adjacency Create Order -> Reset Password. It continues after Save Customer to Search/Reset Filter, so this local proof must not be reused as a complete top-toolbar count proof. Accessibility-tree peer order supplies the registered meaning of right.",
+      "read_receipt_sha256": "e03ae76705b02c2c425a0ab654d30784997ad939b12254fb20174e1fea9c2eb4",
+      "retrieval_fault": null,
+      "support_path": "alternate_delivered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:07f50ea549db79b8a856800e",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+          "raw_content_sha256": "5472b38e21d7ff629692b6c55679431111931b953403932561f9351ac828f1ec",
+          "raw_characters": 2048,
+          "decoded_characters": 1862,
+          "decoded_Reset_occurrences": 6,
+          "decoded_Create_Order_occurrences": 2
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 23455.798375000002,
+        "elapsed_seconds": 36.34665033299825,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 101,
+        "strict_span_assertion": true
+      }
+    },
+    "f43926d9": {
+      "question": "I am using our reddit-based custom forum website. On the All forums directory page, what browse tab appears between `Tags` and `Alphabetical` above the forum list? Mark your final answer as a short phrase in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "There is no browse tab between Tags and Alphabetical there.",
+        "None",
+        "No such tab"
+      ],
+      "premise_verdict": "contradicted",
+      "frozen_label_supported": true,
+      "delivered_item_count": 4,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        2
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        2,
+        1
+      ],
+      "evidence": [
+        {
+          "context_item_index": 2,
+          "start_character": 1254,
+          "end_character_exclusive": 1598,
+          "exact_quote": "[107] main '', visible\\n\\t\\t[108] list '', visible\\n\\t\\t\\t[109] listitem '', visible\\n\\t\\t\\t\\t[110] link 'Forums', clickable, visible\\n\\t\\t\\t[111] listitem '', visible\\n\\t\\t\\t\\t[112] link 'Tags', clickable, visible\\n\\t\\t\\t[113] listitem '', visible\\n\\t\\t\\t\\t[114] link 'Alphabetical', clickable, visible\\n\\t\\t[115] heading 'All forums', visible",
+          "source_episode": "episode:3fd1796a0f590ac946fedf12",
+          "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "2f9c6521ec37101544274c91b6c29f9c1265c10a9fd64980d867a8ad8182c888",
+          "fact_id": "fact:93814dfb3aee835f9f3b0149",
+          "raw_content_sha256": "d1dee0e8654694f4f59379ffdd1b9127cb6cb202dda8df12b740927b97f04dd8",
+          "decoded_start_character": 1138,
+          "decoded_end_character_exclusive": 1449,
+          "decoded_exact_quote": "[107] main '', visible\n\t\t[108] list '', visible\n\t\t\t[109] listitem '', visible\n\t\t\t\t[110] link 'Forums', clickable, visible\n\t\t\t[111] listitem '', visible\n\t\t\t\t[112] link 'Tags', clickable, visible\n\t\t\t[113] listitem '', visible\n\t\t\t\t[114] link 'Alphabetical', clickable, visible\n\t\t[115] heading 'All forums', visible",
+          "decoded_exact_quote_sha256": "d43315735ddd20f15a5e2d0b8f195ff2f96652f6b386246655ca1ecf05106ce6"
+        },
+        {
+          "context_item_index": 1,
+          "start_character": 1240,
+          "end_character_exclusive": 1857,
+          "exact_quote": "[109] main ''\\n\\t\\t[110] navigation '', visible\\n\\t\\t\\t[111] list '', visible\\n\\t\\t\\t\\t[112] listitem '', visible\\n\\t\\t\\t\\t\\t[113] link 'Forums', clickable, visible\\n\\t\\t\\t\\t[114] listitem '', visible\\n\\t\\t\\t\\t\\t[115] link 'Tags', clickable, visible\\n\\t\\t\\t\\t[116] listitem '', visible\\n\\t\\t\\t\\t\\t[117] link 'Alphabetical', clickable, visible\\n\\t\\t\\t[118] list '', visible\\n\\t\\t\\t\\t[119] listitem '', visible\\n\\t\\t\\t\\t\\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\\n\\t\\t\\t\\t\\t\\t[122] image '', visible\\n\\t\\t\\t\\t\\t\\tStaticText 'Submissions'\\n\\t\\t[137] heading 'List of forums', visible",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+          "exact_quote_sha256": "4cf032dbebdbc7dd5be604cf679050c27638fda95d22e256ed5f22d0e7888265",
+          "fact_id": "fact:05320c6893d56d323fc8f6fa",
+          "raw_content_sha256": "ee2f8532125829ac4a8f1d2ba7a30df3af477292f85349534e68c967fee6c866",
+          "decoded_start_character": 1126,
+          "decoded_end_character_exclusive": 1671,
+          "decoded_exact_quote": "[109] main ''\n\t\t[110] navigation '', visible\n\t\t\t[111] list '', visible\n\t\t\t\t[112] listitem '', visible\n\t\t\t\t\t[113] link 'Forums', clickable, visible\n\t\t\t\t[114] listitem '', visible\n\t\t\t\t\t[115] link 'Tags', clickable, visible\n\t\t\t\t[116] listitem '', visible\n\t\t\t\t\t[117] link 'Alphabetical', clickable, visible\n\t\t\t[118] list '', visible\n\t\t\t\t[119] listitem '', visible\n\t\t\t\t\t[120] button 'Sort by: Submissions', visible, hasPopup='menu', expanded=False\n\t\t\t\t\t\t[122] image '', visible\n\t\t\t\t\t\tStaticText 'Submissions'\n\t\t[137] heading 'List of forums', visible",
+          "decoded_exact_quote_sha256": "5308d24a6eeaf9f5641beb0e4d663d270cdcc3f1eb1404e7d9dac48499519aa2"
+        }
+      ],
+      "decision_basis": "Under the directory main region, Tags and Alphabetical are consecutive list entries. The second independently sufficient excerpt shows the same adjacency in a different directory view.",
+      "limitations": "The exact registered block and the structurally equivalent alternative are different evidence paths.",
+      "read_receipt_sha256": "9bea60ba8bb5a0fef4bb9a1ff94237fd21a44a8e55e3dac3cec03c8a21a3da02",
+      "retrieval_fault": null,
+      "support_path": "strict_registered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:e47c90015a947de79e21c3fa",
+          "source_episode": "episode:d2f4d8b53dd2179274260ced",
+          "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+          "raw_content_sha256": "e404fbdd920cc762193ab4790d96cfb621a1b6b28b161cbcdd41da30e4c56117",
+          "raw_characters": 2047,
+          "decoded_characters": 1826,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:05320c6893d56d323fc8f6fa",
+          "source_episode": "episode:c520192e24c28192c9c107c6",
+          "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+          "raw_content_sha256": "ee2f8532125829ac4a8f1d2ba7a30df3af477292f85349534e68c967fee6c866",
+          "raw_characters": 2044,
+          "decoded_characters": 1843,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:93814dfb3aee835f9f3b0149",
+          "source_episode": "episode:3fd1796a0f590ac946fedf12",
+          "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+          "raw_content_sha256": "d1dee0e8654694f4f59379ffdd1b9127cb6cb202dda8df12b740927b97f04dd8",
+          "raw_characters": 2048,
+          "decoded_characters": 1848,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:91641897abb792f416953a33",
+          "source_episode": "episode:edc93d08cde3e2ed63c0697d",
+          "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+          "raw_content_sha256": "48704e6bd8bbef9cfaf078019d9d608d67148a4d33c519ae28917fb87c0695d4",
+          "raw_characters": 2048,
+          "decoded_characters": 1847,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 18093.532750000002,
+        "elapsed_seconds": 30.05224258301314,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 0,
+        "strict_span_assertion": false
+      }
+    },
+    "f61a096f": {
+      "question": "I am using our magento-based shopping admin dashboard. On customer detail pages, how many actions are there in the top toolbar, including the \"Back\" and \"Save Customer\" buttons? Your final answer should be in English (e.g., one, two, three) and wrapped in \\boxed{}.",
+      "frozen_accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "premise_verdict": "supported",
+      "frozen_label_supported": true,
+      "delivered_item_count": 5,
+      "reader_context_observed": true,
+      "strict_registered_source_and_span_in_item_indices": [
+        0
+      ],
+      "strict_registered_source_and_span_delivered": true,
+      "context_item_indices": [
+        0
+      ],
+      "evidence": [
+        {
+          "context_item_index": 0,
+          "start_character": 568,
+          "end_character_exclusive": 1482,
+          "exact_quote": "[733] main '', visible\\n\\t\\t[739] button '\\\\ue626 Back', clickable, visible\\n\\t\\t\\tStaticText '\\\\ue626'\\n\\t\\t\\tStaticText 'Back'\\n\\t\\t[741] button 'Login as Customer', clickable, visible\\n\\t\\t\\tStaticText 'Login as Customer'\\n\\t\\t[743] button 'Delete Customer', clickable, visible\\n\\t\\t\\tStaticText 'Delete Customer'\\n\\t\\t[745] button 'Reset', clickable, visible\\n\\t\\t\\tStaticText 'Reset'\\n\\t\\t[747] button 'Create Order', clickable, visible\\n\\t\\t\\tStaticText 'Create Order'\\n\\t\\t[749] button 'Reset Password', clickable, visible\\n\\t\\t\\tStaticText 'Reset Password'\\n\\t\\t[751] button 'Force Sign-In', clickable, visible\\n\\t\\t\\tStaticText 'Force Sign-In'\\n\\t\\t[753] button 'Save and Continue Edit', clickable, visible\\n\\t\\t\\tStaticText 'Save and Continue Edit'\\n\\t\\t[755] button 'Save Customer', clickable, visible\\n\\t\\t\\tStaticText 'Save Customer'\\n\\t\\tStaticText 'Personal Information'\\n\\t\\t[777] table '', visible",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+          "exact_quote_sha256": "4af40f81300d8262b256a14fd0e389800a6f5ab11713eb285b613137eb19a44f",
+          "fact_id": "fact:07f50ea549db79b8a856800e",
+          "raw_content_sha256": "4afcbf5d2b16fd191c8f3486931dbf9b3c42fadf43c5f85d4aaeb7e37a614eec",
+          "decoded_start_character": 510,
+          "decoded_end_character_exclusive": 1349,
+          "decoded_exact_quote": "[733] main '', visible\n\t\t[739] button '\\ue626 Back', clickable, visible\n\t\t\tStaticText '\\ue626'\n\t\t\tStaticText 'Back'\n\t\t[741] button 'Login as Customer', clickable, visible\n\t\t\tStaticText 'Login as Customer'\n\t\t[743] button 'Delete Customer', clickable, visible\n\t\t\tStaticText 'Delete Customer'\n\t\t[745] button 'Reset', clickable, visible\n\t\t\tStaticText 'Reset'\n\t\t[747] button 'Create Order', clickable, visible\n\t\t\tStaticText 'Create Order'\n\t\t[749] button 'Reset Password', clickable, visible\n\t\t\tStaticText 'Reset Password'\n\t\t[751] button 'Force Sign-In', clickable, visible\n\t\t\tStaticText 'Force Sign-In'\n\t\t[753] button 'Save and Continue Edit', clickable, visible\n\t\t\tStaticText 'Save and Continue Edit'\n\t\t[755] button 'Save Customer', clickable, visible\n\t\t\tStaticText 'Save Customer'\n\t\tStaticText 'Personal Information'\n\t\t[777] table '', visible",
+          "decoded_exact_quote_sha256": "e8164347c68a1f916297dc3f359a3b97bf3464e925fce48e852daf3252a36825"
+        }
+      ],
+      "decision_basis": "The first controls in the customer main region are nine consecutive buttons, Back through Save Customer. Personal Information and a table follow. Nested StaticText repeats accessible labels and supplies no additional controls.",
+      "limitations": "The region is identified by order, the customer-specific button labels and the boundary with personal information; other items contain controls from different pages.",
+      "read_receipt_sha256": "83dfcf547d7ae5f2f0b744dd5470d35444cbba1782411b47d69482d076070d83",
+      "retrieval_fault": null,
+      "support_path": "strict_registered",
+      "delivered_source_inventory": [
+        {
+          "context_item_index": 0,
+          "fact_id": "fact:07f50ea549db79b8a856800e",
+          "source_episode": "episode:751dce326043631881f9bf3b",
+          "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+          "raw_content_sha256": "4afcbf5d2b16fd191c8f3486931dbf9b3c42fadf43c5f85d4aaeb7e37a614eec",
+          "raw_characters": 2048,
+          "decoded_characters": 1843,
+          "decoded_Reset_occurrences": 4,
+          "decoded_Create_Order_occurrences": 2
+        },
+        {
+          "context_item_index": 1,
+          "fact_id": "fact:f7a90d85ce8a5a24afda86fb",
+          "source_episode": "episode:e92506fa30379e53f1cb8ae9",
+          "source_id": "longmemeval_v2_trajectory_12eeba3c56fa7a0cd79ba692ad3ac02226d37b3cfc380e3daa7f532a0763c53b_ordered-segments-v1_00000000",
+          "raw_content_sha256": "5660e8bf40f223dbbfc8ff2a64309c6ff8e66e9fde8687bfc00526483d5724fd",
+          "raw_characters": 2045,
+          "decoded_characters": 1881,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 2,
+          "fact_id": "fact:91641897abb792f416953a33",
+          "source_episode": "episode:edc93d08cde3e2ed63c0697d",
+          "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+          "raw_content_sha256": "534bd81f6f441b4d47b6dcc1ab70e6d597ac113a7656aa177ed2a2879cca3f71",
+          "raw_characters": 2048,
+          "decoded_characters": 1819,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 3,
+          "fact_id": "fact:9ca6612a0192da77933a51c5",
+          "source_episode": "episode:bf814bfd62e0d0fccc752eb7",
+          "source_id": "longmemeval_v2_trajectory_d1acede0fa655e1e57defc42d511007fd09039d1180cafeb788a346e46d4c924_ordered-segments-v1_00000000",
+          "raw_content_sha256": "11a5345fbd12c71d1c7b8f8596b0152ae50ec38b83c9bb3c190c6295b4f60965",
+          "raw_characters": 2048,
+          "decoded_characters": 1836,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        },
+        {
+          "context_item_index": 4,
+          "fact_id": "fact:37f2974c09fc83ab98421ce5",
+          "source_episode": "episode:de6c79531ee685f614e42767",
+          "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000000",
+          "raw_content_sha256": "20fc2a0cca93118699683ce68f0ae9eb2b787cd5cf91800e290012904a390d64",
+          "raw_characters": 2048,
+          "decoded_characters": 1800,
+          "decoded_Reset_occurrences": 0,
+          "decoded_Create_Order_occurrences": 0
+        }
+      ],
+      "runtime": {
+        "assembly_elapsed_ms": 21129.958042,
+        "elapsed_seconds": 35.402435708005214,
+        "runtime_completed": true,
+        "receipt_observed": true,
+        "external_timeout": false,
+        "exit_code": 0,
+        "strict_span_assertion": false
+      }
+    }
+  },
+  "summary": {
+    "selected": 7,
+    "premise_verdicts": {
+      "supported": 4,
+      "contradicted": 2,
+      "unknown": 1
+    },
+    "frozen_labels_supported": 6,
+    "strict_registered_source_and_span_delivered": 4,
+    "alternate_sufficient_despite_strict_miss": 2,
+    "delivered_contexts": 7,
+    "delivery_faults": 0,
+    "candidate_assembly_within_30_seconds": 7,
+    "candidate_runtime_within_45_seconds": 7,
+    "source_sufficiency_acceptance_required": 7,
+    "source_sufficiency_acceptance": "FAIL",
+    "candidate_qualified": false
+  },
+  "paired_observations": {
+    "pairs": [
+      {
+        "case_id": "0c6b0c60",
+        "legacy_assembly_ms": 20144.221250000002,
+        "candidate_assembly_ms": 18547.817958,
+        "legacy_process_seconds": 33.2414874160022,
+        "candidate_process_seconds": 31.440267541009234,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "6d975a08",
+        "legacy_assembly_ms": 19927.029625,
+        "candidate_assembly_ms": 18203.239083,
+        "legacy_process_seconds": 33.838221166981384,
+        "candidate_process_seconds": 31.427445667010034,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "89a20f48",
+        "legacy_assembly_ms": 18485.395208,
+        "candidate_assembly_ms": 18259.486834,
+        "legacy_process_seconds": 31.723933875007788,
+        "candidate_process_seconds": 32.18418254199787,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "922a0c56",
+        "legacy_assembly_ms": 28819.234584,
+        "candidate_assembly_ms": 22950.712625,
+        "legacy_process_seconds": 40.759149999998044,
+        "candidate_process_seconds": 34.87701566598844,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "d6da3938",
+        "legacy_assembly_ms": 23201.442584,
+        "candidate_assembly_ms": 23455.798375000002,
+        "legacy_process_seconds": 36.871975709014805,
+        "candidate_process_seconds": 36.34665033299825,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "f43926d9",
+        "legacy_assembly_ms": 19241.671749999998,
+        "candidate_assembly_ms": 18093.532750000002,
+        "legacy_process_seconds": 31.32772579198354,
+        "candidate_process_seconds": 30.05224258301314,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      },
+      {
+        "case_id": "f61a096f",
+        "legacy_assembly_ms": 25411.940458,
+        "candidate_assembly_ms": 21129.958042,
+        "legacy_process_seconds": 37.82575087502482,
+        "candidate_process_seconds": 35.402435708005214,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "actual_delivered_content_and_identity_equal": true
+      }
+    ],
+    "interpretation": "Both arms completed all seven reads in this fresh paired capture, including legacy922 at 40.75915 process seconds. Do not describe this pair as completion improving 6/7 to 7/7: older v3/v4 legacy922 timeouts are separate immutable observations and demonstrate timing variation. Single per-case pairs do not establish population latency gains or stage-cost attribution. Source sufficiency remains 6/7 despite 7/7 contexts delivered. Exit101 on three cases is the retained strict-span assertion after context delivery, not a process/deadline failure."
+  }
+}

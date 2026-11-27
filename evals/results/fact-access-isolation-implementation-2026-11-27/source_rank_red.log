@@ -1,0 +1,22 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.27s
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/e8d2bfba80f6470a/out/long_history_stage_evidence-e8d2bfba80f6470a)
+
+running 1 test
+test quoted_positional_toolbar_anchors_survive_fact_candidate_bounding ... FAILED
+
+failures:
+
+---- quoted_positional_toolbar_anchors_survive_fact_candidate_bounding stdout ----
+
+thread 'quoted_positional_toolbar_anchors_survive_fact_candidate_bounding' (10996314) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:665:5:
+the sole carrier with both whole control labels disappeared at the candidate bound, admitted rank 25
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    quoted_positional_toolbar_anchors_survive_fact_candidate_bounding
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `-p memory_mcp --test long_history_stage_evidence`

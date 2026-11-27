@@ -1,0 +1,63 @@
+{
+  "schema": "reader-protocol-regression-check/v1",
+  "previous_runner_sha256": "9082b0d9c1a4ce6375367c91525d09e08ef7f43a1e3cea7242755a54fc68ef23",
+  "current_runner_sha256": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+  "checked": [
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-full-history-reader-v4/registration.json",
+      "unchanged_prompts": 14
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-ordered-controls-independent/registration.json",
+      "unchanged_prompts": 16
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-ordered-controls-independent-v2/registration.json",
+      "unchanged_prompts": 16
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-ordered-controls-long/registration.json",
+      "unchanged_prompts": 16
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-ordered-controls-long-v2/registration.json",
+      "unchanged_prompts": 16
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-ordered-relations-regression/registration.json",
+      "unchanged_prompts": 20
+    },
+    {
+      "registration": "evals/longmemeval_v2/results/2026-11-27-reader-protocol/registration.json",
+      "unchanged_prompts": 21
+    }
+  ],
+  "unavailable_inputs_not_counted": [],
+  "unchanged_prompt_total": 119,
+  "focused_protocol_tests": "29 passed; /tmp/memory-quality-ledger-green.log",
+  "red_logs": [
+    "/tmp/memory-quality-ledger-channel-red.log",
+    "/tmp/memory-quality-ledger-duplicate-red.log",
+    "/tmp/memory-quality-ledger-freeze-red.log"
+  ],
+  "combined_protocol_attempt_scoring_tests": "40 passed, 1.013s",
+  "combined_log": {
+    "path": "/tmp/memory-quality-ledger-combined.log",
+    "sha256": "845a7058adc29869a3220b38f71e303918ee55fb16f5096187691c7c80247b3a"
+  },
+  "red_receipts": [
+    {
+      "path": "/tmp/memory-quality-ledger-channel-red.log",
+      "sha256": "8b9007230aca66c0cded0a81a9e28dfe8b6289bcb9860a8aec37bce7994de882"
+    },
+    {
+      "path": "/tmp/memory-quality-ledger-duplicate-red.log",
+      "sha256": "fea805a5a5857fc2b15ae06e36f9fcbab01377f97cb93b22a4be27ad662a4ee6"
+    },
+    {
+      "path": "/tmp/memory-quality-ledger-freeze-red.log",
+      "sha256": "17f95c625fcabef1b1648db93358864ecdbb5800c0e90aae1eb03543a194fc85"
+    }
+  ],
+  "git_diff_check": "passed"
+}

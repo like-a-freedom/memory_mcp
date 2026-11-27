@@ -1,0 +1,11 @@
+{
+  "schema": "source-diagnosis-raw-manifest/v1",
+  "files": {
+    "before/0c6b0c60.json": "8931d7035fbf9e74d9eb7a206ba5caa46c3682bbd515b1055c2d9e606d44845a",
+    "before/922a0c56.json": "df4e022a65998ac0842bda014442e141662b2a67219e7b70af2edae3ef3439d1",
+    "before/f61a096f.json": "45cbbec60950102da8c0d4a39ea348874156dab837874f242bf2c8202ef00c5b",
+    "after/0c6b0c60.json": "5bc97a76a796ac1942f51d85edbf5206bbb53db36577aca5c106ab1c7acc6f68",
+    "after/922a0c56.json": "7160555033555e861d092a9c424184f8c4290b5b3fb48221b422f9367b91f9e2",
+    "after/f61a096f.json": "99a0cd5523395899b20096d2090cba1bb42957d303b43f79289e75b6fa535306"
+  }
+}

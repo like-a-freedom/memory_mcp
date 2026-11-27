@@ -1,0 +1,21 @@
+{
+  "previous_revision": "aef5f772^",
+  "files": [
+    {
+      "path": "skills/memory-cli/SKILL.md",
+      "current_sha256": "a9a251bfb1b2b8b8700ef7b850b975e0ed6044f8e79af061cb0b81d3aa5911af",
+      "previous_sha256": "fb5a723d9f6b644e1b87515053c482d8288914bce0268d95034b22ae393b7db0"
+    },
+    {
+      "path": "skills/memory-cli/references/commands.md",
+      "current_sha256": "48236ca459fbd756aa3f540f3787d03af9b9991f9530f588e79dd5a49e232792",
+      "previous_sha256": "48236ca459fbd756aa3f540f3787d03af9b9991f9530f588e79dd5a49e232792"
+    },
+    {
+      "path": "skills/memory-cli/references/memory-contract.md",
+      "current_sha256": "f2bc46760f9fa0a30164c8a5c01665e61f25d5eda6e496f800a8476dcbd5cae8",
+      "previous_sha256": "58e5c4a2f7219dd2765c74e942070ecf2c4ba6e7e649f68e2b24706374a00c62"
+    }
+  ],
+  "prompts_sha256": "6ba4d17f739db0b2da58628afb4236a44f9d9c1d281d4b65216dca81cfdce569"
+}

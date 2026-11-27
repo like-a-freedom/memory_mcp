@@ -1,0 +1,346 @@
+{
+  "structured-final-first": {
+    "middle-positive": {
+      "response_raw": "\\boxed{Lantern}\nQUOTE: [18] link 'Lantern', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 1541,
+        "total_tokens": 1563,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Review stages', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1532,
+        "total_tokens": 1550,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [25] link 'Archive', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1527,
+        "total_tokens": 1545,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "\\boxed{4}\nQUOTE: [2] toolbar 'Document controls', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1652,
+        "total_tokens": 1670,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Destinations', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1531,
+        "total_tokens": 1549,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "\\boxed{North}\nQUOTE: [18] link 'North', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1558,
+        "total_tokens": 1576,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Progress', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1419,
+        "total_tokens": 1436,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "\\boxed{Help}\nQUOTE: [11] link 'Help', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1495,
+        "total_tokens": 1513,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "\\boxed{Export}\nQUOTE: [5] list 'Footer', visible\n\t[6] link 'Open', visible\n\t[7] link 'Export', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 37,
+        "prompt_tokens": 1450,
+        "total_tokens": 1487,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "\\boxed{April, June, October}\nQUOTE: [2] list 'Categories', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 1522,
+        "total_tokens": 1543,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  },
+  "ordered-relations-final-first": {
+    "middle-positive": {
+      "response_raw": "\\boxed{Lantern}\nQUOTE: [18] link 'Lantern', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 1790,
+        "total_tokens": 1812,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: [11] link 'Staging', visible -> [18] link 'Review', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 33,
+        "prompt_tokens": 1775,
+        "total_tokens": 1808,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: After [25] link 'Archive', visible | successor: NONE",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 23,
+        "prompt_tokens": 1770,
+        "total_tokens": 1793,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "\\boxed{4}\nQUOTE: [2] toolbar 'Document controls', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1945,
+        "total_tokens": 1963,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Destinations', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1776,
+        "total_tokens": 1794,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "\\boxed{North}\nQUOTE: [11] link 'Open', visible -> [18] link 'North', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 32,
+        "prompt_tokens": 1824,
+        "total_tokens": 1856,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Progress', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1598,
+        "total_tokens": 1615,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "\\boxed{Help}\nQUOTE: [11] link 'Help', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1737,
+        "total_tokens": 1755,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "\\boxed{Export}\nQUOTE: [5] list 'Footer', visible\n\t[6] link 'Open', visible\n\t[7] link 'Export', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 37,
+        "prompt_tokens": 1629,
+        "total_tokens": 1666,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "\\boxed{April, June, October}\n\nQUOTE: [2] list 'Categories', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'April', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'June', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'October', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 90,
+        "prompt_tokens": 1764,
+        "total_tokens": 1854,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  }
+}

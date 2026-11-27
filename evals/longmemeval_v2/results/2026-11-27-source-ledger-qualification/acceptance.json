@@ -1,0 +1,29 @@
+{
+  "schema": "reader-qualification-acceptance/v1",
+  "frozen_at_utc": "2026-11-27T14:42:07.571603+00:00",
+  "before_inference_outputs": true,
+  "registration_sha256": "3522269fa86549afeda59ccdad838015c61c4b49de87679de02fe13b02373252",
+  "runner_sha256": "6423ba1bfa67af0c069442579b50c35145b9e77d7ecbf079998449a83286a708",
+  "scheduled": 32,
+  "case_families": 16,
+  "cohorts": {
+    "exposed_regression": 10,
+    "new_source_reviewed": 6
+  },
+  "candidate": "source-ledger-final-first",
+  "per_candidate_case_required": [
+    "correct frozen value",
+    "finished without length truncation",
+    "registered boxed/quote format",
+    "quoted fragment is literal in delivered raw source or decoded source text, never navigation annotations",
+    "no transport or protocol error"
+  ],
+  "all_cases_required": 16,
+  "refusal_and_unknown": "None for source-supported empty result; UNKNOWN only for unresolved/insufficient evidence, per frozen truth. Positive/negative rows all remain in denominator.",
+  "not_claimed": [
+    "blind confirmation",
+    "memory-treatment effect",
+    "literal quote as proof of full source binding or entailment"
+  ],
+  "stop_rule": "One frozen capture, retries0, no output repair, no best-output selection. Preserve failed qualification and old failed captures."
+}

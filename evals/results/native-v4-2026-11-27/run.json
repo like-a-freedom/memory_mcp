@@ -1,0 +1,236 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1795787506",
+  "profile": "nightly",
+  "started_at": "2026-11-27T13:51:46.322119Z",
+  "duration_ms": 298,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-absent-target"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-current-snapshot"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-ordinary-location"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-peer-conflict"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-prior-knowledge"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-similar-name"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-unverified-correction"
+    },
+    {
+      "suite_id": "memory-decisions",
+      "case_id": "v10-valid-boundary"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-absent-target"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-current-snapshot"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 3,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-ordinary-location"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 3,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-peer-conflict"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-prior-knowledge"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-similar-name"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 3,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-unverified-correction"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 3,
+      "attempts": 0
+    },
+    {
+      "case_key": {
+        "suite_id": "memory-decisions",
+        "case_id": "v10-valid-boundary"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "invalid",
+      "metrics": {},
+      "evidence": {},
+      "invalid_reason": "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required",
+      "failures": [
+        "MEMORY_DECISIONS_PRODUCT_REVISION is required; MEMORY_DECISIONS_ARTIFACT_ROOT is required"
+      ],
+      "duration_ms": 4,
+      "attempts": 0
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "memory-decisions",
+      "mode": "end_to_end",
+      "total": 8,
+      "passed": 0,
+      "quality_failed": 0,
+      "invalid": 8,
+      "metrics": {
+        "decision_success_rate": 0.0,
+        "evidence_success_rate": 0.0,
+        "probe_success_rate": 0.0
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "bfbe523ed85a518e3dcc05363b9d0e990327540e8a5ded8d9aa4d6906a5c7336",
+    "git_commit": "496368549d856957e5fa317c7adea462d925288b",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "memory-decisions": {
+        "config_sha256": "17ff6b862de83dce474a4e94ab75db5c32b7965b4b8e8265002c338df04de892",
+        "corpus_sha256": "19b4e9890df5f5706cf99b97638341c2db1ea54dc86f16e8f4e04696e9caaa0e",
+        "product_binary": "/tmp/memory-quality-product-v4-2026-11-27",
+        "product_binary_sha256": "5b490dbd9babd356cf22c53068f9e050cd5c345ad954dcddd39acc5f513c5d63",
+        "provider_profile": "storage=embedded-surreal-local;namespace=main;embeddings=disabled;retrieval=lexical-fallback;ner=regex-builtin;primary_claim_rollout=product_default;evidence_diagnostic_claim_rollout=evidence;transaction_time=server-assigned;scoring_protocol=temporal-cutoff-v2",
+        "receipt_index": "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/memory-decisions-invalid-85849-1795787506021777000/index.json",
+        "receipt_index_sha256": "936428cfb48dbb847d548f58990a3037d0db2160523542b9111cf9dedc1358d8",
+        "replay_cases": "8",
+        "replay_elapsed_ms": "36"
+      }
+    },
+    "profile_digest": "b3740ed049e44d3d45cd9d62928b2074a5ef5d272ae8ae941a871d1517852ad0"
+  },
+  "budget_status": "passed",
+  "verdict": "invalid",
+  "issues": []
+}

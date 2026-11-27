@@ -1,0 +1,13 @@
+{
+  "schema": "source-diagnosis-snapshot-audit/v1",
+  "registration_correction": "The preregistered trajectory_count 100 describes the adjacent cohort file, not the actual store population. The actual surviving store contains 18 episodes. It is a partial snapshot and cannot qualify full-history acceptance.",
+  "observed_episode_count": 18,
+  "formation_source_span_present": "3/3",
+  "registered_source_span_packed": "2/3",
+  "read_deadline_met": "3/3",
+  "alternative_support": {
+    "922a0c56": "Same source, different state: Reset and Create Order are adjacent. This supports refusal of the false premise but does not satisfy the original exact-span gate. No relabelling of that gate."
+  },
+  "historical_full_snapshot": "unavailable after earlier cleanup; no historical speed or complete-history claim",
+  "source_of_counts": "before/*.json FULL_HISTORY_START and FULL_HISTORY_RECEIPT"
+}

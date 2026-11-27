@@ -1,0 +1,550 @@
+{
+  "ordered-relations-final-first": {
+    "middle-positive": {
+      "response_raw": "\\boxed{Lantern}\nQUOTE: [18] link 'Lantern', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 1790,
+        "total_tokens": 1812,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: [11] link 'Staging', visible -> [18] link 'Review', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 33,
+        "prompt_tokens": 1775,
+        "total_tokens": 1808,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: After [25] link 'Archive', visible | successor: NONE",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 23,
+        "prompt_tokens": 1770,
+        "total_tokens": 1793,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "\\boxed{4}\nQUOTE: [2] toolbar 'Document controls', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1945,
+        "total_tokens": 1963,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Destinations', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1776,
+        "total_tokens": 1794,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "\\boxed{North}\nQUOTE: [11] link 'Open', visible -> [18] link 'North', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 32,
+        "prompt_tokens": 1824,
+        "total_tokens": 1856,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Progress', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1598,
+        "total_tokens": 1615,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "\\boxed{Help}\nQUOTE: [11] link 'Help', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 1737,
+        "total_tokens": 1755,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "\\boxed{Export}\nQUOTE: [5] list 'Footer', visible\n\t[6] link 'Open', visible\n\t[7] link 'Export', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 37,
+        "prompt_tokens": 1629,
+        "total_tokens": 1666,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "\\boxed{April, June, October}\n\nQUOTE: [2] list 'Categories', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'April', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'June', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'October', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 90,
+        "prompt_tokens": 1764,
+        "total_tokens": 1854,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-conflicting-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 30,
+        "prompt_tokens": 1032,
+        "total_tokens": 1062,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-consistent-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 30,
+        "prompt_tokens": 1028,
+        "total_tokens": 1058,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-named-scope-repeat": {
+      "response_raw": "\\boxed{Port}\nQUOTE: [5] button 'Release', visible -> [6] button 'Port', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 30,
+        "prompt_tokens": 1055,
+        "total_tokens": 1085,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-role-selected-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 30,
+        "prompt_tokens": 1044,
+        "total_tokens": 1074,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-opaque-intervening": {
+      "response_raw": "\\boxed{River}\nQUOTE: [4] button 'River', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 921,
+        "total_tokens": 938,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-clipped-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 30,
+        "prompt_tokens": 969,
+        "total_tokens": 999,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 274,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  },
+  "source-ledger-final-first": {
+    "middle-positive": {
+      "response_raw": "\\boxed{Lantern}\nQUOTE: [18] link 'Lantern', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 2203,
+        "total_tokens": 2225,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: [11] link 'Staging', visible -> [18] link 'Review', visible | between: EMPTY",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 33,
+        "prompt_tokens": 2187,
+        "total_tokens": 2220,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "\\boxed{None}\n\nQUOTE: After [25] link 'Archive', visible | successor: NONE",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 23,
+        "prompt_tokens": 2184,
+        "total_tokens": 2207,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "\\boxed{4}\nQUOTE: [71] button 'Version 84', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 2360,
+        "total_tokens": 2381,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Destinations', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2195,
+        "total_tokens": 2213,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [11] link 'Open', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2309,
+        "total_tokens": 2327,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [18] link 'Running', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2013,
+        "total_tokens": 2031,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "\\boxed{Help}\nQUOTE: [11] link 'Help', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2154,
+        "total_tokens": 2172,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "\\boxed{Export}\nQUOTE: [6] link 'Open', visible\n[7] link 'Export', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 26,
+        "prompt_tokens": 2051,
+        "total_tokens": 2077,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "\\boxed{April, June, October}\n\nQUOTE: [2] list 'Categories', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 2179,
+        "total_tokens": 2200,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-conflicting-repeat": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] button 'Release', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1519,
+        "total_tokens": 1536,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-consistent-repeat": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] button 'Release', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1579,
+        "total_tokens": 1596,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-named-scope-repeat": {
+      "response_raw": "\\boxed{Port}\nQUOTE: [5] button 'Release', visible\n  [6] button 'Port', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 27,
+        "prompt_tokens": 1477,
+        "total_tokens": 1504,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-role-selected-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible\n  [3] button 'River', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 27,
+        "prompt_tokens": 1532,
+        "total_tokens": 1559,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-opaque-intervening": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [3] group 'More controls; children omitted', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 1342,
+        "total_tokens": 1363,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-clipped-repeat": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] button 'Release', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1453,
+        "total_tokens": 1470,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 444,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "model_bundle_path": "/Users/solovey/Documents/dev/memory_mcp/evals/results/local-inference-startup-2026-11-27/model-bundle.json",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "local_native_only": true,
+  "before_study_inference": true
+}

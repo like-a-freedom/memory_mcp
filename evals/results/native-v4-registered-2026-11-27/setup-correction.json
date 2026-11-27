@@ -1,0 +1,11 @@
+{
+  "schema": "evaluation-setup-correction/v1",
+  "previous_attempt": "../native-v4-2026-11-27",
+  "previous_temporal_invalid": 8,
+  "previous_scenario_executions": 0,
+  "reason": "operator omitted required product revision and absolute artifact root",
+  "correction": "supply the already required product metadata and new artifact directory; product/runner/query/labels/budgets/floors unchanged",
+  "selection": "Previous invalid artifact retained. New attempt separately registered before scenario outputs, no successful case replacement.",
+  "driver_sha256": "2ef6ef94f649a48a22777c2493b0bcc11ba0d722cd488e6c40e07b90bd703885",
+  "resource_note": "Owned idle MLX server stopped during native gates before full-history capture to release resident model memory. Native regression latency is not a matched treatment effect."
+}

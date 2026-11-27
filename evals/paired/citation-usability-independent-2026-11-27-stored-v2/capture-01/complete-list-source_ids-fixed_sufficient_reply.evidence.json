@@ -1,0 +1,22 @@
+{
+  "context_items": [
+    {
+      "content": "The Fern archive access gates are South and Roof.",
+      "source_episode_ids": [
+        "episode:8f4c8eb0378f2794a8c3c854"
+      ]
+    },
+    {
+      "content": "The Marigold archive access gates are East, North, and West.",
+      "source_episode_ids": [
+        "episode:2ae67cbb659a3b62883ca247"
+      ]
+    },
+    {
+      "content": "The Cobalt archive access gates are Canal and Bridge.",
+      "source_episode_ids": [
+        "episode:a38dcdfd494f0506865eb116"
+      ]
+    }
+  ]
+}

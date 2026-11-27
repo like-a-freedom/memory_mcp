@@ -1,0 +1,572 @@
+{
+  "schema": "reader-source-ledger-semantic-review/v1",
+  "review_method": "Read original delivered source trees and all16 candidate raw outputs plus every baseline joint failure. Unblinded development review; reviewer previously contributed source-ledger protocol. No new inference, truth edits, output repair, or acceptance changes.",
+  "inputs": {
+    "registration.json": "3522269fa86549afeda59ccdad838015c61c4b49de87679de02fe13b02373252",
+    "acceptance.json": "a325375b148f2fc3be2fc2735b3850d8a2096e0304dd7a91b91c90d2d23b07f7",
+    "rows.jsonl": "599b418b118e65d8463ff45dd473c42eae0bff44394e68794255ae2c9e58f742",
+    "truth.json": "f1ce54629e64e002e8fb74371094dc422823511077d25e76dbd934f66b2e1089",
+    "prompts.json": "dead33faa2116d577068b8c29423adcf307ebe60725b200bbc54978d5a3411be",
+    "outputs.json": "5e9b2ce2037710138a5e080aeebfdc97258f33ff8cfe1c382dc3f3767a72f73d",
+    "report.json": "65c366684b3f6e1185823276dafe073e917ca8a61e018de1a6a0c8edc9ab32c1",
+    "candidate-decision-v1.json": "d5dbcadf081eac19ab8553efd05d39ff12d31bb4ba9b1f0abd4028190e1c2d1b"
+  },
+  "metrics": {
+    "ordered-relations-final-first": {
+      "all16": {
+        "selected": 16,
+        "value_correct": 12,
+        "format_valid": 16,
+        "literal_quote": 8,
+        "joint": 7
+      },
+      "exposed10": {
+        "selected": 10,
+        "value_correct": 9,
+        "format_valid": 10,
+        "literal_quote": 7,
+        "joint": 7
+      },
+      "new6": {
+        "selected": 6,
+        "value_correct": 3,
+        "format_valid": 6,
+        "literal_quote": 1,
+        "joint": 0
+      }
+    },
+    "source-ledger-final-first": {
+      "all16": {
+        "selected": 16,
+        "value_correct": 15,
+        "format_valid": 16,
+        "literal_quote": 14,
+        "joint": 13
+      },
+      "exposed10": {
+        "selected": 10,
+        "value_correct": 10,
+        "format_valid": 10,
+        "literal_quote": 8,
+        "joint": 8
+      },
+      "new6": {
+        "selected": 6,
+        "value_correct": 5,
+        "format_valid": 6,
+        "literal_quote": 6,
+        "joint": 5
+      }
+    }
+  },
+  "classification_parity": "32/32 current classifier agrees with retained report fields",
+  "source_labels_reviewed": 16,
+  "source_label_corrections": 0,
+  "candidate_failure_diagnosis": {
+    "adjacent-negative": "Correct None; QUOTE copies generated arrow/between annotation absent from raw sources.",
+    "terminal-negative": "Correct None; QUOTE copies generated successor annotation absent from raw sources.",
+    "ledger-consistent-repeat": "Incorrect UNKNOWN. Both matching Release buttons have observed River successor in own source and original ledger; repetition alone does not create conflict. No missing parser evidence established."
+  },
+  "literal_vs_entailment": "The frozen quote rubric tests a nonempty one-line substring in any single delivered source item. It does not score full entailment or requested-source binding. Header-only, single-anchor, and single-button quotes pass literal presence without independently establishing list completeness, conflict, or count. Preserve literal score; do not describe it as grounded-entailment accuracy. Multiline continuations are outside the first QUOTE line scored.",
+  "source_binding_limit": "Source IDs and scopes are inspected manually here, but the literal substring classifier itself does not require the quote from the question-relevant item. This is explicitly excluded from the frozen acceptance claim.",
+  "minimal_design_conclusion": "No demonstrated parser repair explains the consistent-repeat error; the facts and occurrence pairs were already retained. A question-independent typed graph is a bounded presentation hypothesis, not a proven semantic fix. Evaluate the separately frozen source-graph arm once without gold/query answer selection.",
+  "gate": "FAIL:13/16 joint versus required16/16; wrong consistent-repeat value remains even without quote failures.",
+  "full_reader14": "NOT_ACTIVATED for this source-ledger qualification; no full-reader requests started.",
+  "cases": [
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "adjacent-negative",
+      "response_sha256": "7408a91eb7d6b416c9be1776760ad58d0ccb3498e4e0e151dd015028898d7db9",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "None",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "[11] link 'Staging', visible -> [18] link 'Review', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "terminal-negative",
+      "response_sha256": "28cc1231ec87b29f23ea136e1fc452b44ab5360357d2c41829f6e158cc605acb",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "None",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "After [25] link 'Archive', visible | successor: NONE",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "duplicate-anchor-unknown",
+      "response_sha256": "0c8e55347dbe3a1fb101925d1468ae7982ba95b3f3f3a76f18d7c2566ce09bbc",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "North",
+      "value_correct": false,
+      "literal_quote": false,
+      "quote_line": "[11] link 'Open', visible -> [18] link 'North', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-conflicting-repeat",
+      "response_sha256": "9d122ee9edd6c43a355bd9ddce0f0fc5d655702b68c63f10167f28d5b815a397",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": false,
+      "literal_quote": false,
+      "quote_line": "[2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-consistent-repeat",
+      "response_sha256": "9d122ee9edd6c43a355bd9ddce0f0fc5d655702b68c63f10167f28d5b815a397",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "[2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-named-scope-repeat",
+      "response_sha256": "09266681fef19bb7a619457c643a8e0da77dff9ac14a44a753d7b6fbc7dbc168",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "Port",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "[5] button 'Release', visible -> [6] button 'Port', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-role-selected-repeat",
+      "response_sha256": "9d122ee9edd6c43a355bd9ddce0f0fc5d655702b68c63f10167f28d5b815a397",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "[2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-opaque-intervening",
+      "response_sha256": "748c66154a691c9a54fc02b3a705b115b32f3237119740a4fa1b10a9e5e9d723",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": false,
+      "literal_quote": true,
+      "quote_line": "[4] button 'River', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "73132e49e6806b5b575e4445aa9ecc675e8b02a6c5020d67b2561f8e88edc619",
+          "decoded_range": [
+            119,
+            146
+          ],
+          "raw_range": [
+            123,
+            150
+          ]
+        }
+      ],
+      "joint": false
+    },
+    {
+      "variant": "ordered-relations-final-first",
+      "case": "ledger-clipped-repeat",
+      "response_sha256": "9d122ee9edd6c43a355bd9ddce0f0fc5d655702b68c63f10167f28d5b815a397",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": false,
+      "literal_quote": false,
+      "quote_line": "[2] button 'Release', visible -> [3] button 'River', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "middle-positive",
+      "response_sha256": "d1e709da3f3b07f8efe4511a65d4b9df5a235721a1cc2aff1649cccb10d15a8d",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "Lantern",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[18] link 'Lantern', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "f11f411d5bcf207594d7c798e2f3d8a1cdf3674cd8dc5de7cec40d031a2e6cf2",
+          "decoded_range": [
+            155,
+            183
+          ],
+          "raw_range": [
+            172,
+            200
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "adjacent-negative",
+      "response_sha256": "7408a91eb7d6b416c9be1776760ad58d0ccb3498e4e0e151dd015028898d7db9",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "None",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "[11] link 'Staging', visible -> [18] link 'Review', visible | between: EMPTY",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "terminal-negative",
+      "response_sha256": "28cc1231ec87b29f23ea136e1fc452b44ab5360357d2c41829f6e158cc605acb",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "None",
+      "value_correct": true,
+      "literal_quote": false,
+      "quote_line": "After [25] link 'Archive', visible | successor: NONE",
+      "literal_locations": [],
+      "joint": false
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "button-count-mixed",
+      "response_sha256": "1a4b30ac823d4d18182f88b2ebf0bfb5fc195051c42afce6387f4fdc27211e15",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "4",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[71] button 'Version 84', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 3,
+          "raw_sha256": "006ed6d8b8e90e80e8e539ae17f92b4504a3f174dda154ab652cfe2ba58eb9e6",
+          "decoded_range": [
+            71,
+            104
+          ],
+          "raw_range": [
+            77,
+            110
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "missing-anchor-unknown",
+      "response_sha256": "91374d58e9d469c7dbfa68a6072b735f05138352511c7b70106e2d8392fa0ed8",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[2] list 'Destinations', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "76337a9eabcb1eb953d617573c773f616d6b9c71c6f59af7c75633547c18227a",
+          "decoded_range": [
+            30,
+            62
+          ],
+          "raw_range": [
+            33,
+            65
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "duplicate-anchor-unknown",
+      "response_sha256": "9fd723076ed24008acfbb7968a42cb26eac3211f8d047763f1424edcf1b501a5",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[11] link 'Open', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 1,
+          "raw_sha256": "fb8989e6f3cf0eb57feb3694ae9131736abd5cd55b03a9e59071c1cb80932849",
+          "decoded_range": [
+            89,
+            114
+          ],
+          "raw_range": [
+            99,
+            124
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "clipped-terminal-unknown",
+      "response_sha256": "af07c309b3e06935afb1967e2293f7c3ad5c8018f353b358675d29e50ee7f397",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[18] link 'Running', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 2,
+          "raw_sha256": "3e9f9c1970ffee35cefabd122f38ef514aa052b41b34c9682814aaa31c1dfbb4",
+          "decoded_range": [
+            149,
+            177
+          ],
+          "raw_range": [
+            166,
+            194
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "heterogeneous-positive",
+      "response_sha256": "1ebf3435084c568f7ba383957ceb327da4babc5aa87bfae80064d3c8742bbd8c",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "Help",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[11] link 'Help', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 3,
+          "raw_sha256": "b1a15487c8dd652d862349d79ef1c802c80950fb30d22298357e0dfb679d7fc0",
+          "decoded_range": [
+            93,
+            118
+          ],
+          "raw_range": [
+            102,
+            127
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "named-scope-positive",
+      "response_sha256": "bea4268c83ee18f4d0b8350e18244efdf3e7baf57b262d599369aa7190596b27",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "Export",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[6] link 'Open', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "20887858a6653d1613e0d5fc722f4a4e913dfe2bf1b68c56332ed8000dc5f822",
+          "decoded_range": [
+            155,
+            179
+          ],
+          "raw_range": [
+            169,
+            193
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "complete-list-positive",
+      "response_sha256": "91d378ba00fc40649c9bf8ed9fbeed4393ed2418f264ec29c10fdf8597283e62",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "April, June, October",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[2] list 'Categories', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 1,
+          "raw_sha256": "bb29db1498a2640a756bf3373ba71664bce651660d9b9f2412d8545144fbfee6",
+          "decoded_range": [
+            30,
+            60
+          ],
+          "raw_range": [
+            33,
+            63
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-conflicting-repeat",
+      "response_sha256": "3f81a86b08cd09cb4497e09a5c631948b4a6749e32989b86605531b24d816b5c",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[2] button 'Release', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "b72d650e9c1d7ed3be9cb46c2c27e1c7ab5d665f93d7d1346e174766e1b601fe",
+          "decoded_range": [
+            32,
+            61
+          ],
+          "raw_range": [
+            34,
+            63
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-consistent-repeat",
+      "response_sha256": "3f81a86b08cd09cb4497e09a5c631948b4a6749e32989b86605531b24d816b5c",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": false,
+      "literal_quote": true,
+      "quote_line": "[2] button 'Release', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 1,
+          "raw_sha256": "73db70dc728bea937f20623b8f21bcffc274d45523b5ced8bd26bdf83ab10257",
+          "decoded_range": [
+            32,
+            61
+          ],
+          "raw_range": [
+            34,
+            63
+          ]
+        }
+      ],
+      "joint": false
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-named-scope-repeat",
+      "response_sha256": "6bb0cd41e76e26a792dae5f6e9ed4f6ef26a7bdd061049b8d3dbf44c793f8c8b",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "Port",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[5] button 'Release', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 2,
+          "raw_sha256": "9a9b228004f5b4823c35b40669543659279fb49468d63f01293a20d224ceb95e",
+          "decoded_range": [
+            123,
+            152
+          ],
+          "raw_range": [
+            128,
+            157
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-role-selected-repeat",
+      "response_sha256": "837309acc76d53f6b2d71734ef5fc9d7f07f5010cff53e68bee636104f0477c5",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "River",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[2] button 'Release', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 3,
+          "raw_sha256": "68c1199e5c9ff6e18778f4e4951502c736cb8d27d37f507e234bff05fd6e72e8",
+          "decoded_range": [
+            32,
+            61
+          ],
+          "raw_range": [
+            34,
+            63
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-opaque-intervening",
+      "response_sha256": "bdb167ab5b63c817eb25c1019f8c844256ca124c00bf30019fa19891a25753d9",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[3] group 'More controls; children omitted', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "73132e49e6806b5b575e4445aa9ecc675e8b02a6c5020d67b2561f8e88edc619",
+          "decoded_range": [
+            64,
+            116
+          ],
+          "raw_range": [
+            67,
+            119
+          ]
+        }
+      ],
+      "joint": true
+    },
+    {
+      "variant": "source-ledger-final-first",
+      "case": "ledger-clipped-repeat",
+      "response_sha256": "3f81a86b08cd09cb4497e09a5c631948b4a6749e32989b86605531b24d816b5c",
+      "source_label_review": "supported by own delivered source; no relabel",
+      "answer": "UNKNOWN",
+      "value_correct": true,
+      "literal_quote": true,
+      "quote_line": "[2] button 'Release', visible",
+      "literal_locations": [
+        {
+          "source_item_index": 1,
+          "raw_sha256": "96cc63080328ec3fa30dd07346586741752dd9c20b1f17feedc64ebd5d4247a9",
+          "decoded_range": [
+            32,
+            61
+          ],
+          "raw_range": [
+            34,
+            63
+          ]
+        }
+      ],
+      "joint": true
+    }
+  ]
+}

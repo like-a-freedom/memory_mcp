@@ -1,0 +1,81 @@
+{
+  "schema_version": "fact-access-implementation-source-review-v1",
+  "reviewed_at_utc": "2026-11-27T14:34:05.059433+00:00",
+  "reviewer": "semantic_review",
+  "method": "Read-only source and regression-contract review; no Cargo, inference, benchmark retry or label changes during this review. JSON is the sole artifact written.",
+  "scope": "Latest fact-access write/read/ranking/decay/archival/observer integration. Earlier migration fencing and readiness/reconciliation changes were implemented by this same reviewer and are not claimed as independently authored review findings.",
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/fact_access_store.rs": "332523d22066c4a495a48fd334d74b636e50298271fc1b1eb08e19ed172cb6a2",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "635236b759ebfa7513c70a6c69c397490338f7c1cbd0cc8c5b0bb22f0b1938bc",
+    "crates/memory-mcp/src/memory/retrieval.rs": "f7f63a9cf62b7ab43bb8b6ebee837d9152314ae0f36a19dffbd27b77e4d451ab",
+    "crates/memory-mcp/src/memory/retrieval/ranking.rs": "6e9564974e588f3e715df1ec74e80aa566d7bf2fb77d7583a3dd95ec60864daf",
+    "crates/memory-mcp/src/memory/lifecycle_workers/decay.rs": "c4d6879e0e5c5c0a0a29d13aeaf2855f998441376307794919ab4288ce5397d3",
+    "crates/memory-mcp/src/memory/lifecycle_workers/archival.rs": "e3fc2ae5217834b187484a044b884ee4245c2f813e45aedc52bd62890b308aff",
+    "crates/memory-mcp/src/storage/client.rs": "5c2d76867de1d9b525abde286aa23f5bf1166f2714d10dea752ad4b5e932bf4f",
+    "crates/memory-mcp/src/storage/migrations.rs": "66bb404d7510ea00c4380aa9dc74f1cce6f70862ac54c7bb10cbaa150155fffc",
+    "crates/memory-mcp/src/storage/table_scope.rs": "e89f666e5bee1cc35e832803d6a9d441a181c2c671fa442e7073ff6c2d918fa6",
+    "crates/memory-mcp/migrations/057_fact_access_isolation.surql": "29f1ac9f38f69859f85c0cc0b0fe2cddbbe3b96c24c44b715ddf484575fe00bb",
+    "crates/memory-mcp/tests/fact_access_upgrade.rs": "8c2f8d8493c02ad179839ca98660207d5adc745d83129ef932ff8a512e89e0a2",
+    "crates/memory-mcp/tests/fact_access_concurrency.rs": "4db788db7a50fe72246e341b60184f0fa7bf0061fa56630388ed963a6b338987",
+    "crates/memory-mcp/tests/fact_access_payload.rs": "2f2c08730cdaa9903a925b16f66e3ebcbbbbdd5e3700e87bef9524b6e6e9bfd7",
+    "crates/memory-mcp/tests/lifecycle_archival.rs": "5264ebc258c639bfa594fb729a1fc131947425886fe7cfc63b51695c7ea5879e",
+    "crates/memory-mcp/tests/lifecycle_decay.rs": "c8b8578499b708efa14f958a56d842cc9642f41a124e66b2faf94df0faadb6d1",
+    "crates/memory-mcp/tests/explain_provenance.rs": "558d14bc101ff7144780bf36fed741eb2c889f6b8b9e57e62f1409a1453f1b0c",
+    "crates/memory-mcp/tests/service_integration.rs": "890381471e9eb31c9f0fb3b476db705ca83c194bd55a7ce3155061ced7632b9c",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "88f413b529dc5b3f9ad58c0f2318ea1c3a8a1fb51ec2bb2b8744a92b2c41a609",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md": "57a4d84ba64c836c9208003cacd15cad35497376fdcf49ba9551bccf2de09089"
+  },
+  "checks": [
+    {
+      "id": "ranking-overlay",
+      "status": "no_actionable_finding",
+      "basis": "All seven typed channel vectors participate in the same overlay before build_ranked_context_facts and novelty_factor; existing channel collection performs access/kind filtering. Distinct exact-key batching is owned by read_fact_accesses. No gold/question-specific selection was introduced in this change."
+    },
+    {
+      "id": "read-errors-and-absence",
+      "status": "no_actionable_finding",
+      "basis": "Missing side rows become zero heat by explicit contract. Database/read-shape/deserialization/timestamp errors propagate instead of becoming a cold ranking. At most 64 distinct validated keys are bound per read query."
+    },
+    {
+      "id": "write-arithmetic-and-ownership",
+      "status": "no_actionable_finding",
+      "basis": "First access projects only persisted source_episode inside the transaction; subsequent accesses modify only side metadata. Both signed saturation branches guard addition; zero boost still stamps time. Bound values, namespace client enforcement, shared retry adapter and awaiting/four-wide cancellation ownership remain in place."
+    },
+    {
+      "id": "decay-preflight",
+      "status": "no_actionable_finding",
+      "basis": "Every candidate ID and every side-stat batch are read/validated before the first retraction. Positive count plus recent timestamp preserves the prior protection predicate. Controlled read failure regression exists through the public decay seam."
+    },
+    {
+      "id": "archival-predicates",
+      "status": "no_actionable_finding",
+      "basis": "Single and batched side-store queries use source_episode and inclusive recent timestamp without requiring positive count or valid fact. Worker obtains both active-fact and hot-episode sets before mutation; batched request size remains 64."
+    },
+    {
+      "id": "historical-and-other-views",
+      "status": "no_actionable_finding",
+      "basis": "Revision-safe historical path bypasses current heat hydration and tracking. Other view semantics and existing synthetic-identity filtering remain unchanged."
+    },
+    {
+      "id": "snapshot-observer",
+      "status": "no_actionable_finding",
+      "basis": "Separate ignored upgrade action uses the explicitly supplied disposable store and performs migration outside the steady-read observer. Query observer and actual source/evidence capture do not inject missing evidence or relax reader labels. The caller remains responsible for supplying a disposable closed-store clone."
+    },
+    {
+      "id": "caller-fixtures",
+      "status": "no_actionable_finding",
+      "basis": "Examined lifecycle/explanation/service fixtures use actual side-store writes or side-store readback where heat behavior is tested; immutable fact assertions remain. Concurrency fixture exercises the public read seam and gates actual side-write SQL."
+    }
+  ],
+  "actionable_findings": [],
+  "limitations": [
+    "Static review is not proof of correctness for all possible states.",
+    "Native upgrade/reopen/rollback tests were pending in another agent at review time; their results are not inferred here.",
+    "This artifact does not qualify full-history completion, delivered evidence, reader correctness, latency improvement or C2 utility; those require the unchanged registered executions.",
+    "Exact source hashes define the reviewed snapshot; later edits require checking scope of drift."
+  ],
+  "prior_locally_observed_regression_results": {
+    "migration_module": "30/30 passed; /tmp/memory-migration-exact-types-green.log",
+    "upgrade_integration": "8/8 passed; /tmp/memory-migration-reconciliation-upgrade-green.log"
+  }
+}

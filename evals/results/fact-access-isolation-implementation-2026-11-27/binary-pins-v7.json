@@ -1,0 +1,66 @@
+{
+  "architecture": "arm64",
+  "binaries": [
+    {
+      "role": "product",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--bin",
+        "memory_mcp",
+        "--locked",
+        "--message-format=json"
+      ],
+      "env": {},
+      "path": "/tmp/memory-quality-product-v7-2026-11-27",
+      "sha256": "6d5f0382547f1e2f99e978cd80083f23b6cfb4f8f14ebf27264660dbcce0dd66",
+      "elapsed_seconds": 0.8920728339871857,
+      "log_sha256": "caf25f4ed5bfbd0e0b405a07ce8db6c0051518e4555ee4ecabd0456ff6650362"
+    },
+    {
+      "role": "eval",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "eval-harness",
+        "--bin",
+        "memory-eval",
+        "--locked",
+        "--message-format=json"
+      ],
+      "env": {},
+      "path": "/tmp/memory-quality-eval-v7-2026-11-27",
+      "sha256": "28c7faa06144c23d359980740495d12aad5618b0a93d3a13fa64619f7ac93092",
+      "elapsed_seconds": 8.413636874989606,
+      "log_sha256": "f512896d39dfc3a6ddc8791fc7198526d85841965dd48a3982a50349987e0cb4"
+    },
+    {
+      "role": "history",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--test",
+        "full_history_evidence",
+        "--no-run",
+        "--locked",
+        "--message-format=json"
+      ],
+      "env": {
+        "CARGO_PROFILE_TEST_OPT_LEVEL": "3"
+      },
+      "path": "/tmp/memory-quality-history-v7-2026-11-27",
+      "sha256": "b4b7cbe87c5a7006b64cb2698d4d2c572cbd100ea90a94e9f3443a0d6efd1922",
+      "elapsed_seconds": 15.982206833024975,
+      "log_sha256": "ae772729f6551726cee48d3917724a7ae4c40e004364f56c0ccb0a5a7463fa98"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "memory-quality-focused-review/v1",
+  "reviewer": "independent local sub-agent; source review, no model capture selection",
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/retrieval/admission.rs": "535244c858a4733a928ff0757b304c8da4686d83fea44a131b3b882671267035",
+    "crates/memory-mcp/tests/retrieval_partial_evidence.rs": "23736893d0ee5320d1bf0bee637cb40376c22b90b610df8c6c4db91a66e4d5de",
+    "evals/longmemeval_v2/reader_protocol.py": "9082b0d9c1a4ce6375367c91525d09e08ef7f43a1e3cea7242755a54fc68ef23",
+    "evals/longmemeval_v2/test_reader_protocol.py": "142317f6405cef669cce3c73d955f424bee86eb98bf9bb4cfdb14d1c8b88b9bd",
+    "evals/longmemeval_v2/fixtures/ordered-relations-regression-v1/rows.jsonl": "586df31d7857818cdadc9b201f7abd31a43dd8826aaae256bb766bcc50f9b124",
+    "evals/longmemeval_v2/fixtures/ordered-relations-regression-v1/truth.json": "c328cbdab347e194a1ec77b0c59b601779193a4c8a26cdfa86c34ced561e090d"
+  },
+  "findings": [],
+  "conclusion": "No substantive blocker in exact-key lazy vocabulary semantics, opposite Experience evidence, question-independent ordered relations or the ten source-reviewed labels. This is a bounded code/label review, not a general correctness proof.",
+  "coverage_limit": "Direct link children of list without listitem wrappers have no structure annotation; full raw text remains available.",
+  "tests_observed_separately": [
+    "public admission 2→1 dictionary RED/GREEN; Experience raw-URL evidence preserved",
+    "ordered relation projection controls before independent local capture"
+  ]
+}

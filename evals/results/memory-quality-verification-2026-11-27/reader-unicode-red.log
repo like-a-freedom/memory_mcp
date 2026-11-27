@@ -1,0 +1,23 @@
+Command: python3 -m unittest evals.longmemeval_v2.test_reader_protocol.ReaderProtocolTests.test_escaped_supplementary_character_can_be_dispatched_with_exact_raw_offsets
+Exit: 1
+F
+======================================================================
+FAIL: test_escaped_supplementary_character_can_be_dispatched_with_exact_raw_offsets (evals.longmemeval_v2.test_reader_protocol.ReaderProtocolTests.test_escaped_supplementary_character_can_be_dispatched_with_exact_raw_offsets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reader_protocol.py", line 61, in test_escaped_supplementary_character_can_be_dispatched_with_exact_raw_offsets
+    body = json.dumps(messages,ensure_ascii=False).encode('utf-8')
+UnicodeEncodeError: 'utf-8' codec can't encode characters in position 1241-1242: surrogates not allowed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reader_protocol.py", line 63, in test_escaped_supplementary_character_can_be_dispatched_with_exact_raw_offsets
+    self.fail(f'projected prompt is not UTF-8 encodable ({error.reason})')
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: projected prompt is not UTF-8 encodable (surrogates not allowed)
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

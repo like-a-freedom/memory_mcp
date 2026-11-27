@@ -1,0 +1,32 @@
+[
+  {
+    "name": "run",
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-final-gate-82aotys9/memory-eval",
+      "run",
+      "--profile",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/profiles/memory_decisions_current.json",
+      "--artifact",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-temporal-2026-11-27/run.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 53.62571654099156
+  },
+  {
+    "name": "comparison",
+    "command": [
+      "/var/folders/49/tgd627ns2y19fj8nqnnq0ds00000gp/T/fts-final-gate-82aotys9/memory-eval",
+      "compare-current-memory",
+      "--baseline",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+      "--candidate",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-temporal-2026-11-27/current/index.json",
+      "--corpus",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/corpora/memory-decisions-v10",
+      "--output",
+      "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-temporal-2026-11-27/comparison.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.20473645901074633
+  }
+]

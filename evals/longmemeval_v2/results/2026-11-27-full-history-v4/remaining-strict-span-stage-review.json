@@ -1,0 +1,167 @@
+{
+  "schema": "remaining-span-stage-review/v1",
+  "posthoc_source_only": true,
+  "not_a_new_inference_or_label_change": true,
+  "cases": [
+    {
+      "case_id": "6d975a08",
+      "artifact_sha256": "d77147f75d643088bc1ce2a01900d59572adb7e85095e69166f7298c7a41f7a8",
+      "first_observed_full_registered_span_loss": "bounded_fact_candidates",
+      "stages": [
+        {
+          "stage": "formation",
+          "carrier_items": [
+            {
+              "fact_id": "",
+              "content_bytes": 86868,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "ranked_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:93814dfb3aee835f9f3b0149",
+              "content_bytes": 86868,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "subject_scoped_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:93814dfb3aee835f9f3b0149",
+              "content_bytes": 86868,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "admitted_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:93814dfb3aee835f9f3b0149",
+              "content_bytes": 86868,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "bounded_fact_candidates",
+          "carrier_items": []
+        },
+        {
+          "stage": "episode_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "episode_fallback:episode:3fd1796a0f590ac946fedf12",
+              "content_bytes": 86868,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "selected_pre_packaging",
+          "carrier_items": []
+        },
+        {
+          "stage": "packed_context",
+          "carrier_items": []
+        }
+      ],
+      "interpretation": "Registered-carrier loss at candidate bounding; other delivered sources independently sufficient.",
+      "metric_policy": "Original strict span remains FAIL; source sufficiency is separate. No gold-ID promotion or byte-budget increase."
+    },
+    {
+      "case_id": "d6da3938",
+      "artifact_sha256": "22a83591303ffd5b70f3d339ac6ae54feb75999a2a8e89b23faa08c3631587bf",
+      "first_observed_full_registered_span_loss": "packed_context",
+      "stages": [
+        {
+          "stage": "formation",
+          "carrier_items": [
+            {
+              "fact_id": "",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "ranked_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "subject_scoped_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "admitted_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "bounded_fact_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "episode_candidates",
+          "carrier_items": [
+            {
+              "fact_id": "episode_fallback:episode:751dce326043631881f9bf3b",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "selected_pre_packaging",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 804658,
+              "registered_span_present": true
+            }
+          ]
+        },
+        {
+          "stage": "packed_context",
+          "carrier_items": [
+            {
+              "fact_id": "fact:07f50ea549db79b8a856800e",
+              "content_bytes": 2048,
+              "registered_span_present": false
+            }
+          ]
+        }
+      ],
+      "interpretation": "Selected804658-byte carrier becomes2048-byte packed context; full registered span lost while independently reviewed requested relation remains supported. No claim of formation loss.",
+      "metric_policy": "Original strict span remains FAIL; source sufficiency is separate. No gold-ID promotion or byte-budget increase."
+    }
+  ]
+}

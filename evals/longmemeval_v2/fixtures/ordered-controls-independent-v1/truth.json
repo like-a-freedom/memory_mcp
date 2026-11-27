@@ -1,0 +1,56 @@
+{
+  "schema": "independent-ordered-controls/v1",
+  "label_status": "author-reviewed synthetic development; created before any predictions; no original case IDs, labels or text",
+  "cases": {
+    "menu-complete": {
+      "accepted_answers": [
+        "Birch, Cedar, Maple"
+      ],
+      "answer_kind": "phrase_set"
+    },
+    "menu-between": {
+      "accepted_answers": [
+        "Cedar"
+      ],
+      "answer_kind": "single_value"
+    },
+    "menu-adjacent": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise"
+    },
+    "menu-terminal": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise"
+    },
+    "menu-missing-anchor": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unsupported"
+    },
+    "toolbar-count": {
+      "accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "answer_kind": "single_value"
+    },
+    "toolbar-scoped-count": {
+      "accepted_answers": [
+        "nine",
+        "9"
+      ],
+      "answer_kind": "single_value"
+    },
+    "menu-clipped": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unsupported"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "reader-qualification-acceptance/v1",
+  "frozen_at_utc": "2026-11-27T15:37:23.145383+00:00",
+  "before_inference_outputs": true,
+  "registration_sha256": "5a5e04637c3d800f6caf3362ec8ba573964838cdca919455b239c0b57e66fadf",
+  "runner_sha256": "b17c63b3954ddc8f2637e396c44a4c61cacf1c677990f63623b4a9011e421b65",
+  "scheduled": 48,
+  "case_families": 24,
+  "candidate": "source-graph-final-first",
+  "all_cases_required": 24,
+  "per_case_required": [
+    "completed correct frozen value",
+    "one valid boxed answer",
+    "one literal delivered-source quote",
+    "no error or length truncation"
+  ],
+  "stop_rule": "One new capture, retries0; preserve all outputs/failures, no repair/relabel/budget changes. On FAIL stop protocol iteration and do not activate actual full-history reader comparison.",
+  "not_claimed": [
+    "held-out benefit confirmation",
+    "literal quote as full entailment/source-binding proof",
+    "autonomous workflow qualification"
+  ]
+}

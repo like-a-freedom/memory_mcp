@@ -1,0 +1,228 @@
+[
+  {
+    "id": "currency-en",
+    "description": "currency; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "currency-en",
+    "content": "The invoice total is CHF 380.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "currency",
+    "language": "en"
+  },
+  {
+    "id": "currency-ru",
+    "description": "currency; language=ru; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "currency-ru",
+    "content": "Стоимость составила 4200 рублей.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "currency",
+    "language": "ru"
+  },
+  {
+    "id": "unit-en",
+    "description": "unit; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "unit-en",
+    "content": "The package weighs 18 kg.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "unit",
+    "language": "en"
+  },
+  {
+    "id": "unit-de",
+    "description": "unit; language=de; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "unit-de",
+    "content": "Das Paket wiegt 18 kg.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "unit",
+    "language": "de"
+  },
+  {
+    "id": "metric-en",
+    "description": "metric; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "metric-en",
+    "content": "SLO is 99.5%.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "metric",
+    "language": "en"
+  },
+  {
+    "id": "metric-fr",
+    "description": "metric; language=fr; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "metric-fr",
+    "content": "Le SLO est de 99,5 %. ",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "metric",
+    "language": "fr"
+  },
+  {
+    "id": "metric-ru",
+    "description": "metric; language=ru; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "metric-ru",
+    "content": "SLO составляет 99.5%.",
+    "expected": {
+      "entities": [],
+      "warnings": []
+    },
+    "class": "metric",
+    "language": "ru"
+  },
+  {
+    "id": "name-digits",
+    "description": "name; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "name-digits",
+    "content": "3M manufactures adhesives.",
+    "expected": {
+      "entities": [
+        "3M"
+      ],
+      "warnings": []
+    },
+    "class": "name",
+    "language": "en"
+  },
+  {
+    "id": "name-number",
+    "description": "name; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "name-number",
+    "content": "Studio 54 reopened.",
+    "expected": {
+      "entities": [
+        "Studio 54"
+      ],
+      "warnings": []
+    },
+    "class": "name",
+    "language": "en"
+  },
+  {
+    "id": "organization",
+    "description": "organization; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "organization",
+    "content": "NASA operates a research center.",
+    "expected": {
+      "entities": [
+        "NASA"
+      ],
+      "warnings": []
+    },
+    "class": "organization",
+    "language": "en"
+  },
+  {
+    "id": "organization-age",
+    "description": "organization; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "organization-age",
+    "content": "NASA is 68 years old.",
+    "expected": {
+      "entities": [
+        "NASA"
+      ],
+      "warnings": []
+    },
+    "class": "organization",
+    "language": "en"
+  },
+  {
+    "id": "person-en",
+    "description": "person; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "person-en",
+    "content": "Mira Bennett approved the release.",
+    "expected": {
+      "entities": [
+        "Mira Bennett"
+      ],
+      "warnings": []
+    },
+    "class": "person",
+    "language": "en"
+  },
+  {
+    "id": "person-ru",
+    "description": "person; language=ru; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "person-ru",
+    "content": "Марина Соколова утвердила выпуск.",
+    "expected": {
+      "entities": [
+        "Марина Соколова"
+      ],
+      "warnings": []
+    },
+    "class": "person",
+    "language": "ru"
+  },
+  {
+    "id": "person-fr",
+    "description": "person; language=fr; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "person-fr",
+    "content": "Lucie Moreau a validé la livraison.",
+    "expected": {
+      "entities": [
+        "Lucie Moreau"
+      ],
+      "warnings": []
+    },
+    "class": "person",
+    "language": "fr"
+  },
+  {
+    "id": "project-en",
+    "description": "project; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "project-en",
+    "content": "Project Cedar is approved.",
+    "expected": {
+      "entities": [
+        "Cedar"
+      ],
+      "warnings": []
+    },
+    "class": "project",
+    "language": "en"
+  },
+  {
+    "id": "manual-ambiguous",
+    "description": "manual; language=en; exhaustive entity labels",
+    "source_type": "document",
+    "source_id": "manual-ambiguous",
+    "content": "SLO is the explicitly registered project name.",
+    "expected": {
+      "entities": [
+        "SLO"
+      ],
+      "warnings": []
+    },
+    "class": "manual",
+    "language": "en"
+  }
+]

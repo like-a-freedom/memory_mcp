@@ -1,0 +1,63 @@
+{
+  "plan_sha256": "78107c4ec32c9c31e1e484a25ad7a43828faf47c9c575b5f8a3f762893985aa1",
+  "captures": [
+    {
+      "repetition": 1,
+      "rows": [
+        {
+          "case": "complete-list-source_ids",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "complete-list-handles",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "neighborhood-source_ids",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "neighborhood-handles",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "count-source_ids",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "count-handles",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "false-premise-source_ids",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        },
+        {
+          "case": "false-premise-handles",
+          "arm": "fixed_sufficient_reply",
+          "status": "invalid",
+          "error": "RuntimeError: episode-only formation: complete-list-distractor"
+        }
+      ]
+    }
+  ],
+  "c2_eligible": false,
+  "c2_reason": "Diagnostic fixed requests and sufficient replies do not establish independently qualified autonomous memory treatment; original C1 stop rule is unchanged.",
+  "second_capture_eligible": false,
+  "stop_reason": "capture 1 contains failed or invalid arms; no selected successful retry",
+  "elapsed_seconds": 7.332
+}

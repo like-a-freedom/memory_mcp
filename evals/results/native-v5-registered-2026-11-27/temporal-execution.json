@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/tmp/memory-quality-eval-v5-2026-11-27",
+    "run",
+    "--profile",
+    "evals/profiles/memory_decisions_current.json",
+    "--artifact",
+    "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v5-registered-2026-11-27/run.json"
+  ],
+  "exit_code": 0,
+  "fault": null,
+  "elapsed_seconds": 59.303232583013596,
+  "log_sha256": "d7bff45a31bd71149f6e5549a0d377a2be11dceeeff703a17b09e22f147e5a0f"
+}

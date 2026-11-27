@@ -1,0 +1,7 @@
+{
+  "note": "Build began with explicit partial/error rejection. While that process ran, missing status was also rejected for future invocations; this archive records the already loaded module. Actual CLI envelopes specify status. Snapshot admission additionally requires complete durable content readback. Original registration unchanged.",
+  "backend_sha256": "892c47e37cd69e8ea72b309d0faf683b35493409fd89633013152650f06b683b",
+  "preflight_sha256": "14065ffc3aea17855f007357a82df3702c2e613cc8da4b0ce2c4d9beab7bbf94",
+  "observer_binary_sha256": "5985afc4baacbcf1d580c02cfa5572776f9f76f89ff9f969b2c451c6f2e4510b",
+  "observer_profile": "CARGO_PROFILE_TEST_OPT_LEVEL=3; dependencies optimized per workspace"
+}

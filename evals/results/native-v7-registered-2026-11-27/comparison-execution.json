@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/tmp/memory-quality-eval-v7-2026-11-27",
+    "compare-current-memory",
+    "--baseline",
+    "evals/paired/current-contract-baseline-2026-11-26/receipts/index.json",
+    "--candidate",
+    "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/current/index.json",
+    "--corpus",
+    "evals/corpora/memory-decisions-v10",
+    "--output",
+    "/Users/solovey/Documents/dev/memory_mcp/evals/results/native-v7-registered-2026-11-27/comparison.json"
+  ],
+  "exit_code": 0,
+  "fault": null,
+  "elapsed_seconds": 0.18600116702145897,
+  "log_sha256": "7144cade794147adb0f95ae27b3f691fb56f0691652d0fbcea93b1a2e61fae8b"
+}

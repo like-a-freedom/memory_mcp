@@ -1,0 +1,189 @@
+{
+  "schema": "full-history-candidate-decision/v1",
+  "registration_sha256": "165d11b64d0263985a783aac45fbb32c15586b0c82f46a513efa6eb3c9616b8d",
+  "candidate_accepted": false,
+  "reason": "922a0c56 external45s deadline, no delivered context; required no-deadline criterion failed. No successful retry substitution.",
+  "native_gate_directory": "evals/results/native-v4-registered-2026-11-27",
+  "source_snapshot_unchanged": true,
+  "strict_gold": {
+    "baseline": 4,
+    "candidate": 4,
+    "scheduled": 7
+  },
+  "sufficient_source_support": {
+    "baseline": 6,
+    "candidate": 6,
+    "scheduled": 7
+  },
+  "rows": [
+    {
+      "case": "0c6b0c60",
+      "baseline": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 32.59973662500852,
+        "completed": true,
+        "assembly_ms": 19718.707792,
+        "admission_index_dictionaries": 228,
+        "admission_records": 114,
+        "delivered_items": 5
+      },
+      "candidate": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 33.154665708018,
+        "completed": true,
+        "assembly_ms": 19502.022209,
+        "admission_index_dictionaries": 224,
+        "admission_records": 114,
+        "delivered_items": 5
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "6d975a08",
+      "baseline": {
+        "exit_code": 101,
+        "external_timeout": false,
+        "process_seconds": 33.94742608300294,
+        "completed": true,
+        "assembly_ms": 20886.529167,
+        "admission_index_dictionaries": 296,
+        "admission_records": 148,
+        "delivered_items": 5
+      },
+      "candidate": {
+        "exit_code": 101,
+        "external_timeout": false,
+        "process_seconds": 31.272577416995773,
+        "completed": true,
+        "assembly_ms": 19553.375917,
+        "admission_index_dictionaries": 294,
+        "admission_records": 148,
+        "delivered_items": 5
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "89a20f48",
+      "baseline": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 30.77109854199807,
+        "completed": true,
+        "assembly_ms": 18870.375375,
+        "admission_index_dictionaries": 302,
+        "admission_records": 151,
+        "delivered_items": 5
+      },
+      "candidate": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 31.05457654199563,
+        "completed": true,
+        "assembly_ms": 18413.418583,
+        "admission_index_dictionaries": 298,
+        "admission_records": 151,
+        "delivered_items": 5
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "922a0c56",
+      "baseline": {
+        "exit_code": 101,
+        "external_timeout": false,
+        "process_seconds": 44.45266608300153,
+        "completed": false,
+        "assembly_ms": null,
+        "admission_index_dictionaries": 302,
+        "admission_records": 151,
+        "delivered_items": 0
+      },
+      "candidate": {
+        "exit_code": -9,
+        "external_timeout": true,
+        "process_seconds": 45.117616250005085,
+        "completed": false,
+        "assembly_ms": null,
+        "admission_index_dictionaries": 298,
+        "admission_records": 151,
+        "delivered_items": 0
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "d6da3938",
+      "baseline": {
+        "exit_code": 101,
+        "external_timeout": false,
+        "process_seconds": 34.04700049999519,
+        "completed": true,
+        "assembly_ms": 22222.857,
+        "admission_index_dictionaries": 2,
+        "admission_records": 1,
+        "delivered_items": 1
+      },
+      "candidate": {
+        "exit_code": 101,
+        "external_timeout": false,
+        "process_seconds": 38.63331454098807,
+        "completed": true,
+        "assembly_ms": 22718.147792,
+        "admission_index_dictionaries": 2,
+        "admission_records": 1,
+        "delivered_items": 1
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "f43926d9",
+      "baseline": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 35.96705937499064,
+        "completed": true,
+        "assembly_ms": 24279.935999999998,
+        "admission_index_dictionaries": 298,
+        "admission_records": 149,
+        "delivered_items": 4
+      },
+      "candidate": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 32.642664624989266,
+        "completed": true,
+        "assembly_ms": 19572.78775,
+        "admission_index_dictionaries": 296,
+        "admission_records": 149,
+        "delivered_items": 4
+      },
+      "delivered_text_identical": true
+    },
+    {
+      "case": "f61a096f",
+      "baseline": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 38.5985921669926,
+        "completed": true,
+        "assembly_ms": 24757.866416999997,
+        "admission_index_dictionaries": 300,
+        "admission_records": 150,
+        "delivered_items": 5
+      },
+      "candidate": {
+        "exit_code": 0,
+        "external_timeout": false,
+        "process_seconds": 37.349310999998124,
+        "completed": true,
+        "assembly_ms": 24696.821,
+        "admission_index_dictionaries": 296,
+        "admission_records": 150,
+        "delivered_items": 5
+      },
+      "delivered_text_identical": true
+    }
+  ],
+  "timing_limit": "single sequential paired observations with variable engine/load state; timeout is censored. No general latency or allocation/RSS claim."
+}

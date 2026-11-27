@@ -1,0 +1,29 @@
+{
+  "schema": "source-graph-cost/v1",
+  "capture_wall_seconds": 252.86088225001004,
+  "variants": {
+    "source-ledger-final-first": {
+      "attempts": 24,
+      "elapsed_sum_seconds": 102.17358562696609,
+      "median_seconds": 4.461882478499319,
+      "max_seconds": 7.240177958999993,
+      "prompt_tokens": 37075,
+      "completion_tokens": 480
+    },
+    "source-graph-final-first": {
+      "attempts": 24,
+      "elapsed_sum_seconds": 149.94811429193942,
+      "median_seconds": 6.371695312511292,
+      "max_seconds": 18.287063416995807,
+      "prompt_tokens": 44380,
+      "completion_tokens": 715
+    }
+  },
+  "interpretation": "One case-major capture on restarted local runtime, cached states/order not balanced; descriptive cost only, no speed effect or cold-start claim.",
+  "unobserved": [
+    "provider prefill",
+    "provider generation duration",
+    "true cold state",
+    "server startup duration"
+  ]
+}

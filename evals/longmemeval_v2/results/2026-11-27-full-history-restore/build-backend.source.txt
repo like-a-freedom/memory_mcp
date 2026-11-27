@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""LongMemEval-V2 memory backend adapter for memory_mcp.
+
+Implements the official memory backend interface:
+
+    class MemoryMcpBackend:
+        def insert(self, trajectory):
+            ...
+        def query(self, query, query_image=None):
+            ...
+
+The adapter invokes the existing public ingest/inline extract and
+assemble_context surfaces. It does not seed facts directly.
+"""
+
+import argparse
+from bisect import bisect_right
+from contextlib import nullcontext
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import shutil
+import subprocess
+from tempfile import TemporaryDirectory
+from threading import RLock
+import time
+from typing import Any, Callable, Optional
+
+try:
+    from memory_modules.memory import Memory, register_memory
+except ModuleNotFoundError as error:  # standalone smoke without upstream checkout
+    if error.name not in {"memory_modules", "memory_modules.memory"}:
+        raise
+    class Memory:  # type: ignore[no-redef]
+        def __init__(self, memory_params):
+            self.memory_params = dict(memory_params)
+
+    def register_memory(cls):  # type: ignore[no-redef]
+        return cls
+
+
+ORDERED_SEGMENTS = "ordered-segments-v1"
+WHOLE_TRAJECTORY = "whole-trajectory-v1"
+FORMATION_METHODS = (WHOLE_TRAJECTORY, ORDERED_SEGMENTS)
+ANNO_INPUT_LIMIT = 1_048_576
+
+
+def serialize_trajectory(trajectory: Any) -> tuple[bytes, list[int]]:
+    encoder = json.JSONEncoder(ensure_ascii=False, sort_keys=True)
+    if not isinstance(trajectory, dict) or not isinstance(trajectory.get("states"), list):
+        return encoder.encode(trajectory).encode("utf-8"), []
+
+    content = bytearray(b"{")
+    boundaries = []
+    for index, key in enumerate(sorted(trajectory)):
+        if index:
+            content.extend(b", ")
+        content.extend(encoder.encode(key).encode("utf-8"))
+        content.extend(b": ")
+        if key != "states":
+            content.extend(encoder.encode(trajectory[key]).encode("utf-8"))
+            continue
+        content.extend(b"[")
+        for state_index, state in enumerate(trajectory[key]):
+            if state_index:
+                content.extend(b", ")
+                boundaries.append(len(content))
+            content.extend(encoder.encode(state).encode("utf-8"))
+        content.extend(b"]")
+    content.extend(b"}")
+    return bytes(content), boundaries
+
+
+def ordered_segments(content: bytes, boundaries: list[int]):
+    start = 0
+    while start < len(content):
+        end = min(start + ANNO_INPUT_LIMIT, len(content))
+        if end < len(content):
+            boundary_index = bisect_right(boundaries, end) - 1
+            if boundary_index >= 0 and boundaries[boundary_index] > start:
+                end = boundaries[boundary_index]
+            else:
+                # An oversized state may span multiple episodes. Keep UTF-8 intact.
+                while content[end] & 0b11000000 == 0b10000000:
+                    end -= 1
+        yield content[start:end].decode("utf-8")
+        start = end
+
+
+UNDATED_TRAJECTORY_REFERENCE = "2000-01-01T00:00:00Z"
+
+
+@register_memory
+class MemoryMcpBackend(Memory):
+    """Memory backend for LongMemEval-V2 backed by memory_mcp."""
+
+    memory_type = "memory_mcp"
+
+    def __init__(self, memory_params: Optional[dict] = None, *, binary: str = "memory_mcp", runner: Optional[Callable[..., str]] = None) -> None:
+        memory_params = memory_params or {}
+        super().__init__(memory_params)
+        binary = memory_params.get("binary", binary)
+        self.db_path = memory_params.get("db_path")
+        self.binary = binary
+        self.cli_timeout_seconds = memory_params.get('cli_timeout_seconds', 1800.0)
+        if (isinstance(self.cli_timeout_seconds, bool)
+                or not isinstance(self.cli_timeout_seconds, (int, float))
+                or not math.isfinite(self.cli_timeout_seconds)
+                or self.cli_timeout_seconds <= 0):
+            raise ValueError('cli_timeout_seconds must be a positive finite number')
+        self.formation_method = memory_params.get("formation_method", WHOLE_TRAJECTORY)
+        if self.formation_method not in FORMATION_METHODS:
+            raise ValueError("unknown LongMemEval-V2 formation method")
+        self._store_lock = RLock()
+        self._restored_store: Optional[TemporaryDirectory] = None
+        self._runner = runner or self._run_cli
+        self._insert_count = 0
+        self._query_count = 0
+        self._insert_time_secs = 0.0
+        self._query_time_secs = 0.0
+        self._query_copy_time_secs = 0.0
+        self._query_cli_time_secs = 0.0
+
+    def insert(self, trajectory: Any) -> None:
+        """Insert a trajectory into memory via ingest + extract."""
+        with self._store_lock:
+            self._insert(trajectory)
+
+    def _insert(self, trajectory: Any) -> None:
+        start = time.monotonic()
+        encoded, boundaries = serialize_trajectory(trajectory)
+        digest = hashlib.sha256(encoded).hexdigest()
+        source_id = f"longmemeval_v2_trajectory_{digest}"
+        if self.formation_method == ORDERED_SEGMENTS:
+            for index, segment in enumerate(ordered_segments(encoded, boundaries)):
+                self._form_episode(f"{source_id}_{ORDERED_SEGMENTS}_{index:08d}", segment)
+        else:
+            self._form_episode(source_id, encoded.decode("utf-8"))
+
+        self._insert_count += 1
+        self._insert_time_secs += time.monotonic() - start
+
+    def _form_episode(self, source_id: str, content: str) -> None:
+        # Step 1: ingest the raw trajectory content.
+        ingest_output = self._runner(
+            "ingest",
+            "--source-type", "other",
+            "--source-id", source_id,
+            "--content", content,
+            "--t-ref", UNDATED_TRAJECTORY_REFERENCE,
+        )
+
+        # Step 2: extract facts from the server-issued episode ID.
+        payload = json.loads(ingest_output)
+        result = payload.get("result")
+        episode_id = payload.get("episode_id")
+        if episode_id is None and isinstance(result, str):
+            episode_id = result
+        elif episode_id is None and isinstance(result, dict):
+            episode_id = result.get("episode_id")
+        if not episode_id:
+            raise RuntimeError("ingest response did not contain an episode_id")
+        extraction = json.loads(self._runner(
+            "extract",
+            "--episode-id", episode_id,
+        ))
+        if extraction.get("status", "success") != "success":
+            raise RuntimeError(f"incomplete extraction for {episode_id}")
+
+    def query(self, query: str, query_image: Optional[Any] = None) -> list[dict[str, str]]:
+        """Query memory for relevant context."""
+        if query_image is not None:
+            raise NotImplementedError(
+                "Image queries are not supported; full multimodal LongMemEval-V2 "
+                "requires an explicit image representation design."
+            )
+
+        start = time.monotonic()
+        result = self._runner(
+            "assemble-context",
+            "--query", query,
+        )
+        with self._store_lock:
+            self._query_count += 1
+            self._query_time_secs += time.monotonic() - start
+        payload = json.loads(result)
+        nested = payload.get("result")
+        items = payload.get("items")
+        if items is None and isinstance(nested, dict):
+            items = nested.get("items")
+        if items is None:
+            items = nested
+        if not isinstance(items, list):
+            raise RuntimeError("assemble-context response did not contain a list")
+        context = []
+        for item in items:
+            text = item.get("content") if isinstance(item, dict) else item
+            if not isinstance(text, str) or not text.strip():
+                raise RuntimeError("assemble-context item must contain nonempty text")
+            context.append({"type": "text", "value": text})
+        return context
+
+    @property
+    def stats(self) -> dict:
+        return {
+            "insert_count": self._insert_count,
+            "query_count": self._query_count,
+            "insert_time_secs": round(self._insert_time_secs, 3),
+            "query_time_secs": round(self._query_time_secs, 3),
+            "query_copy_time_secs": round(self._query_copy_time_secs, 3),
+            "query_cli_time_secs": round(self._query_cli_time_secs, 3),
+        }
+
+    def _save_backend(self, output_dir: Path) -> None:
+        """Snapshot the dedicated, quiescent CLI store into the upstream save."""
+        with self._store_lock:
+            if not self.db_path or not Path(self.db_path).is_dir():
+                raise RuntimeError("saving memory_mcp requires a built dedicated CLI store")
+            store = Path(self.db_path).resolve()
+            destination = output_dir.resolve() / "store"
+            if destination.is_relative_to(store):
+                raise ValueError("memory snapshot must be outside the active CLI store")
+            if destination.exists():
+                raise FileExistsError(destination)
+            with TemporaryDirectory(prefix=".snapshot-", dir=output_dir) as staging:
+                staged_store = Path(staging) / "store"
+                shutil.copytree(store, staged_store)
+                staged_store.rename(destination)
+
+    def _load_backend(self, input_dir: Path) -> None:
+        """Clone the snapshot so each restore gets its own mutable store."""
+        with self._store_lock:
+            source = input_dir / "store"
+            if not source.is_dir():
+                raise RuntimeError("saved memory_mcp state is missing its store snapshot")
+            workspace = TemporaryDirectory(prefix="longmemeval-mcp-restore-")
+            try:
+                store = Path(workspace.name) / "store"
+                shutil.copytree(source, store)
+            except BaseException:
+                workspace.cleanup()
+                raise
+            if self._restored_store is not None:
+                self._restored_store.cleanup()
+            self._restored_store = workspace
+            self.db_path = str(store)
+
+    def _run_cli(self, subcommand: str, *args: str) -> str:
+        read_workspace = (
+            TemporaryDirectory(prefix="longmemeval-mcp-read-")
+            if subcommand == "assemble-context" else nullcontext()
+        )
+        with read_workspace as directory:
+            with self._store_lock:
+                if not self.db_path:
+                    raise ValueError("memory_mcp requires an explicit dedicated db_path")
+                if directory is None:
+                    return self._invoke_cli(self.db_path, subcommand, args)
+                copy = Path(directory) / "store"
+                started = time.monotonic()
+                try:
+                    shutil.copytree(self.db_path, copy)
+                finally:
+                    self._query_copy_time_secs += time.monotonic() - started
+            started = time.monotonic()
+            try:
+                return self._invoke_cli(str(copy), subcommand, args)
+            finally:
+                elapsed = time.monotonic() - started
+                with self._store_lock:
+                    self._query_cli_time_secs += elapsed
+
+    def _invoke_cli(self, store: str, subcommand: str, args: tuple[str, ...]) -> str:
+        env = {
+            name: os.environ[name]
+            for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
+            if name in os.environ
+        }
+        env.update({
+            "SURREALDB_EMBEDDED": "true",
+            "SURREALDB_DATA_DIR": store,
+            "EMBEDDINGS_ENABLED": "false",
+            "RUST_LOG": "error",
+        })
+        argv = list(args)
+        stdin_content = None
+        if subcommand == "ingest":
+            content_index = argv.index("--content")
+            stdin_content = argv[content_index + 1].encode("utf-8")
+            argv[content_index:content_index + 2] = ["--content-stdin"]
+        result = subprocess.run(
+            [self.binary, subcommand, *argv],
+            input=stdin_content, capture_output=True, check=True, env=env,
+            timeout=self.cli_timeout_seconds,
+        )
+        return result.stdout.decode("utf-8")
+
+
+def _smoke_test() -> None:
+    calls = []
+    responses = iter([
+        json.dumps({"result": {"episode_id": "episode:server-issued"}}),
+        json.dumps({"status": "success", "result": {"ok": True}}),
+        json.dumps({"result": {"items": [{"content": "remembered fact"}]}}),
+    ])
+
+    def fake_runner(subcommand: str, *args: str) -> str:
+        calls.append((subcommand, args))
+        return next(responses)
+
+    backend = MemoryMcpBackend({"db_path": "/tmp/longmemeval-v2-smoke"}, runner=fake_runner)
+    backend.insert({"role": "user", "content": "I prefer tea"})
+    result = backend.query("What do I prefer?")
+    assert result == [{"type": "text", "value": "remembered fact"}]
+    assert calls[0][0] == "ingest" and "--scope" not in calls[0][1]
+    assert "other" in calls[0][1]
+    assert calls[1] == ("extract", ("--episode-id", "episode:server-issued"))
+    print("LongMemEval-V2 adapter smoke: PASS")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--smoke-test", action="store_true")
+    args = parser.parse_args()
+    if args.smoke_test:
+        _smoke_test()

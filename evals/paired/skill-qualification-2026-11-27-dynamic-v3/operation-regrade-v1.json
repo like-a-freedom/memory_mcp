@@ -1,0 +1,1130 @@
+{
+  "capture_summary_sha256": "479637c843354be87ca6619cdc1b647389f563102f97305b107fdd3294ee601a",
+  "corrections": [
+    "Score observed operations independently of final answer state.",
+    "Ignore only explicit MCP extract include_fact_evidence=true in argument comparison."
+  ],
+  "frozen_plan_sha256": "df4da698b62b2ec93893211417705d6c167d4769b0195fa6330df3f399d32206",
+  "full_row_pass": "false is a known failure; null requires separate semantic adjudication",
+  "original_grader_sha256": "58d641c4c392b838e0036db38f379b647bb72452efb3115c45591597375201a4",
+  "original_operation_passes": 10,
+  "regrade_source_sha256": "cb7e3cee9edd80c00e2b334c0bccfc788b913df0d4d2ae284db813fc61bbd5a5",
+  "regraded_operation_passes": 16,
+  "rows": [
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        },
+        "pending_vs_completed_oracle": {
+          "original": null,
+          "regraded": "verified"
+        },
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 1,
+      "identity": "memory-mcp-1-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "4b47b91a18eb745bf37a6ac982c05240ca4e1b92549b17a0e1105579026f6f3c",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        },
+        "pending_vs_completed_oracle": {
+          "original": null,
+          "regraded": "verified"
+        },
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 1,
+      "identity": "memory-mcp-1-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "c7802ba24ac6c6c5863196bd7b6df9358210774d33df25adce6f497e0c03ad42",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 2,
+      "identity": "memory-mcp-2-current",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "177908a614583a76106bc26cbfd3458f2241f050e8c7dfeb4447c2f963e44ec2",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 2,
+      "identity": "memory-mcp-2-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "712bcf6f3541e2da81b6a3e3739ccca47742f8078d23b6e7ff7a48e0973b3de6",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 3,
+      "identity": "memory-mcp-3-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "08a210e44134923dc1e7b494a80a450d95da78e50c92345924b1eef6b70ac0d5",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 3,
+      "identity": "memory-mcp-3-current",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "6ea67506dd4e7644d7d40aacb7534cd933b9eaa829dbeb1933a2087d5cbfb9af",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "episode-only",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        }
+      },
+      "id": 4,
+      "identity": "memory-mcp-4-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": "episode-only",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "45fd0bcffad86f65d33e380ef3b1457c3cd8fe634f9add87ded6ecb549a879ca",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 4,
+      "identity": "memory-mcp-4-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "add331b050826cf24db24392891ca693d89bc127a3d9ceb159ae3458938789d2",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 5,
+      "identity": "memory-mcp-5-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "d004a71455a1d3e69319cbc74356f5ac5264468d50035499f4d8d91895c6d4be",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 5,
+      "identity": "memory-mcp-5-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "6010b7e0247443355391e311dc5670afe62d5afdc1966ba99fae73235758fa48",
+      "skill": "memory-mcp",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": false,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "source_binding_observed": {
+          "original": null,
+          "regraded": false
+        }
+      },
+      "id": 6,
+      "identity": "memory-mcp-6-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "6209c61b18431a5bd63d8f0e7f6c7c5aafa583c5ff120eab87236d82030fa99b",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": false,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "source_binding_observed": {
+          "original": null,
+          "regraded": false
+        }
+      },
+      "id": 6,
+      "identity": "memory-mcp-6-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "c77c1ae88b602d9e6d4aa2dc41aa2ff2661f06023f2830dd6b249ba058056858",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 7,
+      "identity": "memory-mcp-7-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "35807ff7719c3a4f7186811c467b7e9f1d2a8ed2c746978781ac438f28a08b22",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 7,
+      "identity": "memory-mcp-7-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "a82553929048bd6b7cefc5bdecbf9448b45adac51680f54af2c025c025140667",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 8,
+      "identity": "memory-mcp-8-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "98f2a29295c8d417b3d6218e37ae348a36d0376ea564bb46da1e47f427776741",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 8,
+      "identity": "memory-mcp-8-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "da682f7b3d6b99313cbd4676bd9f6f3145ca7ee90bfeb5a556979be6c7d2c6ba",
+      "skill": "memory-mcp",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 1,
+      "identity": "memory-cli-1-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "a20d78469fc0ae33b6de79ba2963887bce114359f8fb2c86d4f3774eeef1c700",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 1,
+      "identity": "memory-cli-1-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "44314f07a51dde02607a216985f2986994c2b4d3a2876d53f653a032236e8d26",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 2,
+      "identity": "memory-cli-2-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "979462fdf7a85ca3533dbe0254f31f93d56668d9e9cdac66b432eb3de07f4b10",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 2,
+      "identity": "memory-cli-2-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "e4b916d5b2fa41093cc0802b7845863b8bf8cf752780ddb4f32fc23d3fc60bde",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 3,
+      "identity": "memory-cli-3-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "e6a8505f49206edce43718ce1624057537109475d0b9bd0dfe25e527f5aec77b",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 3,
+      "identity": "memory-cli-3-current",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "interrupted",
+        "process_faults": [
+          {
+            "exit_status": 130,
+            "operation": "reembed"
+          }
+        ],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "cd577d9fb8ba725849fe7a74c231931eb60a7f2183e64adeb88f50e9829eeee3",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "episode-only",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        },
+        "pending_vs_completed_oracle": {
+          "original": null,
+          "regraded": "episode-only"
+        },
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 4,
+      "identity": "memory-cli-4-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "8576b4cbf3c3de023a5d0e112f678020c54588e625906ac36b622a976c89652a",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "native",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "episode-only",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        },
+        "pending_vs_completed_oracle": {
+          "original": null,
+          "regraded": "episode-only"
+        },
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 4,
+      "identity": "memory-cli-4-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "bf8a6e0b124eb8fb0a1cc0d6ef5d2837015f063f077da218ebc4470db5f04356",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 5,
+      "identity": "memory-cli-5-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "a2af71c128c97cd88ce3c2d9a66b30f7fd086b26b40da5b915ee676d5564de60",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md",
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "operation_and_exact_arguments": {
+          "original": false,
+          "regraded": true
+        },
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 5,
+      "identity": "memory-cli-5-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md",
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "53003865a588b15c4971bbc2bc7b37d7a7fbb8fa326fa7ea2e00cf77b28428e3",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 6,
+      "identity": "memory-cli-6-current",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "9898ed55045ed5614b5abd0035e86a830945f6e8aa9b2eb4bccf38dba1f81f32",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": false,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {
+        "source_binding_observed": {
+          "original": null,
+          "regraded": true
+        }
+      },
+      "id": 6,
+      "identity": "memory-cli-6-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "9ce220914b39adb922cf1fcfefbd4fb2447809d7bec988bdabaa28c2cd5d4200",
+      "skill": "memory-cli",
+      "terminal": "error"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 7,
+      "identity": "memory-cli-7-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "fd7ad3a06736ac5357a98bcb132c8ce4a40d9c88aa5e82c024ae2bf4b1ec1e18",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 7,
+      "identity": "memory-cli-7-current",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "dbcfbd40d8c257545b749bc67a78c18d7531f77370ff9c25d51a8cc709c6f716",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "current",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 8,
+      "identity": "memory-cli-8-current",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "e45b96c698f9170753588e053e7b20cb01c7963b6070054cdcbed0c9b52d0813",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    },
+    {
+      "arm": "previous",
+      "binding": "controlled",
+      "full_row_pass": null,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "grade_difference": {},
+      "id": 8,
+      "identity": "memory-cli-8-previous",
+      "original_grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "pending",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "original_trial_sha256": "82cc26c6b9f2d4aa66a6e619b16661faf05a84257fd670472f95bf07f32cb736",
+      "skill": "memory-cli",
+      "terminal": "answered"
+    }
+  ],
+  "rows_with_differences": 10,
+  "scheduled": 32,
+  "schema": "memory-mcp-skill-operation-regrade/v1"
+}

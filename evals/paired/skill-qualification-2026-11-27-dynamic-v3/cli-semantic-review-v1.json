@@ -1,0 +1,467 @@
+{
+  "arm_labels_seen_during_review": false,
+  "controlled_full_passes": 3,
+  "full_passes": 3,
+  "input_sha256": "8432231b51fe01cd56dc1b1a122c848deff7920be83c20dae5d0f79b173f7c36",
+  "native_full_passes": 0,
+  "observed_answered": 7,
+  "rows": [
+    {
+      "binding": "native",
+      "case": 1,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3,
+        4,
+        5
+      ],
+      "full_pass": false,
+      "observations": [
+        "Exact source metadata and stdin. Separate stdout/stderr/exit receipts. Linked extraction returned a verified decision fact.",
+        "The subsequent assemble-context readback located the same fact. The frozen CLI1 action grader requires exactly ingest→extract, so the extra readback fails that sequence check. This is a trace/criterion distinction, not a capture failure.",
+        "The subsequent model request timed out. No final shell sequence or structured result report was observed."
+      ],
+      "opaque_id": "0af5d28612f6",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "44314f07a51dde02607a216985f2986994c2b4d3a2876d53f653a032236e8d26",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "native",
+      "case": 1,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3,
+        4,
+        5
+      ],
+      "full_pass": false,
+      "observations": [
+        "Exact source metadata and stdin. Separate stdout/stderr/exit receipts. Linked extraction returned a verified decision fact.",
+        "The subsequent assemble-context readback located the same fact. The frozen CLI1 action grader requires exactly ingest→extract, so the extra readback fails that sequence check. This is a trace/criterion distinction, not a capture failure.",
+        "The subsequent model request timed out. No final shell sequence or structured result report was observed."
+      ],
+      "opaque_id": "58b5bc261fd9",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "a20d78469fc0ae33b6de79ba2963887bce114359f8fb2c86d4f3774eeef1c700",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "native",
+      "case": 2,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3
+      ],
+      "full_pass": false,
+      "observations": [
+        "Read-only assemble-context succeeded and returned the correct weekly incremental indexing fact.",
+        "No explain call linked the fact to the citation-ready source, and no final answer was observed before the model request timed out."
+      ],
+      "opaque_id": "8947e9dcf7b4",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": false,
+      "semantic_clauses": null,
+      "source_binding_observed": false,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": null,
+      "trial_sha256": "979462fdf7a85ca3533dbe0254f31f93d56668d9e9cdac66b432eb3de07f4b10",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "native",
+      "case": 2,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3
+      ],
+      "full_pass": false,
+      "observations": [
+        "Read-only assemble-context succeeded and returned the correct weekly incremental indexing fact.",
+        "No explain call linked the fact to the citation-ready source, and no final answer was observed before the model request timed out."
+      ],
+      "opaque_id": "ca083bdf771a",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": false,
+      "semantic_clauses": null,
+      "source_binding_observed": false,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": null,
+      "trial_sha256": "e4b916d5b2fa41093cc0802b7845863b8bf8cf752780ddb4f32fc23d3fc60bde",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 3,
+      "error_type": null,
+      "evidence_turns": [
+        2
+      ],
+      "full_pass": true,
+      "observations": [
+        "Controlled reembed used fail-fast max-failures 0 for the confirmed model change. The observed terminal process result was interrupted, exit 130, 2/5 processed and one failed fact.",
+        "The final answer used that state and fact ID and correctly reported unfinished work. The expected process interruption satisfies this scenario."
+      ],
+      "opaque_id": "6748c38af1e9",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": true,
+      "source_binding_observed": null,
+      "source_report_correct": null,
+      "status_report_correct": true,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "e6a8505f49206edce43718ce1624057537109475d0b9bd0dfe25e527f5aec77b",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 3,
+      "error_type": null,
+      "evidence_turns": [
+        2
+      ],
+      "full_pass": true,
+      "observations": [
+        "Controlled reembed used fail-fast max-failures 0 for the confirmed model change. The observed terminal process result was interrupted, exit 130, 2/5 processed and one failed fact.",
+        "The final answer used that state and fact ID and correctly reported unfinished work. The expected process interruption satisfies this scenario."
+      ],
+      "opaque_id": "ae28ef805921",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": true,
+      "source_binding_observed": null,
+      "source_report_correct": null,
+      "status_report_correct": true,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "cd577d9fb8ba725849fe7a74c231931eb60a7f2183e64adeb88f50e9829eeee3",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "native",
+      "case": 4,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3,
+        4
+      ],
+      "full_pass": false,
+      "observations": [
+        "Exact literal multiline stdin with source/date metadata. No --t-ingested, external file read, or URL fetch. Bound extraction succeeded with no facts, which is episode-only.",
+        "Model request timed out after those receipts. No final transaction-time or capture status report was observed."
+      ],
+      "opaque_id": "4e5bbb1dc82e",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "bf8a6e0b124eb8fb0a1cc0d6ef5d2837015f063f077da218ebc4470db5f04356",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "native",
+      "case": 4,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3,
+        4
+      ],
+      "full_pass": false,
+      "observations": [
+        "Exact literal multiline stdin with source/date metadata. No --t-ingested, external file read, or URL fetch. Bound extraction succeeded with no facts, which is episode-only.",
+        "Model request timed out after those receipts. No final transaction-time or capture status report was observed."
+      ],
+      "opaque_id": "b3266dcc9a9a",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/memory-contract.md",
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "8576b4cbf3c3de023a5d0e112f678020c54588e625906ac36b622a976c89652a",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 5,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "full_pass": false,
+      "observations": [
+        "Controlled file and public URL imports used exact confined root/path and authorized URL, source types and event dates. Both generated source and episode identities were returned and both exact episodes were separately extracted.",
+        "No final command/boundary explanation after the model timeout. No real filesystem/network import is inferred."
+      ],
+      "opaque_id": "118f432df717",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/commands.md",
+        "references/memory-contract.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "53003865a588b15c4971bbc2bc7b37d7a7fbb8fa326fa7ea2e00cf77b28428e3",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 5,
+      "error_type": null,
+      "evidence_turns": [
+        1
+      ],
+      "full_pass": false,
+      "observations": [
+        "The final answer proposed exact authorized import commands and bound extract syntax, but dispatched no import or extract as required by the frozen scenario.",
+        "It cautioned about redirects, credentials and traversal. It omitted the explicit 4 MiB cap and generated source identity. No source was actually bound in the trace."
+      ],
+      "opaque_id": "a5e7f4ef5b0c",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": false,
+      "semantic_clauses": false,
+      "source_binding_observed": false,
+      "source_report_correct": false,
+      "status_report_correct": null,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "a2af71c128c97cd88ce3c2d9a66b30f7fd086b26b40da5b915ee676d5564de60",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 6,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        2,
+        3
+      ],
+      "full_pass": false,
+      "observations": [
+        "One refinement used exact valid_at and revision 17 and kept other selectors. No as_of/known_at, write, or resolve. The recall response still had partial coverage.",
+        "The source continuation selected a single matching source, start 1200 scalars and limit 8000, returning a verified, complete, contained quote. Its provenance_next_offset=20 was not followed before timeout.",
+        "No final report addressed partial omissions, verification or possible access heat."
+      ],
+      "opaque_id": "1faef65ff25c",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": false,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "9898ed55045ed5614b5abd0035e86a830945f6e8aa9b2eb4bccf38dba1f81f32",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 6,
+      "error_type": "TimeoutError",
+      "evidence_turns": [
+        2,
+        3
+      ],
+      "full_pass": false,
+      "observations": [
+        "One refinement used exact valid_at and revision 17 and kept other selectors. No as_of/known_at, write, or resolve. The recall response still had partial coverage.",
+        "The source continuation selected a single matching source, start 1200 scalars and limit 8000, returning a verified, complete, contained quote. Its provenance_next_offset=20 was not followed before timeout.",
+        "No final report addressed partial omissions, verification or possible access heat."
+      ],
+      "opaque_id": "b5bb53c65bda",
+      "operation_and_arguments": false,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": false,
+      "semantic_clauses": null,
+      "source_binding_observed": true,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "terminal": "error",
+      "time_arguments_correct": true,
+      "trial_sha256": "9ce220914b39adb922cf1fcfefbd4fb2447809d7bec988bdabaa28c2cd5d4200",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 7,
+      "error_type": null,
+      "evidence_turns": [
+        2
+      ],
+      "full_pass": false,
+      "observations": [
+        "Correct compact extraction of the original canonical episode. The final answer accurately retained episode/fact IDs, success and omission-flag behavior.",
+        "It did not explain the shared 4 KiB JSON evidence limit, stored-episode source fallback, or the required verified/complete-empty/pending status distinction. An extraction fallback note is different from later source fallback."
+      ],
+      "opaque_id": "b43131d61ab3",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": false,
+      "source_binding_observed": true,
+      "source_report_correct": true,
+      "status_report_correct": false,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "fd7ad3a06736ac5357a98bcb132c8ce4a40d9c88aa5e82c024ae2bf4b1ec1e18",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 7,
+      "error_type": null,
+      "evidence_turns": [
+        2
+      ],
+      "full_pass": false,
+      "observations": [
+        "Correct compact extraction and canonical episode/fact IDs. The final answer accurately noted that the compact omission flag was absent.",
+        "It classified a generic empty facts result as episode-only without requiring completed successful extraction and left partial/pending unresolved. It also omitted the shared 4 KiB JSON evidence limit and stored-episode source fallback."
+      ],
+      "opaque_id": "ce0f2a6ccc32",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/commands.md"
+      ],
+      "required_core_operations_observed": true,
+      "semantic_clauses": false,
+      "source_binding_observed": true,
+      "source_report_correct": true,
+      "status_report_correct": false,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "dbcfbd40d8c257545b749bc67a78c18d7531f77370ff9c25d51a8cc709c6f716",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 8,
+      "error_type": null,
+      "evidence_turns": [
+        1
+      ],
+      "full_pass": true,
+      "observations": [
+        "Question-only recovery. The final answer correctly reported pending despite empty facts and exit zero, preserved episode:pending-cedar-295, and recommended the safe retry for that exact episode.",
+        "It required completed successful extraction before classifying an empty result as episode-only."
+      ],
+      "opaque_id": "beee4cb06fb4",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/memory-contract.md"
+      ],
+      "required_core_operations_observed": null,
+      "semantic_clauses": true,
+      "source_binding_observed": null,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "e45b96c698f9170753588e053e7b20cb01c7963b6070054cdcbed0c9b52d0813",
+      "unnecessary_reference_loading": false
+    },
+    {
+      "binding": "controlled",
+      "case": 8,
+      "error_type": null,
+      "evidence_turns": [
+        1
+      ],
+      "full_pass": false,
+      "observations": [
+        "Question-only recovery. The response correctly classified the observed partial result as pending despite exit zero, retained episode:pending-cedar-295, and recommended the exact safe retry.",
+        "The required completed-successful-empty → episode-only rule was not stated. The final instruction allows a confirmed empty result alongside a verified fact set as a condition for claiming durable-fact capture, a misleading distinction."
+      ],
+      "opaque_id": "dc0b4357ea84",
+      "operation_and_arguments": true,
+      "reference_reads": [
+        "references/memory-contract.md"
+      ],
+      "required_core_operations_observed": null,
+      "semantic_clauses": false,
+      "source_binding_observed": null,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "terminal": "answered",
+      "time_arguments_correct": null,
+      "trial_sha256": "82cc26c6b9f2d4aa66a6e619b16661faf05a84257fd670472f95bf07f32cb736",
+      "unnecessary_reference_loading": false
+    }
+  ],
+  "scheduled": 16,
+  "schema": "memory-mcp-skill-cli-blind-semantic-review/v1",
+  "trace_reference_indices": "one-based; null dimension means not applicable or a required answer was unobserved"
+}

@@ -1,0 +1,15 @@
+test_same_value_successors_preserve_both_occurrences (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_same_value_successors_preserve_both_occurrences) ... ERROR
+
+======================================================================
+ERROR: test_same_value_successors_preserve_both_occurrences (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_same_value_successors_preserve_both_occurrences)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reader_protocol.py", line 362, in test_same_value_successors_preserve_both_occurrences
+    repeated, = group['repeated_labels']
+                ~~~~~^^^^^^^^^^^^^^^^^^^
+KeyError: 'repeated_labels'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+FAILED (errors=1)

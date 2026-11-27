@@ -1,0 +1,46 @@
+{
+  "method": "Deterministic offline regrade; archived capture unchanged; no inference rerun.",
+  "grader_sha256": "520c2eabb0ad997a085f3c6656a520821c5f3b005f863834e6ad115c2313e108",
+  "rows": [
+    {
+      "case": "complete-list-source_ids",
+      "old": true,
+      "current": true
+    },
+    {
+      "case": "complete-list-handles",
+      "old": false,
+      "current": false
+    },
+    {
+      "case": "neighborhood-source_ids",
+      "old": true,
+      "current": true
+    },
+    {
+      "case": "neighborhood-handles",
+      "old": false,
+      "current": false
+    },
+    {
+      "case": "count-source_ids",
+      "old": true,
+      "current": true
+    },
+    {
+      "case": "count-handles",
+      "old": false,
+      "current": false
+    },
+    {
+      "case": "false-premise-source_ids",
+      "old": true,
+      "current": true
+    },
+    {
+      "case": "false-premise-handles",
+      "old": true,
+      "current": true
+    }
+  ]
+}

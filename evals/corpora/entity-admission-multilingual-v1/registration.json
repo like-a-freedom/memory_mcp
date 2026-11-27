@@ -1,0 +1,17 @@
+{
+  "schema": "memory-mcp-extraction-independent-registration/v1",
+  "created_before_predictions": true,
+  "cases": 16,
+  "files": {
+    "README.md": "174ab75f394ebe82cef3de8c0aa8cc556221030a48ba379c608779de783dad4d",
+    "cases.json": "f4db85976466e5dc02d6c89ebf921f3b59a9e3fb1ea85f6f0eb9ced8973f2d79"
+  },
+  "label_provenance": "author-reviewed synthetic development labels; not human independent confirmation",
+  "primary_metrics": [
+    "entity_true_positive",
+    "entity_false_positive",
+    "entity_false_negative",
+    "linking"
+  ],
+  "rule": "closed/exhaustive entities by class and language; retain all failures; do not modify labels after predictions"
+}

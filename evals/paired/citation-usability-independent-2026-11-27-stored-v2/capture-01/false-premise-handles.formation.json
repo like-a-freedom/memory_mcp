@@ -1,0 +1,20 @@
+[
+  {
+    "source_id": "false-premise-distractor",
+    "episode_id": "episode:aec8bc92ee35653ef887f76c",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "false-premise-gold",
+    "episode_id": "episode:4423ca254ef6c80217e00040",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "false-premise-other",
+    "episode_id": "episode:c0ab85884d701b8c895ba97b",
+    "status": "success",
+    "fact_count": 0
+  }
+]

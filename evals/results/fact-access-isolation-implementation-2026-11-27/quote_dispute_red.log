@@ -1,0 +1,8 @@
+---- quoted_dispute_participants_do_not_gain_positional_control_priority stdout ----
+
+thread 'quoted_dispute_participants_do_not_gain_positional_control_priority' (11029057) panicked at crates/memory-mcp/tests/long_history_stage_evidence.rs:700:5:
+assertion failed: item.provenance.get("control_label_coverage").is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.28s

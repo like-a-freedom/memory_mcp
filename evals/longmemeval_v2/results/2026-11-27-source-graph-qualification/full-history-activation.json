@@ -1,0 +1,13 @@
+{
+  "schema": "source-graph-full-history-activation/v1",
+  "at_utc": "2026-11-27T15:44:20.604277+00:00",
+  "status": "NOT_ACTIVATED",
+  "admitted": false,
+  "reason": "Registered24-case qualification failed19/24 strict; stop rule prohibits further protocol tuning or conditional14-call full-history comparison.",
+  "qualification_decision_sha256": "76e80a7619b6e3cad91dd4d35409ae0a54d04da4e5b8ac0f675b4ae4d21827b4",
+  "candidate_acceptance_sha256": "2a52ea48c462167166465cb3349c6cfc72cabee7f80a7bc8189b1ed22bad41f9",
+  "source_v7_gate_sha256": "08ebae552033b1db8321560f288d660ea6a299555ecab14b50e19b07c25b7840",
+  "scheduled_full_history_calls": 0,
+  "actual_full_history_calls": 0,
+  "default_change": false
+}

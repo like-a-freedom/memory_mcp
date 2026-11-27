@@ -1,0 +1,311 @@
+{
+  "schema": "memory-quality-final-storage-checks/v1",
+  "architecture": "arm64",
+  "complete": true,
+  "all_passed": true,
+  "production_passed": 2270,
+  "production_ignored": 12,
+  "harness_passed": 571,
+  "harness_ignored": 3,
+  "counts_policy": "2270 includes2091 lib and179 integration-target checks; repeated concurrency6 are not added. OptionalSDK6 executed separately from default discovery skips.",
+  "checks": [
+    {
+      "id": "production_after_storage_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support,test-fixtures",
+        "--lib",
+        "--test",
+        "fact_access_upgrade",
+        "--test",
+        "fact_access_native_upgrade",
+        "--test",
+        "fact_access_concurrency",
+        "--test",
+        "fact_access_payload",
+        "--test",
+        "retrieval_partial_evidence",
+        "--test",
+        "long_history_stage_evidence",
+        "--test",
+        "full_history_evidence",
+        "--test",
+        "service_integration",
+        "--test",
+        "explain_provenance",
+        "--test",
+        "lifecycle_decay",
+        "--test",
+        "lifecycle_archival",
+        "--test",
+        "query_scaling_regressions",
+        "--test",
+        "knowledge_read_scopes",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72.13282066601096,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt2-production_after_storage_isolation.log",
+      "log_sha256": "a05ab6b6827305130b61066c6d3cf474f87195a348f0661e5afce297e93dc574",
+      "test_targets": [
+        {
+          "passed": 2091,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 2
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 9
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 46,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 51,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "id": "harness_after_storage_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "eval-harness",
+        "--lib",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 29.19806337499176,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt2-harness_after_storage_isolation.log",
+      "log_sha256": "61d4fcc6fe2946aa977ea3f00efb18f4c5e3b90e302758050a6d8422198ff0b3",
+      "test_targets": [
+        {
+          "passed": 571,
+          "failed": 0,
+          "ignored": 3
+        }
+      ]
+    },
+    {
+      "id": "concurrency_after_clippy_fix",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support",
+        "--test",
+        "fact_access_concurrency",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 12.510449000023073,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-concurrency_after_clippy_fix.log",
+      "log_sha256": "5ea0874e75289c0f17a36e2d6e6ed0906494997eadfea86239cdda93f1b02f63",
+      "test_targets": [
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-concurrency_after_clippy_fix.log"
+    },
+    {
+      "id": "workspace_clippy_after_admission",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.897805708023952,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-workspace_clippy_after_admission.log",
+      "log_sha256": "0682bd49610e075cf387813ceabe04031933a2f9beca575d774628672026a121",
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-workspace_clippy_after_admission.log"
+    },
+    {
+      "id": "eval_clippy_after_admission",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "memory_mcp",
+        "-p",
+        "eval-harness",
+        "--all-targets",
+        "--features",
+        "eval-support,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 52.029124041000614,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-eval_clippy_after_admission.log",
+      "log_sha256": "053fe9b997ce888c3bd501244b4b9d5b7fcb82d5acdfa897641000f677228287",
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-eval_clippy_after_admission.log"
+    },
+    {
+      "id": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.1101573340129107,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-fmt.log"
+    },
+    {
+      "id": "python_paired_final",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/paired",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 28.95416154200211,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-python_paired_final.log",
+      "log_sha256": "451ad5c053b69e78a4cecca6d63f9fead0ccaaba7d0364cc49e60d814bba81e0",
+      "total": 80,
+      "skipped": 0,
+      "passed": 80,
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-python_paired_final.log"
+    },
+    {
+      "id": "python_longmem_final",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "evals/longmemeval_v2",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.687218541017501,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-python_longmem_final.log",
+      "log_sha256": "a55cd75942a196fabc9c77135147bb0d2fb438fad74e35f74ce3b7e5647e83ed",
+      "total": 116,
+      "skipped": 11,
+      "passed": 105,
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-python_longmem_final.log"
+    },
+    {
+      "id": "sdk_final",
+      "command": [
+        "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+        "-m",
+        "unittest",
+        "evals.longmemeval_v2.test_observed_sdk"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.73805779198301,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-sdk_final.log",
+      "log_sha256": "f3bc93632cbe6ca66707b39292770cde7b186a7c86aea3f66c693cc15ce2a4cf",
+      "total": 6,
+      "skipped": 0,
+      "passed": 6,
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-sdk_final.log"
+    },
+    {
+      "id": "diff_check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.06637437499011867,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt3-diff_check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_small_log": "evals/results/memory-quality-verification-2026-11-27/final-attempt3-diff_check.log"
+    }
+  ],
+  "failed_attempts_retained": [
+    "storage-isolation-verification-attempt1.json",
+    "storage-isolation-verification-attempt2.json"
+  ],
+  "final_source_review": "../fact-access-isolation-implementation-2026-11-27/source-review-v2.json",
+  "post_review_edits": "Only retrieval test adapter heat-query fixtures, catalog last-migration expectation, equivalent concurrency slice assertions, and docs. Production implementation pinned in execution identity."
+}

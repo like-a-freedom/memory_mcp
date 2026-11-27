@@ -1,0 +1,16 @@
+test_graph_preserves_literal_locations_and_observed_successor (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_graph_preserves_literal_locations_and_observed_successor) ... ERROR
+
+======================================================================
+ERROR: test_graph_preserves_literal_locations_and_observed_successor (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_graph_preserves_literal_locations_and_observed_successor)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reader_protocol.py", line 346, in test_graph_preserves_literal_locations_and_observed_successor
+    messages = protocol_messages(row, self.variant)
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/reader_protocol.py", line 183, in protocol_messages
+    raise ValueError('unregistered protocol variant')
+ValueError: unregistered protocol variant
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (errors=1)

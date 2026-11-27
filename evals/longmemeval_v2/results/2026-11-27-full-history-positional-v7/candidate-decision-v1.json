@@ -1,0 +1,167 @@
+{
+  "schema": "full-history-positional-candidate-decision/v1",
+  "candidate": "v7",
+  "registered_source_native_acceptance": "PASS",
+  "qualified_for": "This frozen exposed source/native development gate only. Reader, dynamic-agent and independent-benefit qualification are separate and not established here.",
+  "gates": {
+    "delivered_contexts": {
+      "required": 7,
+      "observed": 7,
+      "status": "PASS"
+    },
+    "runtime_deadlines": {
+      "required": 0,
+      "observed": 0,
+      "status": "PASS"
+    },
+    "assembly_lte_30000_ms": {
+      "required_cases": 7,
+      "observed_cases": 7,
+      "status": "PASS"
+    },
+    "strict_original_source_span": {
+      "minimum": 4,
+      "observed": 5,
+      "status": "PASS"
+    },
+    "sufficient_actual_delivered_source": {
+      "minimum": 7,
+      "observed": 7,
+      "status": "PASS"
+    },
+    "native_temporal": {
+      "passed": 8,
+      "failed": 0,
+      "invalid": 0,
+      "no_regressions": true,
+      "status": "PASS"
+    },
+    "native_retrieval": {
+      "passed": 37,
+      "failed": 0,
+      "invalid": 0,
+      "original_six_floors_unchanged": 1.0,
+      "status": "PASS"
+    }
+  },
+  "source_support_summary": {
+    "selected": 7,
+    "premise_verdicts": {
+      "supported": 4,
+      "contradicted": 3,
+      "unknown": 0
+    },
+    "frozen_labels_supported": 7,
+    "strict_registered_source_and_span_delivered": 5,
+    "alternate_sufficient_despite_strict_miss": 2,
+    "delivered_contexts": 7,
+    "delivery_faults": 0,
+    "candidate_assembly_within_30_seconds": 7,
+    "candidate_runtime_within_45_seconds": 7,
+    "source_sufficiency_acceptance_required": 7,
+    "source_sufficiency_acceptance": "PASS",
+    "qualification_scope": "Actual-source sufficiency only; no reader predictions or model qualification assessed."
+  },
+  "prior_v5_retained": {
+    "overall": "FAIL",
+    "strict_source_span": 4,
+    "sufficient_sources": 6,
+    "delivered_contexts": 7,
+    "runtime_completed": 7,
+    "missing_support_case": "922a0c56",
+    "source_review_sha256": "235441065db59f6ea34ecf7393f791de08c0ff08feeb01c2d6f401a5339130dd",
+    "decision_sha256": "7757e23416db7252b5e9179195f8f62d0093a23894594a697cae5f3aaa6a94d8"
+  },
+  "case_observations": [
+    {
+      "case_id": "0c6b0c60",
+      "assembly_ms": 18054.321042000003,
+      "process_seconds": 32.23477387501043,
+      "strict": true,
+      "source_support": "strict_registered"
+    },
+    {
+      "case_id": "6d975a08",
+      "assembly_ms": 17452.663583999998,
+      "process_seconds": 29.78505929102539,
+      "strict": false,
+      "source_support": "alternate_delivered"
+    },
+    {
+      "case_id": "89a20f48",
+      "assembly_ms": 17757.829583,
+      "process_seconds": 30.020248458982678,
+      "strict": true,
+      "source_support": "strict_registered"
+    },
+    {
+      "case_id": "922a0c56",
+      "assembly_ms": 23926.635416,
+      "process_seconds": 36.65587499999674,
+      "strict": true,
+      "source_support": "strict_registered"
+    },
+    {
+      "case_id": "d6da3938",
+      "assembly_ms": 21686.614792,
+      "process_seconds": 33.953513415995985,
+      "strict": false,
+      "source_support": "alternate_delivered"
+    },
+    {
+      "case_id": "f43926d9",
+      "assembly_ms": 17489.202583000002,
+      "process_seconds": 29.67878375001601,
+      "strict": true,
+      "source_support": "strict_registered"
+    },
+    {
+      "case_id": "f61a096f",
+      "assembly_ms": 20424.923583000003,
+      "process_seconds": 33.30002570900251,
+      "strict": true,
+      "source_support": "strict_registered"
+    }
+  ],
+  "interpretation": [
+    "V7 source-selection capture is one new registered version on the same seven exposed questions, not a paired speed experiment or successful retry replacing V5.",
+    "922 now has its own returned exact registered toolbar block supporting the false-premise refusal. Other question source judgments are unchanged; strict misses6d andd6 remain.",
+    "Current-context reading succeeds7/7 in both V5 andV7; do not claim a runtime completion6->7 gain.",
+    "No labels or deadlines were changed; alternate support is not promoted to strict gold. Context content differs for some non-target distractors, so do not claim allV7 contexts byte-identical toV5.",
+    "V6 was build-only and superseded before native/history/reader outputs after an independently found false-positive control; its pins remain archived.",
+    "This source audit read no reader predictions and establishes neither model accuracy nor independent memory benefit."
+  ],
+  "hash_verification": {
+    "status": "PASS",
+    "frozen_registration_files_verified": 88,
+    "retained_binary_pins_verified": 3,
+    "reader_rows_equal_exact_actual_sources": 7,
+    "exact_literal_quotes_verified": 9,
+    "original_and_upgraded_initial_snapshots_unchanged": true,
+    "inputs": {
+      "evals/longmemeval_v2/results/2026-11-27-full-history-restore/reads-registration.json": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+      "evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/source-support-review-v1.json": "235441065db59f6ea34ecf7393f791de08c0ff08feeb01c2d6f401a5339130dd",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/registration.json": "a74c7e0e0c02f201080529ca7777eb6f20362f8feedf689c0d2fe5d1bd7dc35c",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/reads-summary.json": "47d68bc6db484c859451bdf5945a088e2d2e9002fc7d78c50069d11aee9d77d0",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/reader-rows.jsonl": "341561f998d789ee2ab9061d7c34593e72a7513ed9271609376f943a14baa206",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/schedule.json": "ce4574ed67426c45aeb45c11df0341e99a26e315781283383bee03199efaa2a3",
+      "evals/results/fact-access-isolation-implementation-2026-11-27/v7-dispatch-sources.json": "d76fdfadbb0ee6fe05d972ab353972f3fc545ce30dcfa7327693ee3e71c4c9f0",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/0c6b0c60.json": "6a6110afb43f80a0f5cffc75efa168e497ec2f248be0b1f04759ad608bd72930",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/6d975a08.json": "fdcfcbead3024f235261d31bb1d977584c61f574c367091a747f1bdc5b11458b",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/89a20f48.json": "51baa3e881a8fb29d7010cf15270ce6c9eef9e46f7e41ca99aa6b309bbda4755",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/922a0c56.json": "6c774acb5bf047a2494f4e83c1ec050156f666fdedddf4a0831de0ce8145e12b",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/d6da3938.json": "25613ad3e352f6e0703b26b07ae096d9754092509b038aea3762ccced8cf6263",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/f43926d9.json": "0a11f18bb05d3404f12c5b568872071824594105b0507c4c61b38461f51d078b",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate/f61a096f.json": "913cd61b78ba1c59aa251fc8895c110ca0ccc5982e272890f35b79849c156363",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/source-support-review-v1.json": "225f620774b0e97c532446e08bd405910255f42bc1c01e1c16355cd231c2a003",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate-decision-v1.json": "7757e23416db7252b5e9179195f8f62d0093a23894594a697cae5f3aaa6a94d8",
+      "evals/results/native-v7-registered-2026-11-27/registration.json": "471fccff8a7bc92e8b0050837e12b1329a1a5e6873b84085de525888325ad257",
+      "evals/results/native-v7-registered-2026-11-27/run.json": "a4e42a7ae20e22582f46626ea17b9216224bc4a104a817439a4b4d7aeff9c372",
+      "evals/results/native-v7-registered-2026-11-27/retrieval.json": "88e8c016cb61fa899cc15f60a83812605129a7bb23d192a1c3a9014a6aa65d77",
+      "evals/results/native-v7-registered-2026-11-27/comparison.json": "daa35ac78e7d7633e5a40906f2cc23994447e625f21515eb4818b700e78b991d",
+      "evals/results/native-v7-registered-2026-11-27/temporal-execution.json": "54276a37e7a250efa8f8332559fe6d135942e63589fbfd7b77c565c6a7ffa6bf",
+      "evals/results/native-v7-registered-2026-11-27/retrieval-execution.json": "7c47d2b55ce9831adf3ee4eaca014b129e6e306fc3ae715c0ad3d95b14e962a4"
+    }
+  }
+}

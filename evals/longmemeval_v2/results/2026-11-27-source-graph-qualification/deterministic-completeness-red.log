@@ -1,0 +1,15 @@
+test_virtualized_peer_count_does_not_claim_complete_membership (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_virtualized_peer_count_does_not_claim_complete_membership) ... ERROR
+
+======================================================================
+ERROR: test_virtualized_peer_count_does_not_claim_complete_membership (evals.longmemeval_v2.test_reader_protocol.SourceGraphProtocolTests.test_virtualized_peer_count_does_not_claim_complete_membership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_reader_protocol.py", line 436, in test_virtualized_peer_count_does_not_claim_complete_membership
+    self.assertFalse(group['membership_complete'])
+                     ~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'membership_complete'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (errors=1)

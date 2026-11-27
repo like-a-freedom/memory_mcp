@@ -1,0 +1,22 @@
+{
+  "context_items": [
+    {
+      "content": "The Fern archive release key is approved for Vault-31.",
+      "source_episode_ids": [
+        "episode:aec8bc92ee35653ef887f76c"
+      ]
+    },
+    {
+      "content": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "source_episode_ids": [
+        "episode:4423ca254ef6c80217e00040"
+      ]
+    },
+    {
+      "content": "The Cobalt archive release key is approved for Vault-84.",
+      "source_episode_ids": [
+        "episode:c0ab85884d701b8c895ba97b"
+      ]
+    }
+  ]
+}

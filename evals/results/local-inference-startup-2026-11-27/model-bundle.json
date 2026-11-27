@@ -1,0 +1,106 @@
+{
+  "schema": "local-inference-bundle/v1",
+  "registered_before_study_outputs": true,
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "files": [
+    {
+      "path": "chat_template.jinja",
+      "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+      "bytes": 8952,
+      "mtime_ns": 1787136475594154166
+    },
+    {
+      "path": "config.json",
+      "sha256": "14b65a0ee06517060a6bbd979bb1a8ff54e7b304b1a1f01d54344b88b8285e85",
+      "bytes": 4932,
+      "mtime_ns": 1787136475590345606
+    },
+    {
+      "path": "generation_config.json",
+      "sha256": "e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e",
+      "bytes": 202,
+      "mtime_ns": 1787136475580716187
+    },
+    {
+      "path": "model-00001-of-00003.safetensors",
+      "sha256": "471a9a81b54dddbfef43e8a71960ca24ad3c727891c6b0750a9db9a214aab504",
+      "bytes": 5343268752,
+      "mtime_ns": 1787140516597760320
+    },
+    {
+      "path": "model-00002-of-00003.safetensors",
+      "sha256": "e7474b8f968f4078dfd4889925961c5b0da9939219b614dba08eb63c46590de7",
+      "bytes": 5354185100,
+      "mtime_ns": 1787140441699604700
+    },
+    {
+      "path": "model-00003-of-00003.safetensors",
+      "sha256": "1038989bed1346ecdb541a45c078df2aae99a9509f35bfd51e7a04802a5d8402",
+      "bytes": 5357087747,
+      "mtime_ns": 1787140456580474593
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "sha256": "13b840162b4cb35c66fef7df072f7dbb4717908204364f5e5d9f9655a2758fa8",
+      "bytes": 218281,
+      "mtime_ns": 1787136882373308508
+    },
+    {
+      "path": "preprocessor_config.json",
+      "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "bytes": 390,
+      "mtime_ns": 1787137031166729078
+    },
+    {
+      "path": "processor_config.json",
+      "sha256": "45fc17c8dd2474af6b493b52483c26c0584b0082d368c480f9fa611e73070040",
+      "bytes": 991,
+      "mtime_ns": 1787137031623223033
+    },
+    {
+      "path": "tokenizer.json",
+      "sha256": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+      "bytes": 19989325,
+      "mtime_ns": 1787137043950853361
+    },
+    {
+      "path": "tokenizer_config.json",
+      "sha256": "47a7a8371379b07650b22f3c8a78c32fed85c4e35ea88e3da0c4b7a7611e8082",
+      "bytes": 10404,
+      "mtime_ns": 1787140447599496379
+    },
+    {
+      "path": "video_preprocessor_config.json",
+      "sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+      "bytes": 385,
+      "mtime_ns": 1787140447792126876
+    },
+    {
+      "path": "vocab.json",
+      "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+      "bytes": 6722759,
+      "mtime_ns": 1787140449897159240
+    }
+  ],
+  "runtime": "mlx-lm server",
+  "endpoint": "http://127.0.0.1:18767/v1",
+  "server_pid": 92744,
+  "server_launch_log": "/tmp/memory-quality-closure-model.log",
+  "chat_template_args": {
+    "enable_thinking": false
+  },
+  "temperature": 0,
+  "decode_concurrency": 1,
+  "prompt_concurrency": 1,
+  "retries": 0,
+  "elapsed_hash_seconds": 7.002608834009152,
+  "determinism": "Inputs and scoring are pinned; temperature0 on Metal is not a universal bitwise inference guarantee.",
+  "hash_observer_python_version": "3.15.2",
+  "inference_python_version": "3.15.2",
+  "runtime_versions": {
+    "mlx-lm": "0.32.2",
+    "mlx": "0.32.4",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  }
+}

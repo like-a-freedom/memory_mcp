@@ -1,0 +1,45 @@
+{
+  "schema": "full-history-retention/v1",
+  "retained_at_utc": "2026-11-27T13:21:12.100607+00:00",
+  "stable_directory": "/Users/solovey/Documents/dev/memory_mcp/data/eval-snapshots/full-history-2026-11-27",
+  "snapshot_directory": "/Users/solovey/Documents/dev/memory_mcp/data/eval-snapshots/full-history-2026-11-27/store",
+  "temporary_alias": "/tmp/memory-quality-full-100-2026-11-27/build/memory_state/store",
+  "files": {
+    "LOCK": {
+      "sha256": "5bbd6ccf096f4833f96079544d4902e8428d28fb70d45ce735d344613da971e0",
+      "bytes": 6
+    },
+    "manifest/00000000000000000000.manifest": {
+      "sha256": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+      "bytes": 71
+    },
+    "vlog/00000000000000000001.vlog": {
+      "sha256": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+      "bytes": 536952194
+    },
+    "vlog/00000000000000000002.vlog": {
+      "sha256": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+      "bytes": 537111135
+    },
+    "vlog/00000000000000000003.vlog": {
+      "sha256": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+      "bytes": 148014667
+    },
+    "wal/00000000000000000302.wal": {
+      "sha256": "9f0a3daba46f3dca49186692682c7838ded5720cdd8d53c1e36c5cb6b576061c",
+      "bytes": 4343726080
+    }
+  },
+  "total_bytes": 5565804153,
+  "file_manifest_identical_after_move": true,
+  "build_exit_code": 0,
+  "source_only_trajectories": 100,
+  "original_1800s_gate_passed": false,
+  "formation_progress_elapsed_seconds": 4501,
+  "duration_source": "final tqdm elapsed (one-second resolution), not isolated startup or storage timing",
+  "extraction_completion": "inferred from the archived backend completing all 151 public extract calls with pinned ToolResponse.status contract; per-call response receipts were not retained",
+  "binaries": {
+    "memory-quality-product-2026-11-27": "d12239c5162717811426eae15be6794fbdee94b19eb7d92c13d6e6e6250e313c",
+    "memory-quality-history-registered-2026-11-27": "247e2a33cf12c6217d2c2b9f49e0d36ab0fd59ab82f41f66452aa8a01a4b4648"
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "full-history-heat-isolation-candidate-decision/v1",
+  "candidate": "v5",
+  "overall_registered_acceptance": "FAIL",
+  "qualified": false,
+  "reason": "All physical/native gates pass, but the unchanged full-history source-sufficiency gate requires7/7 and observes6/7. Case922a0c56 completes yet returns no source supporting the required Reset/Create Order adjacency. Runtime completion cannot substitute for evidence sufficiency.",
+  "gates": {
+    "candidate_delivered_contexts": {
+      "required": 7,
+      "observed": 7,
+      "status": "PASS"
+    },
+    "candidate_runtime_deadlines": {
+      "required": 0,
+      "observed": 0,
+      "status": "PASS"
+    },
+    "candidate_assembly_lte_30000_ms": {
+      "required_cases": 7,
+      "observed_cases": 7,
+      "status": "PASS"
+    },
+    "strict_original_source_span": {
+      "minimum": 4,
+      "observed": 4,
+      "status": "PASS"
+    },
+    "sufficient_actual_delivered_source": {
+      "minimum": 7,
+      "observed": 6,
+      "status": "FAIL"
+    },
+    "native_temporal": {
+      "passed": 8,
+      "failed": 0,
+      "invalid": 0,
+      "unobserved": 0,
+      "comparison_no_regressions": true,
+      "status": "PASS"
+    },
+    "native_retrieval": {
+      "passed": 37,
+      "failed": 0,
+      "invalid": 0,
+      "unchanged_original_six_floors": "1.0",
+      "status": "PASS"
+    },
+    "native_upgrade_reopen_backup_rollback": {
+      "passed": 3,
+      "failed": 0,
+      "status": "PASS",
+      "scope": "Embedded native SurrealKV fixtures, exact signed/zero heat and timestamps, backup/reopen/rollback/replay contracts; does not establish remote-engine behavior."
+    }
+  },
+  "source_support": {
+    "strict_original": 4,
+    "alternate_sufficient_strict_misses": 2,
+    "insufficient": 1,
+    "insufficient_case": "922a0c56",
+    "premise_verdicts": {
+      "supported": 4,
+      "contradicted": 2,
+      "unknown": 1
+    },
+    "gold_or_label_changes": false
+  },
+  "paired_observations": {
+    "schema": "paired-full-history-heat-observations/v1",
+    "pairs": 7,
+    "attempts": 14,
+    "rows": [
+      {
+        "case_id": "0c6b0c60",
+        "legacy_process_s": 33.2414874160022,
+        "candidate_process_s": 31.440267541009234,
+        "legacy_assembly_ms": 20144.221250000002,
+        "candidate_assembly_ms": 18547.817958,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": true,
+        "candidate_strict_span": true,
+        "same_delivered_items": true,
+        "legacy_sha256": "3372f4ae62db990d52d9e8964dde95e41f9ff0d6709d81da16942280a7b27f3c",
+        "candidate_sha256": "58a42c11fc8d682b709bffa34a924f66f4a2fffd5197ff21639e5c3bd94f31b1"
+      },
+      {
+        "case_id": "6d975a08",
+        "legacy_process_s": 33.838221166981384,
+        "candidate_process_s": 31.427445667010034,
+        "legacy_assembly_ms": 19927.029625,
+        "candidate_assembly_ms": 18203.239083,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": false,
+        "candidate_strict_span": false,
+        "same_delivered_items": true,
+        "legacy_sha256": "e28d430b47284e719aa1339d3b96b2cebeb10fa5373beeaf6a3f1142af8f7d94",
+        "candidate_sha256": "ebd79a0441ab4afc5cd20eccc263350b8d197b4e80e19694c44c8f86a1952c27"
+      },
+      {
+        "case_id": "89a20f48",
+        "legacy_process_s": 31.723933875007788,
+        "candidate_process_s": 32.18418254199787,
+        "legacy_assembly_ms": 18485.395208,
+        "candidate_assembly_ms": 18259.486834,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": true,
+        "candidate_strict_span": true,
+        "same_delivered_items": true,
+        "legacy_sha256": "3473fd0c40f3dd4475c3e02cd3a1fc7cff7452a7d7d8dad937ddc950651723de",
+        "candidate_sha256": "06984ed6c0ce255b10e3fcd1b2b71166c7f90315f58ab5ee03f76082b5586164"
+      },
+      {
+        "case_id": "922a0c56",
+        "legacy_process_s": 40.759149999998044,
+        "candidate_process_s": 34.87701566598844,
+        "legacy_assembly_ms": 28819.234584,
+        "candidate_assembly_ms": 22950.712625,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": false,
+        "candidate_strict_span": false,
+        "same_delivered_items": true,
+        "legacy_sha256": "a19df81da1110d89551ec3368fb4f50b1e6cc8ebbe953b9663847eb3298a382b",
+        "candidate_sha256": "1f957e9ec8ec6139a314e0d5781a948cbaf9025cf57ee4c5fa635becb21b7ecd"
+      },
+      {
+        "case_id": "d6da3938",
+        "legacy_process_s": 36.871975709014805,
+        "candidate_process_s": 36.34665033299825,
+        "legacy_assembly_ms": 23201.442584,
+        "candidate_assembly_ms": 23455.798375000002,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": false,
+        "candidate_strict_span": false,
+        "same_delivered_items": true,
+        "legacy_sha256": "8fd46fd41a593ae2820660b3ee495cdd42cbfbef9a7572d42f45b84269f77c7f",
+        "candidate_sha256": "e03ae76705b02c2c425a0ab654d30784997ad939b12254fb20174e1fea9c2eb4"
+      },
+      {
+        "case_id": "f43926d9",
+        "legacy_process_s": 31.32772579198354,
+        "candidate_process_s": 30.05224258301314,
+        "legacy_assembly_ms": 19241.671749999998,
+        "candidate_assembly_ms": 18093.532750000002,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": true,
+        "candidate_strict_span": true,
+        "same_delivered_items": true,
+        "legacy_sha256": "630920faddec0019c48e79f3b7bd704933a950a406279b14be43523e6fb1e7c7",
+        "candidate_sha256": "9bea60ba8bb5a0fef4bb9a1ff94237fd21a44a8e55e3dac3cec03c8a21a3da02"
+      },
+      {
+        "case_id": "f61a096f",
+        "legacy_process_s": 37.82575087502482,
+        "candidate_process_s": 35.402435708005214,
+        "legacy_assembly_ms": 25411.940458,
+        "candidate_assembly_ms": 21129.958042,
+        "legacy_runtime_completed": true,
+        "candidate_runtime_completed": true,
+        "legacy_strict_span": true,
+        "candidate_strict_span": true,
+        "same_delivered_items": true,
+        "legacy_sha256": "de47cf8698e4dd1a740264dd5290569a387cc3418b377edbd2f7e5b281228b40",
+        "candidate_sha256": "83dfcf547d7ae5f2f0b744dd5470d35444cbba1782411b47d69482d076070d83"
+      }
+    ],
+    "legacy_runtime_completed": 7,
+    "candidate_runtime_completed": 7,
+    "legacy_strict_span": 4,
+    "candidate_strict_span": 4,
+    "all_delivered_items_equal": true,
+    "legacy_assembly_median_ms": 20144.221250000002,
+    "candidate_assembly_median_ms": 18547.817958,
+    "claim_boundary": "One pair per exposed case; all14 kept, no timeout substitution. Botharms7runtime completion in this capture, unlikehistorical922timeouts. Do not claim population latency benefit or source improvement from physical design."
+  },
+  "interpretation": {
+    "runtime": "Both arms completed7/7 in this capture, including legacy922 at40.75915 process seconds. Earlier censored legacy observations remain separate historical outcomes; no6/7->7/7 completion claim.",
+    "source": "Actual delivered content/quote UTF-8 bytes and fact/source identity equal for all7 paired contexts. Strict coverage4/7 and semantic source adequacy6/7 therefore remain unchanged.",
+    "latency": "One exposed pair per case with alternating order, no inference/heavy Cargo contention. Six candidate assemblies were shorter, but d6da3938 was slower by254.355791ms (23201.442584 ->23455.798375). The candidate89a20f48 process was also slower (31.723934 ->32.184183s), despite a shorter assembly. Do not infer a general speedup, variance, population effect, reader-answer improvement or substage/FTS rebuilding mechanism.",
+    "physical_change": "Migration/native contract validation PASS is separate from overall full-history source acceptance FAIL. No model reader was run as part of this source-only decision.",
+    "next_step": "A separately preregistered generic source-selection repair and deterministic controls are needed for the missing positional-toolbar evidence; do not retry or modify these frozen captures."
+  },
+  "hash_verification": {
+    "status": "PASS",
+    "checks": [
+      "All14 individual receipt SHA values match paired-observations.",
+      "All7 candidate receipt SHA values match independent source-review.",
+      "All3 pinned binary SHA values rechecked against retained local binaries.",
+      "Native product/evaluator identities match full-history execution pins.",
+      "Frozen protocol SHA matches execution identity.",
+      "All7 paired content and quote UTF-8 bytes plus fact/source IDs match."
+    ],
+    "inputs": {
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/protocol.json": "27f0610373d253fe7a375992a4884b5aea9937f2c2eaa5ea2cee70491cc3291b",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/execution-identity.json": "5f9ce83ef2ee08a066d9cbbd54001f21f9ede9684398658aab9e7c3b65cb48f2",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/snapshot-admission.json": "085af7364c1f50a2a6f90c90293aed2c47ba78ebdf8b0bf73406d25d9aaf389d",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/post-upgrade-readback.json": "3e7a89f8d06fac9c455b96bc2e91e510cbda7cf03507b8552d24a709c99831f5",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/reads-summary.json": "37ea427e59eefb8addedcdc89d4bbee995121d2c4c1426513ec26d224c8a0c23",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/paired-observations.json": "f59e1cd4b20936dd4fb3edf37eeec5223d7321b70e199d7dff4a6e63c07cadc9",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/source-support-review-v1.json": "235441065db59f6ea34ecf7393f791de08c0ff08feeb01c2d6f401a5339130dd",
+      "evals/results/native-v5-registered-2026-11-27/registration.json": "6a89312cf1289152426757fe2bdd5877c2105a29ae0645882f6cbdb52a445388",
+      "evals/results/native-v5-registered-2026-11-27/run.json": "26678c4666404e6e8640ea5c5b5357529f195625e7f50162319e121dae602768",
+      "evals/results/native-v5-registered-2026-11-27/retrieval.json": "b813cfec4811bc1780dd9a25d39fe7ef99b31e489316f81faac5d6272b809f7e",
+      "evals/results/native-v5-registered-2026-11-27/comparison.json": "2298273acffe51a8e7710033bd3135ddb025d2ac31e88407ccab385562ce067d",
+      "evals/results/native-v5-registered-2026-11-27/temporal-execution.json": "f7ef9a9dfe6813730f06735b37ee19843e6cb5bfe63574d3e57d82716feef9d9",
+      "evals/results/native-v5-registered-2026-11-27/retrieval-execution.json": "42543dcbeccd8864ca134ff4edc722602d54ae5f6ba3648114d57e789f814766",
+      "evals/results/fact-access-isolation-implementation-2026-11-27/native-upgrade-verification.log": "98d70c64969c5c8ecad5b7b3db698c93bb0c0c0e9146aee6c374798ce4c2b4e5",
+      "evals/results/fact-access-isolation-implementation-2026-11-27/source-review-v2.json": "a92c73ea7d258e5ad41f6334cc93590ec6224f3adc8642a49a928dabc1ffa93c",
+      "evals/results/fact-access-isolation-implementation-2026-11-27/binary-pins-v5.json": "ab9714bf2f99b35fe1ba7733dc38be2458318f6e91958fdc860fa0f95ba16d29",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/0c6b0c60.json": "3372f4ae62db990d52d9e8964dde95e41f9ff0d6709d81da16942280a7b27f3c",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/0c6b0c60.json": "58a42c11fc8d682b709bffa34a924f66f4a2fffd5197ff21639e5c3bd94f31b1",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/6d975a08.json": "e28d430b47284e719aa1339d3b96b2cebeb10fa5373beeaf6a3f1142af8f7d94",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/6d975a08.json": "ebd79a0441ab4afc5cd20eccc263350b8d197b4e80e19694c44c8f86a1952c27",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/89a20f48.json": "3473fd0c40f3dd4475c3e02cd3a1fc7cff7452a7d7d8dad937ddc950651723de",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/89a20f48.json": "06984ed6c0ce255b10e3fcd1b2b71166c7f90315f58ab5ee03f76082b5586164",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/922a0c56.json": "a19df81da1110d89551ec3368fb4f50b1e6cc8ebbe953b9663847eb3298a382b",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/922a0c56.json": "1f957e9ec8ec6139a314e0d5781a948cbaf9025cf57ee4c5fa635becb21b7ecd",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/d6da3938.json": "8fd46fd41a593ae2820660b3ee495cdd42cbfbef9a7572d42f45b84269f77c7f",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/d6da3938.json": "e03ae76705b02c2c425a0ab654d30784997ad939b12254fb20174e1fea9c2eb4",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/f43926d9.json": "630920faddec0019c48e79f3b7bd704933a950a406279b14be43523e6fb1e7c7",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/f43926d9.json": "9bea60ba8bb5a0fef4bb9a1ff94237fd21a44a8e55e3dac3cec03c8a21a3da02",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/legacy/f61a096f.json": "de47cf8698e4dd1a740264dd5290569a387cc3418b377edbd2f7e5b281228b40",
+      "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/candidate/f61a096f.json": "83dfcf547d7ae5f2f0b744dd5470d35444cbba1782411b47d69482d076070d83"
+    }
+  }
+}

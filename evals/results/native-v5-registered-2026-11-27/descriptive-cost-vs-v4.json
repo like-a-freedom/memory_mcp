@@ -1,0 +1,196 @@
+{
+  "schema": "native-retrieval-descriptive-cost/v1",
+  "old_artifact_sha256": "e12f3544956e57b28ad7e1c615cc3c7d5de391ab262d355c1d7b7a80f5cb159c",
+  "new_artifact_sha256": "b813cfec4811bc1780dd9a25d39fe7ef99b31e489316f81faac5d6272b809f7e",
+  "same_case_ids": true,
+  "old_wall_ms": 203020,
+  "new_wall_ms": 262009,
+  "rows": [
+    {
+      "case_id": "historical-observed-cutoff",
+      "old_ms": 429,
+      "new_ms": 402
+    },
+    {
+      "case_id": "http-task-16",
+      "old_ms": 5087,
+      "new_ms": 5866
+    },
+    {
+      "case_id": "http-task-paraphrase",
+      "old_ms": 7370,
+      "new_ms": 9768
+    },
+    {
+      "case_id": "http-task-short",
+      "old_ms": 3536,
+      "new_ms": 3744
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "old_ms": 6328,
+      "new_ms": 7091
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "old_ms": 6158,
+      "new_ms": 6897
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "old_ms": 7854,
+      "new_ms": 9466
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "old_ms": 9236,
+      "new_ms": 13581
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "old_ms": 7566,
+      "new_ms": 11179
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "old_ms": 9064,
+      "new_ms": 13185
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "old_ms": 7560,
+      "new_ms": 20959
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "old_ms": 8046,
+      "new_ms": 12114
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "old_ms": 5391,
+      "new_ms": 6818
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "old_ms": 7966,
+      "new_ms": 10450
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "old_ms": 8119,
+      "new_ms": 11118
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "old_ms": 6732,
+      "new_ms": 7991
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "old_ms": 7211,
+      "new_ms": 8772
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "old_ms": 5322,
+      "new_ms": 6483
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "old_ms": 5744,
+      "new_ms": 8514
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "old_ms": 7628,
+      "new_ms": 8923
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "old_ms": 8455,
+      "new_ms": 9998
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "old_ms": 6181,
+      "new_ms": 5774
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "old_ms": 7195,
+      "new_ms": 8157
+    },
+    {
+      "case_id": "logging-config",
+      "old_ms": 5960,
+      "new_ms": 6759
+    },
+    {
+      "case_id": "logging-correlation",
+      "old_ms": 4712,
+      "new_ms": 5387
+    },
+    {
+      "case_id": "logging-levels",
+      "old_ms": 4178,
+      "new_ms": 4360
+    },
+    {
+      "case_id": "logging-original",
+      "old_ms": 10298,
+      "new_ms": 12184
+    },
+    {
+      "case_id": "logging-russian",
+      "old_ms": 4418,
+      "new_ms": 4900
+    },
+    {
+      "case_id": "logging-sink",
+      "old_ms": 4214,
+      "new_ms": 4908
+    },
+    {
+      "case_id": "policy-denied-abstention",
+      "old_ms": 304,
+      "new_ms": 250
+    },
+    {
+      "case_id": "policy-public-evidence",
+      "old_ms": 439,
+      "new_ms": 362
+    },
+    {
+      "case_id": "qualified-other-project",
+      "old_ms": 465,
+      "new_ms": 420
+    },
+    {
+      "case_id": "timeline-atlas-q1-cross-project-abstention",
+      "old_ms": 409,
+      "new_ms": 408
+    },
+    {
+      "case_id": "timeline-atlas-q2-reverse-quarter",
+      "old_ms": 505,
+      "new_ms": 490
+    },
+    {
+      "case_id": "unknown-database",
+      "old_ms": 3270,
+      "new_ms": 3613
+    },
+    {
+      "case_id": "unknown-task",
+      "old_ms": 3078,
+      "new_ms": 3507
+    },
+    {
+      "case_id": "unknown-url",
+      "old_ms": 4583,
+      "new_ms": 5163
+    }
+  ],
+  "interpretation": "Both37/37 quality passed with same floors. V5 wall262.009s versus earlier203.020s is a descriptive adverse cost observation, not a paired isolated causal regression estimate. Include it rather than claim universal speedup; new registered full-history paired capture is separate."
+}

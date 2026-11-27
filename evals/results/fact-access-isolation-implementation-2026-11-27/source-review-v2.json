@@ -1,0 +1,144 @@
+{
+  "schema_version": "fact-access-implementation-source-review-v2",
+  "reviewed_at_utc": "2026-11-27T14:36:29.466721+00:00",
+  "reviewer": "semantic_review",
+  "method": "Read-only source and regression-contract review; no Cargo, inference, benchmark retry or label changes during this review. Only this versioned receipt and verbatim retained proof logs/driver were written.",
+  "scope": "Latest fact-access write/read/ranking/decay/archival/observer integration. Earlier migration fencing and readiness/reconciliation changes were implemented by this same reviewer and are not claimed as independently authored review findings.",
+  "source_sha256": {
+    "crates/memory-mcp/src/memory/fact_access_store.rs": "332523d22066c4a495a48fd334d74b636e50298271fc1b1eb08e19ed172cb6a2",
+    "crates/memory-mcp/src/memory/retrieval/pipeline.rs": "8201933ee4ebfdf0b21c04e4127ae84758d10a2bc505999c18d73429c4f9c6e2",
+    "crates/memory-mcp/src/memory/retrieval.rs": "f7f63a9cf62b7ab43bb8b6ebee837d9152314ae0f36a19dffbd27b77e4d451ab",
+    "crates/memory-mcp/src/memory/retrieval/ranking.rs": "6e9564974e588f3e715df1ec74e80aa566d7bf2fb77d7583a3dd95ec60864daf",
+    "crates/memory-mcp/src/memory/lifecycle_workers/decay.rs": "7e8aa064023f6cec460737d91507a6e3ea72a183df51d0c4652bb62d4a501e91",
+    "crates/memory-mcp/src/memory/lifecycle_workers/archival.rs": "e3fc2ae5217834b187484a044b884ee4245c2f813e45aedc52bd62890b308aff",
+    "crates/memory-mcp/src/storage/client.rs": "5c2d76867de1d9b525abde286aa23f5bf1166f2714d10dea752ad4b5e932bf4f",
+    "crates/memory-mcp/src/storage/migrations.rs": "66bb404d7510ea00c4380aa9dc74f1cce6f70862ac54c7bb10cbaa150155fffc",
+    "crates/memory-mcp/src/storage/table_scope.rs": "fa82f24ae92f4b3d576a2e80d2c3540bead2de0e5120cc5a4134944f13002687",
+    "crates/memory-mcp/migrations/057_fact_access_isolation.surql": "29f1ac9f38f69859f85c0cc0b0fe2cddbbe3b96c24c44b715ddf484575fe00bb",
+    "crates/memory-mcp/tests/fact_access_upgrade.rs": "6c340750b4aebed60b3c3968131e86cea244fbbde222119584b5c3944a553eaa",
+    "crates/memory-mcp/tests/fact_access_concurrency.rs": "4db788db7a50fe72246e341b60184f0fa7bf0061fa56630388ed963a6b338987",
+    "crates/memory-mcp/tests/fact_access_payload.rs": "2f2c08730cdaa9903a925b16f66e3ebcbbbbdd5e3700e87bef9524b6e6e9bfd7",
+    "crates/memory-mcp/tests/lifecycle_archival.rs": "5264ebc258c639bfa594fb729a1fc131947425886fe7cfc63b51695c7ea5879e",
+    "crates/memory-mcp/tests/lifecycle_decay.rs": "c8b8578499b708efa14f958a56d842cc9642f41a124e66b2faf94df0faadb6d1",
+    "crates/memory-mcp/tests/explain_provenance.rs": "558d14bc101ff7144780bf36fed741eb2c889f6b8b9e57e62f1409a1453f1b0c",
+    "crates/memory-mcp/tests/service_integration.rs": "890381471e9eb31c9f0fb3b476db705ca83c194bd55a7ce3155061ced7632b9c",
+    "crates/memory-mcp/tests/full_history_evidence.rs": "310c1c952e9e84a55a24060df7bf3d1bb93ab47134b0fbfe02dbee5e22a68249",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md": "57a4d84ba64c836c9208003cacd15cad35497376fdcf49ba9551bccf2de09089"
+  },
+  "checks": [
+    {
+      "id": "ranking-overlay",
+      "status": "no_actionable_finding",
+      "basis": "All seven typed channel vectors participate in the same overlay before build_ranked_context_facts and novelty_factor; existing channel collection performs access/kind filtering. Distinct exact-key batching is owned by read_fact_accesses. No gold/question-specific selection was introduced in this change."
+    },
+    {
+      "id": "read-errors-and-absence",
+      "status": "no_actionable_finding",
+      "basis": "Missing side rows become zero heat by explicit contract. Database/read-shape/deserialization/timestamp errors propagate instead of becoming a cold ranking. At most 64 distinct validated keys are bound per read query."
+    },
+    {
+      "id": "write-arithmetic-and-ownership",
+      "status": "no_actionable_finding",
+      "basis": "First access projects only persisted source_episode inside the transaction; subsequent accesses modify only side metadata. Both signed saturation branches guard addition; zero boost still stamps time. Bound values, namespace client enforcement, shared retry adapter and awaiting/four-wide cancellation ownership remain in place."
+    },
+    {
+      "id": "decay-preflight",
+      "status": "no_actionable_finding",
+      "basis": "Every candidate ID and every side-stat batch are read/validated before the first retraction. Positive count plus recent timestamp preserves the prior protection predicate. Controlled read failure regression exists through the public decay seam."
+    },
+    {
+      "id": "archival-predicates",
+      "status": "no_actionable_finding",
+      "basis": "Single and batched side-store queries use source_episode and inclusive recent timestamp without requiring positive count or valid fact. Worker obtains both active-fact and hot-episode sets before mutation; batched request size remains 64."
+    },
+    {
+      "id": "historical-and-other-views",
+      "status": "no_actionable_finding",
+      "basis": "Revision-safe historical path bypasses current heat hydration and tracking. Other view semantics and existing synthetic-identity filtering remain unchanged."
+    },
+    {
+      "id": "snapshot-observer",
+      "status": "no_actionable_finding",
+      "basis": "Separate ignored upgrade action uses the explicitly supplied disposable store and performs migration outside the steady-read observer. Query observer and actual source/evidence capture do not inject missing evidence or relax reader labels. The caller remains responsible for supplying a disposable closed-store clone."
+    },
+    {
+      "id": "caller-fixtures",
+      "status": "no_actionable_finding",
+      "basis": "Examined lifecycle/explanation/service fixtures use actual side-store writes or side-store readback where heat behavior is tested; immutable fact assertions remain. Concurrency fixture exercises the public read seam and gates actual side-write SQL."
+    },
+    {
+      "id": "native-recovery-and-rollback",
+      "status": "no_actionable_finding",
+      "basis": "Inspected current native test, exact operator script, runbook and retained final 3/3 log. Verified bounded exact assignment/reconciliation, replay, offline handle closure, reopen and separate backup restoration; constraints and untested predecessor/remote boundaries are explicit."
+    }
+  ],
+  "actionable_findings": [],
+  "limitations": [
+    "Static review is not proof of correctness for all possible states.",
+    "This artifact does not qualify full-history completion, delivered evidence, reader correctness, latency improvement or C2 utility; those require the unchanged registered executions.",
+    "Exact source hashes define the reviewed snapshot; later edits require checking scope of drift.",
+    "Workspace lib/integration/clippy checks were still running under the root agent; no result is inferred here."
+  ],
+  "prior_locally_observed_regression_results": {
+    "migration_module": "30/30 passed; /tmp/memory-migration-exact-types-green.log",
+    "upgrade_integration": "8/8 passed; /tmp/memory-migration-reconciliation-upgrade-green.log"
+  },
+  "supersedes_review": {
+    "path": "evals/results/fact-access-isolation-implementation-2026-11-27/source-review-v1.json",
+    "sha256": "cbe09f32722bf6e4cdeceb455d99146796a1699dda05bda0007101cf71d84447",
+    "retained_immutable": true
+  },
+  "additional_reviewed_source_sha256": {
+    "crates/memory-mcp/tests/fact_access_native_upgrade.rs": "45d1de2ff7d88e83579469a5e227ffe655b6c58ae1d8490c7271f010792480bc",
+    "crates/memory-mcp/operations/fact_access_rollback_batch.surql": "31b049ec073904453ee65e4cbdf2a08863d32638a0b947656a5f11c765e08b48",
+    "docs/operations/FACT_ACCESS_UPGRADE.md": "b01ed4bcc618b290aa6749879e2d2517804223c077cde8048a3a44a2999c1b81"
+  },
+  "post_format_reinspection": {
+    "changed_paths_relative_to_v1": [
+      "crates/memory-mcp/src/memory/retrieval/pipeline.rs",
+      "crates/memory-mcp/src/memory/lifecycle_workers/decay.rs",
+      "crates/memory-mcp/src/storage/table_scope.rs",
+      "crates/memory-mcp/tests/fact_access_upgrade.rs",
+      "crates/memory-mcp/tests/full_history_evidence.rs"
+    ],
+    "result": "No semantic drift identified on reinspection: seven-channel overlay remains before fusion; decay preloads all heat before mutation; side-table owner registration remains intact; upgrade/fault fixtures and observer keep the same contracts. Historical revision-safe route still deliberately omits mutable heat.",
+    "comparison_limit": "V1 pins digests, not full before-format file copies; this is source reinspection, not an automated proof that every byte difference is whitespace."
+  },
+  "native_proof": {
+    "status": "3/3 passed in retained local native SurrealKV log",
+    "evidence": {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/native-upgrade-verification.log",
+      "sha256": "98d70c64969c5c8ecad5b7b3db698c93bb0c0c0e9146aee6c374798ce4c2b4e5"
+    },
+    "source": "crates/memory-mcp/tests/fact_access_native_upgrade.rs",
+    "operator_script": "crates/memory-mcp/operations/fact_access_rollback_batch.surql",
+    "runbook": "docs/operations/FACT_ACCESS_UPGRADE.md",
+    "observed_coverage": [
+      "Closed-store byte-manifest backup and restore into a separate path; backup unchanged after upgraded-store operations.",
+      "Migration through reopened native store, exact signed count and timestamp-only heat, immutable fact fields and retained empty cold fact.",
+      "Real post-cutover side heat, explicit writer/client closure before operator reopen, replayable rollback pages of 128 and 2 keys, then reopen and exact legacy-value verification.",
+      "Whole-page rollback rejection for inconsistent identity and rejection of more than 128 requested keys."
+    ],
+    "retained_prior_failure": {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/native-upgrade-harness-close-failure.log",
+      "sha256": "053c3718112e628be60b697cece1fd2a94dbe828ef069e07a78f00f3320c4bfd"
+    },
+    "boundary": "The earlier failed native attempt is retained; final 3/3 is after fixing test handle ownership. Fixture simulates predecessor state using the same locked native engine; it does not boot the predecessor binary or verify a remote deployment. Log was inspected, not rerun by this reviewer."
+  },
+  "decay_fault_regression_review": {
+    "genuine_red": {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/decay-owner-genuine-red.log",
+      "sha256": "a57fe7f41655d634b90b76eb8c32d9786af7b623d7a1016a6e36d2427f31eea8"
+    },
+    "counterfactual_driver": {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/decay-owner-counterfactual.py",
+      "sha256": "d8d42bd3b78ae3bf91747a1ee38052316caf9c32e1545028d9e85036ae5f0e7a"
+    },
+    "excluded_nondiscriminating_attempt": {
+      "path": "evals/results/fact-access-isolation-implementation-2026-11-27/decay-owner-nondiscriminating-control.log",
+      "sha256": "c98e128bcfc2c37a9b58c319b73a31a4e4d51b2f8387b7786497de2d4fcc12df"
+    },
+    "finding": "Current controlled adapter forwards transaction_query to the real client, so the Knowledge close owner can actually retract under the original HEAD decay path. Genuine retained counterfactual RED reports outcome 1 where failure was required; final current integration target previously passed 8/8. Initial old-path test passed before adapter transaction delegation and is explicitly excluded as regression evidence.",
+    "not_counted_as_red": "decay-owner-nondiscriminating-control.log"
+  }
+}

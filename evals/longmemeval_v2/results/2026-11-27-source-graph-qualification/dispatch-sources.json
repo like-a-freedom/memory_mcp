@@ -1,0 +1,18 @@
+{
+  "schema": "reader-graph-dispatch-sources/v1",
+  "files": [
+    {
+      "path": "registration-driver.source.py",
+      "sha256": "d8612ea3a85d8372add5e3833b51727586a25c037eef78984fac23a363d47ca6"
+    },
+    {
+      "path": "capture-launcher.source.py",
+      "sha256": "45604967b7fa3e0bca2ed526458927ae28c62aa89578b9d95c5e92437abada29"
+    },
+    {
+      "path": "owned-server.source.py",
+      "sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec"
+    }
+  ],
+  "scope": "Exact registration/capture/server drivers; archive only, do not replay exposed capture. No model output selection."
+}

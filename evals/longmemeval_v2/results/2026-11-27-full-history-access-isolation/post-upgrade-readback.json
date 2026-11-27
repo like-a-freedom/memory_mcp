@@ -1,0 +1,1213 @@
+{
+  "episode_count": 151,
+  "episodes": [
+    {
+      "content_bytes": 35234,
+      "content_sha256": "0423e4148e61760c127c3682e037732b468690912edf5a3e507dc7b93d8c4988",
+      "episode_id": "episode:7db83031cf064f5ecbd95e58",
+      "source_id": "longmemeval_v2_trajectory_0423e4148e61760c127c3682e037732b468690912edf5a3e507dc7b93d8c4988_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:05:02.573361Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 35168,
+      "content_sha256": "b82e0dad5e20c0c27ea64358cc497692074f816dd78a3a7523efc5fb3ac97c5a",
+      "episode_id": "episode:53da6a241a249938c571a0f8",
+      "source_id": "longmemeval_v2_trajectory_b82e0dad5e20c0c27ea64358cc497692074f816dd78a3a7523efc5fb3ac97c5a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:05:07.561771Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 86868,
+      "content_sha256": "e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1",
+      "episode_id": "episode:3fd1796a0f590ac946fedf12",
+      "source_id": "longmemeval_v2_trajectory_e375c44fd864d93d22c147ae2c1b91d4b167c95ff8a18b5aede021c30ed7ace1_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:05:12.437247Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 382024,
+      "content_sha256": "be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a",
+      "episode_id": "episode:28a05ac3465896dd0fa1dd41",
+      "source_id": "longmemeval_v2_trajectory_be216359e72b34dba8834b7fece20608f0ad675b985e316e10d7f764acf69d5a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:05:18.912995Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 868764,
+      "content_sha256": "16ad32bfa765d6f94beecde6688eb2508e952e42b7fee0c94068011789affbc3",
+      "episode_id": "episode:f3132a237811b717abc4ef2d",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:05:26.429029Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 978123,
+      "content_sha256": "5599d125a6fa9c672b8c1a287574f325f1f6ef897283a498839aa1ee4d08164d",
+      "episode_id": "episode:3d5f0dc7c5d0358209265e67",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:05:46.605341Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1040517,
+      "content_sha256": "b787fe46f67f8ebcf1f2286a69261d2156bd708e07640857f3eafe0ebfa54bae",
+      "episode_id": "episode:bdfc18a28d606a716e882f10",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:05:59.747588Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 985092,
+      "content_sha256": "c12342ea7354959cc4d21de964425893d5a4d765967393f063b2e3feabc4bff2",
+      "episode_id": "episode:ae4c5d5a16b463452772f08e",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:06:15.501218Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 804658,
+      "content_sha256": "438f3c7b505a445cbc8cb5ad6335ab72c7777b7e4949176471c40f8d75595ec7",
+      "episode_id": "episode:751dce326043631881f9bf3b",
+      "source_id": "longmemeval_v2_trajectory_ac60ce61abf44022afb2559d937c4c8d1648e489020b820ac7ef39cf5489ed90_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T12:06:39.231489Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 98426,
+      "content_sha256": "992cb34011cd3ebe0763b9a2acd18bd763099cfc6b4afbcf13427f371c3a5a09",
+      "episode_id": "episode:7bc44986934ed2330ecc86c1",
+      "source_id": "longmemeval_v2_trajectory_992cb34011cd3ebe0763b9a2acd18bd763099cfc6b4afbcf13427f371c3a5a09_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:07:09.659890Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 54100,
+      "content_sha256": "29229cb1d4014cc300669eac5b43b3516588a83817a84b5e5be78928e87ea8b6",
+      "episode_id": "episode:4a18d063c1f4b598fc161ad5",
+      "source_id": "longmemeval_v2_trajectory_29229cb1d4014cc300669eac5b43b3516588a83817a84b5e5be78928e87ea8b6_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:07:20.775681Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 766174,
+      "content_sha256": "6bfba0781cfe2b33cc552dd5e30a177da8fff9899fd439e4dd814b495859b569",
+      "episode_id": "episode:3095101bf2f2eabf80ee7d70",
+      "source_id": "longmemeval_v2_trajectory_6bfba0781cfe2b33cc552dd5e30a177da8fff9899fd439e4dd814b495859b569_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:07:27.117013Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 689391,
+      "content_sha256": "abb1a43234fe57b81df5c746e038af606201a4d3a2da9183de7efab9a2645a8f",
+      "episode_id": "episode:84ce64138c9ef18c964835de",
+      "source_id": "longmemeval_v2_trajectory_abb1a43234fe57b81df5c746e038af606201a4d3a2da9183de7efab9a2645a8f_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:07:42.898610Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 198687,
+      "content_sha256": "0359e840308699f68c92c03dab2eebefaffdcfa7a7ddca8be8b316d01bad4b65",
+      "episode_id": "episode:5815c66b67752facab63e530",
+      "source_id": "longmemeval_v2_trajectory_0359e840308699f68c92c03dab2eebefaffdcfa7a7ddca8be8b316d01bad4b65_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:07:55.171271Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 298064,
+      "content_sha256": "896d22d952043eb7b4dca0f6b7f0305b3758d7e7d65f5e03e450476d1dc04b55",
+      "episode_id": "episode:580e6c98ac5da4220f7f690d",
+      "source_id": "longmemeval_v2_trajectory_896d22d952043eb7b4dca0f6b7f0305b3758d7e7d65f5e03e450476d1dc04b55_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:08:05.569214Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 128008,
+      "content_sha256": "0de5f3106aca215c88df6020c7aa6ae9ca72dd0bd1e476201a47719d86d36cea",
+      "episode_id": "episode:c69c48b60dc971c4f13edec7",
+      "source_id": "longmemeval_v2_trajectory_0de5f3106aca215c88df6020c7aa6ae9ca72dd0bd1e476201a47719d86d36cea_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:08:16.809870Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1000500,
+      "content_sha256": "13e9d2ce7b3dd1251c9637653cb06f662b8d04b2a501a732e17dcd6646d79d15",
+      "episode_id": "episode:9d6c045f723f6e7fa8125886",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:08:29.806380Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1033851,
+      "content_sha256": "9794e3866fb9c51417e8d1608ffff7831e2526af8953fa3e39710193700ff375",
+      "episode_id": "episode:43358c9c6d5cf0b0f6755263",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:08:50.074430Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1034592,
+      "content_sha256": "949921c51854153b6f9c2b8768dc276fe62c8e3a350aba882728008ab89d33fe",
+      "episode_id": "episode:a7e7965798e0375046fc7cd1",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:09:00.620485Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1039593,
+      "content_sha256": "b1ed433bcf08c9c4977364fc96dbc1e7934f554a9c55f2973acf7ac6ca29e313",
+      "episode_id": "episode:98f83eb09de10901a31b942e",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:09:10.803804Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 897630,
+      "content_sha256": "b5bd214625ae906050da737d008fafc78b73df6f4ce526a36660a3841cf25df4",
+      "episode_id": "episode:0fda107e6fef8a0c740a635a",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T12:09:21.457042Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 862416,
+      "content_sha256": "b525313d9e0ccd3adfef2b31498fe868420e952a54344d8bbbf727c783257915",
+      "episode_id": "episode:a47cfbef26f3beb07eaf31cd",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000005",
+      "t_ingested": "2026-11-27T12:09:35.959402Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 865803,
+      "content_sha256": "0607e6810cb1fb3fe6dd6f017462ba64e12c703fc60ebfd6eb76c13388497b95",
+      "episode_id": "episode:2b8c67132c2a3c500b0391a5",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000006",
+      "t_ingested": "2026-11-27T12:09:55.280073Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 865684,
+      "content_sha256": "a5c6f002e53a3c8ace5193ddc782c82c1e7d303849dfaaae033c31635f9e06e0",
+      "episode_id": "episode:6f372a9681b0a458e8a43288",
+      "source_id": "longmemeval_v2_trajectory_0f157d6208482f5f59a7a34c3c9c3045b3315c41840ebead72a5caec6b71613a_ordered-segments-v1_00000007",
+      "t_ingested": "2026-11-27T12:10:12.132461Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 92346,
+      "content_sha256": "ff9029dfddbb2428d167862a77bae65379356bee4a229410895f547a43f503bf",
+      "episode_id": "episode:ff19eaaf91ae1a1c046eacfb",
+      "source_id": "longmemeval_v2_trajectory_ff9029dfddbb2428d167862a77bae65379356bee4a229410895f547a43f503bf_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:10:29.499368Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 41006,
+      "content_sha256": "153436ab2ce8e5a85413f952df00b96563e4223e6763d9fb8b074e265d582515",
+      "episode_id": "episode:2a18f20d229662ac349b3550",
+      "source_id": "longmemeval_v2_trajectory_153436ab2ce8e5a85413f952df00b96563e4223e6763d9fb8b074e265d582515_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:10:39.553840Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1004187,
+      "content_sha256": "9549efef5335decc74356c2db7e7ba587e5b18353c1c97180306ae1e2fc51efc",
+      "episode_id": "episode:2b3acb44b88f36a0ee1a4a2a",
+      "source_id": "longmemeval_v2_trajectory_f59c04850c9628409a50ad3bb76f0221d08d4f03f991e7a90c035e0d6e1078dc_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:10:47.583642Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1040405,
+      "content_sha256": "48c28e66183f0aee54c394336444abd72491c75833f78dbd63008d78b8cc0bfa",
+      "episode_id": "episode:a43ad06d66d9c825df6c3b04",
+      "source_id": "longmemeval_v2_trajectory_f59c04850c9628409a50ad3bb76f0221d08d4f03f991e7a90c035e0d6e1078dc_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:11:44.836818Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 753200,
+      "content_sha256": "147df2a2cf30844ea29439bb5c29d835a9207a9cab6027c59a811231b35147c2",
+      "episode_id": "episode:6d69935bc49f88e101d2892e",
+      "source_id": "longmemeval_v2_trajectory_f59c04850c9628409a50ad3bb76f0221d08d4f03f991e7a90c035e0d6e1078dc_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:13:20.372026Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 769984,
+      "content_sha256": "8e4fabb42d07848ba1414e10d8084383cf0f4999055ea991a03f467d0af38d4f",
+      "episode_id": "episode:078fdde6670a601d57926268",
+      "source_id": "longmemeval_v2_trajectory_f59c04850c9628409a50ad3bb76f0221d08d4f03f991e7a90c035e0d6e1078dc_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:13:54.624261Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 23584,
+      "content_sha256": "5580d671eee7b103ece38ff85bbe487882faf29f3c030d31c1988a9fa784e234",
+      "episode_id": "episode:a46f72d212b7c071c09c6027",
+      "source_id": "longmemeval_v2_trajectory_5580d671eee7b103ece38ff85bbe487882faf29f3c030d31c1988a9fa784e234_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:14:37.303567Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 361830,
+      "content_sha256": "af10208ac3c603b58e7180fffc1b0d0a16f5d17586b92925746c4f13dd7c4745",
+      "episode_id": "episode:c23dc3490c109068644c816e",
+      "source_id": "longmemeval_v2_trajectory_af10208ac3c603b58e7180fffc1b0d0a16f5d17586b92925746c4f13dd7c4745_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:14:43.753785Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 335639,
+      "content_sha256": "395ba7c777301e5c9a8fe504596c752376982ab5247ce890caf9852e7185b700",
+      "episode_id": "episode:76512a619b8020e2c35bfb0b",
+      "source_id": "longmemeval_v2_trajectory_395ba7c777301e5c9a8fe504596c752376982ab5247ce890caf9852e7185b700_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:15:19.719972Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 116679,
+      "content_sha256": "494f1993d6788bf2e050c1feff01d36da8f23cf831abe57e390328b269b4e4e8",
+      "episode_id": "episode:65c5e762726b34da5ccf14bb",
+      "source_id": "longmemeval_v2_trajectory_494f1993d6788bf2e050c1feff01d36da8f23cf831abe57e390328b269b4e4e8_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:15:45.753037Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 44945,
+      "content_sha256": "a99ab5eb7f1910055d0936dca21dfb40773830ce438b7a4ffc6291bfc0562b79",
+      "episode_id": "episode:533fe7e7c976804e6b186e02",
+      "source_id": "longmemeval_v2_trajectory_a99ab5eb7f1910055d0936dca21dfb40773830ce438b7a4ffc6291bfc0562b79_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:16:01.867379Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 96673,
+      "content_sha256": "444446fb227fa5d733c6ba688f39696315a42b898a197aec3ea0edeb245831a1",
+      "episode_id": "episode:caec2f02d529adcdb383ab74",
+      "source_id": "longmemeval_v2_trajectory_444446fb227fa5d733c6ba688f39696315a42b898a197aec3ea0edeb245831a1_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:16:11.212817Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 67366,
+      "content_sha256": "9b820a2d8b807f3e43396dc762ad93f99d8825c260fc9fd6f53d497a87db822b",
+      "episode_id": "episode:67802ce77c4301cff11f2042",
+      "source_id": "longmemeval_v2_trajectory_9b820a2d8b807f3e43396dc762ad93f99d8825c260fc9fd6f53d497a87db822b_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:16:22.197590Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 59491,
+      "content_sha256": "0c4a214e66fb83ebb68e07357bfcaa3007b8dc71aca461d1d7ffa3f2f5abf64e",
+      "episode_id": "episode:d15c6332e98036e1b4cbe1a4",
+      "source_id": "longmemeval_v2_trajectory_0c4a214e66fb83ebb68e07357bfcaa3007b8dc71aca461d1d7ffa3f2f5abf64e_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:16:31.720619Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 283084,
+      "content_sha256": "4d90e106294105363aec53bc19f4fe69c2f4f1f55663babcbadf1f2aa78279a9",
+      "episode_id": "episode:8465fc4122f364dc54363eb7",
+      "source_id": "longmemeval_v2_trajectory_4d90e106294105363aec53bc19f4fe69c2f4f1f55663babcbadf1f2aa78279a9_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:16:41.422905Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 194700,
+      "content_sha256": "c7c1b45efdc68eeca4226dd9c180a77c849f136f280747db5890a8d0cf960b47",
+      "episode_id": "episode:0f8e7a1fe5e3390cf66a19df",
+      "source_id": "longmemeval_v2_trajectory_c7c1b45efdc68eeca4226dd9c180a77c849f136f280747db5890a8d0cf960b47_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:17:14.290623Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 96508,
+      "content_sha256": "33c1cc2af8cad4510a0e41c5acdf4826899a74815a248f5941fd7e204b8892b5",
+      "episode_id": "episode:65d4d5747970b28dc79b230d",
+      "source_id": "longmemeval_v2_trajectory_33c1cc2af8cad4510a0e41c5acdf4826899a74815a248f5941fd7e204b8892b5_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:17:38.390700Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 66060,
+      "content_sha256": "06422c46f584aed1a6bec50ddefde3d5e3c37061157114cef4692d7f4dd7cea5",
+      "episode_id": "episode:88aae65596a1cd0c9703e401",
+      "source_id": "longmemeval_v2_trajectory_06422c46f584aed1a6bec50ddefde3d5e3c37061157114cef4692d7f4dd7cea5_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:17:50.249939Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 99283,
+      "content_sha256": "89bf3f9d647dfe3a4e946985e04a64ee56849a82976739ed30e8272d5b34b963",
+      "episode_id": "episode:60405401184c6fd738d5a1bb",
+      "source_id": "longmemeval_v2_trajectory_89bf3f9d647dfe3a4e946985e04a64ee56849a82976739ed30e8272d5b34b963_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:18:05.092671Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 59676,
+      "content_sha256": "b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874",
+      "episode_id": "episode:ec03490ff27b058f0a75e1a1",
+      "source_id": "longmemeval_v2_trajectory_b9a97d33842f07cdadbf2a6cb1d30ff2c7b317ad67c0882b8bbc922eeab3d874_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:18:18.578397Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1047521,
+      "content_sha256": "8ff362753e2eb0e3a5cb16b7a50e5bc2d1188dcdf649f22a6417b70c69f78852",
+      "episode_id": "episode:03a958e0e9d8b65fcb792337",
+      "source_id": "longmemeval_v2_trajectory_7ce3544e7fb30ab23bd4aca8187c36dcde76e396d5721892ea4e70cb67380697_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:18:29.195434Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 524358,
+      "content_sha256": "e7455efc68f406e6fc492ff47a7b65c22dc92e1db2c9ac1cd1831d74213465d9",
+      "episode_id": "episode:1119ef99327e8a6c94dd1d54",
+      "source_id": "longmemeval_v2_trajectory_7ce3544e7fb30ab23bd4aca8187c36dcde76e396d5721892ea4e70cb67380697_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:19:09.002617Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 941429,
+      "content_sha256": "991726e969e5f37e17a59bfefb6da5cee6793426a0f3aa17dc27476432d9e89d",
+      "episode_id": "episode:25f8ea222207e0ea9b8ee1a3",
+      "source_id": "longmemeval_v2_trajectory_251125f4a4a32e6ee8a633f905e9e99a8f85dec6825ba06e473eb086f2cf139f_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:19:31.458455Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 648697,
+      "content_sha256": "d2b3e2abfefe478d9b4da136d93d395a8a659feed8ca8de4237072164873a015",
+      "episode_id": "episode:266de6f446404d67586c469c",
+      "source_id": "longmemeval_v2_trajectory_251125f4a4a32e6ee8a633f905e9e99a8f85dec6825ba06e473eb086f2cf139f_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:20:30.151501Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 438583,
+      "content_sha256": "532f0588ce58582ab554d77e38182f48ad0e0f4c913d7bef00cf4991933e7233",
+      "episode_id": "episode:cfcf8370370671ba1f95488b",
+      "source_id": "longmemeval_v2_trajectory_532f0588ce58582ab554d77e38182f48ad0e0f4c913d7bef00cf4991933e7233_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:21:02.850634Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 147695,
+      "content_sha256": "a7d0960c4fbc1e1cc4aedcdabd4faeafbdfc2104d45a90123ee3bdf6c1aad8ae",
+      "episode_id": "episode:f060dff177f5ba9019228847",
+      "source_id": "longmemeval_v2_trajectory_a7d0960c4fbc1e1cc4aedcdabd4faeafbdfc2104d45a90123ee3bdf6c1aad8ae_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:21:19.450209Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 242192,
+      "content_sha256": "57e097dc4b5128349f6f6e4235f88ac7b6338e97073335a764263afe8cbacb4b",
+      "episode_id": "episode:4d4881b16cab7d96193e9bde",
+      "source_id": "longmemeval_v2_trajectory_57e097dc4b5128349f6f6e4235f88ac7b6338e97073335a764263afe8cbacb4b_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:21:30.188198Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 23632,
+      "content_sha256": "88f43aba3e16c6534ac1c740139cf9928e363fc9cd2da84a0bbe09ece0649792",
+      "episode_id": "episode:7d79299745d4547f5c5ee14c",
+      "source_id": "longmemeval_v2_trajectory_88f43aba3e16c6534ac1c740139cf9928e363fc9cd2da84a0bbe09ece0649792_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:21:58.523919Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 390995,
+      "content_sha256": "3b0aa7679f1a2d714ab987eda78e93e9a7f9d1b0f06d915b4f6c7478270eb7bc",
+      "episode_id": "episode:690b2556e441b4960de2616a",
+      "source_id": "longmemeval_v2_trajectory_3b0aa7679f1a2d714ab987eda78e93e9a7f9d1b0f06d915b4f6c7478270eb7bc_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:22:06.215230Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 92399,
+      "content_sha256": "065b0391ad9e6b4119ce1c7d2e79af722079840d337885b88dbe85f0e06f0441",
+      "episode_id": "episode:46d432b9679cac7cad7bab35",
+      "source_id": "longmemeval_v2_trajectory_065b0391ad9e6b4119ce1c7d2e79af722079840d337885b88dbe85f0e06f0441_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:22:26.096291Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 246635,
+      "content_sha256": "d5990b6012b496ec359e52ac9989ecd5bced0974aa63eaf373a2661bbb663064",
+      "episode_id": "episode:c5412ee302e1ea9b5dd860eb",
+      "source_id": "longmemeval_v2_trajectory_d5990b6012b496ec359e52ac9989ecd5bced0974aa63eaf373a2661bbb663064_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:22:39.306887Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 461035,
+      "content_sha256": "73701a94f8fa54efb55959dacf8fa95bd5b7180f68033a4411d641615822ee2f",
+      "episode_id": "episode:4663f426035fce749d267900",
+      "source_id": "longmemeval_v2_trajectory_73701a94f8fa54efb55959dacf8fa95bd5b7180f68033a4411d641615822ee2f_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:23:00.403378Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 126617,
+      "content_sha256": "baab8a1a866575f17a56bc0937c518e5979f9105c65b37ce35a7d6d681e51c50",
+      "episode_id": "episode:724624f8828e3f56e8852267",
+      "source_id": "longmemeval_v2_trajectory_baab8a1a866575f17a56bc0937c518e5979f9105c65b37ce35a7d6d681e51c50_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:23:26.943616Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 397512,
+      "content_sha256": "3b9797e2139ace7183acf46e7e355fc14ac1f78bfd4cebff2c7f6c01aaa4709a",
+      "episode_id": "episode:4003005097c74478a11d3574",
+      "source_id": "longmemeval_v2_trajectory_3b9797e2139ace7183acf46e7e355fc14ac1f78bfd4cebff2c7f6c01aaa4709a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:23:42.239271Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 127100,
+      "content_sha256": "e84113c8311ce1c14dc94e6cea736b36fbed7c2f1af1eccc818cd932278b44be",
+      "episode_id": "episode:035ae5d434bc3c4209e6389e",
+      "source_id": "longmemeval_v2_trajectory_e84113c8311ce1c14dc94e6cea736b36fbed7c2f1af1eccc818cd932278b44be_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:23:57.911883Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 831631,
+      "content_sha256": "57c6514d29b84c5950479690f3babf91e025b6663e2e080266942e88ddc0cf07",
+      "episode_id": "episode:de6c79531ee685f614e42767",
+      "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:24:17.635853Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1041293,
+      "content_sha256": "2efca6db81437a3ea5e5ea451ec7452127bf6d0bd6d898863e9c175ea1f93781",
+      "episode_id": "episode:af97d4740044e06d0961c30b",
+      "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:25:09.685262Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1042522,
+      "content_sha256": "8c34acc5b263a7e8c2304fe01b4ba52dab6726baaa4bc5c5de14feea715ee33f",
+      "episode_id": "episode:b84533a13a1011ebae3e0f9d",
+      "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:25:44.320465Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 700215,
+      "content_sha256": "a83fed85f28f8002db935acba47c9c688277e8ab801106f1f5fca8ccef35aa1c",
+      "episode_id": "episode:8d0bcc21cb6b9817914bee74",
+      "source_id": "longmemeval_v2_trajectory_7d3b5b5d5928d80b246f0ef99768e8f8adb02b030803fab4a177d1ebfffc8fc7_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:26:03.372783Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 66293,
+      "content_sha256": "94675b4315a023dd1d22d876b9f5d6985536afcbc7fe936386eab51f2a9ea26a",
+      "episode_id": "episode:8122e2256e17c9af60a0292f",
+      "source_id": "longmemeval_v2_trajectory_94675b4315a023dd1d22d876b9f5d6985536afcbc7fe936386eab51f2a9ea26a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:26:27.332663Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1045037,
+      "content_sha256": "61356e2eaef51cded6ccd4b93397b2459f7022abf2e42d099f09a4df3e396c32",
+      "episode_id": "episode:4736c3c50534750f279e5c9f",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:26:43.778706Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 997030,
+      "content_sha256": "40626bbb377f892f73b2e81dc834087734c40805603460741e9a72227cc4af1b",
+      "episode_id": "episode:c56b8261ac8519495a92e107",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:27:16.705724Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1003842,
+      "content_sha256": "34ce3a355ae048238274445fa386fb9dccbc2192adeed404789e7ece48f5eb87",
+      "episode_id": "episode:7ecd27c66ad954ed69e620ac",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:27:56.010326Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1024335,
+      "content_sha256": "276813eb9f4e2aed1594d238220bef9fcd2964b23e5fd4776704cc378f1c802e",
+      "episode_id": "episode:873b95da3ba624678f5c07dd",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:28:23.526034Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1012156,
+      "content_sha256": "4d79e7be7e147003a34eb2efc939f2010cdaa8ce1353642c51c7f5741098815d",
+      "episode_id": "episode:a58cab01c846358081bcc185",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T12:28:48.150365Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1013457,
+      "content_sha256": "f3dc1ffdc1a08187dba861347e6dcbccb7ed37f1e7807705407c3ec139606cc1",
+      "episode_id": "episode:92b3a5285087cb66458a89dd",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000005",
+      "t_ingested": "2026-11-27T12:29:09.748592Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 206928,
+      "content_sha256": "64b8d91575d3b4ec698803b64fa4d78d35a286e7434bb0076feb9c6478b46757",
+      "episode_id": "episode:a9f4467854a45a252b8d5f05",
+      "source_id": "longmemeval_v2_trajectory_fabae66cf11b8c7463d20bf878bcc47d0784d6231e87013b9f3d7ade4a0a8e45_ordered-segments-v1_00000006",
+      "t_ingested": "2026-11-27T12:29:35.123316Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 833066,
+      "content_sha256": "7cb88531963b0af6990a80cb017b667b1f59050a88ad01daac9ab5f8850a89d2",
+      "episode_id": "episode:9d6cfaa29a7a3bbb7c3ce745",
+      "source_id": "longmemeval_v2_trajectory_2c51c6da0f11138731c375343a818502ce56d4004dc54d154a2c0e3c134bc894_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:29:50.930101Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1007172,
+      "content_sha256": "e31a6535428e84e8e514c0470f57c33909504ff133961fd6c17c2b858bc6d7b1",
+      "episode_id": "episode:07e7dc13c2e227e934c22632",
+      "source_id": "longmemeval_v2_trajectory_2c51c6da0f11138731c375343a818502ce56d4004dc54d154a2c0e3c134bc894_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:30:21.606194Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 814391,
+      "content_sha256": "ad17ec855e379f5a4ebc8f5116329f92604d16d1615c8e5ba7624d48edc39103",
+      "episode_id": "episode:4b9dc6df285cda3c0bd8c932",
+      "source_id": "longmemeval_v2_trajectory_2c51c6da0f11138731c375343a818502ce56d4004dc54d154a2c0e3c134bc894_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:30:51.147973Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1045140,
+      "content_sha256": "a286857865bc88e76ac0ce07730891adbd7e1aba9c0e50e7cd76bfe5599313b1",
+      "episode_id": "episode:dc94aae372faa085908277f2",
+      "source_id": "longmemeval_v2_trajectory_2c51c6da0f11138731c375343a818502ce56d4004dc54d154a2c0e3c134bc894_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:31:11.592709Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 209607,
+      "content_sha256": "55cdefb6f492583ec240a297d9d2ef86f6c5238ad2f7253815e976dba440bd1e",
+      "episode_id": "episode:bf47be61d5bed4016f03eab4",
+      "source_id": "longmemeval_v2_trajectory_2c51c6da0f11138731c375343a818502ce56d4004dc54d154a2c0e3c134bc894_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T12:31:38.964261Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 896372,
+      "content_sha256": "d1acede0fa655e1e57defc42d511007fd09039d1180cafeb788a346e46d4c924",
+      "episode_id": "episode:bf814bfd62e0d0fccc752eb7",
+      "source_id": "longmemeval_v2_trajectory_d1acede0fa655e1e57defc42d511007fd09039d1180cafeb788a346e46d4c924_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:31:55.683789Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 233314,
+      "content_sha256": "38cc9b43850569b9c3df1cbe39d1b0763ff159200f43137c1ae7f88164e52025",
+      "episode_id": "episode:6926329dd68f1b641c62182d",
+      "source_id": "longmemeval_v2_trajectory_38cc9b43850569b9c3df1cbe39d1b0763ff159200f43137c1ae7f88164e52025_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:33:15.962165Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 796304,
+      "content_sha256": "26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6",
+      "episode_id": "episode:d2f4d8b53dd2179274260ced",
+      "source_id": "longmemeval_v2_trajectory_26327be816d117365929425ae1d353cd56ef89b50129fe664f39b513c3e985a6_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:33:40.355428Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 123793,
+      "content_sha256": "9d46e67f4134a6f7dd736d9f4a931c711f630a9d11b66dfe2a43e43826584381",
+      "episode_id": "episode:a476136f6db17ad2adaaed6c",
+      "source_id": "longmemeval_v2_trajectory_9d46e67f4134a6f7dd736d9f4a931c711f630a9d11b66dfe2a43e43826584381_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:34:14.783531Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 23530,
+      "content_sha256": "e26cd883e7615517351cf82b18bd96aea4f6e951b356e4daaca0681bca23b21c",
+      "episode_id": "episode:9be82df31da8084c0c4a7ede",
+      "source_id": "longmemeval_v2_trajectory_e26cd883e7615517351cf82b18bd96aea4f6e951b356e4daaca0681bca23b21c_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:34:33.661816Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 147168,
+      "content_sha256": "4abff25ba5a33fc654a4ff3078af99c7cb56a4c4b8e2a82d14d8b00c1754bd63",
+      "episode_id": "episode:4a7dd57717c354db0ad24324",
+      "source_id": "longmemeval_v2_trajectory_4abff25ba5a33fc654a4ff3078af99c7cb56a4c4b8e2a82d14d8b00c1754bd63_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:34:46.664385Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1020977,
+      "content_sha256": "f6c7abf667ebad65498f5407348ed9829d4529b88bf4071837b9703892b42e40",
+      "episode_id": "episode:9f1e8deac1be7aa22420a7a8",
+      "source_id": "longmemeval_v2_trajectory_a64f0931ef9171afef6387d7c03cc92b3b048929ec126526b8c918cd027ec6c7_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:35:02.803464Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 752801,
+      "content_sha256": "b50e1decf4c414b42ec644af64ef9e1f435b0dcd75c1bf088a1d11f36191aee1",
+      "episode_id": "episode:693fdf1b89723882bb4d3c10",
+      "source_id": "longmemeval_v2_trajectory_a64f0931ef9171afef6387d7c03cc92b3b048929ec126526b8c918cd027ec6c7_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:35:46.102228Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 161281,
+      "content_sha256": "0339a36eb2689ee63deda1fadf561e21a98f53870ed2888d3667cafc0903bc5b",
+      "episode_id": "episode:374a54ebdf374c5479b3716c",
+      "source_id": "longmemeval_v2_trajectory_0339a36eb2689ee63deda1fadf561e21a98f53870ed2888d3667cafc0903bc5b_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:36:18.489117Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 81997,
+      "content_sha256": "b54ebe7df08a539cfbae5783835814f2c13464c06d911f12e4f6b792bd6b7189",
+      "episode_id": "episode:742c14a2b2814f3e44090a6c",
+      "source_id": "longmemeval_v2_trajectory_b54ebe7df08a539cfbae5783835814f2c13464c06d911f12e4f6b792bd6b7189_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:36:41.205073Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 431777,
+      "content_sha256": "17dc45a6f47f74e65474fd820b7a9275bf3895d2532581619b75145925ddfb1c",
+      "episode_id": "episode:6678d91d77c1d3069019c4c0",
+      "source_id": "longmemeval_v2_trajectory_17dc45a6f47f74e65474fd820b7a9275bf3895d2532581619b75145925ddfb1c_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:36:59.367245Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 77380,
+      "content_sha256": "04903d4fe5c09e923318b144826a83bd5f152eb1a7fa8a2c0245095a24be804b",
+      "episode_id": "episode:4c262747b029e806cc702123",
+      "source_id": "longmemeval_v2_trajectory_04903d4fe5c09e923318b144826a83bd5f152eb1a7fa8a2c0245095a24be804b_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:37:41.725471Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 163968,
+      "content_sha256": "396631978014198d3b8d5817c9eed54836e82271892b2bdbfc37ad02193deccd",
+      "episode_id": "episode:8a1eea4f586a60f7b14731ba",
+      "source_id": "longmemeval_v2_trajectory_396631978014198d3b8d5817c9eed54836e82271892b2bdbfc37ad02193deccd_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:38:00.824709Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 53009,
+      "content_sha256": "e9c43dcbce0766454f460f0197f038b1955fee9baaef2697a4ef599f199009f1",
+      "episode_id": "episode:54a6cb617a663b7e85e98550",
+      "source_id": "longmemeval_v2_trajectory_e9c43dcbce0766454f460f0197f038b1955fee9baaef2697a4ef599f199009f1_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:38:22.048141Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 103589,
+      "content_sha256": "8daf4a49c2601d8af4f589ee956f25cb5ccb174bf8385516b5013465ed8d3e99",
+      "episode_id": "episode:e3009e294ceeb52c4a10eeb8",
+      "source_id": "longmemeval_v2_trajectory_8daf4a49c2601d8af4f589ee956f25cb5ccb174bf8385516b5013465ed8d3e99_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:38:40.032933Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1020405,
+      "content_sha256": "84a772d0d97bfe673c4d83d7b3684d41e5ca28f95bd6140c4ab6e32e3a854d30",
+      "episode_id": "episode:984b149467d3b3a16cb0c5b5",
+      "source_id": "longmemeval_v2_trajectory_fef4df72ef3dc21026b91817262ce4848d7668ce7606793f43cb40494dbac1aa_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:39:00.149Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 413383,
+      "content_sha256": "459c4d65fde1ac1ec6a963cfef7aad4ae503f754e6e4c1fae0dcd48b3c8b7cb3",
+      "episode_id": "episode:8f83e2e6832b0ee68e0e6a8b",
+      "source_id": "longmemeval_v2_trajectory_fef4df72ef3dc21026b91817262ce4848d7668ce7606793f43cb40494dbac1aa_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:40:12.156023Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 938866,
+      "content_sha256": "3995723a65c262fd57b721844ba4d8b832adf101a61b9b70e02179d637bb8fb2",
+      "episode_id": "episode:089e75aef1bbdb2953cc7988",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:40:46.904332Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1016214,
+      "content_sha256": "6c1eefa9b8c6e437473e62cd2ede3ed14b7aa8a80ef4fb8722653d9ab2ff2272",
+      "episode_id": "episode:d995ce6915b1947d4837c4cb",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:41:37.392540Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1048542,
+      "content_sha256": "b49a24c9b9f508ad3ebda3a5638f590c8fc2ad741a1e0f640df90ca06c01e33d",
+      "episode_id": "episode:af5b824148d6a6a07187cd25",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:42:19.037731Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 996320,
+      "content_sha256": "233dcd91e714f6078d76ded26fc672e095b6b81675da904c9a35c470ed74ad49",
+      "episode_id": "episode:c02809be2d68fbeeed5f8526",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T12:42:55.818970Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 877010,
+      "content_sha256": "40e53d3ad2d38f00fde43fdc0aef85c220f7ea0ed3830faab6fdbd270399573f",
+      "episode_id": "episode:807a9518327f4cd7ac0cbf74",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T12:43:35.289222Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 882681,
+      "content_sha256": "de4ca1ec4bf2bc783e9a49308e08a83e4b17a42154516f5f7e9a9cb27260475c",
+      "episode_id": "episode:f1ac46340521762e50819dae",
+      "source_id": "longmemeval_v2_trajectory_8682a3c2e6a50e3323ab3ace1ce00c80c41a595b89deeccd28755a8b310e5f3f_ordered-segments-v1_00000005",
+      "t_ingested": "2026-11-27T12:44:20.989540Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 614491,
+      "content_sha256": "aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816",
+      "episode_id": "episode:edc93d08cde3e2ed63c0697d",
+      "source_id": "longmemeval_v2_trajectory_aad1926080ab27a39a07305597d8aa5e944f4102d1b4bf6381ed1817e593e816_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:45:06.509220Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 90319,
+      "content_sha256": "0ebb9ade8f02f55841a5eb69400b2670f78f0f204d745bf40b902fdd14ed356e",
+      "episode_id": "episode:e66e09ec947d235f6c6dd06d",
+      "source_id": "longmemeval_v2_trajectory_0ebb9ade8f02f55841a5eb69400b2670f78f0f204d745bf40b902fdd14ed356e_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:46:21.326805Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 41097,
+      "content_sha256": "9b211e75f029f89f7346fc49b4796813fb7ad331780d3f9918a31d72a75fc379",
+      "episode_id": "episode:bc7d272b656e9c8c105ced96",
+      "source_id": "longmemeval_v2_trajectory_9b211e75f029f89f7346fc49b4796813fb7ad331780d3f9918a31d72a75fc379_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:46:49.926023Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 81569,
+      "content_sha256": "b5d31f64262dcf2d52f12c5670ed1d2fda4d259a955fcaf06d4c4c0bdb0de790",
+      "episode_id": "episode:928a274600c4646741f95072",
+      "source_id": "longmemeval_v2_trajectory_b5d31f64262dcf2d52f12c5670ed1d2fda4d259a955fcaf06d4c4c0bdb0de790_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:47:13.713445Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 51272,
+      "content_sha256": "f3a69bd9c2ddc7852026e0c3361711f3d961ef4c6e0386dc7ad07e63f8692c44",
+      "episode_id": "episode:c8c7809cd6bdec19b5c7b8a3",
+      "source_id": "longmemeval_v2_trajectory_f3a69bd9c2ddc7852026e0c3361711f3d961ef4c6e0386dc7ad07e63f8692c44_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:47:39.167257Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 169314,
+      "content_sha256": "c47aee2252cd9012dee201087f5d98f0839dde93e4188025c8c69307c467ad40",
+      "episode_id": "episode:c56fdd816932277b60328054",
+      "source_id": "longmemeval_v2_trajectory_c47aee2252cd9012dee201087f5d98f0839dde93e4188025c8c69307c467ad40_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:48:10.036233Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 977101,
+      "content_sha256": "3ee0c8b7e1cda43bf16925d84b6ff9d0e7c8ffe3f04154410730fdbf31cce9a5",
+      "episode_id": "episode:1792f596667d76ba4316a5a9",
+      "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:48:37.422426Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1042118,
+      "content_sha256": "842bd55f7c7dbf6968614ed8ef16810a66cf67344cd1d4628335e07118bce08e",
+      "episode_id": "episode:6c7627c85f98d12de2e8d4af",
+      "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:49:19.751993Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 186089,
+      "content_sha256": "b2b106d16a8bc38bc28e414ab9dbb6b93ea391105b7f80bd6ad1aeb233bee5c5",
+      "episode_id": "episode:2acf5da80577cded5737c313",
+      "source_id": "longmemeval_v2_trajectory_5a13f1b222bcb3612b125b05e06a00bdf221b77f75f00c690d387000ab55583e_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:50:04.599128Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 566739,
+      "content_sha256": "b6eb14e0ab8ea50cd378fc917a0ab334c9cbb63af89472b4f8f7a7949621dbc9",
+      "episode_id": "episode:af136947e7b8fe624f1fd9f1",
+      "source_id": "longmemeval_v2_trajectory_b6eb14e0ab8ea50cd378fc917a0ab334c9cbb63af89472b4f8f7a7949621dbc9_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:50:53.508899Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1029961,
+      "content_sha256": "e6aaf34fdc2b7f437ecc90b912d0c30bd6ed39ebe238bc499ab6f068bdb0a3cf",
+      "episode_id": "episode:7f6774d38aeaa8f9e29ba7f8",
+      "source_id": "longmemeval_v2_trajectory_ff23f37dcb7a8b7f6ab0c36e8dcd9edc09b4b1d659bbf15241d2174cf8797f59_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:51:24.962223Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 64509,
+      "content_sha256": "311eb2eb5b08f2dd84a39f0f54ecb84b633b3f264482ed5b75f7e08b77183101",
+      "episode_id": "episode:4564272f42a3aff896385382",
+      "source_id": "longmemeval_v2_trajectory_ff23f37dcb7a8b7f6ab0c36e8dcd9edc09b4b1d659bbf15241d2174cf8797f59_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:51:57.302731Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 914121,
+      "content_sha256": "9fc80daac58331d57d5618a403caa7980dfb380404634a8ece3ae1c0d50cb5d3",
+      "episode_id": "episode:2adff4a7f92e420a6e6a442b",
+      "source_id": "longmemeval_v2_trajectory_9fc80daac58331d57d5618a403caa7980dfb380404634a8ece3ae1c0d50cb5d3_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:52:21.835738Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 98665,
+      "content_sha256": "237f578fa9e779d075d7edc62316cfac4d04bd0f8a0eef500183c3ccaf560336",
+      "episode_id": "episode:05d04007076609223a39f174",
+      "source_id": "longmemeval_v2_trajectory_237f578fa9e779d075d7edc62316cfac4d04bd0f8a0eef500183c3ccaf560336_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:53:16.489610Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1026685,
+      "content_sha256": "d55a81d17aa1d2793ca9c059399be74e070b559b5a6f763770e2bc3e974939bd",
+      "episode_id": "episode:f627394486271085ba2a05cf",
+      "source_id": "longmemeval_v2_trajectory_45cd8e500aec73a8dcb28795713b96a25b12698a6f552d5a7d0f39cd97a305f6_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:53:47.508995Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 682838,
+      "content_sha256": "6e374fdf89a1a3a1b543b93fb1b0bb8d69bd6f96bce552bf4460cf5ca19b7382",
+      "episode_id": "episode:2907d4a6f01a6fade4fd8c1a",
+      "source_id": "longmemeval_v2_trajectory_45cd8e500aec73a8dcb28795713b96a25b12698a6f552d5a7d0f39cd97a305f6_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:55:10.357946Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 307356,
+      "content_sha256": "0dcde76de2813ae3d3d1ac41409cbb1bd8513f4bb69eb0fb816f536316d2f968",
+      "episode_id": "episode:950b622a4a319557ac0d9317",
+      "source_id": "longmemeval_v2_trajectory_0dcde76de2813ae3d3d1ac41409cbb1bd8513f4bb69eb0fb816f536316d2f968_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:55:50.474777Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 80558,
+      "content_sha256": "e72e869cb6de0dc05dec3b77bde6c39889356082af2066ab538c8dc33926cc78",
+      "episode_id": "episode:d324664221ef4dfee1160224",
+      "source_id": "longmemeval_v2_trajectory_e72e869cb6de0dc05dec3b77bde6c39889356082af2066ab538c8dc33926cc78_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:56:44.539367Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 681614,
+      "content_sha256": "90d60edae2febfaeb45e7f7710deb23608330062b8a6dd68797a51846415d570",
+      "episode_id": "episode:1ec95780e91f6d18857f44e1",
+      "source_id": "longmemeval_v2_trajectory_90d60edae2febfaeb45e7f7710deb23608330062b8a6dd68797a51846415d570_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:57:08.537368Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 891757,
+      "content_sha256": "4f2c7e140602f548ef9c5299826c3471ac3cfc1302d0edbc6f5b49f94b0c4f04",
+      "episode_id": "episode:0a3e21f301e0a955a4efedff",
+      "source_id": "longmemeval_v2_trajectory_f2ea0cf5c7cd88e624e57e8917b31dadee0e7a9dcc8276212e81087a1df8f208_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T12:58:00.984317Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1031393,
+      "content_sha256": "0636ef0a39142de2609779f8926d355d602d06b9f5ecd1920894bff9a73356d8",
+      "episode_id": "episode:55b975d5387de36ae246298c",
+      "source_id": "longmemeval_v2_trajectory_f2ea0cf5c7cd88e624e57e8917b31dadee0e7a9dcc8276212e81087a1df8f208_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T12:58:50.782051Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1034211,
+      "content_sha256": "66d7f8e6ce45ab4fc997d83a6aeeb697f1adb438ff7c9284b6f6f5c795fb84cc",
+      "episode_id": "episode:8075d9b710761fd6f58d6068",
+      "source_id": "longmemeval_v2_trajectory_f2ea0cf5c7cd88e624e57e8917b31dadee0e7a9dcc8276212e81087a1df8f208_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T12:59:47.085708Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1031335,
+      "content_sha256": "82f0fd93fe403c7a99c5f56f8f81dbcf1f2a7011e53af0046b83eae2d787038a",
+      "episode_id": "episode:23d66578be7d9d7f9c46f962",
+      "source_id": "longmemeval_v2_trajectory_f2ea0cf5c7cd88e624e57e8917b31dadee0e7a9dcc8276212e81087a1df8f208_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T13:00:44.203958Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 412660,
+      "content_sha256": "7bdce8cdc29dcc8055e8c44862c0bcdb5a0bd498022409e5cb53ba0bde8b2ab1",
+      "episode_id": "episode:412e35e2cb8cef74949c8645",
+      "source_id": "longmemeval_v2_trajectory_f2ea0cf5c7cd88e624e57e8917b31dadee0e7a9dcc8276212e81087a1df8f208_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T13:01:24.147706Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 157709,
+      "content_sha256": "7b5a5b3e56c1b2926d70a2c506c69020907e251b1775c7625748d8a07654b8e1",
+      "episode_id": "episode:ca55a1e9ea1872cfc86f6aa3",
+      "source_id": "longmemeval_v2_trajectory_7b5a5b3e56c1b2926d70a2c506c69020907e251b1775c7625748d8a07654b8e1_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:01:58.098626Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 68945,
+      "content_sha256": "930a315a17e45b4c36c0e06060850fb40c682b58a76377651794eb3869616999",
+      "episode_id": "episode:24dbad9dedc014f0a7a8ed7e",
+      "source_id": "longmemeval_v2_trajectory_930a315a17e45b4c36c0e06060850fb40c682b58a76377651794eb3869616999_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:02:25.102886Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 132223,
+      "content_sha256": "59fe58997fcb4d231a4e164ed513fdcc3d0d302cebc5478d54f95e5450896537",
+      "episode_id": "episode:1be1fe2b7efc12eb06307dcf",
+      "source_id": "longmemeval_v2_trajectory_59fe58997fcb4d231a4e164ed513fdcc3d0d302cebc5478d54f95e5450896537_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:02:54.566867Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 187112,
+      "content_sha256": "bc1727bada672befb7b794f99b0d4ea8a0f74131871caaa079e9e9e543c71e84",
+      "episode_id": "episode:c30dddf6bd7ac8dbe3c5b4b3",
+      "source_id": "longmemeval_v2_trajectory_bc1727bada672befb7b794f99b0d4ea8a0f74131871caaa079e9e9e543c71e84_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:03:39.476006Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 326512,
+      "content_sha256": "0d82a0eceaefd94bd69dc90b45849de3e08e97c861c3010fca5ea12d0b50aaac",
+      "episode_id": "episode:18133610c9c5ed37bd199250",
+      "source_id": "longmemeval_v2_trajectory_0d82a0eceaefd94bd69dc90b45849de3e08e97c861c3010fca5ea12d0b50aaac_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:04:20.633719Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 66159,
+      "content_sha256": "8bc17344001ca4568e899979beba0d4e3f5f15b87980561dfcbec4e9e33bc899",
+      "episode_id": "episode:c08d7d8682558a53a6ec3314",
+      "source_id": "longmemeval_v2_trajectory_8bc17344001ca4568e899979beba0d4e3f5f15b87980561dfcbec4e9e33bc899_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:05:02.238547Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 478492,
+      "content_sha256": "12eeba3c56fa7a0cd79ba692ad3ac02226d37b3cfc380e3daa7f532a0763c53b",
+      "episode_id": "episode:e92506fa30379e53f1cb8ae9",
+      "source_id": "longmemeval_v2_trajectory_12eeba3c56fa7a0cd79ba692ad3ac02226d37b3cfc380e3daa7f532a0763c53b_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:05:38.271481Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 134608,
+      "content_sha256": "f7ca6028ac798245cff683f6bc1d9355519f3ab874f7684e6645c3b0a74d70a0",
+      "episode_id": "episode:37ef5d1f6cf07e1f9279bbd5",
+      "source_id": "longmemeval_v2_trajectory_f7ca6028ac798245cff683f6bc1d9355519f3ab874f7684e6645c3b0a74d70a0_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:06:08.205026Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 137247,
+      "content_sha256": "ebd11ce9517500199d6c2c934471d380fc7c0c91468d5ee840712629ceb9863a",
+      "episode_id": "episode:b94af2487721d888c0e08c1a",
+      "source_id": "longmemeval_v2_trajectory_ebd11ce9517500199d6c2c934471d380fc7c0c91468d5ee840712629ceb9863a_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:06:41.823532Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 384247,
+      "content_sha256": "a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591",
+      "episode_id": "episode:c520192e24c28192c9c107c6",
+      "source_id": "longmemeval_v2_trajectory_a6fecc9c5e1c0f646d1fb0cd0bd59ed4adf93ba1a07ca25efd34f0ebe88bc591_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:07:23.823764Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 385740,
+      "content_sha256": "b860b51e3880f0591d66bbace25ebc671b66fde2f2f1a350aceb740bd989d599",
+      "episode_id": "episode:1322a63ce22b24f741f6058e",
+      "source_id": "longmemeval_v2_trajectory_b860b51e3880f0591d66bbace25ebc671b66fde2f2f1a350aceb740bd989d599_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:07:51.435702Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 111301,
+      "content_sha256": "d75307c62c5d8de43c6c70cd44d5473bd1c7c507a35aa7e3652b66a683753a68",
+      "episode_id": "episode:e287211a4ba435459fa36708",
+      "source_id": "longmemeval_v2_trajectory_d75307c62c5d8de43c6c70cd44d5473bd1c7c507a35aa7e3652b66a683753a68_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:08:27.678501Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 77602,
+      "content_sha256": "8888d1a61595e45239023e62666800e93e3e63c812566d9119f2666cf7f4a3ea",
+      "episode_id": "episode:186203dd0feccb372d16380b",
+      "source_id": "longmemeval_v2_trajectory_8888d1a61595e45239023e62666800e93e3e63c812566d9119f2666cf7f4a3ea_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:08:56.026068Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 1044126,
+      "content_sha256": "afff7d6738331258388232e9e07ab1a6c87b1fcfe1f999a1d0c644b6abf8acec",
+      "episode_id": "episode:7f1488ddc4fd95d5a3f83555",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:09:24.484013Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943219,
+      "content_sha256": "158b328e8ec17e88b59309deaad292c414d37f53d1e4051677e2878ca95eb964",
+      "episode_id": "episode:ca39f84ea5f79befe2ccd0ef",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000001",
+      "t_ingested": "2026-11-27T13:10:08.386605Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943317,
+      "content_sha256": "5c4ccc0d9887c333f5d718e3ebe20fa4373e62cc894051171b42a535b6200a5a",
+      "episode_id": "episode:d84983b8306117eeaca49730",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000002",
+      "t_ingested": "2026-11-27T13:10:43.635414Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943513,
+      "content_sha256": "f25360a7ad715a66d44a0e233f5a4f792808c25a3ae142b21e07d69f389d8a5b",
+      "episode_id": "episode:59421d5fe9b3df9d3f0b6d9e",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000003",
+      "t_ingested": "2026-11-27T13:11:16.906566Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943417,
+      "content_sha256": "cbc201ab1ddaead0d22c4cccf842ccd23ccbb827f439f454444628cf8c66bc58",
+      "episode_id": "episode:922ccca4a1bab7b553ff7195",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000004",
+      "t_ingested": "2026-11-27T13:11:50.898418Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943406,
+      "content_sha256": "485a6adb88bddac98135ef72795f79f4cebc1a8837c01316054d282f0618db46",
+      "episode_id": "episode:f2003ab440636ac90c5157a8",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000005",
+      "t_ingested": "2026-11-27T13:12:24.952711Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 943607,
+      "content_sha256": "a591c904a9d99203f3acffa5163fc3327e3d238a23b2cc84cccdcfce240b7c43",
+      "episode_id": "episode:a4d72732712493b0a293233a",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000006",
+      "t_ingested": "2026-11-27T13:12:58.435386Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 628645,
+      "content_sha256": "e134f555767af6da6ea05de983e911c5a2cb6776152cafe0f2cde72b3e2fafbe",
+      "episode_id": "episode:26e63fab707d2d94043e1e39",
+      "source_id": "longmemeval_v2_trajectory_e17e4082664f125f9345799ad4c2c65eae14b81b7fb20338b6ea9bfcef4092af_ordered-segments-v1_00000007",
+      "t_ingested": "2026-11-27T13:13:31.774994Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 300927,
+      "content_sha256": "c828cefd451a6009a74db58ab120bcfb1f2285511ed08b3b508840d9b2471032",
+      "episode_id": "episode:0d6ea660adf31fcf1410bb4b",
+      "source_id": "longmemeval_v2_trajectory_c828cefd451a6009a74db58ab120bcfb1f2285511ed08b3b508840d9b2471032_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:14:04.643363Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 375902,
+      "content_sha256": "4ab13b36598a3a77f441ebfd619a4895caa769ca7e471e23e4adb05b469fdce8",
+      "episode_id": "episode:c9686615de64d75d1389c7e0",
+      "source_id": "longmemeval_v2_trajectory_4ab13b36598a3a77f441ebfd619a4895caa769ca7e471e23e4adb05b469fdce8_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:14:52.344372Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 100621,
+      "content_sha256": "29bfac1adef3ff6f6d7816f127850b679aa3fff6819808944fb38231fc0abdea",
+      "episode_id": "episode:aa8ce28c40bf261b1f36fa2d",
+      "source_id": "longmemeval_v2_trajectory_29bfac1adef3ff6f6d7816f127850b679aa3fff6819808944fb38231fc0abdea_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:15:48.869755Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 41005,
+      "content_sha256": "a7fc92af4f0e66a37eb23cf70915f4b3f73838c4a2dc2e1555a16d11de0d1270",
+      "episode_id": "episode:f76fa4fa1084f9eb2471aad1",
+      "source_id": "longmemeval_v2_trajectory_a7fc92af4f0e66a37eb23cf70915f4b3f73838c4a2dc2e1555a16d11de0d1270_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:16:19.653412Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 94190,
+      "content_sha256": "aed36558a0a91b15bc6dfb7d62e2b20a0dfe912a653511ba92953a394f6149aa",
+      "episode_id": "episode:f0f421d5d13ed0438ece9865",
+      "source_id": "longmemeval_v2_trajectory_aed36558a0a91b15bc6dfb7d62e2b20a0dfe912a653511ba92953a394f6149aa_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:16:50.265856Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 194282,
+      "content_sha256": "feb5897ac63a2f59675c3c1767dad2bc759d5d432b34e367d90eef6911ecf4d6",
+      "episode_id": "episode:861785cf8d7e856682a04c4c",
+      "source_id": "longmemeval_v2_trajectory_feb5897ac63a2f59675c3c1767dad2bc759d5d432b34e367d90eef6911ecf4d6_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:17:27.148568Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    },
+    {
+      "content_bytes": 510517,
+      "content_sha256": "82dfdeba918f40a70691e7a0dbf3235d5006bb87c779d8e5bcf8216626eb8696",
+      "episode_id": "episode:92efae2c3d36f0afcf6f3fd3",
+      "source_id": "longmemeval_v2_trajectory_82dfdeba918f40a70691e7a0dbf3235d5006bb87c779d8e5bcf8216626eb8696_ordered-segments-v1_00000000",
+      "t_ingested": "2026-11-27T13:18:13.903705Z",
+      "t_ref": "2000-01-01T00:00:00Z"
+    }
+  ]
+}

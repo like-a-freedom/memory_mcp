@@ -1,0 +1,23 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.39s
+     Running tests/fact_access_native_upgrade.rs (target/debug/build/memory_mcp/11d0801f5890b4cc/out/fact_access_native_upgrade-11d0801f5890b4cc)
+
+running 3 tests
+2026-11-27T14:33:04.512427Z  INFO  op=schema.init  namespace=native_upgrade
+2026-11-27T14:33:04.516073Z  INFO  op=schema.init  namespace=native_upgrade
+2026-11-27T14:33:04.519202Z  INFO  op=schema.init  namespace=native_upgrade
+test rollback_aborts_the_whole_page_for_an_inconsistent_fact_identity ... ok
+test rollback_rejects_a_page_larger_than_128_keys_before_copying_heat ... ok
+2026-11-27T14:33:05.736195Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:05.736222Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:05.904851Z  INFO  op=schema.init  namespace=native_upgrade
+2026-11-27T14:33:06.058408Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:06.058439Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:06.284493Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:06.284858Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:06.479657Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:33:06.479691Z  WARN surrealdb::core::kvs::ds: [redacted]
+test native_upgrade_reconciles_exact_heat_and_restores_verified_recovery_point ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.02s
+

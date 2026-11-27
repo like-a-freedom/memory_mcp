@@ -1,0 +1,33 @@
+{
+  "scheduled": 8,
+  "completed": 8,
+  "invalid": 0,
+  "elapsed_seconds": 51.026,
+  "dimensions": {
+    "value_correct": 8,
+    "sources_correct": 5,
+    "quote_correct": 8,
+    "abstention_correct": 8,
+    "passed": 5
+  },
+  "by_mode": {
+    "source_ids": {
+      "n": 4,
+      "passed": 4
+    },
+    "handles": {
+      "n": 4,
+      "passed": 1
+    }
+  },
+  "attempts": 8,
+  "refusal_cases": 2,
+  "refusal_correct": 2,
+  "repeat_admitted": false,
+  "product_binary_unchanged": true,
+  "interpretation": {
+    "quote_correct": "Exact full proposition occurs in registered expected delivered source; not a substitute for the independent source/channel criterion.",
+    "handle_failures": "Correct s2 value in unregistered citation field, rather than required source_refs. No output repair; strict fail.",
+    "joint_passed": 5
+  }
+}

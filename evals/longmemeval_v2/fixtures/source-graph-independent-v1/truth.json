@@ -1,0 +1,52 @@
+{
+  "cases": {
+    "graph-equal-links": {
+      "accepted_answers": [
+        "Lagoon"
+      ],
+      "answer_kind": "single_value"
+    },
+    "graph-conflicting-links": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown"
+    },
+    "graph-opaque-repeat": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown"
+    },
+    "graph-scope-count": {
+      "accepted_answers": [
+        "4"
+      ],
+      "answer_kind": "single_value"
+    },
+    "graph-role-selection": {
+      "accepted_answers": [
+        "Lagoon"
+      ],
+      "answer_kind": "single_value"
+    },
+    "graph-virtualized-last": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown"
+    },
+    "graph-escaped-name": {
+      "accepted_answers": [
+        "Cr\u00e8me"
+      ],
+      "answer_kind": "single_value"
+    },
+    "graph-single-closed-end": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "context_items": [
+    {
+      "content": "The Fern toolbar order is Inspect, Validate, Publish, and Close.",
+      "source_episode_ids": [
+        "episode:9b0856a827061511f1c654cf"
+      ]
+    },
+    {
+      "content": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "source_episode_ids": [
+        "episode:ab82efa401e7654c13ce8d16"
+      ]
+    },
+    {
+      "content": "The Cobalt toolbar order is Export, Inspect, Validate, and Close.",
+      "source_episode_ids": [
+        "episode:b870397fbd5e53d2fc696640"
+      ]
+    }
+  ]
+}

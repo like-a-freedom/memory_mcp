@@ -1,0 +1,2088 @@
+{
+  "attempted": 120,
+  "binary_sha256": "e994315c337ed3916c0518101e9c2749ce510cc6e97dac55f4e77a8dd341bace",
+  "completed": 120,
+  "deterministic_and_completion_gate_passed": true,
+  "events": [
+    {
+      "event": "contract_preflight",
+      "status": "passed"
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 0
+    },
+    {
+      "arm": "legacy",
+      "db_us": 7880,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 0,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 7887
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 0
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4143,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 0,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 4146
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 0
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6682,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 0,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6684
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 1
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4191,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 1,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 4195
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 1
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4819,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 1,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4825
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 1
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5104,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 1,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 5105
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 2
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5178,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 2,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5184
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 2
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4756,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 2,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 4760
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 2
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6104,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 2,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6106
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 3
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4119,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 3,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 4122
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 3
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4803,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 3,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4808
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 3
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5203,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 3,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 5204
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 4
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5314,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 4,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5322
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 4
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4697,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 4,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 4700
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 4
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6172,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 4,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6174
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 5
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5154,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 5,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 99,
+      "wall_us": 5158
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 5
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4665,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 5,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4671
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 5
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5167,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 5,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 5168
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 6
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5247,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 6,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5254
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 6
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4818,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 6,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4821
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 6
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6264,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 6,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6266
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 7
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5985,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 7,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 5990
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 7
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4800,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 7,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4805
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 7
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6165,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 7,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6167
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 8
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5201,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 8,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5209
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 8
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4740,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 8,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4742
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 8
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6258,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 8,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6260
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 9
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5136,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 9,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 5141
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 9
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5821,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 9,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5828
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 9
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6033,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 9,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6035
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 10
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5122,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 10,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5128
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 10
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4870,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 10,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4874
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 10
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7100,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 10,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 7102
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 11
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5130,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 11,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 5135
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 11
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4838,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 11,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4846
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 11
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7106,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 11,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 7108
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 12
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5086,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 12,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5093
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 12
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4794,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 12,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4797
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 12
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5212,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 12,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 5214
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 13
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4188,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 13,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4191
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 13
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4762,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 13,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4769
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 13
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5174,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 13,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 5175
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 14
+    },
+    {
+      "arm": "legacy",
+      "db_us": 6160,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 14,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 6171
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 14
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4706,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 14,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4709
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 14
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6097,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 14,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6099
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 15
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5222,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 15,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 5226
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 15
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4616,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 15,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4622
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 15
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6158,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 15,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6160
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 16
+    },
+    {
+      "arm": "legacy",
+      "db_us": 6186,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 16,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 6225
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 16
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4630,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 16,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4636
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 16
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7164,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 16,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 7166
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 17
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5041,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 17,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 5045
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 17
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4740,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 17,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4746
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 17
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6254,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 17,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6255
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 18
+    },
+    {
+      "arm": "legacy",
+      "db_us": 5195,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 18,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 5202
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 18
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4748,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 18,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 4754
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 18
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5999,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 18,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6000
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 19
+    },
+    {
+      "arm": "isolated",
+      "db_us": 6092,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 19,
+      "queries": 2,
+      "request_bytes": 609,
+      "returned_bytes": 100,
+      "wall_us": 6096
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 19
+    },
+    {
+      "arm": "legacy",
+      "db_us": 4722,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 19,
+      "queries": 1,
+      "request_bytes": 552,
+      "returned_bytes": 2,
+      "wall_us": 4728
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 1,
+      "pair": 19
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6131,
+      "event": "complete",
+      "index_keys": 1,
+      "pair": 19,
+      "queries": 1,
+      "request_bytes": 923,
+      "returned_bytes": 2,
+      "wall_us": 6132
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 0
+    },
+    {
+      "arm": "legacy",
+      "db_us": 198843,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 0,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 198850
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 0
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4878,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 0,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 4881
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 0
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7092,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 0,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 7094
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 1
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4924,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 1,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 4928
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 1
+    },
+    {
+      "arm": "legacy",
+      "db_us": 172183,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 1,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 172189
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 1
+    },
+    {
+      "arm": "first_access",
+      "db_us": 21600,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 1,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 21602
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 2
+    },
+    {
+      "arm": "legacy",
+      "db_us": 169241,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 2,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 169252
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 2
+    },
+    {
+      "arm": "isolated",
+      "db_us": 7765,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 2,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 7769
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 2
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7965,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 2,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 7967
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 3
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4755,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 3,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 4759
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 3
+    },
+    {
+      "arm": "legacy",
+      "db_us": 169327,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 3,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 169332
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 3
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5720,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 3,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5722
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 4
+    },
+    {
+      "arm": "legacy",
+      "db_us": 177937,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 4,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 177943
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 4
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4831,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 4,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 4834
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 4
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7173,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 4,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 7175
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 5
+    },
+    {
+      "arm": "isolated",
+      "db_us": 9281,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 5,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 102,
+      "wall_us": 9286
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 5
+    },
+    {
+      "arm": "legacy",
+      "db_us": 173514,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 5,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 173521
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 5
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6180,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 5,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 6181
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 6
+    },
+    {
+      "arm": "legacy",
+      "db_us": 174029,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 6,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 174036
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 6
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5044,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 6,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 5047
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 6
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6982,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 6,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 6983
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 7
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4709,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 7,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4713
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 7
+    },
+    {
+      "arm": "legacy",
+      "db_us": 176135,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 7,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 176141
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 7
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7875,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 7,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 7877
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 8
+    },
+    {
+      "arm": "legacy",
+      "db_us": 180870,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 8,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 180877
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 8
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4795,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 8,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4798
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 8
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6109,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 8,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 6111
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 9
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4122,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 9,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4125
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 9
+    },
+    {
+      "arm": "legacy",
+      "db_us": 168894,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 9,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 168899
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 9
+    },
+    {
+      "arm": "first_access",
+      "db_us": 7107,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 9,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 7109
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 10
+    },
+    {
+      "arm": "legacy",
+      "db_us": 164950,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 10,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 164960
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 10
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4792,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 10,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4795
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 10
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5265,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 10,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5266
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 11
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4145,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 11,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4149
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 11
+    },
+    {
+      "arm": "legacy",
+      "db_us": 163645,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 11,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 163651
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 11
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5921,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 11,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5923
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 12
+    },
+    {
+      "arm": "legacy",
+      "db_us": 164031,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 12,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 164039
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 12
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4865,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 12,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4869
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 12
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5114,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 12,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5116
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 13
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4117,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 13,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4120
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 13
+    },
+    {
+      "arm": "legacy",
+      "db_us": 163900,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 13,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 163904
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 13
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5867,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 13,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5869
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 14
+    },
+    {
+      "arm": "legacy",
+      "db_us": 164182,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 14,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 164190
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 14
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5165,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 14,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 5168
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 14
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5761,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 14,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5762
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 15
+    },
+    {
+      "arm": "isolated",
+      "db_us": 3774,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 15,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 3776
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 15
+    },
+    {
+      "arm": "legacy",
+      "db_us": 162902,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 15,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 162907
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 15
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6003,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 15,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 6005
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 16
+    },
+    {
+      "arm": "legacy",
+      "db_us": 162574,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 16,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 162581
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 16
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4984,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 16,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4988
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 16
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5813,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 16,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5814
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 17
+    },
+    {
+      "arm": "isolated",
+      "db_us": 4745,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 17,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 4748
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 17
+    },
+    {
+      "arm": "legacy",
+      "db_us": 162190,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 17,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 162196
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 17
+    },
+    {
+      "arm": "first_access",
+      "db_us": 5996,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 17,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 5997
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 18
+    },
+    {
+      "arm": "legacy",
+      "db_us": 163751,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 18,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 163767
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 18
+    },
+    {
+      "arm": "isolated",
+      "db_us": 5026,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 18,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 5029
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 18
+    },
+    {
+      "arm": "first_access",
+      "db_us": 4744,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 18,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 4745
+    },
+    {
+      "arm": "isolated",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 19
+    },
+    {
+      "arm": "isolated",
+      "db_us": 3784,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 19,
+      "queries": 2,
+      "request_bytes": 615,
+      "returned_bytes": 103,
+      "wall_us": 3787
+    },
+    {
+      "arm": "legacy",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 19
+    },
+    {
+      "arm": "legacy",
+      "db_us": 163271,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 19,
+      "queries": 1,
+      "request_bytes": 555,
+      "returned_bytes": 2,
+      "wall_us": 163277
+    },
+    {
+      "arm": "first_access",
+      "event": "start",
+      "index_keys": 8192,
+      "pair": 19
+    },
+    {
+      "arm": "first_access",
+      "db_us": 6176,
+      "event": "complete",
+      "index_keys": 8192,
+      "pair": 19,
+      "queries": 1,
+      "request_bytes": 926,
+      "returned_bytes": 2,
+      "wall_us": 6178
+    },
+    {
+      "event": "contract_reopen",
+      "status": "passed"
+    }
+  ],
+  "exit_code": 0,
+  "fault": null,
+  "high_key_gate_passed": true,
+  "median_wall_us": {
+    "1_keys_AB": {
+      "first_access": 6217.0,
+      "isolated": 4748.0,
+      "isolated_over_legacy": 0.907579088215617,
+      "legacy": 5231.5
+    },
+    "1_keys_BA": {
+      "first_access": 6083.5,
+      "isolated": 5138.0,
+      "isolated_over_legacy": 1.0733235847085858,
+      "legacy": 4787.0
+    },
+    "8192_keys_AB": {
+      "first_access": 5962.5,
+      "isolated": 4934.5,
+      "isolated_over_legacy": 0.029529161131258003,
+      "legacy": 167106.0
+    },
+    "8192_keys_BA": {
+      "first_access": 6091.5,
+      "isolated": 4431.0,
+      "isolated_over_legacy": 0.026628365729876233,
+      "legacy": 166401.5
+    }
+  },
+  "raw_log_sha256": "3fdda8d951e8fb8adeb03f11923b5472943858f99315781dc8dee7308cab1576",
+  "registration_sha256": "d720867d921833db19ec67143e0c37f859c644eb1d9ad8fa253616427130b10c",
+  "wall_seconds": 11.451549374993192
+}

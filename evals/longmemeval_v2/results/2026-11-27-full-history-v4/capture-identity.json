@@ -1,0 +1,16 @@
+{
+  "driver_sha256": "980abe16d6c57802ad6007f8c7ca12d75bddf91220163c78e47c3b9348ff4e38",
+  "observer_sha256": "943b35cf8fcbe8e580afc9c6e219efc284c059cea226587264ebf60be0cd97c0",
+  "profile": "test opt-level=3; native Apple Silicon",
+  "snapshot_file_sha256": {
+    "LOCK": "5bbd6ccf096f4833f96079544d4902e8428d28fb70d45ce735d344613da971e0",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+    "vlog/00000000000000000002.vlog": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+    "vlog/00000000000000000003.vlog": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+    "wal/00000000000000000302.wal": "9f0a3daba46f3dca49186692682c7838ded5720cdd8d53c1e36c5cb6b576061c"
+  },
+  "build_registration_sha256": "5250cf54623bc65f1c8ea60a7eb74241078cdd8238b7598e9a9de925283f17ee",
+  "read_registration_sha256": "47ed077e9616b739ccdcd5d983dbbdd8022c453b1dafcc8addc0173f3508a76f",
+  "source_admission_origin": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-full-history-restore/snapshot-admission.json"
+}

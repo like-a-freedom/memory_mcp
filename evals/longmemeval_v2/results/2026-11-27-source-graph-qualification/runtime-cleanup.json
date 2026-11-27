@@ -1,0 +1,12 @@
+{
+  "schema": "owned-reader-runtime-cleanup/v1",
+  "at_utc": "2026-11-27T15:44:41.461704+00:00",
+  "owned_pid": 81534,
+  "signal": "SIGTERM",
+  "exit_observed": true,
+  "health_reachable": false,
+  "other_user_processes_touched": false,
+  "retained_original_store": true,
+  "retained_raw_evidence": true,
+  "execution_identity_sha256": "b8fde40903ba7a0965dd55e01b70fbdc156322735e7d395e045adaa50f95da38"
+}

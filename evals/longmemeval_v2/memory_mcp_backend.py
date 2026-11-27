@@ -27,6 +27,7 @@ from tempfile import TemporaryDirectory
 from threading import RLock
 import time
 from typing import Any, Callable, Optional
+from uuid import uuid4
 
 try:
     from memory_modules.memory import Memory, register_memory
@@ -92,6 +93,22 @@ def ordered_segments(content: bytes, boundaries: list[int]):
 UNDATED_TRAJECTORY_REFERENCE = "2000-01-01T00:00:00Z"
 
 
+class FormationResponseError(RuntimeError):
+    def __init__(self, step: str, message: str) -> None:
+        super().__init__(message)
+        self.step = step
+
+
+def formation_payload(output: str, step: str) -> dict:
+    try:
+        payload = json.loads(output)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise FormationResponseError(step, f"invalid {step} response JSON") from error
+    if not isinstance(payload, dict):
+        raise FormationResponseError(step, f"invalid {step} response envelope")
+    return payload
+
+
 @register_memory
 class MemoryMcpBackend(Memory):
     """Memory backend for LongMemEval-V2 backed by memory_mcp."""
@@ -113,6 +130,8 @@ class MemoryMcpBackend(Memory):
         self.formation_method = memory_params.get("formation_method", WHOLE_TRAJECTORY)
         if self.formation_method not in FORMATION_METHODS:
             raise ValueError("unknown LongMemEval-V2 formation method")
+        journal = memory_params.get("formation_attempts_path")
+        self._formation_attempts_path = Path(journal) if journal is not None else None
         self._store_lock = RLock()
         self._restored_store: Optional[TemporaryDirectory] = None
         self._runner = runner or self._run_cli
@@ -143,29 +162,66 @@ class MemoryMcpBackend(Memory):
         self._insert_time_secs += time.monotonic() - start
 
     def _form_episode(self, source_id: str, content: str) -> None:
-        # Step 1: ingest the raw trajectory content.
-        ingest_output = self._runner(
-            "ingest",
-            "--source-type", "other",
-            "--source-id", source_id,
-            "--content", content,
-            "--t-ref", UNDATED_TRAJECTORY_REFERENCE,
-        )
+        attempt = None
+        if self._formation_attempts_path is not None:
+            body = content.encode("utf-8")
+            attempt = {"schema": "memory-mcp-formation-attempt/v1", "attempt_id": uuid4().hex,
+                       "source_id": source_id, "body_sha256": hashlib.sha256(body).hexdigest(),
+                       "body_bytes": len(body)}
+            self._record_formation(attempt, event="formation_started", outcome="pending", step="ingest")
 
-        # Step 2: extract facts from the server-issued episode ID.
-        payload = json.loads(ingest_output)
-        result = payload.get("result")
-        episode_id = payload.get("episode_id")
-        if episode_id is None and isinstance(result, str):
-            episode_id = result
-        elif episode_id is None and isinstance(result, dict):
-            episode_id = result.get("episode_id")
-        if not episode_id:
-            raise RuntimeError("ingest response did not contain an episode_id")
-        self._runner(
-            "extract",
-            "--episode-id", episode_id,
-        )
+        step, episode_id, extracted_episode_id = "ingest", None, None
+        output, status, facts, error_type = None, None, None, None
+        try:
+            output = self._runner(
+                "ingest", "--source-type", "other", "--source-id", source_id,
+                "--content", content, "--t-ref", UNDATED_TRAJECTORY_REFERENCE,
+            )
+            payload = formation_payload(output, step)
+            status = payload.get("status")
+            result = payload.get("result")
+            issued = payload.get("episode_id")
+            if issued is None and isinstance(result, str):
+                issued = result
+            elif issued is None and isinstance(result, dict):
+                issued = result.get("episode_id")
+            if not isinstance(issued, str) or not issued.strip():
+                raise FormationResponseError(step, "ingest response did not contain an episode_id")
+            episode_id = issued
+
+            step, output, status = "extract", None, None
+            output = self._runner("extract", "--episode-id", episode_id)
+            extraction = formation_payload(output, step)
+            status = extraction.get("status")
+            result = extraction.get("result")
+            if isinstance(result, dict):
+                extracted_episode_id = result.get("episode_id")
+                facts = result.get("facts")
+            if status != "success" or extracted_episode_id != episode_id or not isinstance(facts, list):
+                raise FormationResponseError(step, f"incomplete extraction for {episode_id}")
+        except BaseException as error:
+            error_type = type(error).__name__
+            if isinstance(error, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                output = error.output
+            raise
+        finally:
+            if attempt is not None:
+                output_bytes = output.encode("utf-8") if isinstance(output, str) else output
+                self._record_formation(
+                    attempt, event="formation_finished", step=step,
+                    outcome="failed" if error_type is not None else "completed",
+                    episode_id=episode_id,
+                    observed_status=status if status in ("success", "partial", "error") else None,
+                    fact_count=len(facts) if isinstance(facts, list) else None,
+                    output_sha256=hashlib.sha256(output_bytes).hexdigest() if isinstance(output_bytes, bytes) else None,
+                    error_type=error_type,
+                )
+
+    def _record_formation(self, attempt: dict, **event: Any) -> None:
+        with self._formation_attempts_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({**attempt, **event}, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
     def query(self, query: str, query_image: Optional[Any] = None) -> list[dict[str, str]]:
         """Query memory for relevant context."""
@@ -244,6 +300,7 @@ class MemoryMcpBackend(Memory):
                 self._restored_store.cleanup()
             self._restored_store = workspace
             self.db_path = str(store)
+            self._formation_attempts_path = None
 
     def _run_cli(self, subcommand: str, *args: str) -> str:
         read_workspace = (
@@ -300,7 +357,7 @@ def _smoke_test() -> None:
     calls = []
     responses = iter([
         json.dumps({"result": {"episode_id": "episode:server-issued"}}),
-        json.dumps({"result": {"ok": True}}),
+        json.dumps({"status": "success", "result": {"episode_id": "episode:server-issued", "facts": []}}),
         json.dumps({"result": {"items": [{"content": "remembered fact"}]}}),
     ])
 

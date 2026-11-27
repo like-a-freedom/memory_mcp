@@ -1,0 +1,76 @@
+{
+  "schema": "reader-reviewed-truth/v1",
+  "cases": {
+    "middle-positive": {
+      "accepted_answers": [
+        "Lantern"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "adjacent-negative": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "terminal-negative": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "button-count-mixed": {
+      "accepted_answers": [
+        "four",
+        "4"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "missing-anchor-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "duplicate-anchor-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "clipped-terminal-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "heterogeneous-positive": {
+      "accepted_answers": [
+        "Help"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "named-scope-positive": {
+      "accepted_answers": [
+        "Export"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "complete-list-positive": {
+      "accepted_answers": [
+        "April, June, October"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    }
+  }
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "source_id": "count-distractor",
+    "episode_id": "episode:c3c09f7606d01eb8ae96d4a1",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "count-gold",
+    "episode_id": "episode:31a7c42255f6ba83f7bbbc0b",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "count-other",
+    "episode_id": "episode:81dfab73a92a675032a3db49",
+    "status": "success",
+    "fact_count": 0
+  }
+]

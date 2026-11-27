@@ -1,0 +1,278 @@
+{
+  "readable-final-first": {
+    "menu-complete": {
+      "response_raw": "\\boxed{Birch, Cedar, Maple}\nQUOTE: [2] list 'Browse', visible\n\t\t[3] listitem '', visible\n\t\t\t[4] link 'Birch', visible\n\t\t[5] listitem '', visible\n\t\t\t[6] link 'Cedar', visible\n\t\t[7] listitem '', visible\n\t\t\t[8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 88,
+        "prompt_tokens": 244,
+        "total_tokens": 332,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-between": {
+      "response_raw": "\\boxed{Cedar}\nQUOTE: [6] link 'Cedar', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 254,
+        "total_tokens": 273,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-adjacent": {
+      "response_raw": "\\boxed{Maple}\nQUOTE: [8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 254,
+        "total_tokens": 273,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-terminal": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 250,
+        "total_tokens": 268,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-missing-anchor": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Browse', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 250,
+        "total_tokens": 267,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "toolbar-count": {
+      "response_raw": "\\boxed{9}\nQUOTE: [101] toolbar 'Archive actions', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 401,
+        "total_tokens": 421,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "toolbar-scoped-count": {
+      "response_raw": "\\boxed{9}\nQUOTE: [101] toolbar 'Archive actions', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 449,
+        "total_tokens": 469,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-clipped": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [CONTEXT TRUNCATED]",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 15,
+        "prompt_tokens": 221,
+        "total_tokens": 236,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 115,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  },
+  "structured-final-first": {
+    "menu-complete": {
+      "response_raw": "\\boxed{Birch, Cedar, Maple}\nQUOTE: [2] list 'Browse', visible\n\t\t[3] listitem '', visible\n\t\t\t[4] link 'Birch', visible\n\t\t[5] listitem '', visible\n\t\t\t[6] link 'Cedar', visible\n\t\t[7] listitem '', visible\n\t\t\t[8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 88,
+        "prompt_tokens": 419,
+        "total_tokens": 507,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-between": {
+      "response_raw": "\\boxed{Cedar}\nQUOTE: [6] link 'Cedar', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 429,
+        "total_tokens": 448,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-adjacent": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [2] list 'Browse', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 429,
+        "total_tokens": 446,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-terminal": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 425,
+        "total_tokens": 443,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-missing-anchor": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [8] link 'Maple', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 425,
+        "total_tokens": 443,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "toolbar-count": {
+      "response_raw": "\\boxed{9}\nQUOTE: [101] toolbar 'Archive actions', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 813,
+        "total_tokens": 833,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "toolbar-scoped-count": {
+      "response_raw": "\\boxed{9}\nQUOTE: [101] toolbar 'Archive actions', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 914,
+        "total_tokens": 934,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "menu-clipped": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE: [CONTEXT TRUNCATED]",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 15,
+        "prompt_tokens": 382,
+        "total_tokens": 397,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  }
+}

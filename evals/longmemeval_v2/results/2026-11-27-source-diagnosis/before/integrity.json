@@ -1,0 +1,11 @@
+{
+  "before_equals_registration": true,
+  "after_equals_registration": true,
+  "file_sha256": {
+    "LOCK": "fc17186734ccf6e76bfdd12275771ce71dcb0916268586239e3581d5a7f82b6a",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "49967c27e751173297103bb97f435e5f43353eec1a1df9617dfe36e2a9bde4b5",
+    "wal/00000000000000000036.wal": "e69c20506692ee54e5f3a12f14a5552911f6c7fb5b11e95321e4074101b314da"
+  },
+  "binary_unchanged": true
+}

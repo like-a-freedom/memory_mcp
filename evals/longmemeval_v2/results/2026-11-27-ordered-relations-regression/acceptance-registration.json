@@ -1,0 +1,16 @@
+{
+  "schema": "reader-candidate-acceptance/v1",
+  "registered_before_any_outputs": true,
+  "registration_sha256": "db022b3a85e7d2574044f3e7d59905e7d860baa41d2c3691193af3908e87aa60",
+  "scheduled_per_arm": 10,
+  "candidate_required": {
+    "value_correct": 10,
+    "format_valid": 10,
+    "false_premise_correct": 2,
+    "errors": 0,
+    "unobserved": 0
+  },
+  "non_regression": "No candidate value loss on any correctly answered baseline case. Unknown controls must remain UNKNOWN, distinct from source-supported None.",
+  "quote_metric": "Report exact literal presence separately; it is not a source-ID binding or provenance qualification.",
+  "stopping": "One paired comparison only, all failures retained; no successful retry selection. No general memory-treatment claim."
+}

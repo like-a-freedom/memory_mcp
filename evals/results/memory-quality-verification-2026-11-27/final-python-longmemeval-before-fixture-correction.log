@@ -1,0 +1,48 @@
+........................................ssssss....................E.......sssss
+======================================================================
+ERROR: test_observed_transport_keeps_finish_reason_and_missing_usage_without_changing_score (test_scored_coverage.ScoredCoverageTests.test_observed_transport_keeps_finish_reason_and_missing_usage_without_changing_score)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_scored_coverage.py", line 230, in test_observed_transport_keeps_finish_reason_and_missing_usage_without_changing_score
+    self.assertEqual(run_observed(harness, [], ['a'], output, attempts=attempts), 0)
+                     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/scored_coverage.py", line 137, in run_observed
+    harness.main()
+    ~~~~~~~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_scored_coverage.py", line 222, in main
+    asyncio.run(harness.generate_all_reader_outputs(None, [
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {'question_id': 'a', 'messages': [], 'memory_context': []},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ]))
+    ^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/asyncio/base_events.py", line 724, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/scored_coverage.py", line 61, in observe_generation
+    return await generate(args, rows)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_scored_coverage.py", line 219, in generate
+    await harness.call_reader_model_async(None, args, rows[0]['messages'])
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/scored_coverage.py", line 68, in observe_reader
+    response = await reader(client, args, messages)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_scored_coverage.py", line 212, in reader
+    await attempts.call_async('a', 'reader', completed)
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/inference_attempts.py", line 163, in call_async
+    completion_body(result)
+    ~~~~~~~~~~~~~~~^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/inference_attempts.py", line 34, in completion_body
+    raise InvalidResponse('malformed text completion envelope', body)
+evals.longmemeval_v2.inference_attempts.InvalidResponse: malformed text completion envelope
+
+----------------------------------------------------------------------
+Ran 79 tests in 3.785s
+
+FAILED (errors=1, skipped=11)

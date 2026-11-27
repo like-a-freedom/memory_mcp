@@ -1,0 +1,26 @@
+{
+  "schema": "memory-mcp-reader-protocol/v1",
+  "rows_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-candidate-work/original-seven-post-topical/scores/per_question.jsonl",
+  "rows_sha256": "218324f33b1b2169eaae3e1957a028f7dd106051896eb5c132f1bbc12d7537dc",
+  "truth_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-26-long-history-diagnosis/reviewed-truth.json",
+  "truth_sha256": "61dd739e6afa5125c6596a384de9164eb2a90bd3af614d9620fadab4b41273af",
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "endpoint": "http://127.0.0.1:18767/v1",
+  "variants": [
+    "source-first",
+    "final-first",
+    "readable-final-first"
+  ],
+  "sampling": {
+    "temperature": 0,
+    "max_completion_tokens": 256
+  },
+  "timeout_seconds": 60,
+  "max_retries": 1,
+  "capture_budget_seconds": 1800,
+  "repetitions": 1,
+  "order": "case-major then declared variant order; no repeat or best output selection",
+  "hypothesis": "reader protocol only, fixed evidence; no retrieval or general memory benefit claim",
+  "runner_sha256": "e33658e1aa9cb5f5a70e928f2cb5a91b11b92481c2c6e7d7f1bec594f66ecd42",
+  "attempt_recorder_sha256": "e2baf840dc47ff1a4cb045f4bc6a4bad0de02b9b95cd43618505cfe01efb77d9"
+}

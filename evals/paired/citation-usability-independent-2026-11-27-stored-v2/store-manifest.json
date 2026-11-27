@@ -1,0 +1,9 @@
+{
+  "retained_path": "/tmp/memory-quality-stores-2026-11-27/citation-usability-independent-2026-11-27-stored-v2",
+  "files_sha256": {
+    "LOCK": "06d46ff803d3db3ac6a966c6c5bcbd0a04c3c60182f8f4b7f890c435b60abe1c",
+    "wal/00000000000000000001.wal": "e53102ee56954810db907a683c52cc14f29a238a375085b75545014bb643eb85",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5"
+  },
+  "reason": "Generated store retained outside tracked evidence; public input and exact tool receipts remain in this directory."
+}

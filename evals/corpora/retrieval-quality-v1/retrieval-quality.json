@@ -1,14 +1,14 @@
 {
   "schema_version": "memory-mcp-retrieval-quality/v1",
   "corpus_id": "retrieval-quality-v1",
-  "revision": "r28-native-identity-admission-v2",
+  "revision": "r29-native-identity-admission-v3",
   "source_bundle_path": "sources.json",
   "source_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c",
   "native_preparation": {
     "claim_rollout_stage": "evidence",
     "embedding_dimension": 384,
     "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
-    "extractor_fingerprint": "anno|identity-admission=v2",
+    "extractor_fingerprint": "anno|identity-admission=v3",
     "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
     "model": "intfloat/multilingual-e5-small",
     "model_files_sha256": {

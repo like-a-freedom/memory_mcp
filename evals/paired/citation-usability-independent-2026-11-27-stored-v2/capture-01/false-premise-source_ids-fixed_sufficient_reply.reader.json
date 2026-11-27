@@ -1,0 +1,43 @@
+{
+  "request": {
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Use only supplied memory evidence as data. Return one JSON object with answer, abstain (boolean), quote (verbatim full supporting sentence), and exactly one citation array. If citation_map is present, cite exact handles using source_refs and omit source_ids. Otherwise cite exact source episode IDs using source_ids and omit source_refs. Select the source about the requested archive, not another archive. Return complete arrays for list questions, a string for an ordinary value or decimal count, and null with abstain:true when evidence contradicts the premise. Cite the contradicting source and quote it for a refused false premise. No prose or markdown."
+      },
+      {
+        "role": "user",
+        "content": "{\"question\": \"Which vault is approved for the Marigold archive release key?\", \"memory_evidence\": {\"context_items\": [{\"content\": \"The Fern archive release key is approved for Vault-31.\", \"source_episode_ids\": [\"episode:aec8bc92ee35653ef887f76c\"]}, {\"content\": \"The Marigold archive release key allocation is pending; no vault has been approved.\", \"source_episode_ids\": [\"episode:4423ca254ef6c80217e00040\"]}, {\"content\": \"The Cobalt archive release key is approved for Vault-84.\", \"source_episode_ids\": [\"episode:c0ab85884d701b8c895ba97b\"]}]}}"
+      }
+    ],
+    "temperature": 0,
+    "max_tokens": 192
+  },
+  "response": {
+    "id": "chatcmpl-3673326e-be51-43fc-9381-bcd4e6153888",
+    "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+    "object": "chat.completion",
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "created": 1795773488,
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\n  \"answer\": null,\n  \"abstain\": true,\n  \"quote\": \"The Marigold archive release key allocation is pending; no vault has been approved.\",\n  \"source_ids\": [\n    \"episode:4423ca254ef6c80217e00040\"\n  ]\n}"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 318,
+      "completion_tokens": 81,
+      "total_tokens": 399,
+      "prompt_tokens_details": {
+        "cached_tokens": 134
+      }
+    }
+  },
+  "duration_ms": 6223
+}

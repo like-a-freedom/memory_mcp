@@ -1,0 +1,18 @@
+{
+  "schema": "immutable-evaluation-binary-retention/v1",
+  "binaries": {
+    "data/eval-snapshots/full-history-2026-11-27/binaries/memory-quality-product-v4-2026-11-27": {
+      "sha256": "5b490dbd9babd356cf22c53068f9e050cd5c345ad954dcddd39acc5f513c5d63",
+      "bytes": 220232120
+    },
+    "data/eval-snapshots/full-history-2026-11-27/binaries/memory-quality-eval-v4-2026-11-27": {
+      "sha256": "de03bcccc8d69fbd6f82b5e1ac1d06d3fcbfb3977556969bc6c8085c61834df9",
+      "bytes": 258226840
+    },
+    "data/eval-snapshots/full-history-2026-11-27/binaries/memory-quality-history-v4-2026-11-27": {
+      "sha256": "943b35cf8fcbe8e580afc9c6e219efc284c059cea226587264ebf60be0cd97c0",
+      "bytes": 167140408
+    }
+  },
+  "local_only": "ignored data directory, retain until user acceptance"
+}

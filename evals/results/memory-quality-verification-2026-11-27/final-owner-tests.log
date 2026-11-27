@@ -1,0 +1,214 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.14s
+     Running tests/conversation_neighborhood.rs (target/debug/build/memory_mcp/feebc2b21be668df/out/conversation_neighborhood-feebc2b21be668df)
+
+running 36 tests
+test a_source_question_cannot_drop_substantive_post_question_constraints ... ok
+test adjacent_answer_with_a_different_language_relation_is_not_admitted ... ok
+test answer_after_historical_cutoff_is_not_returned ... ok
+test anaphoric_car_follow_up_requires_the_response_to_assert_the_requested_purchase ... ok
+test adjacent_answer_from_another_stream_is_not_returned ... ok
+test answer_replaces_a_question_only_turn_in_context_assembly ... ok
+test another_persons_pet_is_not_attributed_to_the_speaker ... ok
+test a_shared_pronoun_does_not_ground_an_explicitly_different_duration_object ... ok
+test an_unrelated_duration_question_does_not_bridge_into_a_dog_adoption_answer ... ok
+test adjacent_answer_with_a_conflicting_predicate_is_not_admitted ... ok
+test a_shared_pet_topic_recovers_the_same_speakers_answer ... ok
+test a_positive_task_alternative_survives_an_excluded_alternative ... ok
+test anaphoric_follow_up_does_not_add_a_related_response_that_cannot_answer_the_query ... ok
+test anaphoric_follow_up_answer_stays_linked_to_its_query_relevant_assertion ... ok
+test adjacent_answer_with_a_different_task_id_is_not_admitted ... ok
+test adjacent_answer_with_a_conflicting_task_reference_is_not_admitted ... ok
+test an_old_to_new_vehicle_transition_recovers_the_prior_answer_turn ... ok
+test a_following_question_does_not_match_topic_words_from_prior_sentences ... ok
+test batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds ... ok
+test learned_programming_languages_are_supported_answer_relations ... ok
+test answer_replaces_its_matching_question_when_the_context_budget_allows_both ... ok
+test denied_adjacent_answer_is_not_returned ... ok
+test named_subject_source_question_recovers_its_adjacent_answer ... ok
+test explicitly_named_pet_owner_matches_the_requested_subject ... ok
+test dated_team_question_recovers_its_adjacent_answer ... ok
+test named_answer_in_adjacent_turn_survives_context_assembly ... ok
+test matching_where_question_recovers_the_answer_from_a_family_trip ... ok
+test answer_to_a_followup_question_retains_relevant_prior_answer ... ok
+test possessive_source_question_matches_the_named_subjects_answer_slot ... ok
+test shared_here_statement_retains_both_speakers_source_grounded_relief ... ok
+test source_siblings_keep_per_episode_remaining_cap ... ok
+test pet_slot_keeps_owned_snakes_and_rejects_an_anaphoric_pet_comment ... ok
+test unlisted_programming_language_value_is_not_a_contradiction ... ok
+test typed_language_query_rejects_topic_only_and_unrelated_entity_evidence ... ok
+test query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window ... ok
+test original_dog_adoption_query_excludes_a_later_puppy_session ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/extract_quality_e2e.rs (target/debug/build/memory_mcp/f5db01550d6bf8df/out/extract_quality_e2e-f5db01550d6bf8df)
+
+running 32 tests
+test explicit_resolution_remains_available_for_currency_names ... ok
+test explicit_resolution_remains_available_for_scalar_names ... ok
+test automatic_unregistered_metric_dimension_does_not_create_an_entity ... ok
+test french_article_metric_dimension_does_not_create_an_identity ... ok
+test automatic_metric_filter_does_not_remove_manual_identity ... ok
+test profile_extract_quality_corpus ... ignored, manual performance profile
+test profile_genuine_conflict_scale ... ignored, manual genuine-conflict scale profile
+test automatic_currency_amount_does_not_create_an_entity ... ok
+test date_and_percentage_mentions_do_not_become_entities ... ok
+test automatic_growing_metric_dimension_does_not_create_an_entity ... ok
+test french_named_actor_occurrence_is_not_a_global_metric_blacklist ... ok
+test automatic_company_name_can_contain_digits ... ok
+test automatic_reported_metric_dimension_does_not_create_an_entity ... ok
+test automatic_acronym_actor_remains_an_entity ... ok
+test automatic_company_name_can_start_with_a_digit ... ok
+test compound_reporter_does_not_invent_a_group_identity ... ok
+test automatic_email_subject_retains_named_atlas_topic ... ok
+test distinct_dated_workout_records_do_not_create_conflicts_or_cross_source_context ... ok
+test equivalent_currency_scales_do_not_create_a_contradiction ... ok
+test grammatical_subject_does_not_span_sentences ... ok
+test russian_metric_predicate_does_not_create_an_identity ... ok
+test grammatical_chinese_subject_is_linked_without_inventing_a_person_type ... ok
+test metric_spelling_in_a_named_actor_occurrence_remains_an_entity ... ok
+test unresolved_first_person_promise_does_not_invent_an_identity ... ok
+test repeated_reporting_marker_does_not_bind_the_first_name ... ok
+test literal_url_alone_does_not_answer_a_topical_decision_question ... ok
+test supported_multilingual_names_remain_linked ... ok
+test reporter_is_not_implicitly_the_subject_of_another_persons_claim ... ok
+test standalone_file_reference_is_recallable_without_importing_it ... ok
+test standalone_url_reference_is_recallable_without_fetching_it ... ok
+test url_in_a_commitment_preserves_its_canonical_subject ... ok
+test genuine_conflicts_are_all_returned ... ok
+
+test result: ok. 30 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/fact_access_concurrency.rs (target/debug/build/memory_mcp/37e4bb68eb3c3caf/out/fact_access_concurrency-37e4bb68eb3c3caf)
+
+running 4 tests
+test cancellation_drops_all_pending_access_writes ... ok
+2026-11-27T09:57:22.329513Z ERROR  op=assemble_context.access_track_error  access.allowed_tags=null  access.caller_id=null  access.content_type=null  access.session_vars=null  access.transport=null  args={}  result.error_code=storage
+test public_read_awaits_four_access_writes_before_starting_the_next_wave ... ok
+test failed_access_does_not_cancel_siblings_or_skip_later_facts ... ok
+test public_read_durably_records_all_distinct_fact_accesses_before_returning ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/fact_access_payload.rs (target/debug/build/memory_mcp/2196b5495cebe024/out/fact_access_payload-2196b5495cebe024)
+
+running 5 tests
+test small_body_small_keys_access_cost ... ok
+test large_body_small_keys_access_cost ... ok
+test access_write_does_not_return_the_large_source_afterimage ... ok
+test small_body_large_keys_access_cost ... ok
+test large_body_large_keys_access_cost ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+     Running tests/long_history_stage_evidence.rs (target/debug/build/memory_mcp/e8d2bfba80f6470a/out/long_history_stage_evidence-e8d2bfba80f6470a)
+
+running 46 tests
+test diagnostic_source_observation_respects_request_policy ... ok
+test compound_when_question_preserves_a_source_with_the_event_date ... ok
+test compound_when_question_requires_event_time_from_the_source ... ok
+test diagnostic_observes_admission_between_fusion_and_selection ... ok
+test excluded_label_is_not_reported_as_requested_control_membership ... ok
+test generic_options_group_does_not_replace_a_topical_narrative_answer ... ok
+test directory_narrative_does_not_jump_to_unrequested_link_tabs ... ok
+test excludes_label_has_no_positive_membership_priority ... ok
+test excepted_label_has_no_positive_membership_priority ... ok
+test complete_group_topic_support_beats_a_nearer_generic_control_group ... ok
+test independent_plain_tree_group_keeps_quote_offsets_and_byte_cap ... ok
+test explicitly_hidden_control_question_keeps_its_matching_hidden_group ... ok
+test directory_tabs_keep_the_complete_short_link_list ... ok
+test button_request_with_tab_context_keeps_the_requested_buttons ... ok
+test enumeration_keeps_the_control_group_near_its_matching_narrative ... ok
+test later_toolbar_request_does_not_prefer_the_old_visible_container ... ok
+test diagnostic_observes_the_selected_source_before_and_after_packaging ... ok
+test narrative_query_does_not_jump_to_a_distant_control_group ... ok
+test named_source_phrases_outrank_scattered_words_and_index_only_labels ... ok
+test number_words_in_a_format_clause_do_not_hide_substantive_requirements ... ok
+test nearby_control_group_survives_a_stronger_narrative_window ... ok
+test no_longer_included_label_has_no_positive_membership_priority ... ok
+test neighboring_tab_groups_that_cannot_fit_keep_the_byte_cap ... ok
+test oversized_control_group_retains_lexical_window_and_cap ... ok
+test response_format_instructions_do_not_dilute_the_same_question_evidence ... ok
+test neighboring_link_groups_crossing_the_window_edge_remain_complete ... ok
+test replacement_quote_is_not_reported_as_a_requested_control_label ... ok
+test quoted_popup_attributes_do_not_hide_visible_control_labels ... ok
+test quoted_visibility_word_inside_escaped_label_is_not_an_attribute ... ok
+test quoted_visibility_word_inside_popup_value_is_not_an_attribute ... ok
+test exploratory_32_source_control_fetch_preserves_exact_membership ... ok
+test relative_date_question_keeps_its_matching_unknown_container ... ok
+test losing_lexical_pool_retains_source_without_native_fts_provenance ... ok
+2026-11-27T09:57:26.649055Z  WARN  op=embedding.input_truncated  args.limit=8000  args.original_chars=13531  args.truncated_chars=8000  result={}
+test reviewed_dropdown_survives_public_context_packaging ... ok
+test substantive_qualifiers_after_a_question_remain_admission_constraints ... ok
+test separate_visible_button_names_do_not_form_one_requested_label ... ok
+test role_only_list_does_not_displace_neighboring_directory_tabs ... ok
+test short_tab_list_inside_an_oversized_list_remains_complete ... ok
+test unknown_nearest_container_does_not_inherit_outer_visibility ... ok
+test tab_list_after_a_long_button_group_remains_complete ... ok
+test unknown_visibility_keeps_the_prior_nearest_group_ordering ... ok
+test visible_control_container_confirms_an_unqualified_toolbar_question ... ok
+test unnamed_container_without_attributes_still_blocks_outer_visibility ... ok
+test visible_controls_outrank_a_hidden_copy_near_the_lexical_window ... ok
+test visible_word_in_hidden_control_name_is_not_a_visibility_attribute ... ok
+test reviewed_toolbar_survives_public_context_packaging ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+
+     Running tests/service_integration.rs (target/debug/build/memory_mcp/4d4c830ff641e14d/out/service_integration-4d4c830ff641e14d)
+
+running 51 tests
+test test_service_add_fact_persists_provenance ... ok
+test test_service_add_fact_logs_warning_on_embedding_error_and_still_persists ... ok
+test test_service_assemble_context_facets_view_groups_by_policy_tags ... ok
+test test_service_assemble_context_does_not_track_access_for_synthetic_view_ids ... ok
+test test_service_archival_pass_skips_recent_episodes ... ok
+test test_service_archival_pass_with_real_surrealdb_archives_old_episode ... ok
+test test_extract_generates_note_fact_for_summary_requirement_episode ... ok
+test test_service_assemble_context_cache_hit_tracks_fact_access ... ok
+test test_extract_meeting_summary_generates_line_level_decision_and_fact_records ... ok
+test test_service_assemble_context_does_not_append_recent_experience_for_query_driven_retrieval ... ok
+test test_service_active_namespace_contains_legacy_scope_records_without_filtering ... ok
+test test_extract_summary_with_thematic_sections_generates_line_level_note_records ... ok
+test assemble_context_graph_expansion_returns_anchor_neighbor_fact ... ok
+test test_service_add_fact_and_assemble_context ... ok
+test assemble_context_auto_timeline_orders_results_without_explicit_view_mode ... ok
+test test_service_assemble_context_does_not_record_query_log_when_disabled_by_default ... ok
+test extractor_fingerprint_projection ... ok
+test test_service_active_namespace_does_not_route_by_legacy_scope ... ok
+test test_service_assemble_context_map_view_includes_communities ... ok
+test test_service_assemble_context_map_view_returns_hub_entities_sorted_by_degree ... ok
+test test_service_assemble_context_records_fact_access_heat ... ok
+test test_service_assemble_context_filters_by_fact_type_within_active_namespace ... ok
+test test_service_assemble_context_honors_custom_query_log_retention_days ... ok
+test test_service_assemble_context_prunes_query_logs_older_than_default_retention ... ok
+test test_service_exposes_regex_entity_extractor ... ok
+test test_service_assemble_context_wake_up_prioritizes_persona_then_recent ... ok
+test test_service_assemble_context_records_fact_access_heat_on_cache_hit_and_fresh ... ok
+test test_service_decay_pass_skips_already_invalidated_facts ... ok
+test test_service_assemble_context_records_query_log_with_tier_latency_and_result_count ... ok
+test test_service_assemble_context_without_provider_skips_semantic_similarity ... ok
+test test_service_assemble_context_records_query_log_when_enabled ... ok
+test test_service_decay_pass_with_real_surrealdb_invalidates_old_low_confidence ... ok
+test test_service_assemble_context_timeline_view_sorts_and_filters_by_window ... ok
+test test_service_assemble_context_timeline_view_sorts_chronologically ... ok
+test test_service_assemble_context_records_query_log_with_resolved_view_mode_and_flags ... ok
+test test_service_assemble_context_records_query_log_for_cache_hit_queries ... ok
+test test_service_cache_behavior ... ok
+test test_service_does_not_persist_fact_embeddings_without_provider ... ok
+test test_service_experience_read_keeps_source_and_confidence ... ok
+test test_service_relate_persists_native_edge_endpoints_and_inferred_origin ... ok
+test test_service_resolve_and_relate_entities ... ok
+test test_service_resolve_handles_concurrent_duplicate_gracefully ... ok
+test test_service_explain_with_graph_insights_returns_hub_and_connections ... ok
+test test_service_extract_persists_edge_provenance_and_extracted_origin ... ok
+test test_service_extract_persists_index_keys_for_entities_and_temporal_markers ... ok
+test test_service_semantic_returns_empty_without_embedding_provider ... ok
+test test_service_invalidate_sets_t_invalid_and_clears_cache ... ok
+test test_service_merges_overlapping_entity_cohorts_into_one_community ... ok
+test test_service_extract_returns_contradiction_warning_for_conflicting_metric_fact ... ok
+test test_service_fact_invalidation ... ok
+test test_service_ingest_and_extract_flow ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+

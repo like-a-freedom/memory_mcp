@@ -1,0 +1,20 @@
+[
+  {
+    "source_id": "neighborhood-distractor",
+    "episode_id": "episode:9b0856a827061511f1c654cf",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "neighborhood-gold",
+    "episode_id": "episode:ab82efa401e7654c13ce8d16",
+    "status": "success",
+    "fact_count": 0
+  },
+  {
+    "source_id": "neighborhood-other",
+    "episode_id": "episode:b870397fbd5e53d2fc696640",
+    "status": "success",
+    "fact_count": 0
+  }
+]

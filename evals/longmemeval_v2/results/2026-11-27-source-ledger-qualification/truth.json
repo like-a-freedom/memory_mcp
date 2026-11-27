@@ -1,0 +1,118 @@
+{
+  "schema": "reader-reviewed-truth/v1",
+  "cases": {
+    "middle-positive": {
+      "accepted_answers": [
+        "Lantern"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "adjacent-negative": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "terminal-negative": {
+      "accepted_answers": [
+        "None"
+      ],
+      "answer_kind": "false_premise",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "button-count-mixed": {
+      "accepted_answers": [
+        "four",
+        "4"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "missing-anchor-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "duplicate-anchor-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "clipped-terminal-unknown": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "heterogeneous-positive": {
+      "accepted_answers": [
+        "Help"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "named-scope-positive": {
+      "accepted_answers": [
+        "Export"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "complete-list-positive": {
+      "accepted_answers": [
+        "April, June, October"
+      ],
+      "answer_kind": "answerable",
+      "support_policy": "Only the named scope in actual delivered items; duplicate named anchors or a missing scope boundary cannot establish a unique successor."
+    },
+    "ledger-conflicting-repeat": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "Two matching button anchors have different immediate successors: River and Hill."
+    },
+    "ledger-consistent-repeat": {
+      "accepted_answers": [
+        "River"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "Every matching Release button has the same observed successor River; repetition alone does not imply ambiguity."
+    },
+    "ledger-named-scope-repeat": {
+      "accepted_answers": [
+        "Port"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "The question names Footer; Header is a separate scope and cannot supply a competing answer."
+    },
+    "ledger-role-selected-repeat": {
+      "accepted_answers": [
+        "River"
+      ],
+      "answer_kind": "answerable",
+      "source_review_basis": "Only one button anchor matches. The same-name link is a different role; River immediately follows the button."
+    },
+    "ledger-opaque-intervening": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "An intervening group has omitted children. The source does not establish which interactive action is next; it is unsafe to skip the group."
+    },
+    "ledger-clipped-repeat": {
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "answer_kind": "unknown",
+      "source_review_basis": "The first anchor is followed by River, but the second matching anchor is followed by a clipped action label. The answer cannot be uniquely established."
+    }
+  }
+}

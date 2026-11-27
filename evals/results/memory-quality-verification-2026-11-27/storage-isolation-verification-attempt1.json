@@ -1,0 +1,52 @@
+{
+  "schema": "memory-quality-verification/v3",
+  "architecture": "arm64",
+  "delivery": "uncommitted; no push; unrelated CI preserved",
+  "checks": [
+    {
+      "id": "production_after_storage_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--features",
+        "eval-support,test-fixtures",
+        "--lib",
+        "--test",
+        "fact_access_upgrade",
+        "--test",
+        "fact_access_native_upgrade",
+        "--test",
+        "fact_access_concurrency",
+        "--test",
+        "fact_access_payload",
+        "--test",
+        "retrieval_partial_evidence",
+        "--test",
+        "long_history_stage_evidence",
+        "--test",
+        "full_history_evidence",
+        "--test",
+        "service_integration",
+        "--test",
+        "explain_provenance",
+        "--test",
+        "lifecycle_decay",
+        "--test",
+        "lifecycle_archival",
+        "--test",
+        "query_scaling_regressions",
+        "--test",
+        "knowledge_read_scopes",
+        "--locked"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 159.95907804201124,
+      "log_path": "/tmp/memory-quality-storage-v5-attempt1-production_after_storage_isolation.log",
+      "log_sha256": "c38e2ae54572413464d08e49e7efc19987636dc1fcac9d31cf9692bbf55e5663"
+    }
+  ],
+  "complete": false,
+  "all_passed": false
+}

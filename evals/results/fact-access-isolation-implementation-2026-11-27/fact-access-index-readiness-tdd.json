@@ -1,0 +1,37 @@
+{
+  "schema_version": "fact-access-index-readiness-tdd-v1",
+  "recorded_at_utc": "2026-11-27T15:21:59.871268+00:00",
+  "prior_readonly_review": {
+    "path": "evals/results/fact-access-isolation-implementation-2026-11-27/final-readonly-review-v3.json",
+    "sha256": "1b00911ad1c8c127ac079424c5f7bdf51399e5708292206f43eeedbc3984d4d9"
+  },
+  "changed_source_sha256": {
+    "crates/memory-mcp/src/storage/migrations.rs": "1da1e44296eceb1b224f739b6051243f364c2b0eaa83c51a1f3d6fe12827f8e3",
+    "crates/memory-mcp/tests/fact_access_upgrade.rs": "772bc10a2dfef559d6dfbdfd5d91e95611f0e222ccb2ab34eabc1a029b48b629"
+  },
+  "change": "Validate the complete canonical INFO definition of the Memory-owned recent-access index, accepting an optional trailing comment. Its exact two ordered fields carry no extra field or alternate index kind. Clarify backfill retry safety in terms of guarded exact assignments.",
+  "scope": "Valid index behavior and other index matchers retain their existing semantics; no migration DDL, retrieval behavior, or evaluation limits changed. Existing timed v7 pins retain their source identity.",
+  "runs": {
+    "red": {
+      "command": "rtk cargo test -p memory_mcp --locked --test fact_access_upgrade upgrade_rejects_a_preexisting_unique_recent_access_index",
+      "exit_code": 101,
+      "observation": "Apply migrations incorrectly returned Ok, triggering the intended expect_err.",
+      "stdout_sha256": "7d411161dfe6ebe0b86a674e13f2e802cd6168d5b75cfe502a0c8649e6d1d43a",
+      "stdout": "---- upgrade_rejects_a_preexisting_unique_recent_access_index stdout ----\n\nthread 'upgrade_rejects_a_preexisting_unique_recent_access_index' (11068950) panicked at crates/memory-mcp/tests/fact_access_upgrade.rs:36:10:\nsame-episode accesses at the same time must be permitted: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.22s\n"
+    },
+    "green_integration": {
+      "command": "rtk cargo test -p memory_mcp --locked --test fact_access_upgrade --test fact_access_native_upgrade",
+      "exit_code": 0,
+      "observation": "12 passed across the two real-engine integration targets.",
+      "stdout_sha256": "32dff365186281325c38c9bcdddfe89e05a6a4a9461871c54790be1ee5940694",
+      "stdout": "cargo test: 12 passed (2 suites, 21.15s)\n"
+    },
+    "green_readiness_controls": {
+      "command": "rtk cargo test -p memory_mcp --locked --lib storage::migrations::tests::fact_access_readiness",
+      "exit_code": 0,
+      "observation": "5 passed in the existing readiness controls.",
+      "stdout_sha256": "5885c0351cea384ddc7940e4fda2e662a1d6bb0daebbae71f27e7bbc69799e40",
+      "stdout": "cargo test: 5 passed, 2079 filtered out (1 suite, 0.28s)\n"
+    }
+  }
+}

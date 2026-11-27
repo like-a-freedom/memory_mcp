@@ -1,0 +1,48 @@
+suite 1/1: retrieval-quality started (37 expected cases)
+suite 1/1: retrieval-quality finished (37 cases, 202930 ms)
+# Evaluation Report — nightly
+
+**Verdict:** PASSED
+**Schema:** `memory-mcp-eval/v2`
+**Run ID:** `run-1795787828`
+**Duration:** 203020ms
+**Budget:** passed
+
+## Coverage
+
+**Expected cases:** 37
+**Outcomes:** 37 (failed: 0, invalid: 0)
+
+**Gates:** 6 (failed: 0, invalid: 0)
+
+| Status | Count |
+|--------|-------|
+| Passed | 37 |
+| Quality Failed | 0 |
+| Invalid | 0 |
+
+## Suite Metrics
+
+| Suite | Total | Passed | Failed | Invalid | Metrics |
+|-------|-------|--------|--------|---------|--------|
+| retrieval-quality | 37 | 37 | 0 | 0 | answerable_non_abstention_rate=1.0000, answerable_non_abstention_rate_applicable_count=32.0000, duplicate_free_rate=1.0000, duplicate_free_rate_applicable_count=37.0000, precision_macro=1.0000, precision_macro_applicable_count=32.0000, prohibited_free_rate=1.0000, prohibited_free_rate_applicable_count=37.0000, required_group_recall=1.0000, required_group_recall_applicable_count=46.0000, unknown_abstention_rate=1.0000, unknown_abstention_rate_applicable_count=5.0000 |
+
+## Gates
+
+| Suite | Metric | Observed | Floor | Baseline | Budget | Status |
+|-------|--------|----------|-------|----------|--------|--------|
+| retrieval-quality | precision_macro | 1.0000 | 1.0000 | - | - | passed |
+| retrieval-quality | required_group_recall | 1.0000 | 1.0000 | - | - | passed |
+| retrieval-quality | unknown_abstention_rate | 1.0000 | 1.0000 | - | - | passed |
+| retrieval-quality | answerable_non_abstention_rate | 1.0000 | 1.0000 | - | - | passed |
+| retrieval-quality | duplicate_free_rate | 1.0000 | 1.0000 | - | - | passed |
+| retrieval-quality | prohibited_free_rate | 1.0000 | 1.0000 | - | - | passed |
+
+profile=nightly total=37 passed=37 quality_failed=0 invalid=0 duration_ms=203020
+gate=retrieval-quality/precision_macro observed=1.0000 status=passed
+gate=retrieval-quality/required_group_recall observed=1.0000 status=passed
+gate=retrieval-quality/unknown_abstention_rate observed=1.0000 status=passed
+gate=retrieval-quality/answerable_non_abstention_rate observed=1.0000 status=passed
+gate=retrieval-quality/duplicate_free_rate observed=1.0000 status=passed
+gate=retrieval-quality/prohibited_free_rate observed=1.0000 status=passed
+RESULT: PASSED

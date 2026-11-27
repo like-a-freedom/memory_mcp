@@ -1,0 +1,44 @@
+{
+  "stage": "upgrade",
+  "admitted": true,
+  "command": [
+    "/tmp/memory-quality-history-v5-2026-11-27",
+    "full_history_upgrade_fact_access_statistics",
+    "--exact",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "external_timeout": false,
+  "elapsed_seconds": 14.080181209021248,
+  "process_fault": null,
+  "malformed_events": [],
+  "strict_span_assertion": false,
+  "raw_log": "/tmp/memory-quality-full-100-2026-11-27/observations-heat-isolation/upgrade.log",
+  "raw_sha256": "48a3d7e26fe84b7ed89977314148697912c485f28586dcb6e23b793ec899b089",
+  "raw_bytes": 310,
+  "original_snapshot_file_sha256": {
+    "LOCK": "5bbd6ccf096f4833f96079544d4902e8428d28fb70d45ce735d344613da971e0",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+    "vlog/00000000000000000002.vlog": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+    "vlog/00000000000000000003.vlog": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+    "wal/00000000000000000302.wal": "9f0a3daba46f3dca49186692682c7838ded5720cdd8d53c1e36c5cb6b576061c"
+  },
+  "candidate_closed_file_sha256": {
+    "LOCK": "bd573dd073f4cb734d365f38b7d81b33fc12fbbfda21b3b1f2b954989fe07ade",
+    "manifest/00000000000000000000.manifest": "d5bf45c221760fc82d64ed33a156b4d7f91fbf98ab203927aad22dcc92a183d5",
+    "vlog/00000000000000000001.vlog": "724acc15144692894f1f98f50d2c4df166c17d193d3cb56797b8c3543ba1d31c",
+    "vlog/00000000000000000002.vlog": "bd583a229db09f935692a5553fce4d0a3ecce87592a8223e13d7cb5d814da2d0",
+    "vlog/00000000000000000003.vlog": "e1c62906278c1fb7c264f331b0f3164e94f1a5dc424272a79ca6076796da2072",
+    "wal/00000000000000000303.wal": "a2525edd58d9f047ee2abcaddee4381d67f7703b8e36df282081d63d3e224753"
+  },
+  "upgrade_receipt": {
+    "elapsed_ms": 575.010291,
+    "heat_counts": [
+      {
+        "rows": 0
+      }
+    ]
+  }
+}

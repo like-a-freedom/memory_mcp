@@ -1,0 +1,58 @@
+   Compiling memory_mcp v2.0.2 (/Users/solovey/Documents/dev/memory_mcp/crates/memory-mcp)
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/dev/memory_mcp/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.04s
+     Running tests/chat_completions_runner.rs (target/debug/build/eval-harness/daa6f9e025d18be6/out/chat_completions_runner-daa6f9e025d18be6)
+
+running 35 tests
+test chat_completions_runner_configuration_cannot_send_task_data_to_non_loopback_hosts ... ok
+test evidence_action_hint_fails_closed_when_any_item_status_is_unknown_or_missing ... ok
+test evidence_action_hint_marks_a_typed_conflict_for_clarification ... ok
+test evidence_action_hint_on_an_empty_partial_read_does_not_claim_absence ... ok
+test evidence_action_hint_preserves_an_opaque_public_reply ... ok
+test chat_completions_runner_distinguishes_request_send_failure_without_retaining_content ... ok
+test chat_completions_runner_records_only_http_status_for_provider_rejection ... ok
+test chat_completions_runner_classifies_empty_formation_completion ... ok
+test chat_completions_runner_classifies_final_answer_schema_mismatch_without_retaining_it ... ok
+test chat_completions_runner_never_executes_a_tool_outside_the_phase_allow_list ... ok
+test chat_completions_agent_sends_one_combined_system_message ... ok
+test chat_completions_runner_distinguishes_response_body_read_failure_without_retaining_content ... ok
+test chat_completions_runner_records_malformed_provider_output_as_a_model_failure ... ok
+test fixed_read_registration_accepts_evidence_action_hint ... ok
+test chat_completions_runner_classifies_non_json_final_answer_without_retaining_it ... ok
+test chat_completions_runner_records_a_trace_event_for_a_clarification_answer ... ok
+test chat_completions_agent_sends_registered_sampling_parameters ... ok
+test local_chat_completions_smoke_executes_a_public_memory_tool ... ignored, opt-in loopback smoke; configure any local OpenAI-compatible Chat Completions server
+test phase_rejects_an_unrepresentable_deadline_before_any_model_request ... ok
+test source_authority_control_candidate_keeps_the_write_profile ... ok
+test empty_read_reports_zero_items ... ok
+test chat_completions_agent_sends_registered_provider_parameters_on_every_turn ... ok
+test evidence_action_hint_reaches_the_model_with_the_same_returned_source ... ok
+test chat_completions_agent_sends_registered_response_format_on_tool_and_final_turns ... ok
+test chat_completions_agent_executes_an_allowed_mcp_tool_and_records_only_receipt_metadata ... ok
+test chat_completions_agent_preserves_optional_reasoning_for_tool_followup_without_recording_it ... ok
+test extract_evidence_telemetry_uses_the_product_default_when_the_argument_is_omitted ... ok
+test source_authority_formation_accepts_a_non_json_completion_message ... ok
+test turn_budget_exhaustion_is_recorded_in_the_normalized_trace ... ok
+test jsonrpc_read_error_remains_a_failed_read ... ok
+test fixed_reply_is_delivered_to_the_original_tool_call ... ok
+test read_error_does_not_become_empty_memory ... ok
+test loopback_read_normalizes_only_the_matched_structured_reply ... ok
+test text_only_loopback_reply_has_unknown_read_outcome ... ok
+test chat_completions_client_refuses_redirects_even_to_another_loopback_url ... ok
+
+test result: ok. 34 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/extraction_suite_contract.rs (target/debug/build/eval-harness/71e1db2dc6af64c4/out/extraction_suite_contract-71e1db2dc6af64c4)
+
+running 8 tests
+test observe_registered_multilingual_admission ... ignored, explicit registered corpus capture; output must be a new file
+test unreadable_fixture_remains_invalid_reviewed_development_evidence ... ok
+test deadline_retains_declared_reviewed_development_population ... ok
+test setup_fault_preserves_declared_development_population ... ok
+test primary_fault_retains_reviewed_development_identity ... ok
+test complete_empty_expectations_accept_no_predictions ... ok
+test complete_entity_expectation_rejects_false_positives ... ok
+test complete_warning_expectation_rejects_additional_contradictions ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.40s
+

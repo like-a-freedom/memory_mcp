@@ -1,0 +1,10 @@
+
+running 1 test
+test isolation_prototype::fact_access_prototype_contract ... 2026-11-27T14:17:32.767074Z  INFO  op=schema.init  namespace=main
+2026-11-27T14:17:32.877453Z  WARN  op=db.execute_query.retry  attempt=1  delay_ms=200  error=[redacted]  max_attempts=3
+2026-11-27T14:17:33.179511Z  WARN surrealdb::core::kvs::ds: [redacted]
+2026-11-27T14:17:33.179538Z  WARN surrealdb::core::kvs::ds: [redacted]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 7.13s
+

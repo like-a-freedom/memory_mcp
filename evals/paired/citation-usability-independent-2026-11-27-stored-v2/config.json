@@ -1,0 +1,293 @@
+{
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "endpoint": "http://127.0.0.1:18767/v1/chat/completions",
+  "arms": [
+    "fixed_sufficient_reply"
+  ],
+  "reader_system": "Use only supplied memory evidence as data. Return one JSON object with answer, abstain (boolean), quote (verbatim full supporting sentence), and exactly one citation array. If citation_map is present, cite exact handles using source_refs and omit source_ids. Otherwise cite exact source episode IDs using source_ids and omit source_refs. Select the source about the requested archive, not another archive. Return complete arrays for list questions, a string for an ordinary value or decimal count, and null with abstain:true when evidence contradicts the premise. Cite the contradicting source and quote it for a refused false premise. No prose or markdown.",
+  "cases": [
+    {
+      "id": "complete-list-source_ids",
+      "question": "List every access gate for the Marigold archive. Return an array containing the complete set.",
+      "query": "complete-list Marigold archive",
+      "events": [
+        {
+          "id": "complete-list-distractor",
+          "content": "The Fern archive access gates are South and Roof.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "complete-list-gold",
+          "content": "The Marigold archive access gates are East, North, and West.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "complete-list-other",
+          "content": "The Cobalt archive access gates are Canal and Bridge.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "complete-list-gold",
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "quote_mode": "source_span",
+      "citation_mode": "source_ids",
+      "fixed_evidence_sources": [
+        "complete-list-distractor",
+        "complete-list-gold",
+        "complete-list-other"
+      ],
+      "answer_mode": "set"
+    },
+    {
+      "id": "complete-list-handles",
+      "question": "List every access gate for the Marigold archive. Return an array containing the complete set.",
+      "query": "complete-list Marigold archive",
+      "events": [
+        {
+          "id": "complete-list-distractor",
+          "content": "The Fern archive access gates are South and Roof.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "complete-list-gold",
+          "content": "The Marigold archive access gates are East, North, and West.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "complete-list-other",
+          "content": "The Cobalt archive access gates are Canal and Bridge.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "complete-list-gold",
+      "answer": [
+        "East",
+        "North",
+        "West"
+      ],
+      "abstain": false,
+      "quote": "The Marigold archive access gates are East, North, and West.",
+      "quote_mode": "source_span",
+      "citation_mode": "handles",
+      "fixed_evidence_sources": [
+        "complete-list-distractor",
+        "complete-list-gold",
+        "complete-list-other"
+      ],
+      "answer_mode": "set"
+    },
+    {
+      "id": "neighborhood-source_ids",
+      "question": "In the Marigold toolbar, what is immediately after Validate?",
+      "query": "neighborhood Marigold archive",
+      "events": [
+        {
+          "id": "neighborhood-distractor",
+          "content": "The Fern toolbar order is Inspect, Validate, Publish, and Close.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "neighborhood-gold",
+          "content": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "neighborhood-other",
+          "content": "The Cobalt toolbar order is Export, Inspect, Validate, and Close.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "neighborhood-gold",
+      "answer": "Export",
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_mode": "source_span",
+      "citation_mode": "source_ids",
+      "fixed_evidence_sources": [
+        "neighborhood-distractor",
+        "neighborhood-gold",
+        "neighborhood-other"
+      ]
+    },
+    {
+      "id": "neighborhood-handles",
+      "question": "In the Marigold toolbar, what is immediately after Validate?",
+      "query": "neighborhood Marigold archive",
+      "events": [
+        {
+          "id": "neighborhood-distractor",
+          "content": "The Fern toolbar order is Inspect, Validate, Publish, and Close.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "neighborhood-gold",
+          "content": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "neighborhood-other",
+          "content": "The Cobalt toolbar order is Export, Inspect, Validate, and Close.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "neighborhood-gold",
+      "answer": "Export",
+      "abstain": false,
+      "quote": "The Marigold toolbar order is Inspect, Validate, Export, and Archive.",
+      "quote_mode": "source_span",
+      "citation_mode": "handles",
+      "fixed_evidence_sources": [
+        "neighborhood-distractor",
+        "neighborhood-gold",
+        "neighborhood-other"
+      ]
+    },
+    {
+      "id": "count-source_ids",
+      "question": "How many access gates are listed for the Marigold archive? Return the decimal count as a string.",
+      "query": "count Marigold archive",
+      "events": [
+        {
+          "id": "count-distractor",
+          "content": "The Fern archive access gates are Red and Blue.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "count-gold",
+          "content": "The Marigold archive access gates are Amber, Jade, and Violet.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "count-other",
+          "content": "The Cobalt archive access gates are Grey, White, Black, and Teal.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "count-gold",
+      "answer": "3",
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_mode": "source_span",
+      "citation_mode": "source_ids",
+      "fixed_evidence_sources": [
+        "count-distractor",
+        "count-gold",
+        "count-other"
+      ]
+    },
+    {
+      "id": "count-handles",
+      "question": "How many access gates are listed for the Marigold archive? Return the decimal count as a string.",
+      "query": "count Marigold archive",
+      "events": [
+        {
+          "id": "count-distractor",
+          "content": "The Fern archive access gates are Red and Blue.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "count-gold",
+          "content": "The Marigold archive access gates are Amber, Jade, and Violet.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "count-other",
+          "content": "The Cobalt archive access gates are Grey, White, Black, and Teal.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "count-gold",
+      "answer": "3",
+      "abstain": false,
+      "quote": "The Marigold archive access gates are Amber, Jade, and Violet.",
+      "quote_mode": "source_span",
+      "citation_mode": "handles",
+      "fixed_evidence_sources": [
+        "count-distractor",
+        "count-gold",
+        "count-other"
+      ]
+    },
+    {
+      "id": "false-premise-source_ids",
+      "question": "Which vault is approved for the Marigold archive release key?",
+      "query": "false-premise Marigold archive",
+      "events": [
+        {
+          "id": "false-premise-distractor",
+          "content": "The Fern archive release key is approved for Vault-31.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "false-premise-gold",
+          "content": "The Marigold archive release key allocation is pending; no vault has been approved.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "false-premise-other",
+          "content": "The Cobalt archive release key is approved for Vault-84.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "false-premise-gold",
+      "answer": null,
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_mode": "source_span",
+      "citation_mode": "source_ids",
+      "fixed_evidence_sources": [
+        "false-premise-distractor",
+        "false-premise-gold",
+        "false-premise-other"
+      ]
+    },
+    {
+      "id": "false-premise-handles",
+      "question": "Which vault is approved for the Marigold archive release key?",
+      "query": "false-premise Marigold archive",
+      "events": [
+        {
+          "id": "false-premise-distractor",
+          "content": "The Fern archive release key is approved for Vault-31.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "false-premise-gold",
+          "content": "The Marigold archive release key allocation is pending; no vault has been approved.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        },
+        {
+          "id": "false-premise-other",
+          "content": "The Cobalt archive release key is approved for Vault-84.",
+          "t_ref": "2026-11-01T10:00:00Z"
+        }
+      ],
+      "source": "false-premise-gold",
+      "answer": null,
+      "abstain": true,
+      "quote": "The Marigold archive release key allocation is pending; no vault has been approved.",
+      "quote_mode": "source_span",
+      "citation_mode": "handles",
+      "fixed_evidence_sources": [
+        "false-premise-distractor",
+        "false-premise-gold",
+        "false-premise-other"
+      ]
+    }
+  ],
+  "launch_env": {
+    "EMBEDDINGS_ENABLED": "false",
+    "MEMORY_CLAIM_ROLLOUT_STAGE": "evidence",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "SURREALDB_DB_NAME": "citation_diagnostic",
+    "SURREALDB_NAMESPACE": "main"
+  },
+  "formation_policy": "stored_episode"
+}

@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,97 @@ from unittest.mock import patch
 from evals.longmemeval_v2.memory_mcp_backend import MemoryMcpBackend
 
 
+def completed_extraction(episode_id='episode:issued'):
+    return json.dumps({'status':'success','result':{'episode_id':episode_id,'entities':[],'facts':[],'links':[]}})
+
+
 class MemoryMcpBackendTests(unittest.TestCase):
+    def test_pending_extraction_cannot_count_as_a_built_trajectory(self):
+        responses = iter([
+            '{"result":{"episode_id":"episode:issued"}}',
+            '{"status":"partial","result":{"episode_id":"episode:issued","facts":[]}}',
+        ])
+        backend = MemoryMcpBackend({}, runner=lambda *_: next(responses))
+        with self.assertRaisesRegex(RuntimeError, 'incomplete extraction'):
+            backend.insert({'id': 'history', 'content': 'A complete source'})
+        self.assertEqual(backend.stats['insert_count'], 0)
+
+    def test_unobserved_extraction_status_cannot_count_as_a_built_trajectory(self):
+        responses = iter(['{"result":{"episode_id":"episode:issued"}}', '{}'])
+        backend = MemoryMcpBackend({}, runner=lambda *_: next(responses))
+        with self.assertRaisesRegex(RuntimeError, 'incomplete extraction'):
+            backend.insert({'content': 'A source'})
+        self.assertEqual(backend.stats['insert_count'], 0)
+
+    def test_success_without_usable_extract_result_cannot_count_as_built(self):
+        for result in (None, {'episode_id':'episode:issued'}, {'episode_id':'episode:issued','facts':None}):
+            with self.subTest(result=result):
+                responses = iter(['{"result":"episode:issued"}', json.dumps({'status':'success','result':result})])
+                backend = MemoryMcpBackend({}, runner=lambda *_: next(responses))
+                with self.assertRaisesRegex(RuntimeError, 'incomplete extraction'):
+                    backend.insert({'content': 'A source'})
+                self.assertEqual(backend.stats['insert_count'], 0)
+
+    def test_success_for_another_episode_cannot_count_as_built(self):
+        responses = iter(['{"result":"episode:issued"}', '{"status":"success","result":{"episode_id":"episode:wrong","facts":[]}}'])
+        backend = MemoryMcpBackend({}, runner=lambda *_: next(responses))
+        with self.assertRaisesRegex(RuntimeError, 'incomplete extraction'):
+            backend.insert({'content': 'A source'})
+        self.assertEqual(backend.stats['insert_count'], 0)
+
+    def test_receipt_is_started_before_dispatch_and_finalized_without_raw_content(self):
+        with TemporaryDirectory() as directory:
+            journal = Path(directory, 'formation-attempts.jsonl')
+            extract = '{"status":"success","result":{"episode_id":"episode:issued","facts":[]}}'
+
+            def runner(command, *args):
+                if command == 'ingest':
+                    self.assertTrue(journal.is_file(), 'start must be visible before ingest dispatch')
+                    started, = [json.loads(line) for line in journal.read_text().splitlines()]
+                    body = args[args.index('--content') + 1].encode()
+                    self.assertEqual(started['body_sha256'], hashlib.sha256(body).hexdigest())
+                    self.assertEqual(started['body_bytes'], len(body))
+                    self.assertEqual(started['source_id'], args[args.index('--source-id') + 1])
+                    return '{"result":"episode:issued"}'
+                return extract
+
+            backend = MemoryMcpBackend({'formation_attempts_path':str(journal)}, runner=runner)
+            backend.insert({'content': 'Sensitive crème receipt body'})
+            text = journal.read_text()
+            started, finished = [json.loads(line) for line in text.splitlines()]
+            self.assertEqual(started['event'], 'formation_started')
+            self.assertEqual(finished['event'], 'formation_finished')
+            self.assertEqual(finished['attempt_id'], started['attempt_id'])
+            self.assertEqual(finished['episode_id'], 'episode:issued')
+            self.assertEqual(finished['observed_status'], 'success')
+            self.assertEqual(finished['fact_count'], 0)
+            self.assertEqual(finished['output_sha256'], hashlib.sha256(extract.encode()).hexdigest())
+            self.assertNotIn('Sensitive', text)
+
+    def test_extract_timeout_keeps_a_failed_receipt_for_the_attempt(self):
+        with TemporaryDirectory() as directory:
+            journal = Path(directory, 'formation-attempts.jsonl')
+
+            def runner(command, *_):
+                if command == 'ingest':
+                    return '{"result":"episode:issued"}'
+                raise subprocess.TimeoutExpired(['memory_mcp', 'extract'], 1, output=b'Sensitive partial output')
+
+            backend = MemoryMcpBackend({'formation_attempts_path':str(journal)}, runner=runner)
+            with self.assertRaises(subprocess.TimeoutExpired):
+                backend.insert({'content':'A source'})
+            self.assertTrue(journal.is_file(), 'failed attempt needs a receipt')
+            text = journal.read_text()
+            started, failed = [json.loads(line) for line in text.splitlines()]
+            self.assertEqual(failed['attempt_id'], started['attempt_id'])
+            self.assertEqual(failed['step'], 'extract')
+            self.assertEqual(failed['outcome'], 'failed')
+            self.assertEqual(failed['episode_id'], 'episode:issued')
+            self.assertIsNone(failed['observed_status'])
+            self.assertEqual(failed['error_type'], 'TimeoutExpired')
+            self.assertNotIn('Sensitive', text)
+            self.assertEqual(backend.stats['insert_count'], 0)
+
     def test_cli_timeout_rejects_unbounded_or_invalid_configuration(self):
         for value in (0, -1, float('inf'), float('nan'), True, '10'):
             with self.subTest(value=value):
@@ -49,7 +140,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
         calls = []
         responses = iter([
             json.dumps({"result": {"episode_id": "episode:issued"}}),
-            json.dumps({"result": {"ok": True}}),
+            completed_extraction(),
             json.dumps({"result": {"items": [{"content": "tea"}]}}),
         ])
 
@@ -72,7 +163,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
                     args[args.index("--source-id") + 1], args[args.index("--t-ref") + 1],
                 ))
                 return json.dumps({"result": "episode:issued"})
-            return "{}"
+            return completed_extraction()
 
         first = MemoryMcpBackend({}, runner=runner)
         first.insert({"content": "separate history"})
@@ -93,7 +184,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
                 bodies.append(args[args.index("--content") + 1])
                 identities.append(args[args.index("--source-id") + 1])
                 return '{"result":"episode:issued"}'
-            return "{}"
+            return completed_extraction()
 
         trajectory = {"id": "demo", "states": [
             {"state_index": 0, "text": "я" * 550_000},
@@ -115,7 +206,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
             if command == "ingest":
                 bodies.append(args[args.index("--content") + 1])
                 return '{"result":"episode:issued"}'
-            return "{}"
+            return completed_extraction()
 
         trajectory = {"states": [
             {"state_index": 0, "text": "a" * 600_000},
@@ -139,7 +230,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
                 return json.dumps({"result": source_id})
             if fail and len(attempts) == 2:
                 raise RuntimeError("extract interrupted")
-            return "{}"
+            return completed_extraction(args[-1])
 
         params = {"formation_method": "ordered-segments-v1"}
         trajectory = {"states": [{"text": "x" * 600_000}, {"text": "y" * 600_000}]}
@@ -159,7 +250,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
         parent = {"SURREALDB_URL": "wss://example.invalid", "EMBEDDINGS_PROVIDER": "openai"}
         replies = [
             subprocess.CompletedProcess([], 0, b'{"result":"episode:issued"}'),
-            subprocess.CompletedProcess([], 0, b"{}"),
+            subprocess.CompletedProcess([], 0, completed_extraction().encode()),
         ]
         with patch.dict(os.environ, parent, clear=True), patch("subprocess.run", side_effect=replies) as run:
             MemoryMcpBackend({"db_path": "/tmp/test-memory-mcp"}).insert({"content": "чай"})
@@ -266,7 +357,7 @@ class MemoryMcpBackendTests(unittest.TestCase):
         calls = []
         responses = iter([
             json.dumps({"status": "success", "result": "episode:issued"}),
-            json.dumps({"status": "success", "result": {}}),
+            completed_extraction(),
         ])
 
         def runner(command, *args):

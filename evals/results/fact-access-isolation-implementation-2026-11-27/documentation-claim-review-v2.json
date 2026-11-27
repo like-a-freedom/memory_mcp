@@ -1,0 +1,63 @@
+{
+  "schema": "memory-quality-documentation-claim-review/v2",
+  "reviewed_at_utc": "2026-11-27T15:25:42.842014+00:00",
+  "scope": "Read-only documentation snapshot plus direct verification addendum. Document SHAs refer to the original v1 read; root owns subsequent edits. No Cargo/inference/production tests.",
+  "sources": {
+    "docs/evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md": "5009ff0ad9163acdb0b017e47c6d3bf0562426de4efcc9aa83fad5ea2f5cd16b",
+    "docs/superpowers/plans/2026-11-26-post-release-memory-quality.md": "d7af6d39b47c0d3a9ece4cfc6d40d440dd5729b9aa335270886241e5c68544c5",
+    "docs/superpowers/specs/2026-11-27-fact-access-storage-isolation-design.md": "f55caab7ef52a2a348f3362488f60f9b05c89c30df4a3deadb6e492990bfa955",
+    "docs/operations/FACT_ACCESS_UPGRADE.md": "b01ed4bcc618b290aa6749879e2d2517804223c077cde8048a3a44a2999c1b81",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-access-isolation/README.md": "e8b6947e94317ba45a66c15bca90b566f80b7031fea473a115f1e3abe8b70336",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/README.md": "d8e2e131975abc5aa53e7be5a885b2479c807226849ce04fe4186d66693c0d42"
+  },
+  "findings": [
+    {
+      "file": "docs/evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md",
+      "line": 77,
+      "issue": "Future P0 source-selection action is already completed inV7; conflicts with current table/plan.",
+      "action": "Mark source repair closed at exposed development gate while retainingV5FAIL and separate reader qualification."
+    },
+    {
+      "file": "docs/evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md",
+      "line": 94,
+      "issue": "Candidate native/full-history results described as future despite completedV5/V7 table.",
+      "action": "Retain pending status only for unfinished model reader captures."
+    },
+    {
+      "file": "docs/evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md",
+      "line": 19,
+      "issue": "Capture described as not executed while source-ledger32 currently in progress.",
+      "action": "Report in progress/uncompleted until final immutable results exist."
+    }
+  ],
+  "checked_consistency": [
+    "V5FAIL6/7 andV7source/nativePASS7/7 are separate immutable versions.",
+    "Strict coverage4/7vs5/7 remains separate from alternate semantic adequacy.",
+    "Both V5 arms andV7 complete7/7; no6->7 completion claim.",
+    "V7 reader, autonomous skill andC2 benefit qualification not inferred from source gate.",
+    "Final index guard is explicitly after immutableV7 capture; nativevalid-schema regression evidence is separate.",
+    "Local markdown targets resolve after handling application-supported :line suffixes. Registry source links exist locally; they are developer-machine paths, not portable repository evidence."
+  ],
+  "production_scenario_coverage_added": 0,
+  "supersedes": {
+    "path": "evals/results/fact-access-isolation-implementation-2026-11-27/documentation-claim-review-v1.json",
+    "sha256": "098168599293e4f1043c31c310c88a3ea7d2cffa9bc7820649d8d0c2f0c3d791",
+    "reason": "Finding4 was based on stale running-status information. Direct inspection now verifies post-guard clippy/eval-clippy/fmt all completed successfully before model startup; withdraw finding4. Other three documentary status findings were accepted for root reconciliation."
+  },
+  "post_guard_verification": {
+    "path": "evals/results/fact-access-isolation-implementation-2026-11-27/positional-final-readiness-checks.json",
+    "sha256": "17731bd92b749895a4873b3d234a394eda0baa8862448d2d53a619737546ee48",
+    "retained_logs_sha_verified": 3,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "elapsed_seconds": [
+      17.415595917002065,
+      13.064740500005428,
+      2.725321375008207
+    ],
+    "claim": "The spec statement required clippy/fmt were checked again is supported; no correction needed."
+  }
+}

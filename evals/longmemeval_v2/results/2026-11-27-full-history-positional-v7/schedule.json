@@ -1,0 +1,89 @@
+{
+  "scheduled": 7,
+  "attempts": [
+    {
+      "ordinal": 0,
+      "case_id": "0c6b0c60",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 1,
+      "case_id": "6d975a08",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "case_id": "89a20f48",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "case_id": "922a0c56",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "case_id": "d6da3938",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "case_id": "f43926d9",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "case_id": "f61a096f",
+      "arm": "candidate",
+      "command": [
+        "/tmp/memory-quality-history-v7-2026-11-27",
+        "full_history_registered_case_retains_reviewed_source",
+        "--exact",
+        "--ignored",
+        "--nocapture"
+      ]
+    }
+  ]
+}
