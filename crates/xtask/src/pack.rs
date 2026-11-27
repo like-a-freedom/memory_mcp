@@ -324,10 +324,10 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
     //
     // Both conditions are required, not just the exit code: `memory_mcp_http`
     // exits `2` for every configuration failure, and a process that started and
-    // died for an unrelated reason would exit non-zero too. A startup failure is
-    // a structured `http.serve_failed` event on stderr rather than bare prose,
-    // so the event and the variable it names are what prove the parser was
-    // reached and named the cause.
+    // died for an unrelated reason would exit non-zero too. Require the
+    // structured startup-failure event, with its error redacted according to
+    // the logging privacy contract. The variable name is intentionally not
+    // observable here; HTTP configuration tests verify invalid bind handling.
     let mut command = Command::new(http);
     command
         .env_clear()
@@ -342,7 +342,7 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     if output.status.code() != Some(2)
         || !stderr.contains("http.serve_failed")
-        || !stderr.contains("MEMORY_MCP_HTTP_BIND")
+        || !stderr.contains("error=[redacted]")
     {
         return Err(PackError::Smoke(format!(
             "HTTP configuration smoke failed: status={:?}, stderr={stderr}",
@@ -734,7 +734,7 @@ fn main() {
 "##;
         let http_source = r#"
 fn main() {
-    eprintln!("ERROR  op=http.serve_failed  error=\"config invalid: MEMORY_MCP_HTTP_BIND\"");
+    eprintln!("ERROR  op=http.serve_failed  error=[redacted]");
     std::process::exit(2);
 }
 "#;
@@ -810,6 +810,63 @@ fn main() {
         );
         assert_sidecar_matches(&archive);
         assert_sidecar_matches(&standalone);
+    }
+
+    fn assert_http_smoke_rejected(http_source: &str) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let build = dir.path().join("build");
+        fs::create_dir(&build).expect("build dir");
+        let cli = compile_fixture_binary(
+            dir.path(),
+            "memory_mcp",
+            r##"fn main() {
+                if std::env::args().nth(1).as_deref() == Some("--version") {
+                    println!("memory_mcp fixture");
+                } else {
+                    println!(r#"{{"mutates_files":false,"target":"vscode"}}"#);
+                }
+            }"##,
+        );
+        let http = compile_fixture_binary(dir.path(), "memory_mcp_http", http_source);
+        fs::copy(
+            cli,
+            build.join(format!("memory_mcp{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .expect("copy CLI fixture");
+        fs::copy(
+            http,
+            build.join(format!("memory_mcp_http{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .expect("copy HTTP fixture");
+        let dist = dir.path().join("dist");
+
+        let outcome = package(&build, &host_target(), &dist);
+
+        assert!(
+            outcome.is_err(),
+            "unqualified HTTP binary must not be packaged"
+        );
+        assert!(directory_file_names(&dist).is_empty());
+    }
+
+    #[test]
+    fn a_configuration_exit_without_the_http_failure_event_produces_no_artifact() {
+        assert_http_smoke_rejected(
+            r#"fn main() {
+            eprintln!("ERROR op=other.failed error=[redacted]");
+            std::process::exit(2);
+        }"#,
+        );
+    }
+
+    #[test]
+    fn an_http_failure_event_with_the_wrong_exit_code_produces_no_artifact() {
+        assert_http_smoke_rejected(
+            r#"fn main() {
+            eprintln!("ERROR op=http.serve_failed error=[redacted]");
+            std::process::exit(1);
+        }"#,
+        );
     }
 
     /// An actual package attempt rejected by the smoke workflow leaves no

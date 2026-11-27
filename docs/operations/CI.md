@@ -125,8 +125,11 @@ runtime library is required.
 Before upload, the actual packaged executables must pass CLI version/init,
 both ordinary NER selector ingestion paths, MCP initialization with an inbox,
 and bounded shutdown. HTTP must load and reject invalid configuration with
-its expected error code; this is a loader check, not a live HTTP deployment
-test. HTTP integration tests run separately on Linux. Native unit and watcher
+its expected error code and structured `http.serve_failed` event with
+`error=[redacted]`. Error prose and variable names are private under the logging
+contract; HTTP configuration tests separately verify invalid bind handling.
+This is a loader check, not a live HTTP deployment test. HTTP integration tests
+run separately on Linux. Native unit and watcher
 process tests run on Linux and macOS during ordinary CI. Windows x64 and ARM64
 run the same packaged executable smoke checks after building, which exercises
 the actual shipped binaries and bundled runtime libraries without the
