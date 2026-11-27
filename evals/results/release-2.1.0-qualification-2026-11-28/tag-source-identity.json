@@ -1,0 +1,10 @@
+{
+  "tag": "v2.1.0",
+  "source_sha": "6740421e41c1f7d4716442c6b875f5a7c92f0737",
+  "candidate_run": 46058402331,
+  "workflow_id": 251353807,
+  "script_sha256": "c1d70d53dfb7f98a111d06f5baf5ab6d41f44ce3ae02b93764aad96487fb3cfb",
+  "failed_release_run": 46072830377,
+  "recovery": "updated master orchestrator; exact existing tag and green candidate; unchanged publisher under existing serialized job, no local publication",
+  "draft_failure": "read-only ref cannot inspect drafts; use existing write-authorized publisher without changing job permissions"
+}

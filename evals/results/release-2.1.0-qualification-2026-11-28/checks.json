@@ -1,0 +1,118 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.9855131250224076,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/fmt.log"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.754126083047595,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/clippy.log"
+  },
+  {
+    "name": "workspace-tests",
+    "command": [
+      "rtk",
+      "cargo",
+      "test",
+      "--workspace",
+      "--lib",
+      "--bins",
+      "--tests",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 532.8083939999924,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/workspace-tests.log"
+  },
+  {
+    "name": "http-tests",
+    "command": [
+      "rtk",
+      "cargo",
+      "test",
+      "-p",
+      "memory_mcp",
+      "--lib",
+      "--bins",
+      "--tests",
+      "--features",
+      "fs-watch,mcp-apps,streamable-http,test-fixtures",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1611.7091422919766,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/http-tests.log"
+  },
+  {
+    "name": "wasm-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "ui",
+      "--target",
+      "wasm32-unknown-unknown",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 69.49033749999944,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/wasm-clippy.log"
+  },
+  {
+    "name": "toolchain",
+    "command": [
+      "cargo",
+      "run",
+      "--locked",
+      "-p",
+      "xtask",
+      "--",
+      "check-toolchain-pin"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.7232364169904031,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/toolchain.log"
+  },
+  {
+    "name": "observability",
+    "command": [
+      "cargo",
+      "run",
+      "--locked",
+      "-p",
+      "xtask",
+      "--",
+      "check-observability"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.201698916964233,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/observability.log"
+  }
+]

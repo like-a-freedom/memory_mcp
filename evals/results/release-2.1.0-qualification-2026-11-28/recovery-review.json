@@ -1,0 +1,14 @@
+{
+  "reviewer": "release_recovery_review",
+  "scope": "one fresh-context review of release orchestrator recovery",
+  "critical": 0,
+  "important": 1,
+  "finding": "Unqualified checkout ref may select same-named branch ahead of immutable tag.",
+  "fix": "checkout refs/tags/${{ inputs.tag }}; downstream publish checks out pinned actual tag SHA",
+  "verification": "Observed RED then GREEN architecture-policy lint;9 executable input guard controls now pass on native Bash3.2; not production scenario coverage",
+  "additional_validation": "9 executable ref controls; 6 controlled draft guard cases; tag qualification architecture lint; 22 publisher integration tests passed",
+  "workflow_sha256": "9c71ac8752394523ca11f90dd2f39ec3554a9d35058f80cf7c3dba8426347e56",
+  "script": "unchanged publisher owned by exact qualified tag; no local publication or lock bypass",
+  "hosted_status": "new recovery dispatch pending",
+  "safe_permission_resolution": "Automatic approval rejected broadening ref contents to write. Final alternative retains every job permission exactly; first publisher step handles draft with its preexisting contents write. Any published recovery now requires explicit input."
+}

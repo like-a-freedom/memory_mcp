@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag; select the same tag in Run workflow
+        description: Existing release tag; select it, or master with an explicit qualified candidate for recovery
         required: true
         type: string
       candidate_run_id:
@@ -44,30 +44,33 @@ jobs:
       actions: read
     outputs:
       candidate_run_id: ${{ steps.candidate.outputs.run_id }}
-      was_draft: ${{ steps.release-state.outputs.was_draft }}
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
-      - name: Require the exact release tag
+      - name: Require exact tag or qualified master recovery
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: test "$REF_TYPE" = tag && test "$REF_NAME" = "$TAG"
-      - name: Require a reviewed draft or explicit published-release recovery
-        id: release-state
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
-          ALLOW_RECOVERY: ${{ inputs.allow_published_recovery }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
         run: |
           set -euo pipefail
-          gh release view "$TAG" --json isDraft,body > "$RUNNER_TEMP/release-state.json"
-          test "$(jq -r '.body | length > 0' "$RUNNER_TEMP/release-state.json")" = true
-          if test "$(jq -r '.isDraft' "$RUNNER_TEMP/release-state.json")" != true; then
-            test "$ALLOW_RECOVERY" = true
+          [[ "$TAG" =~ ^v[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]] || exit 1
+          if test "$REF_TYPE" = tag; then
+            test "$REF_NAME" = "$TAG" || exit 1
+          else
+            test "$REF_TYPE" = branch || exit 1
+            test "$REF_NAME" = master || exit 1
+            # Recovery may update the orchestrator, never rebuild an old tag
+            # under new code or accept an implicit/unqualified candidate.
+            [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
           fi
-          echo "was_draft=$(jq -r '.isDraft' "$RUNNER_TEMP/release-state.json")" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - name: Pin the release source commit
+        id: source
+        run: echo "sha=$(git rev-parse --verify HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
         if: inputs.candidate_run_id != ''
         with:
@@ -80,6 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
           # Reject URL/path/shell fragments before using the supplied run ID.
@@ -87,7 +91,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > "$RUNNER_TEMP/candidate.json"
           WORKFLOW_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml" --jq .id)"
           cargo run -p xtask --locked -- verify-release-candidate "$RUNNER_TEMP/candidate.json" \
-            --source-sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" \
+            --source-sha "$SOURCE_SHA" --repository "$GITHUB_REPOSITORY" \
             --workflow-id "$WORKFLOW_ID" --run-id "$CANDIDATE_RUN_ID"
           echo "run_id=$CANDIDATE_RUN_ID" >> "$GITHUB_OUTPUT"
 
@@ -124,13 +128,32 @@ jobs:
     env:
       ARTIFACT_RUN_ID: ${{ needs.ref.outputs.candidate_run_id || github.run_id }}
       TAG: ${{ inputs.tag || github.ref_name }}
-      # A failed publisher can finish its own partial publication only if the
-      # original successful preflight saw a draft. Retrying a refused public
-      # release preflight cannot bypass explicit recovery authorization.
-      ALLOW_PUBLISHED_RECOVERY: ${{ inputs.allow_published_recovery || (github.run_attempt > 1 && needs.ref.outputs.was_draft == 'true') }}
+      # Any already public release needs explicit recovery authorization,
+      # including a new dispatch after a partially completed publisher.
+      ALLOW_PUBLISHED_RECOVERY: ${{ inputs.allow_published_recovery }}
       GH_TOKEN: ${{ github.token }}
+      RELEASE_SOURCE_SHA: ${{ needs.ref.outputs.source_sha }}
     steps:
+      # This existing publisher is the only job with release-write access.
+      # Read-only metadata qualification cannot see drafts. Check here before
+      # uploads, registry writes or release publication; grant no new privilege.
+      - name: Require a reviewed draft or explicit published-release recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          ALLOW_RECOVERY: ${{ inputs.allow_published_recovery }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json isDraft,body > "$RUNNER_TEMP/release-state.json"
+          test "$(jq -r '.body | length > 0' "$RUNNER_TEMP/release-state.json")" = true
+          if test "$(jq -r '.isDraft' "$RUNNER_TEMP/release-state.json")" != true; then
+            test "$ALLOW_RECOVERY" = true
+          fi
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.ref.outputs.source_sha }}
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
         with:
           toolchain: stable
@@ -164,4 +187,8 @@ jobs:
       - name: Publish verified assets, then advance stable latest
         env:
           IMAGE_DIR: ${{ runner.temp }}/tested-image
-        run: bash .github/scripts/publish-release.sh target/debug/xtask dist "$IMAGE_DIR"
+        run: |
+          # The workflow may run on updated master during recovery. The exact
+          # qualified tag commit owns the publisher, binaries and image.
+          env GITHUB_SHA="$RELEASE_SOURCE_SHA" \
+            bash .github/scripts/publish-release.sh target/debug/xtask dist "$IMAGE_DIR"

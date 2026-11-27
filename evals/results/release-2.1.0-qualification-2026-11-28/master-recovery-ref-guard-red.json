@@ -1,0 +1,56 @@
+[
+  {
+    "case": "unknown ref type",
+    "expected": false,
+    "actual": true,
+    "matched": false
+  },
+  {
+    "case": "prerelease build tag",
+    "expected": true,
+    "actual": true,
+    "matched": true
+  },
+  {
+    "case": "tag exact",
+    "expected": true,
+    "actual": true,
+    "matched": true
+  },
+  {
+    "case": "tag mismatch",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "master qualified recovery",
+    "expected": true,
+    "actual": true,
+    "matched": true
+  },
+  {
+    "case": "master unqualified",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "foreign branch",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "tag invalid",
+    "expected": false,
+    "actual": true,
+    "matched": false
+  },
+  {
+    "case": "candidate malformed",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  }
+]

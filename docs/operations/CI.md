@@ -40,9 +40,10 @@
    Unknown version/registry errors stop publication instead of guessing.
 
 The build-once candidate expires after seven days. Use the tag rebuild path if
-it has expired. Rerun failed jobs from the same Release run to finish a partial
-publication, including a draft already published before a later step failed.
-This reuses that run's artifacts and verifies existing public bytes. For a new
+it has expired. Rerun failed jobs from the same Release run while the release remains draft.
+If it already became public before a later step failed, dispatch explicit
+published-release recovery. This reuses qualified artifacts and verifies
+existing public bytes. For a new
 dispatch recovering an already public release, use **Release** with
 `allow_published_recovery=true`; existing public asset bytes must match the
 qualified bundle, only missing assets may be filled. Reuse the original
@@ -67,8 +68,19 @@ configuration; a native 2.1.0 process against an isolated local 4.0.1 instance
 reproduced exit 2 without the acknowledgement and liveness with it. Hosted
 image/startup/UI qualification is still required.
 
-Manual **Release** must select the existing release tag under **Run workflow**
-and supply the same tag as input. Old tags retain their old workflows: rerunning
+Normally manual **Release** selects the existing release tag under **Run workflow**
+and supplies the same tag as input. A repaired orchestrator on `master` may recover
+an immutable tag only with an explicit successful `candidate_run_id`; master
+without a candidate and other branches are refused. The ref job checks out the
+requested tag, pins its source SHA and verifies the candidate against that SHA.
+The publisher checks out that exact commit and uses its own publisher/verifier;
+the orchestrator's newer commit is not the artifact source. The same serialized
+publication queue and byte/channel checks apply. No tag is moved and no candidate
+is rebuilt. The read-only ref job cannot inspect drafts, as observed in the first v2.1.0
+dispatch. Draft inspection is the first step of the existing write-authorized
+publisher, before uploads or registry/release mutations. Job permissions are
+unchanged. Any already public release needs explicit recovery authorization,
+including a new dispatch after partial publication. Old tags retain their old workflows: rerunning
 an old release does not retroactively use this design. Create a new version/tag
 after merging these workflow changes.
 

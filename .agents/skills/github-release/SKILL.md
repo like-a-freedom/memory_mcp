@@ -160,6 +160,22 @@ gh workflow run release.yml --ref vX.Y.Z \
   -f tag=vX.Y.Z -f candidate_run_id=<candidate-run-id>
 ```
 
+If the immutable tag carries an obsolete/broken orchestrator, the repaired
+workflow on `master` can recover it with an explicit same-tag qualified candidate:
+
+```bash
+gh workflow run release.yml --ref master \
+  -f tag=vX.Y.Z -f candidate_run_id=<original-candidate-run-id>
+```
+
+Master without a candidate and other branch refs are rejected. The wrapper checks
+out `refs/tags/<tag>`, pins its commit, verifies the original candidate against
+that commit and publishes using that exact commit's code under the normal
+serialized queue. The workflow's newer master SHA is an orchestrator identity,
+not the artifact source. Do not move the tag or rebuild verified public bytes.
+The existing publisher's `contents: write` handles draft inspection before
+mutations; the metadata ref job remains read-only. Do not expand its permissions.
+
 Do not publish the draft manually. `Release` attaches qualified bytes, reads
 them back and verifies checksums before publishing; only then can it advance
 stable Docker/GitHub latest. Prereleases and older versions do not advance the
@@ -168,10 +184,12 @@ bytes.
 
 ## Step 8 — verify hosted completion
 
-Find the exact dispatched Release run and wait for it:
+Find the exact dispatched Release run (using its recorded dispatch ID/SHA, which
+may differ from the tag SHA during master recovery). Verify it in the background
+when the user requests continued work without waiting:
 
 ```bash
-gh run list --workflow release.yml --commit "$(git rev-parse HEAD)" --event workflow_dispatch
+gh run list --workflow release.yml --event workflow_dispatch
 gh run watch <release-run-id> --exit-status
 gh release view vX.Y.Z --json tagName,isDraft,isPrerelease,body,assets
 ```
@@ -181,10 +199,11 @@ checksum sidecars. Verify the registry version tag's OCI version/revision and
 manifest digest; for a newly highest stable version, verify both latest markers.
 Report actual hosted completion, not just local gates or draft existence.
 
-Rerun failed jobs of the original Release run to finish its partial publication,
-even if the draft already became public. This preserves the same artifacts. For
-a new recovery dispatch, use the same tag, the original master CI candidate run
-ID and `-f allow_published_recovery=true`. A tag-build Release run ID is not a
+Rerun failed jobs of the original Release run while the release remains draft.
+If it already became public, use an explicit recovery dispatch with the same tag,
+the original master CI candidate run ID and `-f allow_published_recovery=true`.
+This preserves the same qualified artifacts; a retry alone does not authorize
+recovery of an already public release. A tag-build Release run ID is not a
 master CI candidate; for that path prefer rerunning the original failed jobs. Recovery permits missing assets but refuses
 to change existing public bytes. Do not rebuild or overwrite an already public
 release to make a mismatch pass; investigate the provenance conflict.

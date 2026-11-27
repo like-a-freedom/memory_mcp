@@ -1,0 +1,38 @@
+[
+  {
+    "case": "reviewed draft",
+    "expected": true,
+    "actual": true,
+    "matched": true
+  },
+  {
+    "case": "public needs explicit recovery",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "public explicit recovery",
+    "expected": true,
+    "actual": true,
+    "matched": true
+  },
+  {
+    "case": "empty notes",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "lookup failed",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  },
+  {
+    "case": "malformed state",
+    "expected": false,
+    "actual": false,
+    "matched": true
+  }
+]

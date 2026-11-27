@@ -1,0 +1,138 @@
+[
+  {
+    "name": "prepare-embedding",
+    "command": [
+      "cargo",
+      "run",
+      "-p",
+      "eval-harness",
+      "--bin",
+      "memory-eval",
+      "--locked",
+      "--",
+      "prepare-model",
+      "--manifest",
+      "evals/models/multilingual-e5-small.json",
+      "--output-root",
+      "target/eval-models"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 25.09812229097588,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/prepare-embedding.log"
+  },
+  {
+    "name": "prepare-reranker",
+    "command": [
+      "cargo",
+      "run",
+      "-p",
+      "eval-harness",
+      "--bin",
+      "memory-eval",
+      "--locked",
+      "--",
+      "prepare-model",
+      "--manifest",
+      "evals/models/mmarco-minilm.json",
+      "--output-root",
+      "target/eval-models"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.447599207982421,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/prepare-reranker.log"
+  },
+  {
+    "name": "release-eval",
+    "command": [
+      "cargo",
+      "run",
+      "-p",
+      "eval-harness",
+      "--bin",
+      "memory-eval",
+      "--locked",
+      "--",
+      "run",
+      "--profile",
+      "evals/profiles/release.json",
+      "--artifact",
+      "target/release-preflight-2.1.0/release-eval.json",
+      "--baseline",
+      "evals/baselines/one-active-namespace-release.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 216.38092670799233,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/release-eval.log"
+  },
+  {
+    "name": "response-size",
+    "command": [
+      "make",
+      "eval-response-size"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.293470667034853,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/response-size.log"
+  },
+  {
+    "name": "product-bin",
+    "command": [
+      "cargo",
+      "build",
+      "-p",
+      "memory_mcp",
+      "--bin",
+      "memory_mcp",
+      "--features",
+      "streamable-http",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 23.567559084040113,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/product-bin.log"
+  },
+  {
+    "name": "upstream-restore",
+    "command": [
+      "env",
+      "LONGMEMEVAL_V2_RESTORE_SMOKE_BINARY=/Users/solovey/Documents/dev/memory_mcp/target/debug/memory_mcp",
+      "NER_EXTRACTOR=regex",
+      "EMBEDDINGS_ENABLED=false",
+      "/tmp/memory-mcp-lme-postb5-venv/bin/python",
+      "-m",
+      "unittest",
+      "evals.longmemeval_v2.test_upstream_restore"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 37.69535370799713,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/upstream-restore.log"
+  },
+  {
+    "name": "deterministic-memory",
+    "command": [
+      "rtk",
+      "cargo",
+      "test",
+      "-p",
+      "eval-harness",
+      "--test",
+      "deterministic_quality_gate",
+      "--locked",
+      "--",
+      "--ignored"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 64.2638579159975,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/deterministic-memory.log"
+  },
+  {
+    "name": "perf-smoke",
+    "command": [
+      "make",
+      "perf-smoke"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.448623083997518,
+    "log": "/Users/solovey/Documents/dev/memory_mcp/target/release-preflight-2.1.0/perf-smoke.log"
+  }
+]

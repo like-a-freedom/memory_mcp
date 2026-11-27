@@ -1,0 +1,5 @@
+{
+  "error_type": "RuntimeError",
+  "error": "release workflow failed: https://github.com/like-a-freedom/memory_mcp/actions/runs/46072830377",
+  "at_utc": "2026-11-27T21:50:24.564797+00:00"
+}

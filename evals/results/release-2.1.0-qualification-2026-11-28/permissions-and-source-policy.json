@@ -1,0 +1,22 @@
+{
+  "permissions_unchanged": true,
+  "permissions": {
+    "top": {
+      "contents": "read"
+    },
+    "ref": {
+      "contents": "read",
+      "actions": "read"
+    },
+    "build": {
+      "contents": "read"
+    },
+    "publish": {
+      "contents": "write",
+      "actions": "read",
+      "packages": "write"
+    }
+  },
+  "tag_checkout_explicit": true,
+  "scope": "architecture policy, not production scenario coverage"
+}

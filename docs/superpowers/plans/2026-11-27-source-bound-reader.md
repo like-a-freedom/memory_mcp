@@ -66,7 +66,7 @@ Public seams: `SkillHost.dispatch`, `create_messages`, `play`, `freeze`/plan ver
 - [x] Run affected portable Python suites and exact frozen-report replay checks; run Rust checks only if Rust changes.
 - [x] Obtain one independent final review, fix substantive issues with RED→GREEN, verify source hashes and all registered attempts.
 - [x] Update metrics/action plan and separate completed finite evaluations from failed quality acceptance.
-- [ ] Restore preserved unrelated deletions after release dispatch.
+- [x] Restore preserved unrelated deletions after release dispatch.
 - [ ] Reconcile hosted publication evidence without holding up quality work or claiming unverified assets.
 
 ## Execution ledger
@@ -148,3 +148,5 @@ Final new-scope review fix pass:3 Important,0 Critical. Source-only objects/trim
 Task9 deterministic completion: two observed RED→GREEN slices (raw prompt registration and graph-free item freeze);175 reader tests scheduled,164 portable passed/11 explicit SDK/native skips. Mixed range/item and retired-name controls pass.96 legacy graph/range prompts,56 delivered source messages and56 historical classifications are identical; three archived captures replay unchanged. Content UTF-8 bytes shared40 159882→99151 (−38.0%), fresh16 28373→18805 (−33.7%), excluding framing/tokenizer/runtime. One new-scope independent review found0 Critical/Important. No new inference, no measured speed/accuracy improvement; old FAIL and C2NO_GO preserved. Receipt: `evals/longmemeval_v2/results/2026-11-28-raw-item-contract/verification.json`.
 
 Task10 complete: sole capture12/12 answered,12/12 operations,10/12 semantic/full; current6/6 versus previous4/6, no lost passing previous case. All6-current/no-loss development gate PASS.54/54 successful request terminals,0 retries/faults;431.674s capture,444.589s startup-through-cleanup. Independent pre-inference source review0 Critical/Important; primary non-blinded semantic review of all12 finals hash-linked, replay12/54 succeeds offline. Both prior timed finals falsely call canonical facts fallback; current finals preserve actual source/status/quote/snapshot. Oldv3/full6/12 and reader49/56FAIL unchanged. C2decision-v6NO_GO: small bundled development qualification does not supply independent families or qualify reader. No further inference in this task. Evidence: `evals/paired/source-action-v4-qualification-2026-11-28/README.md`.
+
+Task4 publication checkpoint: candidate46058402331 completed success for exact6740421e; annotatedv2.1.0 pushed and reviewed draft created. Release46072830377 failed before publication because read-only ref token could not see that draft. User deletions restored from5575d4b1 stash without committing/dropping it. Recovery keeps tag and qualified bytes immutable; updated master orchestrator will require explicit same-tag green candidate, pin its actual source commit and retain serialized publisher guards. No asset publication is claimed until observed.

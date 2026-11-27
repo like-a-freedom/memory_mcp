@@ -1,0 +1,6 @@
+{
+  "kind": "architecture policy lint, not production scenario coverage",
+  "actual": "refs/tags/${{ inputs.tag }}",
+  "expected": "refs/tags/${{ inputs.tag }}",
+  "pass": true
+}
