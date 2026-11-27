@@ -1,0 +1,350 @@
+{
+  "schema": "memory-reader-retrospective-source-audit/v1",
+  "status": "diagnosis only; no regrading, no inference, no new generalization metric",
+  "input_sha256": {
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/shared40/rows.jsonl": "97c8e2d39a7b032072671f7cfda616667231a9b5923d6cafa14d60a86b4ee039",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/shared40/projection.json": "2c17ab2b84c81680276146dca318321f3f0745f53f49e2404c2fd5469b77a2ee",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/shared40/outputs.json": "4d56f343b7600071ef4e2d0d246208e02115712f07631b398fd6a62c40815d95",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/shared40/report.json": "ec4cd0a2f66640872d77ef982c79ab042efbf2081f03a26adbbfcaf293bf484e",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/shared40/truth.json": "550625493c99472429ffd724690664eb24795df85621374336664e590afd732f",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/fresh16/rows.jsonl": "d7e63b89557e98d8135ccc87185bb6d15fadd5ae05a2ab18989341c957ea25c9",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/fresh16/projection.json": "7bf8acbfa1aebab5e36d50afebbfa03dc4c0bee035e14f9644e2da4a370124a2",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/fresh16/outputs.json": "dd3c92f164f923d44f6cf224627971462280741c7988b28c2ab4e9889a75d841",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/fresh16/report.json": "eacd134141ddf62068b41613d7cfa0e4102224d0c3406309253e71afaa4d0eac",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/fresh16/truth.json": "a66442eca94fb94349e0544fa4dfd3e2ae0c4d0d1919d2af67c155efffe84cb4"
+  },
+  "rows": [
+    {
+      "question_id": "ledger-consistent-repeat",
+      "cohort": "shared40",
+      "question": "In the Harbor toolbar, which action comes immediately after \"Release\"?",
+      "actual_response": "{\n  \"answer\": \"UNKNOWN\",\n  \"sources\": [\n    \"item-1-8ca0f4d578c3ccce\"\n  ]\n}",
+      "accepted_answers_unchanged": [
+        "River"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 1,
+            "raw_sha256": "73db70dc728bea937f20623b8f21bcffc274d45523b5ced8bd26bdf83ab10257",
+            "raw_range": [
+              1,
+              188
+            ],
+            "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n  [4] button 'Release', visible\n  [5] button 'River', visible\n[6] heading 'End', visible\n"
+          }
+        ],
+        "answer": "UNKNOWN",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "102a09a1381e1e025dc9cd91c99cb30a363b145b7702b26617337ae0761b0cf8",
+          "text": "[100] toolbar 'Palette', visible\n  [101] button 'Cyan', visible\n  [102] button 'Violet', visible\n[103] heading 'Colors', visible\n"
+        },
+        {
+          "source_item_index": 1,
+          "raw_sha256": "73db70dc728bea937f20623b8f21bcffc274d45523b5ced8bd26bdf83ab10257",
+          "text": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n  [4] button 'Release', visible\n  [5] button 'River', visible\n[6] heading 'End', visible\n"
+        },
+        {
+          "source_item_index": 2,
+          "raw_sha256": "cef621bf6610d3badf38bb3c5389003b26e865c841adc49c066f729d0d823a9c",
+          "text": "[200] list 'Weather', visible\n  [201] listitem '', visible\n    [202] link 'Rain', visible\n  [203] listitem '', visible\n    [204] link 'Snow', visible\n[205] heading 'Forecast', visible\n"
+        },
+        {
+          "source_item_index": 3,
+          "raw_sha256": "2019ca250585a394016b9243ef3f76630c254fd22f797adc041deec5a7b6f891",
+          "text": "[300] toolbar 'Archive', visible\n  [301] button 'Read', visible\n  [302] button 'Write', visible\n[303] heading 'Records', visible\n"
+        }
+      ],
+      "classification": "repeated_anchors",
+      "primary_postcapture_source_review": "Both Release occurrences have River immediately after them. UNKNOWN disagrees with the consistent visible occurrences.",
+      "prospective_control": "Fresh names; repeated anchors with agreeing versus conflicting successors; scope and closure explicit."
+    },
+    {
+      "question_id": "graph-opaque-repeat",
+      "cohort": "shared40",
+      "question": "In the Bay toolbar, which button follows Dock?",
+      "actual_response": "{\"answer\":\"Lagoon\",\"sources\":[\"item-0-10cd2182a817467a\"]}",
+      "accepted_answers_unchanged": [
+        "UNKNOWN"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "75673688409ab9cd0535b45dcb1496003f5af5ece91fcefe25710f125ed54a19",
+            "raw_range": [
+              1,
+              173
+            ],
+            "quote": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n  [4] button 'Dock'\n  [5] group 'Nested'\n    [6] button 'Delta'\n  [7] button 'Lagoon'\n[8] heading 'End'\n"
+          }
+        ],
+        "answer": "Lagoon",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "75673688409ab9cd0535b45dcb1496003f5af5ece91fcefe25710f125ed54a19",
+          "text": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n  [4] button 'Dock'\n  [5] group 'Nested'\n    [6] button 'Delta'\n  [7] button 'Lagoon'\n[8] heading 'End'\n"
+        }
+      ],
+      "classification": "question_scope_ambiguity",
+      "primary_postcapture_source_review": "Lagoon is the next same-level button after each Dock; Delta is a nested button after the second Dock. The question does not explicitly choose filtered siblings or recursive traversal. Keep the frozen UNKNOWN score; do not count this as a proven memory defect.",
+      "prospective_control": "Use the same tree with three separately reviewed questions: immediate sibling node, next matching same-level button, next recursive button. Specify how repeated anchors are combined."
+    },
+    {
+      "question_id": "range-opaque",
+      "cohort": "shared40",
+      "question": "In Studio, which button immediately follows Launch?",
+      "actual_response": "{\"answer\": \"Granite\", \"sources\": [\"item-0-2e9643d889e7102f\"]}",
+      "accepted_answers_unchanged": [
+        "UNKNOWN"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "f302a8ea4007cbe2f37f696e14268eb7bd1df7749fdb0a814c331aa6fe56a9ce",
+            "raw_range": [
+              0,
+              131
+            ],
+            "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] group ''\n\t\tStaticText 'unresolved controls'\n\t[4] button 'Granite'\n[5] heading 'End'\n"
+          }
+        ],
+        "answer": "Granite",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "f302a8ea4007cbe2f37f696e14268eb7bd1df7749fdb0a814c331aa6fe56a9ce",
+          "text": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] group ''\n\t\tStaticText 'unresolved controls'\n\t[4] button 'Granite'\n[5] heading 'End'\n"
+        }
+      ],
+      "classification": "opaque_membership",
+      "primary_postcapture_source_review": "The intervening group does not expose controls. The registered system contract forbids claiming completeness from opaque groups. Selecting the whole item did not repair that reasoning.",
+      "prospective_control": "Closed and opaque versions with explicit immediate-node versus filtered-role questions; unresolved descendants must remain UNKNOWN where they affect the relation."
+    },
+    {
+      "question_id": "range-clipped",
+      "cohort": "shared40",
+      "question": "In Studio, which button immediately follows Launch?",
+      "actual_response": "{\"answer\": \"Granite\", \"sources\": [\"item-0-1f92868941e4a5e3\"]}",
+      "accepted_answers_unchanged": [
+        "UNKNOWN"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "2f47732dd923b7eb470f4a1f61a03f160d15afb2bc7f6612042bcfaf494e9685",
+            "raw_range": [
+              0,
+              84
+            ],
+            "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] button 'Launch'"
+          }
+        ],
+        "answer": "Granite",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "2f47732dd923b7eb470f4a1f61a03f160d15afb2bc7f6612042bcfaf494e9685",
+          "text": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] button 'Launch'"
+        }
+      ],
+      "classification": "incomplete_repeated_anchor",
+      "primary_postcapture_source_review": "One Launch has Granite after it; the second occurrence is at the clipped end. The complete occurrence does not resolve every matching occurrence.",
+      "prospective_control": "Identical repeated anchors with an explicit closed boundary versus a clipped last occurrence; do not infer closure from missing text."
+    },
+    {
+      "question_id": "range-role",
+      "cohort": "shared40",
+      "question": "In Studio, which action immediately follows the button Launch? The link Launch is a different anchor.",
+      "actual_response": "{\"answer\":\"button 'Granite'\",\"sources\":[\"item-0-f2709964b927e5fe\"]}",
+      "accepted_answers_unchanged": [
+        "Granite"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "2b5bfe49a3e42fd3e5e48040f9ecb56b17b37b1392adc7be04f8d5d50e255b98",
+            "raw_range": [
+              0,
+              122
+            ],
+            "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] link 'Launch'\n\t[5] button 'Marble'\n[6] heading 'End'\n"
+          }
+        ],
+        "answer": "button 'Granite'",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "2b5bfe49a3e42fd3e5e48040f9ecb56b17b37b1392adc7be04f8d5d50e255b98",
+          "text": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] link 'Launch'\n\t[5] button 'Marble'\n[6] heading 'End'\n"
+        }
+      ],
+      "classification": "answer_output_contract",
+      "primary_postcapture_source_review": "The output identifies the correct Granite target but decorates it with an unregistered role. This is an exact answer contract failure, not evidence of selecting the wrong target.",
+      "prospective_control": "Separate entity-choice accuracy and frozen exact-contract accuracy; never change the old accepted answer after outputs."
+    },
+    {
+      "question_id": "item-v3-nested",
+      "cohort": "fresh16",
+      "question": "Among same-level links in Left rail, which immediately follows Board?",
+      "actual_response": "{\"answer\":\"UNKNOWN\",\"sources\":[\"item-0-c83289fc6cdb22bd\"]}",
+      "accepted_answers_unchanged": [
+        "Archive"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": null,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "a50ebc043c43ca843cdee89eba2386b38d25a718ff76d6113c32fe16f398b0c0",
+            "raw_range": [
+              0,
+              149
+            ],
+            "quote": "[1] navigation 'Left rail'\n  [2] link 'Board'\n  [3] group 'History'\n    [4] link 'Older'\n    [5] link 'Newer'\n  [6] link 'Archive'\n[7] heading 'End'\n"
+          }
+        ],
+        "answer": "UNKNOWN",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "a50ebc043c43ca843cdee89eba2386b38d25a718ff76d6113c32fe16f398b0c0",
+          "text": "[1] navigation 'Left rail'\n  [2] link 'Board'\n  [3] group 'History'\n    [4] link 'Older'\n    [5] link 'Newer'\n  [6] link 'Archive'\n[7] heading 'End'\n"
+        }
+      ],
+      "classification": "filtered_hierarchy",
+      "primary_postcapture_source_review": "The question explicitly asks same-level links. Board and Archive are at the same level; Older/Newer are nested under a group. The raw source preserves indentation and the closing boundary.",
+      "prospective_control": "Paired same-level and recursive link questions on one source; preserve raw indentation and reject hidden members."
+    },
+    {
+      "question_id": "item-v3-single-last",
+      "cohort": "fresh16",
+      "question": "Which link follows Ready inside the closed Jobs group?",
+      "actual_response": "{\"answer\":\"UNKNOWN\",\"sources\":[\"item-0-336636f8a3e93d61\"]}",
+      "accepted_answers_unchanged": [
+        "None"
+      ],
+      "frozen_grade": {
+        "upstream_prompt_control_character": false,
+        "observed": true,
+        "error": null,
+        "finish_reason": "stop",
+        "format_valid": true,
+        "truncated": false,
+        "value_correct": false,
+        "refusal_correct": false,
+        "quote_exact": null,
+        "source_bound": true,
+        "proof_covered": true,
+        "resolved_evidence": [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "1a3f0eac0f8447cda7371cc1d15592bc956d69589461cd1d6c5d20fbb448745b",
+            "raw_range": [
+              0,
+              59
+            ],
+            "quote": "[1] navigation 'Jobs'\n  [2] link 'Ready'\n[3] heading 'End'\n"
+          }
+        ],
+        "answer": "UNKNOWN",
+        "completed_correct": false
+      },
+      "delivered_sources": [
+        {
+          "source_item_index": 0,
+          "raw_sha256": "1a3f0eac0f8447cda7371cc1d15592bc956d69589461cd1d6c5d20fbb448745b",
+          "text": "[1] navigation 'Jobs'\n  [2] link 'Ready'\n[3] heading 'End'\n"
+        }
+      ],
+      "classification": "closed_end",
+      "primary_postcapture_source_review": "The question explicitly says closed Jobs group. Ready is its sole link and the following top-level heading closes that group. UNKNOWN is not the registered None answer.",
+      "prospective_control": "Paired one-member closed and clipped sources; end versus insufficient evidence must be assessed independently of derived navigation."
+    }
+  ],
+  "conclusion": "All seven failures retain selected delivered source and registered proof coverage. Six need semantic/output-contract investigation; one has explicit question-scope ambiguity. This does not prove upstream formation completeness or causality of derived navigation.",
+  "inference_calls": 0
+}

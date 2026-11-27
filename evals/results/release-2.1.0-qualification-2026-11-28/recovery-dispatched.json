@@ -1,0 +1,15 @@
+{
+  "release_run": {
+    "conclusion": "",
+    "createdAt": "2026-11-27T22:02:52Z",
+    "databaseId": 46074161545,
+    "headSha": "68286060b1e3cb9620f4defc9a9fe45a8d7e1553",
+    "status": "in_progress",
+    "url": "https://github.com/like-a-freedom/memory_mcp/actions/runs/46074161545"
+  },
+  "artifact_source_sha": "6740421e41c1f7d4716442c6b875f5a7c92f0737",
+  "candidate_run_id": 46058402331,
+  "tag": "v2.1.0",
+  "publication_status": "pending live verification",
+  "verification": "bounded independent background verification; continue quality work without waiting for GitHub builds"
+}
