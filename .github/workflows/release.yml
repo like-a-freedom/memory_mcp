@@ -1,17 +1,36 @@
 name: Release
 
+# Build-once path (before publishing the GitHub Release): bump the version on
+# master, run CI manually with release=true, then tag that exact qualified SHA.
+# Prepare a draft release with reviewed notes and dispatch this workflow on its
+# tag with candidate_run_id. This job attaches the checked bytes and publishes
+# the draft using GITHUB_TOKEN, which does not trigger a duplicate release run.
+# Explicit dispatch keeps the release a draft until downloaded assets verify.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: Existing release tag; select the same tag in Run workflow
         required: true
         type: string
+      candidate_run_id:
+        description: Optional successful release-mode CI run on master at this exact tag commit; reuse its tested bytes
+        required: false
+        type: string
+        default: ''
+      allow_published_recovery:
+        description: Explicit recovery of an already published release; existing asset bytes must match
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_TERM_COLOR: always
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
@@ -20,6 +39,12 @@ concurrency:
 jobs:
   ref:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      candidate_run_id: ${{ steps.candidate.outputs.run_id }}
+      was_draft: ${{ steps.release-state.outputs.was_draft }}
     steps:
       - name: Require the exact release tag
         env:
@@ -27,28 +52,116 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: test "$REF_TYPE" = tag && test "$REF_NAME" = "$TAG"
+      - name: Require a reviewed draft or explicit published-release recovery
+        id: release-state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          ALLOW_RECOVERY: ${{ inputs.allow_published_recovery }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json isDraft,body > "$RUNNER_TEMP/release-state.json"
+          test "$(jq -r '.body | length > 0' "$RUNNER_TEMP/release-state.json")" = true
+          if test "$(jq -r '.isDraft' "$RUNNER_TEMP/release-state.json")" != true; then
+            test "$ALLOW_RECOVERY" = true
+          fi
+          echo "was_draft=$(jq -r '.isDraft' "$RUNNER_TEMP/release-state.json")" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
+        if: inputs.candidate_run_id != ''
+        with:
+          toolchain: stable
+          rustflags: ""
+          cache-key: release-metadata
+      - name: Qualify the explicitly selected candidate
+        id: candidate
+        if: inputs.candidate_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          set -euo pipefail
+          # Reject URL/path/shell fragments before using the supplied run ID.
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > "$RUNNER_TEMP/candidate.json"
+          WORKFLOW_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml" --jq .id)"
+          cargo run -p xtask --locked -- verify-release-candidate "$RUNNER_TEMP/candidate.json" \
+            --source-sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" \
+            --workflow-id "$WORKFLOW_ID" --run-id "$CANDIDATE_RUN_ID"
+          echo "run_id=$CANDIDATE_RUN_ID" >> "$GITHUB_OUTPUT"
+
   build:
     needs: ref
+    if: needs.ref.outputs.candidate_run_id == ''
     permissions:
       contents: read
-      packages: write
     uses: ./.github/workflows/ci.yml
     with:
       release: true
+      tag: ${{ inputs.tag || github.ref_name }}
+
   publish:
-    needs: build
+    needs: [ref, build]
+    # A skipped build is allowed only after an explicit candidate was verified.
+    # Failed/cancelled qualification never falls back to a build or publication.
+    if: >-
+      ${{ !cancelled() && needs.ref.result == 'success' &&
+          (needs.build.result == 'success' ||
+           (needs.build.result == 'skipped' && needs.ref.outputs.candidate_run_id != '')) }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Different tags may build together, but publish the shared stable channel
+    # serially. queue:max preserves pending releases instead of replacing them.
+    concurrency:
+      group: release-publication
+      queue: max
+      cancel-in-progress: false
     permissions:
       contents: write
+      actions: read
+      packages: write
+    env:
+      ARTIFACT_RUN_ID: ${{ needs.ref.outputs.candidate_run_id || github.run_id }}
+      TAG: ${{ inputs.tag || github.ref_name }}
+      # A failed publisher can finish its own partial publication only if the
+      # original successful preflight saw a draft. Retrying a refused public
+      # release preflight cannot bypass explicit recovery authorization.
+      ALLOW_PUBLISHED_RECOVERY: ${{ inputs.allow_published_recovery || (github.run_attempt > 1 && needs.ref.outputs.was_draft == 'true') }}
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
+        with:
+          toolchain: stable
+          rustflags: ""
+          cache-key: release-metadata
       - uses: actions/download-artifact@v8
         with:
-          pattern: binaries-*
+          name: qualified-binaries
           path: dist
-          merge-multiple: true
-      - name: Upload only after all platforms and gates pass
-        uses: softprops/action-gh-release@v3.0.3
+          run-id: ${{ env.ARTIFACT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v8
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          files: dist/*
-          fail_on_unmatched_files: true
+          name: candidate-image
+          path: ${{ runner.temp }}/tested-image
+          run-id: ${{ env.ARTIFACT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Build the publication verifier and require the qualified version
+        run: |
+          set -euo pipefail
+          VERSION="$(cargo pkgid -p memory_mcp --locked | sed 's/.*@//')"
+          test "$TAG" = "v$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cargo build -p xtask --locked
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish verified assets, then advance stable latest
+        env:
+          IMAGE_DIR: ${{ runner.temp }}/tested-image
+        run: bash .github/scripts/publish-release.sh target/debug/xtask dist "$IMAGE_DIR"

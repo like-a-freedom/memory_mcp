@@ -3,32 +3,96 @@
 ## Everyday flow
 
 1. Open a pull request. **CI** runs Linux lint, workspace tests, optional-feature
-   tests and the PR evaluation gate. Native build/test jobs start after the
-   quality gate passes.
-2. Require **CI passed** in branch protection. The required set follows the
-   event: pull requests, manual runs and releases must pass every job; a push
-   to `master` must pass the quality job (the build jobs do not start there
-   and must be skipped, never failed or cancelled). Windows failures are
-   mandatory.
-3. Merge to `master`. The quality job checks the merged commit; the native and
-   image jobs do not start on push — the pull request already ran them and the
-   release rebuilds with the release profile. Feature-branch pushes do not
-   also trigger a duplicate push workflow.
-4. A release run publishes the Linux/amd64 Streamable HTTP image to GitHub
-   Container Registry as `ghcr.io/like-a-freedom/memory_mcp:latest`,
-   `sha-<commit>` and the release tag (a manual run started from `master`
-   refreshes `latest` and `sha-<commit>`). Pull requests build and test the
-   image without publishing it.
-5. Publish a GitHub Release on a tag containing these workflows. **Release**
-   calls the same CI with optimized builds and the release evaluation gate,
-   publishes the matching container tag, then uploads assets only after every
-   job passes. Pushing a tag alone does not start another build. Re-run failed
-   jobs from the original Actions run.
+   tests and the PR evaluation gate. Native and Docker build/smoke jobs run
+   alongside quality checks. Their prospective release artifacts use
+   `candidate-*` names; these jobs have no release or registry publication
+   permission.
+2. Require **CI passed** in branch protection. It fails on a failed, cancelled
+   or unexpectedly skipped prerequisite, including Windows builds and the
+   SurrealDB remote compatibility tests. From 2.0 the remote matrix tests only
+   SurrealDB 4.0.1; older servers are outside the supported CI contract.
+3. Push-triggered CI is currently disabled. Pull requests and manual CI runs
+   validate changes; a plain branch or tag push publishes nothing.
+4. For a release, bump and push the release commit on `master`, then dispatch
+   **CI** on that exact commit with `release=true`. This runs all gates and
+   optimized builds, records compiler timings, and seals `qualified-binaries`
+   only after **CI passed** succeeds. A normal manual CI run uses development
+   builds and cannot qualify as a reusable release candidate.
+5. Tag that exact commit and create a **draft** GitHub Release with reviewed,
+   nonempty notes. Dispatch **Release** on the existing tag, supply the same
+   `tag` and the successful `candidate_run_id`. The wrapper checks the run's
+   repository, workflow, event, branch, source SHA and successful completion;
+   it also requires the release-only qualification receipt. Without a
+   candidate run ID, the wrapper runs the full release-mode CI on the tag.
+6. The publisher verifies every binary/checksum and the smoke-tested image
+   archive against their source SHA/run ID, loads that image without rebuilding,
+   and checks its OCI version/revision. It stages the registry image and refuses
+   to replace a version or SHA alias with a different manifest digest. It then
+   uploads assets to the draft, downloads them again and verifies every byte
+   against the qualified bundle before publishing the draft.
+7. Only after publication may a stable SemVer release advance the shared Docker
+   `latest` and GitHub Latest marker. Publication jobs share a serialized queue;
+   an older version cannot replace a newer one, prereleases cannot become
+   stable `latest`, and the same version with a different digest is refused.
+   New images carry `org.opencontainers.image.version` and `.revision` labels.
+   For an old image without a version label, the publisher reads its CLI version
+   by exact digest in a bounded container with no network, mounts or credentials.
+   Unknown version/registry errors stop publication instead of guessing.
 
-Manual **CI** runs build development binaries. Manual **Release** rebuilds must
-select the existing release tag under **Run workflow** and supply the same tag
-as input. Old tags retain their old workflows: re-running `v1.9.10` does not
-retroactively use a newer workflow. Create a new version/tag after merging.
+The build-once candidate expires after seven days. Use the tag rebuild path if
+it has expired. Rerun failed jobs from the same Release run to finish a partial
+publication, including a draft already published before a later step failed.
+This reuses that run's artifacts and verifies existing public bytes. For a new
+dispatch recovering an already public release, use **Release** with
+`allow_published_recovery=true`; existing public asset bytes must match the
+qualified bundle, only missing assets may be filled. Reuse the original
+candidate run ID to avoid a rebuild changing already public bytes.
+For the tag-build path without a master candidate, prefer rerunning failed
+jobs of the original Release run: its run ID is not a master CI candidate ID.
+
+GitHub and GHCR have no shared transaction. A failure can leave a public release
+without an advanced `latest`, or staged/version image references while the
+release stays draft; retries verify existing bytes before continuing. The
+monotonic update protects publishers using this workflow, not external manual
+tag overwrites. Do not bypass its lock and policy. Pushing a tag or publishing
+a draft by hand does not dispatch **Release** automatically.
+
+Manual **Release** must select the existing release tag under **Run workflow**
+and supply the same tag as input. Old tags retain their old workflows: rerunning
+an old release does not retroactively use this design. Create a new version/tag
+after merging these workflow changes.
+
+## CI improvement completion record — 2026-11-27
+
+Local implementation is complete; hosted release acceptance remains pending.
+No commit, push, workflow dispatch or registry/release mutation was performed
+as part of this CI-only change.
+
+| Work item | Local status and evidence |
+|---|---|
+| Overlap native/Docker builds with quality | Implemented; publication still requires every gate. Executed gate script rejects 54 failure/cancellation/skip controls and accepts three event controls. |
+| Remove pre-4 SurrealDB CI support | Matrix is 4.0.1 only; removed the 3.x conversion/rollback row. Preserved 35 other check/build/smoke command bodies (native build adds timings). |
+| Reuse caches without competing writers | Existing native key namespace retained; quality owns the shared Linux dev key. Docker exports installer layers; source copies exclude unrelated repository material. |
+| Build once and qualify exact bytes | Source/run-bound image handoff and release bundle; explicit candidate-run provenance; no rebuild in the publisher. |
+| Publish only verified release assets | Draft upload/download/hash verification precedes publication. Version/SHA image aliases reject different digests. |
+| Protect stable channels | Independent GitHub/GHCR version checks, serialized publishers, no downgrade/prerelease promotion; both promoted pointers are read back. |
+| Recover partial publication | Same-run retry reuses its artifacts; a fresh dispatch needs explicit recovery. Existing public bytes cannot be replaced; missing assets can be repaired. |
+| Keep runbook and release skill consistent | Both describe draft/manual dispatch, seven-day artifact expiry, recovery and hosted verification. |
+
+Verification: `cargo test -p xtask --locked` passed 78 existing/policy tests and
+22 publisher process-integration scenarios. They exercise real qualification
+policies through controlled GitHub/Docker transports, without external writes.
+The new final-readback regression failed before the fix (a false-success GitHub
+update was accepted), then passed with remote-state verification. Required
+workspace Clippy, formatting, Bash syntax and workflow validation also pass.
+The exact actionlint compatibility exception is documented below.
+
+**Remaining acceptance on the next authorized release:** use the build-once
+path above, verify every hosted gate and published binary/image, then compare
+completed critical-path durations, compiler timings and cache hit/export logs
+with the preceding comparable release. Record cold/warm cache and runner
+differences; no measured speedup is claimed from local tests or DAG changes.
+Unmeasured LTO/profile changes are outside this change.
 
 ## Platforms
 
@@ -74,11 +138,12 @@ smoke checks as well and skip compiling a second test profile.
 - `setup-rust-toolchain` defaults to `RUSTFLAGS=-D warnings`. Our setup
   explicitly disables that override; Clippy supplies `-D warnings` itself.
   Windows and its native dependencies use the toolchain's dynamic MSVC CRT.
-- Cache policy is explicit: successful dependency builds are keyed by target
-  and role, and the Linux x64 `dev` cache is **shared** between the quality job
-  and the native Linux x64 job (`cache-shared-key`) — the platform build
-  restores the dependency tree the gate just compiled instead of rebuilding it.
-  Release builds keep their own separate key. A failed job still saves what it
+- Cache policy is explicit: the Linux x64 `dev` cache is shared by quality,
+  evaluations, remote compatibility and native dev builds. Quality is its sole
+  writer; concurrent readers restore an existing cache, not the current run's
+  unfinished build. Other targets and release profiles own separate keys. The
+  `native-v3` namespace is retained to reuse existing compatible caches. A
+  failed owning job still saves what it
   compiled (`cache-on-failure: true`), so the next run reuses the dependency
   tree and rebuilds only what changed. This covers a job that fails but runs
   its post steps; a runner lost mid-build skips post steps and loses its cache,
@@ -89,6 +154,11 @@ smoke checks as well and skip compiling a second test profile.
   inactivity. Rust, lockfile and Cargo config
   changes invalidate Rust caches. Bump `native-v3` if changing native compiler
   policy outside Cargo configuration.
+- Docker exports/imports a BuildKit GHA cache for `docker-linux-amd64`, including
+  the expensive Dioxus installer layer. Cache export failure is nonfatal and
+  bounded to five minutes. External layer caching does not export mutable Cargo
+  cache mounts; changes to source still require compilation. Narrow source
+  copies keep unrelated documentation/eval changes out of these build layers.
 - The first uncached build is expensive: SurrealDB, SurrealKV, ML libraries
   and release LTO still need compilation. Job timeouts are ceilings, not expected
   durations. Do not infer an optimization gain until comparing completed runs.
@@ -109,17 +179,30 @@ The lightweight PR/release evaluation baselines remain mandatory in CI.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
+cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings
 cargo test --workspace --lib --bins --tests --locked
-actionlint
+cargo test -p xtask --locked
+actionlint -ignore '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'
 ```
+
+As of actionlint 1.7.12, its concurrency parser lacks GitHub's documented
+[`queue: max`](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+field. The command ignores exactly that obsolete diagnostic; all other lint
+checks remain enabled. Validate the full workflow with the current
+[workflow JSON schema](https://json.schemastore.org/github-workflow.json) as
+well. Keep `cancel-in-progress: false` with `queue: max`: the default single
+pending slot can replace older pending publishers.
 
 The shared setup is `.github/actions/setup/action.yml`. Packaging and the
 console-bundle contract live in `crates/xtask` (`cargo run -p xtask -- package`
 and `cargo run -p xtask -- check-ui-bundle`). No generated workflow files or
 custom CI framework are involved.
 
-Every check the pipeline runs is a cargo command. The Python tooling that
+Policy checks are cargo commands. Release orchestration uses `gh`, Docker and
+the tested `.github/scripts/publish-release.sh`; it invokes the `xtask`
+artifact and channel policies. Its filesystem/process integration tests use
+controlled transports and real qualification checks, without registry writes.
+The Python tooling that
 previously lived under `scripts/ci` has been removed: `package.py` became
 `xtask package`, the Dioxus CLI pin and the bundle's output layout became
 `xtask check-ui-bundle`, the embedded-UI checker became the `ui_assets`

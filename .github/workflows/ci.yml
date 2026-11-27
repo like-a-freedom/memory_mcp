@@ -23,6 +23,10 @@ on:
       release:
         type: boolean
         default: false
+      tag:
+        description: Exact tag supplied by the release wrapper; empty for master preflight.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -55,7 +59,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           RELEASE: ${{ inputs.release }}
           REF: ${{ github.ref }}
-          TAG: ${{ github.event.inputs.tag || '' }}
+          TAG: ${{ inputs.tag || '' }}
         run: |
           if test "$EVENT" = workflow_dispatch && test "$RELEASE" = true; then
             if test -n "$TAG"; then
@@ -77,12 +81,31 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           target: x86_64-unknown-linux-gnu
+          # Sole Linux dev-cache writer. Evaluation/remote/native-dev readers
+          # keep the same key but cannot save a partial dependency tree first.
           cache-key: quality
-          # Same target, same dev profile as the native Linux x64 job below:
-          # one shared cache instead of two isolated ones rebuilding the same
-          # dependency tree (rocksdb, ONNX, SurrealDB) per job.
           cache-shared-key: dev
       - run: cargo fmt --all --check
+      - name: Check the HTTP profile and its internal back-compat name
+        run: |
+          set -euo pipefail
+          # `streamable-http` is the documented profile switch. `control-plane` is
+          # an internal name that pre-existing test and operator invocations still
+          # pass on its own (the feature cycle keeps that compiling), so both
+          # entry points must build without default features.
+          for features in streamable-http control-plane; do
+            echo "checking ${features} without default features"
+            cargo check -p memory_mcp --all-targets --no-default-features \
+              --features "${features},test-fixtures" --locked
+          done
+          # `prometheus` alone: the orthogonal axis, and the one whose absence from
+          # this loop let a test in `observability.rs` reference a control-plane
+          # recorder and break a build that is perfectly legal. Every metrics
+          # test needs the features of the recorders it drives, and this is the
+          # check that keeps that requirement from being discovered locally.
+          echo "checking prometheus without default features"
+          cargo check -p memory_mcp --all-targets --no-default-features \
+            --features "prometheus,test-fixtures" --locked
       - name: Workspace and HTTP fixture lint
         # Match the optional test profile: otherwise test-fixtures-gated
         # protocol tests execute below but never receive lint coverage.
@@ -109,8 +132,6 @@ jobs:
           # is what ADR-0064 requires of CI.
           python3 -m pip install --quiet pyyaml
           cargo run --locked -p xtask -- check-observability
-      - name: SurrealDB 3.x embedded conversion and rollback
-        run: bash crates/memory-mcp/tests/support/run-surrealdb4-upgrade-tests.sh
       - name: Default workspace tests
         # Includes eval-harness/tests/storage_release_gates.rs; do not run that
         # target a second time in a dedicated step below.
@@ -145,26 +166,6 @@ jobs:
         # not part of the ordinary feature matrix above. Keep them in PR CI
         # even when the long native resource matrix is unavailable.
         run: cargo test -p memory_mcp --test http_storage_memory --features streamable-http,mcp-apps,eval-support,test-fixtures --locked -- --test-threads=1
-      - name: Check the HTTP profile and its internal back-compat name
-        run: |
-          set -euo pipefail
-          # `streamable-http` is the documented profile switch. `control-plane` is
-          # an internal name that pre-existing test and operator invocations still
-          # pass on its own (the feature cycle keeps that compiling), so both
-          # entry points must build without default features.
-          for features in streamable-http control-plane; do
-            echo "checking ${features} without default features"
-            cargo check -p memory_mcp --all-targets --no-default-features \
-              --features "${features},test-fixtures" --locked
-          done
-          # `prometheus` alone: the orthogonal axis, and the one whose absence from
-          # this loop let a test in `observability.rs` reference a control-plane
-          # recorder and break a build that is perfectly legal. Every metrics
-          # test needs the features of the recorders it drives, and this is the
-          # check that keeps that requirement from being discovered locally.
-          echo "checking prometheus without default features"
-          cargo check -p memory_mcp --all-targets --no-default-features \
-            --features "prometheus,test-fixtures" --locked
 
   evaluation:
     needs: release-ref
@@ -178,6 +179,7 @@ jobs:
           target: x86_64-unknown-linux-gnu
           cache-key: quality
           cache-shared-key: dev
+          cache-save: 'false'
       - name: Cache immutable evaluation models
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -235,7 +237,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [3.3.5, 4.0.1]
+        # BREAKING since Memory MCP 2.0: only SurrealDB 4.x and newer are
+        # supported; legacy 3.x compatibility and conversion are not CI gates.
+        version: [4.0.1]
     env:
       MEMORY_SURREALDB_EXPECTED_VERSION: ${{ matrix.version }}
       SURREALDB_URL: ws://127.0.0.1:8000/rpc
@@ -252,6 +256,7 @@ jobs:
           target: x86_64-unknown-linux-gnu
           cache-key: quality
           cache-shared-key: dev
+          cache-save: 'false'
       - name: Start pinned SurrealDB server
         run: |
           docker run --detach \
@@ -276,7 +281,9 @@ jobs:
         run: docker rm --force surrealdb-${{ matrix.version }} || true
 
   native:
-    needs: [release-ref, quality]
+    # Independent build/smoke work overlaps quality; publication still waits
+    # for every gate below, including all four native targets.
+    needs: release-ref
     # The platform matrix starts for pull requests, manual runs and releases.
     # A push to master runs the quality gate only: the pull request already
     # exercised every platform, and the release rebuilds everything with the
@@ -320,6 +327,9 @@ jobs:
           target: ${{ matrix.target }}
           cache-key: ${{ inputs.release && 'release' || 'dev' }}
           cache-shared-key: ${{ inputs.release && 'release' || 'dev' }}
+          # Quality owns the shared Linux dev key; release and other native
+          # target/profile keys each have their own writer.
+          cache-save: ${{ inputs.release || matrix.target != 'x86_64-unknown-linux-gnu' }}
       - name: macOS feature lint
         if: matrix.target == 'aarch64-apple-darwin'
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,metal --locked -- -D warnings
@@ -369,20 +379,28 @@ jobs:
         # README: the CLI has no console, the image does.
         env:
           BUILD_PROFILE: ${{ inputs.release && 'release' || 'dev' }}
-        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http --locked
+        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http --locked --timings
+      - name: Preserve compiler timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compiler-timings-${{ matrix.target }}
+          path: target/cargo-timings/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Package and test the actual binaries
         env:
           BUILD_DIR: target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}
         run: cargo run -p xtask --locked -- package "$BUILD_DIR" "${{ matrix.target }}"
       - uses: actions/upload-artifact@v7
         with:
-          name: binaries-${{ matrix.target }}
+          name: candidate-binaries-${{ matrix.target }}
           path: dist/*
           if-no-files-found: error
           retention-days: 7
 
   docker:
-    needs: [release-ref, quality, surrealdb-remote-compat]
+    needs: release-ref
     # Same policy as `native`: no image build on push — releases publish,
     # pull requests build and smoke-test without publishing.
     if: github.event_name != 'push'
@@ -391,7 +409,6 @@ jobs:
     timeout-minutes: 150
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: docker/setup-buildx-action@v4
@@ -442,26 +459,29 @@ jobs:
             "MEMORY_MCP_HTTP_OIDC_STATE_KEY=$(hex64)" \
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY=$(hex64)" \
             docker compose --env-file "${SMOKE_ENV_FILE}" config --quiet
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
         with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable=${{ ((github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.ref_type == 'tag' && inputs.release)) && 'true' || 'false' }}
+          toolchain: stable
+          rustflags: ""
+          cache-key: release-metadata
+      - name: Resolve the embedded image version
+        id: image-version
+        run: echo "version=$(cargo pkgid -p memory_mcp --locked | sed 's/.*@//')" >> "$GITHUB_OUTPUT"
       - name: Build distroless image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64
-          tags: |
-            memory-mcp-http:local
-            ${{ steps.meta.outputs.tags }}
+          tags: memory-mcp-http:local
+          labels: |
+            org.opencontainers.image.version=${{ steps.image-version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
           load: true
+          # External layer cache reuses the pinned CLI installer. Cargo cache
+          # mounts are builder-local; this does not export their contents.
+          cache-from: type=gha,scope=docker-linux-amd64
+          cache-to: type=gha,scope=docker-linux-amd64,mode=max,timeout=5m,ignore-error=true
       - name: Smoke test the final image
         shell: bash
         run: |
@@ -665,24 +685,24 @@ jobs:
               exit 1
             }
           done
-      - name: Log in to GitHub Container Registry
-        if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.ref_type == 'tag' && inputs.release) }}
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Publish image to GitHub Container Registry
-        if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.ref_type == 'tag' && inputs.release) }}
-        shell: bash
+      - name: Export the smoke-tested image for gated publication
+        if: inputs.release
         env:
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          IMAGE_DIR: ${{ runner.temp }}/tested-image
         run: |
           set -euo pipefail
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            docker push "$tag"
-          done <<< "$IMAGE_TAGS"
+          mkdir -p "$IMAGE_DIR"
+          docker save --output "$IMAGE_DIR/image.tar" memory-mcp-http:local
+          cargo run -p xtask --locked -- image-handoff seal "$IMAGE_DIR" \
+            --source-sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --image-id "$(docker image inspect --format '{{.Id}}' memory-mcp-http:local)"
+      - uses: actions/upload-artifact@v7
+        if: inputs.release
+        with:
+          name: candidate-image
+          path: ${{ runner.temp }}/tested-image/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
       - name: Show Compose logs on failure
         if: failure()
         shell: bash
@@ -705,12 +725,14 @@ jobs:
       - name: Require every check this event is supposed to run
         env:
           EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ needs.release-ref.result }}
           QUALITY: ${{ needs.quality.result }}
           EVALUATION: ${{ needs.evaluation.result }}
           REMOTE_COMPAT: ${{ needs.surrealdb-remote-compat.result }}
           NATIVE: ${{ needs.native.result }}
           DOCKER: ${{ needs.docker.result }}
         run: |
+          test "$RELEASE_REF" = success || exit 1
           test "$QUALITY" = success || exit 1
           test "$EVALUATION" = success || exit 1
           test "$REMOTE_COMPAT" = success || exit 1
@@ -721,3 +743,35 @@ jobs:
           else
             test "$NATIVE" = success && test "$DOCKER" = success
           fi
+
+  qualify-release:
+    name: Seal the release-mode artifacts
+    needs: passed
+    if: inputs.release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
+        with:
+          toolchain: stable
+          rustflags: ""
+          cache-key: release-metadata
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: candidate-binaries-*
+          path: qualified-binaries
+          merge-multiple: true
+      - name: Seal every platform after all gates pass
+        run: |
+          set -euo pipefail
+          VERSION="$(cargo pkgid -p memory_mcp --locked | sed 's/.*@//')"
+          cargo run -p xtask --locked -- release-bundle seal qualified-binaries \
+            --source-sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --version "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qualified-binaries
+          path: qualified-binaries/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

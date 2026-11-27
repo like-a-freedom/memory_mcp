@@ -56,9 +56,11 @@ ARG WASM_TARGET=wasm32-unknown-unknown
 # Compiled rather than downloaded, deliberately. The prebuilt artefact would
 # need a checksum pinned here, and a wrong one is worse than a slow build: it
 # either fails every image build or, worse, ships a bundler nobody verified.
-# This stage is a cached Docker layer, so the cost is paid once per version
-# bump rather than per run, and it is the only place the console is built —
-# the CI matrix deliberately does not repeat it.
+# CI exports this installer layer to an external BuildKit cache, so warm runs
+# reuse it while its inputs are unchanged. Cargo cache mounts below remain
+# builder-local; exporting layers does not persist their contents across runners.
+# This is the only place the console is built — the native matrix does not
+# repeat it.
 #
 # The version here is checked against `crates/ui/Cargo.toml` by
 # `xtask check-dioxus-pin`, in this stage and as a unit test in CI, so the two
@@ -66,7 +68,14 @@ ARG WASM_TARGET=wasm32-unknown-unknown
 RUN rustup target add "${WASM_TARGET}" \
     && cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked
 
-COPY . .
+# Keep reports, agent worktrees and local configuration out of build layers.
+# All workspace members and the patched vendor crate are needed for resolution;
+# the runtime NER corpus is compiled into memory_mcp through include_str!.
+# Dockerfile itself is read by xtask's Dioxus pin check.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile LICENSE ./
+COPY crates/ crates/
+COPY vendor/ vendor/
+COPY evals/corpora/ner/vago_runtime_regression.json evals/corpora/ner/vago_runtime_regression.json
 
 # Absolute, non-symlink output directory containing nonempty index + JS + WASM.
 #
@@ -116,7 +125,10 @@ RUN apt-get update \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile LICENSE ./
+COPY crates/ crates/
+COPY vendor/ vendor/
+COPY evals/corpora/ner/vago_runtime_regression.json evals/corpora/ner/vago_runtime_regression.json
 
 # The bundle lands at the same literal absolute path `build.rs` reads. Copying
 # it into the build stage (rather than pointing at a stage-relative path) keeps

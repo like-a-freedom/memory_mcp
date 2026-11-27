@@ -1,18 +1,18 @@
 ---
 name: github-release
-description: Cut a release of this project end to end — decide the semver bump, mirror CI locally, bump the version in crates/memory-mcp/Cargo.toml, commit `chore: release X.Y.Z`, create the annotated vX.Y.Z tag, push the branch and tag, and publish the GitHub Release with brief English bullet notes. Use this skill whenever the user says "release", "cut/publish a release", "bump the version", "tag a version", "ship vX.Y.Z", "make the release/notes", or asks for GitHub release notes for this repo — even if they name only one step, because the steps only make sense as one sequence and a half-done release (tag without release, release without a bump) is a state the repo should never be left in.
+description: Prepare and publish a Memory MCP release with a version bump, release-mode CI qualification, annotated tag, reviewed draft, explicit Release dispatch and verification of published assets and image. Use for authorized release preparation or publication; respect requests limited to notes, audits or CI changes.
 ---
 
 # Release this project
 
-One sequence, in order: **bump → commit → annotated tag → push branch + tag → publish the GitHub Release with brief English bullet notes.** Each step assumes the previous one landed; skipping ahead (e.g. a GitHub Release for a tag that does not exist, or a tag whose `Cargo.toml` version differs) leaves the repo inconsistent, and the release workflow on GitHub keys off the release event, not the tag push.
+One sequence: **bump → commit/push master → release-mode CI → annotated tag/push → reviewed draft → dispatch Release → verify published assets and image.** The preferred path reuses the exact tested bytes. Read [the CI/release runbook](../../../docs/operations/CI.md) for cache, publication and recovery contracts. A request to inspect or modify CI does not authorize publishing a release; respect explicit no-push constraints.
 
 ## Why the shape is what it is
 
 - **The version has one owner.** It lives in `crates/memory-mcp/Cargo.toml` (`version = "X.Y.Z"`), not the workspace manifest. `Cargo.lock` mirrors it under `name = "memory_mcp"`, and a correct bump moves exactly one line there — no more.
-- **The tag must be annotated.** `release.yml` runs on `release: published`, and its `ref` job asserts `github.ref_name == the tag`. A lightweight tag and a release name that disagree is how a release silently ships with zero assets (`fail_on_unmatched_files` only fires once the workflow actually runs).
+- **The tag must be annotated.** This is the project convention. `Release` is manually dispatched on the exact tag and checks that its version, SHA and qualified artifacts agree. A tag push or manual draft publication does not trigger the workflow.
 - **The notes are the release body, and they are for a reader deciding whether to upgrade.** Brief bullets beat prose: what changed for a user, what breaks, what behaves differently, what was fixed.
-- **CI is the gate, not a formality.** `release.yml` calls `ci.yml`; if the local preflight and CI disagree, the release fails after the tag is already public. Run CI's own commands locally first (below).
+- **CI gates publication.** Release-mode CI validates every platform and seals binary/image provenance. The publisher downloads and verifies assets before publishing the draft, then promotes stable latest monotonically. Local checks do not establish hosted completion.
 
 ## GitHub goes through `gh`, git goes through `git`
 
@@ -95,7 +95,25 @@ The subject is the whole message, exactly as the repo's own release history does
 
 If the release itself reverses or changes a standing decision, the reason belongs in the tag message (Step 5) and the release notes (Step 7), not a commit body — those are what a reader sees.
 
-## Step 5 — annotated tag
+## Step 5 — qualify the release commit, then annotate the tag
+
+Push the release commit to `master`, dispatch release-mode CI and record the
+resulting run ID (select the run for this exact SHA, not merely the newest run):
+
+```bash
+git push origin master
+gh workflow run ci.yml --ref master -f release=true
+gh run list --workflow ci.yml --commit "$(git rev-parse HEAD)" --event workflow_dispatch
+# Select the dispatched run ID, then wait for successful completion:
+gh run watch <candidate-run-id> --exit-status
+```
+
+Require successful completion and the `qualified-binaries` and `candidate-image`
+artifacts. An ordinary development CI run is not a release candidate. Artifacts
+expire after seven days; if unavailable, omit the candidate ID and let Release
+rebuild and qualify the exact tag.
+
+### Annotated tag
 
 The tag message is `vX.Y.Z — <short title>` followed by a blank line and a short paragraph naming the release:
 
@@ -107,14 +125,13 @@ git tag -a vX.Y.Z -m "vX.Y.Z — <short title>
 
 Annotated (`-a`), not lightweight: an annotated tag carries the message and is what the existing releases use (`git cat-file -t v1.27.0` → `tag`). The tag name follows the repo's current convention `vX.Y.Z` — recent releases have no dot after the `v` (`v1.27.0`), older ones did (`v.1.9.0`); use the current form.
 
-## Step 6 — push branch and tag
+## Step 6 — push the qualified tag
 
 ```bash
-git push origin master
 git push origin vX.Y.Z
 ```
 
-(`git push origin master --follow-tags` does both once the tag is on `HEAD`.) Then **verify the remote tag actually points at the release commit**, reading it the native way through `gh`:
+The master commit was pushed and qualified in Step 5. **Verify the remote tag points at that exact commit**, reading it through `gh`:
 
 ```bash
 slug=$(gh repo view --json nameWithOwner -q .nameWithOwner)
@@ -131,26 +148,46 @@ gh api "repos/$slug/git/tags/$(gh api "repos/$slug/git/ref/tags/vX.Y.Z" --jq .ob
 
 If it does not match, the tag was created on the wrong commit; delete it locally and remotely (`git push origin :refs/tags/vX.Y.Z`), re-tag, and re-push before publishing the release.
 
-## Step 7 — publish the GitHub Release with brief English notes
+## Step 7 — create a draft and dispatch publication
 
-Write the notes to a file (the format is below), then publish. `release.yml` fires on `release: published`, so this step is what starts the build and uploads the assets:
-
-```bash
-gh release create vX.Y.Z \
-  --title "vX.Y.Z" \
-  --notes-file <path-to-notes.md> \
-  --verify-tag
-```
-
-`--verify-tag` refuses to create a release for a tag that is not already on the remote — a guard against publishing a release whose tag push failed.
-
-## Step 8 — verify
+Write brief English notes to a file, create a reviewed draft, then dispatch the
+publisher on the existing tag:
 
 ```bash
-gh release view vX.Y.Z
+gh release create vX.Y.Z --draft --verify-tag \
+  --title "vX.Y.Z" --notes-file <path-to-notes.md>
+gh workflow run release.yml --ref vX.Y.Z \
+  -f tag=vX.Y.Z -f candidate_run_id=<candidate-run-id>
 ```
 
-Confirm the tag, title and body are what you intended, then note that the release workflow is now running. If the notes have a mistake, fix them with `gh release edit vX.Y.Z --notes-file <path>` — the release body is editable; the tag is the only part that is not.
+Do not publish the draft manually. `Release` attaches qualified bytes, reads
+them back and verifies checksums before publishing; only then can it advance
+stable Docker/GitHub latest. Prereleases and older versions do not advance the
+stable channel. Version/SHA image aliases cannot be replaced with different
+bytes.
+
+## Step 8 — verify hosted completion
+
+Find the exact dispatched Release run and wait for it:
+
+```bash
+gh run list --workflow release.yml --commit "$(git rev-parse HEAD)" --event workflow_dispatch
+gh run watch <release-run-id> --exit-status
+gh release view vX.Y.Z --json tagName,isDraft,isPrerelease,body,assets
+```
+
+Require a successful workflow, a public release and all platform archives and
+checksum sidecars. Verify the registry version tag's OCI version/revision and
+manifest digest; for a newly highest stable version, verify both latest markers.
+Report actual hosted completion, not just local gates or draft existence.
+
+Rerun failed jobs of the original Release run to finish its partial publication,
+even if the draft already became public. This preserves the same artifacts. For
+a new recovery dispatch, use the same tag, the original master CI candidate run
+ID and `-f allow_published_recovery=true`. A tag-build Release run ID is not a
+master CI candidate; for that path prefer rerunning the original failed jobs. Recovery permits missing assets but refuses
+to change existing public bytes. Do not rebuild or overwrite an already public
+release to make a mismatch pass; investigate the provenance conflict.
 
 ## Release notes format
 
