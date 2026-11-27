@@ -67,7 +67,7 @@ Public seams: `SkillHost.dispatch`, `create_messages`, `play`, `freeze`/plan ver
 - [x] Obtain one independent final review, fix substantive issues with RED→GREEN, verify source hashes and all registered attempts.
 - [x] Update metrics/action plan and separate completed finite evaluations from failed quality acceptance.
 - [x] Restore preserved unrelated deletions after release dispatch.
-- [ ] Reconcile hosted publication evidence without holding up quality work or claiming unverified assets.
+- [x] Reconcile hosted publication evidence without holding up quality work or claiming unverified assets.
 
 ## Execution ledger
 
@@ -152,3 +152,5 @@ Task10 complete: sole capture12/12 answered,12/12 operations,10/12 semantic/full
 Task4 publication checkpoint: candidate46058402331 completed success for exact6740421e; annotatedv2.1.0 pushed and reviewed draft created. Release46072830377 failed before publication because read-only ref token could not see that draft. User deletions restored from5575d4b1 stash without committing/dropping it. Recovery keeps tag and qualified bytes immutable; updated master orchestrator will require explicit same-tag green candidate, pin its actual source commit and retain serialized publisher guards. No asset publication is claimed until observed.
 
 Post-dispatch reconciliation: recovery46074161545 is dispatched from orchestrator68286060; artifact source6740421e/candidate46058402331/tagv2.1.0 remain fixed. Build job skipped; ref qualification and publisher draft guard passed on GitHub. Continued quality work while publication runs: all72 archived reader and12 workflow grades replay, raw-only96 legacy prompts/56 classifications remain equal, and the seven reader failures are linked to exact delivered sources in the28-Nov source diagnosis. No new inference. This does not activate another capture or close reader/C2 acceptance.
+
+Publication completed: recovery46074161545 SUCCESS, publicv2.1.0,16/16 downloaded assets match qualified hashes; annotated tag/source identity, OCI version/revision and identical version/SHA/latest digests verified independently. Receipt: `evals/results/release-2.1.0-qualification-2026-11-28/recovery-publication-verified.json`. Tasks1–10 finite execution and release reconciliation are complete. Reader acceptance remainsFAIL and C2NO_GO by the registered stopping rule; future research in the main quality report is not counted as completed product quality.

@@ -16,4 +16,4 @@ python3 evals/results/release-2.1.0-qualification-2026-11-28/check_draft_control
 cargo test -p xtask --test release_publication --locked
 ```
 
-The orchestrator commit and artifact-source commit are separate identities. Publication status is pending until a separate live verification receipt records public downloads/checksums and registry identities.
+The orchestrator commit and artifact-source commit are separate identities. Publication is complete: [Release46074161545](https://github.com/like-a-freedom/memory_mcp/actions/runs/46074161545) succeeded. [Independent live verification](recovery-publication-verified.json) downloaded all16 public files and matched every SHA-256, verified the annotated tag, qualified bundle provenance, OCI version/revision, identical version/SHA/latest digests, and GitHub latest. The build job was skipped; quality work continued during publication.
