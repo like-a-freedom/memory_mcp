@@ -1,0 +1,34 @@
+{
+  "schema": "bounded-workflow-local-execution/v1",
+  "frozen_at_utc": "2026-11-27T18:51:29.440743+00:00",
+  "architecture": "arm64",
+  "owned_server_pid": 48685,
+  "server_script_sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "all_model_files_rehashed": 13,
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-lm": "0.32.2",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  },
+  "acceptance_sha256": "1cbc85b156d16b5ec477419fd40a7f11dd0a4060a0f3c15321ce06c22a114642",
+  "model_health": {
+    "object": "list",
+    "data": [
+      {
+        "id": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+        "object": "model",
+        "created": 1795805489
+      }
+    ]
+  },
+  "order": [
+    "fresh-native",
+    "legacy-regression"
+  ],
+  "runtime_scope": "native Apple Silicon local MLX; no LM Studio service, no remote inference",
+  "latency_scope": "descriptive; system services and short xtask checks can overlap, no causal performance comparison",
+  "binary_production_source_commit": "96998c43ca7265e40bfcfdf8904ab40ead0bb058"
+}

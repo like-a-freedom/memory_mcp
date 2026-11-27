@@ -1,0 +1,95 @@
+{
+  "schema": "source-actions-postcapture-verification/v3",
+  "review": {
+    "agent": "source_selection_v4_review",
+    "critical": 0,
+    "important": 3,
+    "fix_passes": 1,
+    "re_review": false
+  },
+  "fixed": {
+    "parser_selection": "source-only objects and trimmed IDs accepted; required episode, invalid unselected entries and legacy aliases rejected; canonical verification separate; empty and non-string optional fields use actual parser defaults, nonempty claimed text still must match",
+    "archived_matcher": "dependency loaded before archived source_references; live matcher drift cannot affect frozen scoring",
+    "request_accounting": "both logs hash-pinned plus fixed totals/outcomes; applied to the same defect in earlier44 archive"
+  },
+  "source_hashes": {
+    "evals/paired/skill_workflow.py": "2fbc5680ce06abd6622876eb17b3a23e32e8f1f1cd68e14c4a4265c9adc49a0a",
+    "evals/paired/skill_source_actions.py": "86091cd7e884e9fadc423a80856b17edfa11285c679de15fd60c5982f0e8a803",
+    "evals/paired/test_skill_source_actions.py": "615ed4bd6676b3048105623a40818b739fb403327ece8e6886c9cc108899df26",
+    "evals/paired/test_capture_replay_integration.py": "39da8d8ffc86289dcd69f1ffe0cc9c3f69c9fab490f06e44271e60e34678cc44",
+    "evals/paired/source-action-qualification-2026-11-27/replay_capture.py": "87cf4023454ed895f4796132bd60a99bc30323cf8a786c11da4bac878c87f35f",
+    "evals/paired/skill-completion-qualification-2026-11-27/replay_capture.py": "b094a94244c9e90a47ccd27d2f4c91361665a843a12943a0ce31ff64864f87a0",
+    "evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py": "3f91e91ec008a1d4877f04ac576222aaff7b081da025556786f140f0e6eeedf7"
+  },
+  "paired_tests": {
+    "scheduled": 140,
+    "passed": 140
+  },
+  "reader_tests": {
+    "scheduled": 171,
+    "passed": 160,
+    "skipped": 11,
+    "scope": "portable; SDK/native-only controls skipped, not counted as passed"
+  },
+  "replays": {
+    "source_actions": {
+      "trials_reproduced": 12,
+      "operation_passes": 8,
+      "full_passes": 6,
+      "requests_started_and_terminal": 54,
+      "inference_calls": 0,
+      "review": "linked primary manual judgments, not independent re-adjudication"
+    },
+    "earlier_workflow": {
+      "scheduled_trials": 44,
+      "operation_grades_reproduced": 44,
+      "initial_prompts_reproduced": 44,
+      "strict_reviewed_pass": 20,
+      "operation_pass": 25,
+      "request_starts_and_terminals": 185,
+      "abandoned_requests": 0,
+      "inference_calls": 0,
+      "semantic_review_scope": "pinned primary non-blinded manual judgments, not new independent adjudication"
+    },
+    "whole_item": {
+      "prompts_and_case_grades_reproduced": 72,
+      "requests_started_and_terminal": 72,
+      "whole_item_strict": 49,
+      "whole_item_value": 49,
+      "whole_item_binding": 56,
+      "whole_item_proof": 56,
+      "whole_item_denominator": 56,
+      "inference_calls": 0
+    }
+  },
+  "logs": {
+    "memory-v4-source-object-red.log": "238d298264663f62a7143e6bd0b6194c478815bdbec56f74722fa13aee0769e2",
+    "memory-v4-required-episode-red.log": "993e98ad03bf663c7524a9bd111294aec4064847e21fc89e4c9f87937a933b56",
+    "memory-v4-string-trim-red.log": "1573f15a2a5c46f948a80468d39a51490ef09d48c8e2ae6d6be08b6c0eab2609",
+    "memory-v4-object-trim-red.log": "03494cfda96347d988b658e74371884d3f5403db6c79ae0c1fe92c48d244db00",
+    "memory-v4-array-validation-red.log": "399a8fdb1087edb60790caf6f1f3b8049d01b3b6479b552e6fe687e2ceb8556d",
+    "memory-v4-legacy-alias-red.log": "83342f880156cf788c09fb541fb1b27279e7db75c666ee17c06fa31c034b64c7",
+    "memory-reader-archive-matcher-red.log": "7396c4b9d057362ae1f563ffe0c208f222a02a6583ad3ba931e8f38a0ebd2ea6",
+    "memory-reader-archive-matcher-green.log": "db37516843f2c7c5d4cf0e63316372d046ef781c814092cc6f939f04c3937eaa",
+    "memory-source-replay-empty-red.log": "e66f468968f198eebd9dee5245db089cf3bfb3f2599318b8168fe2925b5ec3e3",
+    "memory-earlier-replay-empty-red.log": "88c88a3b90fbb8043ed7d471783d1d2c74c793eeab0b069e4f415a4b0c79f736",
+    "memory-v4-parser-final-green.log": "f7306b93e9f4093b6690d747a806801d262550334add5faf232b35cd27f259f8",
+    "memory-paired-reviewed-all.log": "cc58d2b7e53bf7f95bcce8790acc86c5dd8fe9b57ae7776040f7f3905f14b157",
+    "memory-reader-reviewed-complete.log": "e5c4fc02f94e5d4d9e6d732e2f321c5a6443afeac19b769980f4beb33734878b",
+    "memory-replay-three-green.log": "1745a5095f8cbf6029276a690b71f7e6d23d394d3bbc2764ff0cc3ffe3af1101",
+    "memory-v4-optional-defaults-red.log": "d6f188476e38b0a4188f56d630bac863a19b891a64812e1721adba5c305cc6ca",
+    "memory-v4-typed-defaults-red.log": "a48c60347a9ef29ea9c9729d63d768b2d831259d465c31e21501e640a9e4b096",
+    "memory-v4-parser-optional-green.log": "8623eb8ebebf52ce1e0fa52647182bc1d006f40608d0181131bff203ed6f310a",
+    "memory-paired-reviewed-final140.log": "a4929630f5dbccfc081571b89a800e6a8ad758144a7904a2980f4d53a4a7ded1",
+    "memory-paired-final-fixture140.log": "9b94b2c34ba8813e3c8b768725015347f3273a098349e49d7f20700bb6364c2f"
+  },
+  "new_inference_calls_during_review_fix": 0,
+  "qualification": "Original v3 source-actions FAIL6/12 and whole-item FAIL49/56 unchanged; v4 and postcapture skill bytes still dynamically unqualified.",
+  "unqualified_skill_reference_hashes": {
+    "skills/memory-mcp/references/mcp-tools.md": "cf1310b49a23c562a8af85164171a97cb1c7f442bda4c27ac371e8947194ea26",
+    "skills/memory-mcp/references/memory-contract.md": "f4f969f0f3f0ad88aed79dd0f189308db32adfc875e6c076c6df96c2033cf827",
+    "skills/memory-cli/references/commands.md": "3f8a6d50983437ab5c939d2c591f1b489a8c69d1343f422783f06b1f9833b787",
+    "skills/memory-cli/references/memory-contract.md": "ae6566b2847ff418afde143ee9a103c60f838108102600f10bd1b049a5fd4e8a"
+  },
+  "test_fixture_note": "Foreign explain-source mutation uses a separate provenance object, leaving recalled provenance intact; the control tests explanation binding rather than invalidating recall."
+}

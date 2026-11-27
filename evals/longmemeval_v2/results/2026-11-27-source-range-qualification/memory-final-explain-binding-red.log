@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_fresh_recall_cannot_accept_a_foreign_explain_item_with_copied_text (evals.paired.test_skill_disclosure.FreshQualificationTests.test_fresh_recall_cannot_accept_a_foreign_explain_item_with_copied_text)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_disclosure.py", line 171, in test_fresh_recall_cannot_accept_a_foreign_explain_item_with_copied_text
+    self.assertFalse(grade['operation_and_exact_arguments'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+FAILED (failures=1)

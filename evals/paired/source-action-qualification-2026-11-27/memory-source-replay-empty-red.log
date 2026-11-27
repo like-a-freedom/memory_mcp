@@ -1,0 +1,22 @@
+F
+======================================================================
+FAIL: test_source_action_replay_rejects_missing_request_evidence (evals.paired.test_capture_replay_integration.FrozenCaptureReplayTests.test_source_action_replay_rejects_missing_request_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_capture_replay_integration.py", line 40, in test_source_action_replay_rejects_missing_request_evidence
+    self.assertNotEqual(result.returncode,0,result.stdout)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0 : {
+  "trials_reproduced": 12,
+  "operation_passes": 8,
+  "full_passes": 6,
+  "requests_started_and_terminal": 0,
+  "inference_calls": 0,
+  "review": "linked primary manual judgments, not independent re-adjudication"
+}
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.363s
+
+FAILED (failures=1)

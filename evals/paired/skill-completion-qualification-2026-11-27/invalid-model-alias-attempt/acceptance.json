@@ -1,0 +1,32 @@
+{
+  "schema": "memory-skill-completion-acceptance/v1",
+  "plans": [
+    {
+      "directory": "legacy-regression",
+      "sha256": "e9c10b1834d7f22d052c980802ca1f3e600c0832a278646e3e04b857ba1061b5",
+      "cases": 16,
+      "scheduled": 32
+    },
+    {
+      "directory": "fresh-native",
+      "sha256": "beaae092e2b386697822fde5b02556c59b6d4611931043fd6c02455f99dd64f5",
+      "cases": 6,
+      "scheduled": 12
+    }
+  ],
+  "scheduled": 44,
+  "current_scheduled": 22,
+  "require": "all22 current trials: actual finish, source/status/time correct, exact operations, no faults, all semantic checks pass",
+  "retries": 0,
+  "budget": {
+    "turns": 9,
+    "max_tokens": 384,
+    "call_seconds": 20,
+    "case_seconds": 180,
+    "retries": 0,
+    "temperature": 0
+  },
+  "binary_version": "memory_mcp 2.1.0",
+  "binary_sha256": "42dbf4eded62a3e3d47cfe9b0868c4bd09c43cab3d1005947b1bac7632793121",
+  "limits": "exposed16 regression tasks plus6 new development tasks; not independent benefit evidence; previous arm descriptive; no repeat-until-green"
+}

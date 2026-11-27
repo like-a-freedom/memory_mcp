@@ -1,0 +1,6 @@
+{
+  "outcome": "completed",
+  "elapsed_seconds": 319.3228020420065,
+  "scheduled": 72,
+  "missing_outputs": "fail in fixed denominator; no retry"
+}

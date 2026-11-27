@@ -1,0 +1,36 @@
+{
+  "schema": "memory-mcp-reader-protocol/v1",
+  "rows_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/fixtures/source-range-independent-v1/qualification/rows.jsonl",
+  "rows_sha256": "97c8e2d39a7b032072671f7cfda616667231a9b5923d6cafa14d60a86b4ee039",
+  "truth_path": "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/fixtures/source-range-independent-v1/qualification/truth.json",
+  "truth_sha256": "550625493c99472429ffd724690664eb24795df85621374336664e590afd732f",
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "endpoint": "http://127.0.0.1:18767/v1",
+  "variants": [
+    "source-item-final-first"
+  ],
+  "sampling": {
+    "temperature": 0,
+    "max_completion_tokens": 256
+  },
+  "timeout_seconds": 60,
+  "max_retries": 0,
+  "capture_budget_seconds": 1800,
+  "repetitions": 1,
+  "order": "case-major then declared variant order; no repeat or best output selection",
+  "hypothesis": "reader protocol only, fixed evidence; no retrieval or general memory benefit claim",
+  "runner_sha256": "91f78b5727c835c2e66d1c8ab508d9dcad5c481fa87a6d384f0b75f7056c96a4",
+  "attempt_recorder_sha256": "1c1f7fb78bc68858f01c2e7dd8ab7d1890413c734bd509246b0818a3f1e61e49",
+  "source_reference_sha256": "cc02f9fad9080e38dc18f21ee911be7887b00673a65b73d579ce8aff9887bab7",
+  "answer_matcher_sha256": "12b65ee62dd77b74bf3db83caa10d7f8d5289c1b90aae68d2de49630fe48dd60",
+  "variant_treatments": {
+    "source-item-final-first": [
+      "whole_item_response_contract",
+      "source_identity",
+      "reviewed_support_coverage",
+      "whole_delivered_source",
+      "source_graph"
+    ]
+  },
+  "item_reference_catalog_sha256": "493044a51e02d606dc1ae4fab76d4305077a0c4a5bda69bd96a293bdc67a0267"
+}

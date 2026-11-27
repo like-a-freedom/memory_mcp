@@ -1,0 +1,1366 @@
+{
+  "source-graph-final-first": {
+    "middle-positive": {
+      "response_raw": "\\boxed{Lantern}\nQUOTE: [18] link 'Lantern', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 2709,
+        "total_tokens": 2731,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "\\boxed{None}\nQUOTE: [11] link 'Staging', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 2691,
+        "total_tokens": 2710,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "\\boxed{None}\nQUOTE: [25] link 'Archive', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2689,
+        "total_tokens": 2707,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "\\boxed{4}\nQUOTE: [71] button 'Version 84', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 2888,
+        "total_tokens": 2909,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [11] link 'Hill', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 2706,
+        "total_tokens": 2725,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [11] link 'Open', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2825,
+        "total_tokens": 2843,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [18] link 'Running', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2383,
+        "total_tokens": 2401,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "\\boxed{Help}\nQUOTE: [11] link 'Help', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 2662,
+        "total_tokens": 2680,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "\\boxed{Export}\nQUOTE: [7] link 'Export', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 2428,
+        "total_tokens": 2445,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "\\boxed{April, June, October}\nQUOTE: [2] list 'Categories', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 21,
+        "prompt_tokens": 2686,
+        "total_tokens": 2707,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-conflicting-repeat": {
+      "response_raw": "\\boxed{UNKNOWN}\n\nQUOTE:\n\"repeated_labels\": [{\"role\": \"button\", \"name\": \"Release\", \"occurrence_lines\": [2, 4], \"successor_values\": [\"River\", \"Hill\"], \"unresolved_occurrence_lines\": []}]",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 59,
+        "prompt_tokens": 2000,
+        "total_tokens": 2059,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-consistent-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [2] button 'Release', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 2023,
+        "total_tokens": 2040,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-named-scope-repeat": {
+      "response_raw": "\\boxed{Port}\nQUOTE: [6] button 'Port', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 2006,
+        "total_tokens": 2023,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-role-selected-repeat": {
+      "response_raw": "\\boxed{River}\nQUOTE: [3] button 'River', visible",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 1970,
+        "total_tokens": 1987,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-opaque-intervening": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: \"successor\": {\"state\": \"unresolved\"}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 1792,
+        "total_tokens": 1812,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-clipped-repeat": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: \"unresolved_occurrence_lines\": [4]",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 1903,
+        "total_tokens": 1922,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-equal-links": {
+      "response_raw": "\\boxed{Lagoon}\nQUOTE: [3] link 'Lagoon'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 839,
+        "total_tokens": 857,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-conflicting-links": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [2] link 'Dock'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 807,
+        "total_tokens": 823,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-opaque-repeat": {
+      "response_raw": "The question asks which button follows \"Dock\" in the Bay toolbar. Looking at the source text, there are two occurrences of the button 'Dock':\n1. Line 2: `[2] button 'Dock'` is followed by `[3] button 'Lagoon'`.\n2. Line 4: `[4] button 'Dock'` is followed by `[5] group 'Nested'` (which contains button 'Delta').\n\nThe graph indicates that for the repeated label \"Dock\", the successor values are `[\"Lagoon\"]` and there is an unresolved occurrence at line 4. The prompt states: \"Inspect all matching occurrences: equal successor values support that value; conflicting or unresolved occurrences require UNKNOWN.\"\n\nSince one occurrence has a successor of \"Lagoon\" and the other is unresolved (and the next item is a group, not a button, or potentially ambiguous depending on interpretation of \"follows\"), the evidence is not consistent across all occurrences. Specifically, the successor for the first Dock is Lagoon, but the successor for the second Dock is a group (Nested), which is not a button. The graph explicitly marks the second Dock's successor as \"unresolved\". Because there are conflicting or unresolved occurrences for the button \"Dock\", the",
+      "finish_reason": "length",
+      "usage": {
+        "completion_tokens": 256,
+        "prompt_tokens": 849,
+        "total_tokens": 1105,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-scope-count": {
+      "response_raw": "\\boxed{4}\nQUOTE: [2] button 'Dock'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 1051,
+        "total_tokens": 1067,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-role-selection": {
+      "response_raw": "\\boxed{Lagoon}\nQUOTE: [3] button 'Lagoon'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 763,
+        "total_tokens": 781,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-virtualized-last": {
+      "response_raw": "\\boxed{None}\nQUOTE: [3] button 'Lagoon'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 592,
+        "total_tokens": 609,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-escaped-name": {
+      "response_raw": "\\boxed{Cr\u00e8me}\nQUOTE: [3] button 'Cr\u00e8me'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 604,
+        "total_tokens": 622,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-single-closed-end": {
+      "response_raw": "\\boxed{None}\nQUOTE: [3] heading 'End'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 514,
+        "total_tokens": 530,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-middle": {
+      "response_raw": "\\boxed{Slate}\nQUOTE: [3] button 'Slate'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 698,
+        "total_tokens": 716,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-adjacent": {
+      "response_raw": "\\boxed{None}\nQUOTE: [2] button 'Blue'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 598,
+        "total_tokens": 614,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-terminal": {
+      "response_raw": "\\boxed{None}\nQUOTE: [3] button 'Red'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 597,
+        "total_tokens": 613,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-count": {
+      "response_raw": "\\boxed{2}\nQUOTE: [2] button 'Blue'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 694,
+        "total_tokens": 710,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-missing": {
+      "response_raw": "\\boxed{None}\n\nQUOTE:\n[2] button 'Blue'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 17,
+        "prompt_tokens": 595,
+        "total_tokens": 612,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-conflict": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [2] button 'Launch'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 814,
+        "total_tokens": 830,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-consistent": {
+      "response_raw": "\\boxed{Granite}\nQUOTE: [3] button 'Granite'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 838,
+        "total_tokens": 856,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-opaque": {
+      "response_raw": "\\boxed{Granite}\nQUOTE: [4] button 'Granite'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 597,
+        "total_tokens": 615,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-clipped": {
+      "response_raw": "\\boxed{Granite}\nQUOTE: [3] button 'Granite'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 599,
+        "total_tokens": 617,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-virtualized": {
+      "response_raw": "\\boxed{UNKNOWN}\nQUOTE: [3] button 'Granite', posinset=5",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 624,
+        "total_tokens": 646,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-scope": {
+      "response_raw": "\\boxed{Marble}\nQUOTE: [6] button 'Marble'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 809,
+        "total_tokens": 827,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-role": {
+      "response_raw": "\\boxed{Granite}\nQUOTE: [3] button 'Granite'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 776,
+        "total_tokens": 794,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-list": {
+      "response_raw": "\\boxed{Lime, Plum, Pear}\nQUOTE: [2] button 'Lime'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 682,
+        "total_tokens": 704,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-unicode": {
+      "response_raw": "\\boxed{Cr\u00e8me}\nQUOTE: [3] button 'Cr\u00e8me'",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 18,
+        "prompt_tokens": 600,
+        "total_tokens": 618,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-numeric": {
+      "response_raw": "\\boxed{72 hours}\nQUOTE: Confirmed: Cedar retention is 72 hours.",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 415,
+        "total_tokens": 437,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-two-sources": {
+      "response_raw": "\\boxed{96 hours}\nQUOTE: Confirmed: Birch retention is 96 hours.",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 22,
+        "prompt_tokens": 553,
+        "total_tokens": 575,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 197,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  },
+  "source-range-final-first": {
+    "middle-positive": {
+      "response_raw": "{\n  \"answer\": \"Lantern\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-f11f411d5bcf207594d7c798e2f3d8a1cdf3674cd8dc5de7cec40d031a2e6cf2\",\n      \"lines\": [\n        2,\n        8\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 112,
+        "prompt_tokens": 2758,
+        "total_tokens": 2870,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 0,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "adjacent-negative": {
+      "response_raw": "{\"answer\": \"None\", \"evidence\": [{\"source\": \"s1-0ee45db496fa2b4792fe8059537c0ec2cf10bcc39c6f710fbc34e6cd2ac65b6d\", \"lines\": [2, 8]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 82,
+        "prompt_tokens": 2741,
+        "total_tokens": 2823,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "terminal-negative": {
+      "response_raw": "{\"answer\": \"None\", \"evidence\": [{\"source\": \"s2-3968d8b23b2f5f3a5eb921ce99921dadafae62b4dd093e37ce28c89685f39bf2\", \"lines\": [2, 9]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 84,
+        "prompt_tokens": 2739,
+        "total_tokens": 2823,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "button-count-mixed": {
+      "response_raw": "{\n  \"answer\": \"4\",\n  \"evidence\": [\n    {\n      \"source\": \"s3-006ed6d8b8e90e80e8e539ae17f92b4504a3f174dda154ab652cfe2ba58eb9e6\",\n      \"lines\": [\n        2,\n        11\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 113,
+        "prompt_tokens": 2947,
+        "total_tokens": 3060,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "missing-anchor-unknown": {
+      "response_raw": "{\"answer\": \"UNKNOWN\", \"evidence\": [{\"source\": \"s0-76337a9eabcb1eb953d617573c773f616d6b9c71c6f59af7c75633547c18227a\", \"lines\": [2, 8]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 89,
+        "prompt_tokens": 2756,
+        "total_tokens": 2845,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "duplicate-anchor-unknown": {
+      "response_raw": "{\n  \"answer\": \"UNKNOWN\",\n  \"evidence\": [\n    {\n      \"source\": \"s1-fb8989e6f3cf0eb57feb3694ae9131736abd5cd55b03a9e59071c1cb80932849\",\n      \"lines\": [\n        2,\n        10\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 111,
+        "prompt_tokens": 2881,
+        "total_tokens": 2992,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "clipped-terminal-unknown": {
+      "response_raw": "{\"answer\": \"UNKNOWN\", \"evidence\": [{\"source\": \"s2-3e9f9c1970ffee35cefabd122f38ef514aa052b41b34c9682814aaa31c1dfbb4\", \"lines\": [1, 6]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 81,
+        "prompt_tokens": 2426,
+        "total_tokens": 2507,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "heterogeneous-positive": {
+      "response_raw": "{\n  \"answer\": \"Help\",\n  \"evidence\": [\n    {\n      \"source\": \"s3-b1a15487c8dd652d862349d79ef1c802c80950fb30d22298357e0dfb679d7fc0\",\n      \"lines\": [\n        2,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 114,
+        "prompt_tokens": 2705,
+        "total_tokens": 2819,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "named-scope-positive": {
+      "response_raw": "{\n  \"answer\": \"Export\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-20887858a6653d1613e0d5fc722f4a4e913dfe2bf1b68c56332ed8000dc5f822\",\n      \"lines\": [\n        5,\n        7\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 115,
+        "prompt_tokens": 2479,
+        "total_tokens": 2594,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "complete-list-positive": {
+      "response_raw": "{\n  \"answer\": \"April, June, October\",\n  \"evidence\": [\n    {\n      \"source\": \"s1-bb29db1498a2640a756bf3373ba71664bce651660d9b9f2412d8545144fbfee6\",\n      \"lines\": [\n        2,\n        8\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 116,
+        "prompt_tokens": 2736,
+        "total_tokens": 2852,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-conflicting-repeat": {
+      "response_raw": "{\n  \"answer\": \"UNKNOWN\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-b72d650e9c1d7ed3be9cb46c2c27e1c7ab5d665f93d7d1346e174766e1b601fe\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 114,
+        "prompt_tokens": 2016,
+        "total_tokens": 2130,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-consistent-repeat": {
+      "response_raw": "{\n  \"answer\": \"River\",\n  \"evidence\": [\n    {\n      \"source\": \"s1-73db70dc728bea937f20623b8f21bcffc274d45523b5ced8bd26bdf83ab10257\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 109,
+        "prompt_tokens": 2040,
+        "total_tokens": 2149,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-named-scope-repeat": {
+      "response_raw": "{\n  \"answer\": \"Port\",\n  \"evidence\": [\n    {\n      \"source\": \"s2-9a9b228004f5b4823c35b40669543659279fb49468d63f01293a20d224ceb95e\",\n      \"lines\": [\n        4,\n        6\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 117,
+        "prompt_tokens": 2025,
+        "total_tokens": 2142,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-role-selected-repeat": {
+      "response_raw": "{\n  \"answer\": \"River\",\n  \"evidence\": [\n    {\n      \"source\": \"s3-68c1199e5c9ff6e18778f4e4951502c736cb8d27d37f507e234bff05fd6e72e8\",\n      \"lines\": [\n        1,\n        3\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 115,
+        "prompt_tokens": 1987,
+        "total_tokens": 2102,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-opaque-intervening": {
+      "response_raw": "{\"answer\":\"UNKNOWN\",\"evidence\":[{\"source\":\"s0-73132e49e6806b5b575e4445aa9ecc675e8b02a6c5020d67b2561f8e88edc619\",\"lines\":[1,5]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 82,
+        "prompt_tokens": 1807,
+        "total_tokens": 1889,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "ledger-clipped-repeat": {
+      "response_raw": "{\n  \"answer\": \"UNKNOWN\",\n  \"evidence\": [\n    {\n      \"source\": \"s1-96cc63080328ec3fa30dd07346586741752dd9c20b1f17feedc64ebd5d4247a9\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 111,
+        "prompt_tokens": 1918,
+        "total_tokens": 2029,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-equal-links": {
+      "response_raw": "{\n  \"answer\": \"Lagoon\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-3de745fec8d250c6deab593d488282a336c6dea9b9ba4799160f63bed2f569fd\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 110,
+        "prompt_tokens": 855,
+        "total_tokens": 965,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-conflicting-links": {
+      "response_raw": "{\n  \"answer\": \"UNKNOWN\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-7dc61cd39864d7770189f9d0c7db79b718a686ebfd85d374c2991409e2f79b11\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 115,
+        "prompt_tokens": 823,
+        "total_tokens": 938,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-opaque-repeat": {
+      "response_raw": "{\"answer\": \"Lagoon\", \"evidence\": [{\"source\": \"s0-75673688409ab9cd0535b45dcb1496003f5af5ece91fcefe25710f125ed54a19\", \"lines\": [1, 3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 84,
+        "prompt_tokens": 869,
+        "total_tokens": 953,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-scope-count": {
+      "response_raw": "{\"answer\":\"4\",\"evidence\":[{\"source\":\"s0-b4ee2327c28df4eea2ae7698deeb17547bee6411c7d72cf561a1f7d9c7490bda\",\"lines\":[1,5]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 74,
+        "prompt_tokens": 1072,
+        "total_tokens": 1146,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-role-selection": {
+      "response_raw": "{\"answer\": \"Lagoon\", \"evidence\": [{\"source\": \"s0-a6b595028c5b760958bd99bca8a303764c91ee8a2fb9d9ae75c2df4b644d99fc\", \"lines\": [1, 3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 86,
+        "prompt_tokens": 778,
+        "total_tokens": 864,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-virtualized-last": {
+      "response_raw": "{\"answer\": \"UNKNOWN\", \"evidence\": [{\"source\": \"s0-fefd3db0c3c05c1e915325f807666a8760a2d009bc3dbee7b21ccc1127d39b87\", \"lines\": [1, 4]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 84,
+        "prompt_tokens": 603,
+        "total_tokens": 687,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-escaped-name": {
+      "response_raw": "{\"answer\":\"Cr\u00e8me\",\"evidence\":[{\"source\":\"s0-defd37f1163265c246d993b591a5eed0d69e260f40c4cacf748e79a1a5916fe5\",\"lines\":[1,3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 79,
+        "prompt_tokens": 614,
+        "total_tokens": 693,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "graph-single-closed-end": {
+      "response_raw": "{\"answer\": \"None\", \"evidence\": [{\"source\": \"s0-16df80655eecb4bfb759868d896f5d8f43d812a88ce375bcf86bdb728c5a854d\", \"lines\": [1, 3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 85,
+        "prompt_tokens": 524,
+        "total_tokens": 609,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-middle": {
+      "response_raw": "[{\"answer\":\"Slate\",\"evidence\":[{\"source\":\"s0-4db8bd3b452a7d647440796301958e096c7bde88811025519113f6e771dabf97\",\"lines\":[1,4]}]}]",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 85,
+        "prompt_tokens": 715,
+        "total_tokens": 800,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-adjacent": {
+      "response_raw": "{\"answer\": \"None\", \"evidence\": [{\"source\": \"s0-d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c\", \"lines\": [1, 3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 86,
+        "prompt_tokens": 611,
+        "total_tokens": 697,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-terminal": {
+      "response_raw": "{\"answer\": \"None\", \"evidence\": [{\"source\": \"s0-d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c\", \"lines\": [1, 4]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 86,
+        "prompt_tokens": 610,
+        "total_tokens": 696,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-count": {
+      "response_raw": "{\"answer\":\"2\",\"evidence\":[{\"source\":\"s0-43d880dc63466edf02156c6b93a9d41cec056e30ba65ff91dd9bef8d8e95f001\",\"lines\":[1,7]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 77,
+        "prompt_tokens": 715,
+        "total_tokens": 792,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-missing": {
+      "response_raw": "{\"answer\": \"UNKNOWN\", \"evidence\": [{\"source\": \"s0-d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c\", \"lines\": [1, 4]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 86,
+        "prompt_tokens": 608,
+        "total_tokens": 694,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-conflict": {
+      "response_raw": "{\n  \"answer\": \"UNKNOWN\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-253e9cd2e6562b3b2e22919b8940f4f4c1cb63a37d8161af6e5a6908e90cc71b\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 116,
+        "prompt_tokens": 834,
+        "total_tokens": 950,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-consistent": {
+      "response_raw": "{\n  \"answer\": \"Granite\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-e41628ecfe6bfd891433feed52d862208298bbf884d49ec38eb728f97578ed5b\",\n      \"lines\": [\n        1,\n        5\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 109,
+        "prompt_tokens": 857,
+        "total_tokens": 966,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-opaque": {
+      "response_raw": "{\"answer\": \"Granite\", \"evidence\": [{\"source\": \"s0-f302a8ea4007cbe2f37f696e14268eb7bd1df7749fdb0a814c331aa6fe56a9ce\", \"lines\": [1, 5]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 83,
+        "prompt_tokens": 615,
+        "total_tokens": 698,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-clipped": {
+      "response_raw": "{\"answer\": \"Granite\", \"evidence\": [{\"source\": \"s0-2f47732dd923b7eb470f4a1f61a03f160d15afb2bc7f6612042bcfaf494e9685\", \"lines\": [1, 3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 86,
+        "prompt_tokens": 614,
+        "total_tokens": 700,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-virtualized": {
+      "response_raw": "{\"answer\": \"UNKNOWN\", \"evidence\": [{\"source\": \"s0-19bb9c7d0bd5e5ae09d26e348d24d466a115eb33dc3ab315ab56bb9f0553cb14\", \"lines\": [1, 4]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 84,
+        "prompt_tokens": 638,
+        "total_tokens": 722,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-scope": {
+      "response_raw": "{\n  \"answer\": \"Marble\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-41e99e4c72fc0be667bf16b896200c8115a3d8de2682367df9917d6b4cb0d2be\",\n      \"lines\": [\n        4,\n        6\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 114,
+        "prompt_tokens": 831,
+        "total_tokens": 945,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-role": {
+      "response_raw": "{\n  \"answer\": \"button 'Granite'\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-2b5bfe49a3e42fd3e5e48040f9ecb56b17b37b1392adc7be04f8d5d50e255b98\",\n      \"lines\": [\n        1,\n        3\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 117,
+        "prompt_tokens": 796,
+        "total_tokens": 913,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-list": {
+      "response_raw": "{\"answer\": \"Lime, Plum, Pear\", \"evidence\": [{\"source\": \"s0-80ec7b60d1e4d0884d42f19dfd3871eb4db62e231c41f8c8ec775906b08e86dd\", \"lines\": [1, 5]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 91,
+        "prompt_tokens": 699,
+        "total_tokens": 790,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-unicode": {
+      "response_raw": "{\"answer\":\"Cr\u00e8me\",\"evidence\":[{\"source\":\"s0-674f6a0a08fb5ab4ae8a7a28b3a4bafcc9c2b17ecf272bc96e881e68a82ef870\",\"lines\":[1,3]}]}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 79,
+        "prompt_tokens": 614,
+        "total_tokens": 693,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-numeric": {
+      "response_raw": "{\n  \"answer\": \"72 hours\",\n  \"evidence\": [\n    {\n      \"source\": \"s0-5118a4fb498d2e45d77b1fae5e0769d292880462d16828b0c8a62eb16694f342\",\n      \"lines\": [\n        2,\n        2\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 119,
+        "prompt_tokens": 424,
+        "total_tokens": 543,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    },
+    "range-two-sources": {
+      "response_raw": "{\n  \"answer\": \"96 hours\",\n  \"evidence\": [\n    {\n      \"source\": \"s1-ecd4be28b339e5ea60e48931a4b9933b0e258028f35c4050c4dcc01f696196f1\",\n      \"lines\": [\n        1,\n        1\n      ]\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 116,
+        "prompt_tokens": 552,
+        "total_tokens": 668,
+        "completion_tokens_details": null,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": null,
+          "cached_tokens": 215,
+          "image_tokens": null,
+          "text_tokens": null
+        }
+      }
+    }
+  }
+}

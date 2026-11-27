@@ -1,0 +1,629 @@
+{
+  "schema": "skill-completion-diagnostic/v1",
+  "trials": 32,
+  "timeout": 18,
+  "answered": 14,
+  "rows": [
+    {
+      "case": "memory-cli-1-current",
+      "trial_sha256": "44314f07a51dde02607a216985f2986994c2b4d3a2876d53f653a032236e8d26",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 6,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "assemble-context",
+          "--query",
+          "Cedar Index incremental updates Tuesday decision"
+        ]
+      },
+      "last_prompt_chars": 23106,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 124,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-1-previous",
+      "trial_sha256": "a20d78469fc0ae33b6de79ba2963887bce114359f8fb2c86d4f3774eeef1c700",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 6,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "assemble-context",
+          "--query",
+          "Cedar Index incremental updates Tuesday decision"
+        ]
+      },
+      "last_prompt_chars": 22929,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 124,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-2-current",
+      "trial_sha256": "979462fdf7a85ca3533dbe0254f31f93d56668d9e9cdac66b432eb3de07f4b10",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "assemble-context",
+          "--query",
+          "Cedar Index past decision"
+        ]
+      },
+      "last_prompt_chars": 19898,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 48,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-2-previous",
+      "trial_sha256": "e4b916d5b2fa41093cc0802b7845863b8bf8cf752780ddb4f32fc23d3fc60bde",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "assemble-context",
+          "--query",
+          "Cedar Index past decision"
+        ]
+      },
+      "last_prompt_chars": 19129,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 48,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-3-current",
+      "trial_sha256": "cd577d9fb8ba725849fe7a74c231931eb60a7f2183e64adeb88f50e9829eeee3",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 3,
+      "last_action": {
+        "action": "finish",
+        "answer": "Reembed was started after the embedding model change with fail-fast behavior (--max-failures 0). The process was interrupted by the operator and exited with status 130. Terminal status is \"interrupted\", not completed: 2 of 5 facts processed, 1 failed fact (fact:cedar-vector-4). Per the operator preference and the skill's completion criteria, an interrupted job is an unfinished state and must not be reported as completed. The failed fact identifier fact:cedar-vector-4 is preserved for a future --retry-failed run."
+      },
+      "last_prompt_chars": 13102,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 134,
+      "terminal_completion_tokens": 134,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-3-previous",
+      "trial_sha256": "e6a8505f49206edce43718ce1624057537109475d0b9bd0dfe25e527f5aec77b",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 3,
+      "last_action": {
+        "action": "finish",
+        "answer": "Reembed was started after the embedding model change with fail-fast behavior (`--max-failures 0`) per the operator preference. The process was interrupted by the operator (exit status 130). Terminal status is `interrupted`, with 2 of 5 facts processed and 1 failed fact recorded: `fact:cedar-vector-4`. Per the instruction, the work is not reported as completed because the process was interrupted; `interrupted` is an unfinished state. The failed fact identifier is preserved for a future `--retry-failed` run if the operator chooses to resume."
+      },
+      "last_prompt_chars": 12841,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 140,
+      "terminal_completion_tokens": 140,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-4-current",
+      "trial_sha256": "8576b4cbf3c3de023a5d0e112f678020c54588e625906ac36b622a976c89652a",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 5,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "extract",
+          "--episode-id",
+          "episode:b3e00093312f27a9ee2fe929"
+        ]
+      },
+      "last_prompt_chars": 19860,
+      "completed_response_count": 4,
+      "max_observed_completion_tokens": 123,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-4-previous",
+      "trial_sha256": "bf8a6e0b124eb8fb0a1cc0d6ef5d2837015f063f077da218ebc4470db5f04356",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 5,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "extract",
+          "--episode-id",
+          "episode:b3e00093312f27a9ee2fe929"
+        ]
+      },
+      "last_prompt_chars": 19683,
+      "completed_response_count": 4,
+      "max_observed_completion_tokens": 123,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-5-current",
+      "trial_sha256": "53003865a588b15c4971bbc2bc7b37d7a7fbb8fa326fa7ea2e00cf77b28428e3",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 7,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "extract",
+          "--episode-id",
+          "episode:cedar-import-url"
+        ]
+      },
+      "last_prompt_chars": 19112,
+      "completed_response_count": 6,
+      "max_observed_completion_tokens": 61,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-5-previous",
+      "trial_sha256": "a2af71c128c97cd88ce3c2d9a66b30f7fd086b26b40da5b915ee676d5564de60",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "Use exactly these two authorized explicit imports, then extract each returned episode separately. Do not add namespace/scope/project flags, credentials, redirects, file traversal, or any other source.\n\n1) Import /work/notes/doc.md:\nmemory_mcp import file --root /work/notes --path doc.md --source-type document --t-ref 2026-11-19T08:00:00Z\n\n2) Import the public page:\nmemory_mcp import url --url https://example.org/cedar/public-notes --source-type web --t-ref 2026-11-21T08:00:00Z\n\nFor each successful import, capture stdout/stderr/exit status separately, parse the returned episode_id, then run:\nmemory_mcp extract --episode-id <episode_id>\n\nInspect the extraction result and warnings; do not treat exit 0 as verified fact capture. No additional access is granted."
+      },
+      "last_prompt_chars": 12652,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 218,
+      "terminal_completion_tokens": 218,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-6-current",
+      "trial_sha256": "9898ed55045ed5614b5abd0035e86a830945f6e8aa9b2eb4bccf38dba1f81f32",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "explain",
+          "--context-items",
+          "[{\"content\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"fact_id\":\"fact:cedar-long-approval\",\"provenance\":{\"source_id\":\"cedar-retention-report-v3\"},\"quote\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"source_episode\":\"episode:cedar-long-report\"}]",
+          "--source-offset",
+          "1200",
+          "--source-limit-scalars",
+          "8000"
+        ]
+      },
+      "last_prompt_chars": 18725,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 120,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-6-previous",
+      "trial_sha256": "9ce220914b39adb922cf1fcfefbd4fb2447809d7bec988bdabaa28c2cd5d4200",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "run",
+        "argv": [
+          "memory_mcp",
+          "explain",
+          "--context-items",
+          "[{\"content\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"fact_id\":\"fact:cedar-long-approval\",\"provenance\":{\"source_id\":\"cedar-retention-report-v3\"},\"quote\":\"Cedar Index retains exactly 42 full days after a successful rollover.\",\"source_episode\":\"episode:cedar-long-report\"}]",
+          "--source-offset",
+          "1200",
+          "--source-limit-scalars",
+          "8000"
+        ]
+      },
+      "last_prompt_chars": 18464,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 120,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-7-current",
+      "trial_sha256": "dbcfbd40d8c257545b749bc67a78c18d7531f77370ff9c25d51a8cc709c6f716",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 3,
+      "last_action": {
+        "action": "finish",
+        "answer": "Компактный результат получен: `memory_mcp extract --episode-id episode:cedar-long-report --compact` завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Флаг --compact отключает включение evidence-пар, поэтому `fact_evidence_omitted` больше не появляется. Если на произвольном тексте результат пуст (нет facts), это не означает, что фактов нет — free-form extraction эвристична; пустой результат классифицируется как `episode-only` (эпизод сохранён, но устойчивых фактов не извлечено). Для проверки/цитирования отдельных фактов используйте `memory_mcp explain --context-items ...` с JSON-массивом из assembly, а не полагайтесь на exit code."
+      },
+      "last_prompt_chars": 13407,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 232,
+      "terminal_completion_tokens": 232,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-7-previous",
+      "trial_sha256": "fd7ad3a06736ac5357a98bcb132c8ce4a40d9c88aa5e82c024ae2bf4b1ec1e18",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 3,
+      "last_action": {
+        "action": "finish",
+        "answer": "Компактный повторный extract выполнен: memory_mcp extract --episode-id episode:cedar-long-report --compact завершился с exit_status 0 и вернул JSON: {\"status\":\"success\",\"result\":{\"episode_id\":\"episode:cedar-long-report\",\"facts\":[{\"fact_id\":\"fact:cedar-long-approval\",\"type\":\"decision\"}],\"warnings\":[]},\"guidance\":\"\"}. Теперь fact_evidence_omitted отсутствует, т.к. --compact отключает evidence pairs. Для произвольного текста: если extract вернёт пустые facts, это не означает, что фактов нет — free-form extraction эвристична и может вернуть facts, fallback note или ничего. Нужно инспектировать результат, а не полагаться на exit 0. Для явных решений предпочтительны verified structured summaries. Если нужен компактный результат без evidence, используйте --compact."
+      },
+      "last_prompt_chars": 13146,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 207,
+      "terminal_completion_tokens": 207,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-8-current",
+      "trial_sha256": "e45b96c698f9170753588e053e7b20cb01c7963b6070054cdcbed0c9b52d0813",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "No, capture is not finished. The structured response has status=partial, empty facts, and guidance that extraction is pending and retry is safe. Per the memory contract, a zero exit code is not the completion criterion; partial/pending extraction must be classified as pending, not verified or episode-only. Report the capture as pending and preserve the returned episode_id (episode:pending-cedar-295). Next, retry extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the new structured status, facts, and warnings. Only after a completed successful extraction with inspected facts (or a completed successful extraction with no facts, which would be episode-only) can the capture be reported as finished."
+      },
+      "last_prompt_chars": 12591,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 172,
+      "terminal_completion_tokens": 172,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-cli-8-previous",
+      "trial_sha256": "82cc26c6b9f2d4aa66a6e619b16661faf05a84257fd670472f95bf07f32cb736",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "No, capture is not finished. The structured response is status=partial with an episode_id, empty facts, a warning that extraction did not finish, and explicit guidance that extraction is pending and retry is safe. Under the memory contract, a nonzero exit or unresolved failure is classified as pending; exit 0 alone is never the completion criterion. Report the capture as pending (not verified, not episode-only) and preserve the episode_id episode:pending-cedar-295. Next, retry the extraction using the original episode_id (memory_mcp extract --episode-id episode:pending-cedar-295), then inspect the returned facts and warnings. Do not claim durable-fact capture until the retry returns a verified fact set or a confirmed empty result; if it remains partial/pending, keep it pending and do not treat the episode as a completed capture."
+      },
+      "last_prompt_chars": 11822,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 192,
+      "terminal_completion_tokens": 192,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-1-current",
+      "trial_sha256": "c7802ba24ac6c6c5863196bd7b6df9358210774d33df25adce6f497e0c03ad42",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "call",
+        "arguments": {
+          "episode_id": "episode:ed2dca7d0a1f798a9e758042",
+          "include_fact_evidence": true
+        },
+        "name": "mcp__memory__extract"
+      },
+      "last_prompt_chars": 23621,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 79,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-1-previous",
+      "trial_sha256": "4b47b91a18eb745bf37a6ac982c05240ca4e1b92549b17a0e1105579026f6f3c",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 4,
+      "last_action": {
+        "action": "call",
+        "arguments": {
+          "episode_id": "episode:ed2dca7d0a1f798a9e758042",
+          "include_fact_evidence": true
+        },
+        "name": "mcp__memory__extract"
+      },
+      "last_prompt_chars": 23778,
+      "completed_response_count": 3,
+      "max_observed_completion_tokens": 79,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-2-current",
+      "trial_sha256": "177908a614583a76106bc26cbfd3458f2241f050e8c7dfeb4447c2f963e44ec2",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 5,
+      "last_action": {
+        "action": "finish",
+        "answer": "Решение по индексации: Cedar Index использует еженедельную инкрементальную индексацию (weekly incremental indexing). Источник: протокол/конверсация «cedar-index-minutes-2026-11-18» (episode:8c90974a77ca34d60351fbfd, t_ref 2026-11-18T09:00:00Z), факт fact:32d8fb4d13b97c2e2a6cae96. Цитата из источника: «Decision: The Cedar Index uses weekly incremental indexing.» (окно цитаты покрывает весь источник, citation_context_exact=true). Ничего не записывалось — только чтение/воспоминание."
+      },
+      "last_prompt_chars": 31347,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 189,
+      "terminal_completion_tokens": 189,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-2-previous",
+      "trial_sha256": "712bcf6f3541e2da81b6a3e3739ccca47742f8078d23b6e7ff7a48e0973b3de6",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 5,
+      "last_action": {
+        "action": "finish",
+        "answer": "Решение по индексации: Cedar Index использует еженедельную инкрементальную индексацию (weekly incremental indexing). Источник: протокол/конверсация «cedar-index-minutes-2026-11-18» (episode:8c90974a77ca34d60351fbfd, t_ref 2026-11-18T09:00:00Z), факт fact:32d8fb4d13b97c2e2a6cae96. Цитата из источника: «Decision: The Cedar Index uses weekly incremental indexing.» Ничего не записывалось — только чтение/воспоминание."
+      },
+      "last_prompt_chars": 31348,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 172,
+      "terminal_completion_tokens": 172,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-3-current",
+      "trial_sha256": "6ea67506dd4e7644d7d40aacb7534cd933b9eaa829dbeb1933a2087d5cbfb9af",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "Алиасы Alice Smith и A. Smith объединены в одну сущность типа person. Возвращенный canonical entity_id: entity:9eab641bf3e76cdbc3225b18. Статус операции: success. Используйте этот ID для привязки фактов и отношений."
+      },
+      "last_prompt_chars": 18293,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 80,
+      "terminal_completion_tokens": 80,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-3-previous",
+      "trial_sha256": "08a210e44134923dc1e7b494a80a450d95da78e50c92345924b1eef6b70ac0d5",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "Алиасы Alice Smith и A. Smith объединены в одну сущность типа person. Возвращенный canonical entity_id: entity:9eab641bf3e76cdbc3225b18. Статус операции: success. Используйте этот ID для привязки фактов и отношений."
+      },
+      "last_prompt_chars": 18691,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 80,
+      "terminal_completion_tokens": 80,
+      "operation_pass": true,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-4-current",
+      "trial_sha256": "45fd0bcffad86f65d33e380ef3b1457c3cd8fe634f9add87ded6ecb549a879ca",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 4,
+      "last_action": {
+        "action": "finish",
+        "answer": "Ссылка и путь сохранены как литеральный текст, без открытия. Источник: source_id=literal-spec-references-2026-11-23, source_type=note, t_ref=2026-11-23T11:15:00Z (дата события указана; t_ingested намеренно не передаётся — время транзакции присваивает сервер, а не прошлый месяц). Эпизод: episode:b3e00093312f27a9ee2fe929. Извлечение завершено успешно, но устойчивых фактов не извлечено (состояние episode-only): содержимое хранится как текст, но не превращено в recallable-факты. Если нужно, чтобы ссылка и путь были доступны при поиске, могу дополнительно записать структурированное резюме (например, строки вида `Fact: …`) с новым source_id."
+      },
+      "last_prompt_chars": 23216,
+      "completed_response_count": 4,
+      "max_observed_completion_tokens": 217,
+      "terminal_completion_tokens": 217,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-4-previous",
+      "trial_sha256": "add331b050826cf24db24392891ca693d89bc127a3d9ceb159ae3458938789d2",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 6,
+      "last_action": {
+        "action": "call",
+        "arguments": {
+          "episode_id": "episode:8c757e79d26a1bea551191e9",
+          "include_fact_evidence": true
+        },
+        "name": "mcp__memory__extract"
+      },
+      "last_prompt_chars": 25835,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 142,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-5-current",
+      "trial_sha256": "6010b7e0247443355391e311dc5670afe62d5afdc1966ba99fae73235758fa48",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "При уточнении повторного исторического чтения передавать: query=\"Cedar Index retention window\", budget=3, fact_types=[\"decision\"], valid_at=\"2026-10-20T12:00:00Z\", known_revision=17, view_mode=\"current\". Не передавать known_at и as_of: guidance требует сохранить возвращённые snapshot valid_at и known_revision, а known_at и known_revision взаимоисключающи. Это единственное допустимое уточнение; результат остаётся partial и не может быть интерпретирован как полное отсутствие фактов."
+      },
+      "last_prompt_chars": 22339,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 148,
+      "terminal_completion_tokens": 148,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-5-previous",
+      "trial_sha256": "d004a71455a1d3e69319cbc74356f5ac5264468d50035499f4d8d91895c6d4be",
+      "terminal": "answered",
+      "error_type": null,
+      "turns": 2,
+      "last_action": {
+        "action": "finish",
+        "answer": "При уточнении повторного исторического чтения передавать: query=\"Cedar Index retention window\", valid_at=\"2026-10-20T12:00:00Z\", known_revision=17, budget=3, fact_types=[\"decision\"], view_mode=\"current\". Не передавать known_at (взаимоисключается с known_revision) и не передавать as_of. Сохранить snapshot: valid_at и known_revision из предыдущего ответа. Guidance разрешает не более одного уточнения; пустой partial результат не означает глобальное отсутствие факта."
+      },
+      "last_prompt_chars": 22496,
+      "completed_response_count": 2,
+      "max_observed_completion_tokens": 147,
+      "terminal_completion_tokens": 147,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-6-current",
+      "trial_sha256": "6209c61b18431a5bd63d8f0e7f6c7c5aafa583c5ff120eab87236d82030fa99b",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 9,
+      "last_action": {
+        "action": "call",
+        "arguments": {
+          "compact": false,
+          "context_items": "[{\"fact_id\":\"fact:cedar-long-approval\",\"source_episode\":\"episode:cedar-long-report\"}]",
+          "provenance_offset": 20
+        },
+        "name": "mcp__memory__explain"
+      },
+      "last_prompt_chars": 41190,
+      "completed_response_count": 8,
+      "max_observed_completion_tokens": 66,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-6-previous",
+      "trial_sha256": "c77c1ae88b602d9e6d4aa2dc41aa2ff2661f06023f2830dd6b249ba058056858",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 6,
+      "last_action": {
+        "action": "call",
+        "arguments": {
+          "compact": false,
+          "context_items": "[{\"fact_id\":\"fact:cedar-long-approval\",\"source_episode\":\"episode:cedar-long-report\"}]",
+          "source_limit_scalars": 1970,
+          "source_offset": 0
+        },
+        "name": "mcp__memory__explain"
+      },
+      "last_prompt_chars": 35642,
+      "completed_response_count": 5,
+      "max_observed_completion_tokens": 66,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-7-current",
+      "trial_sha256": "a82553929048bd6b7cefc5bdecbf9448b45adac51680f54af2c025c025140667",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 2,
+      "last_action": {
+        "action": "read_reference",
+        "path": "references/memory-contract.md"
+      },
+      "last_prompt_chars": 22047,
+      "completed_response_count": 1,
+      "max_observed_completion_tokens": 15,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-7-previous",
+      "trial_sha256": "35807ff7719c3a4f7186811c467b7e9f1d2a8ed2c746978781ac438f28a08b22",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 2,
+      "last_action": {
+        "action": "read_reference",
+        "path": "references/memory-contract.md"
+      },
+      "last_prompt_chars": 22204,
+      "completed_response_count": 1,
+      "max_observed_completion_tokens": 15,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-8-current",
+      "trial_sha256": "98f2a29295c8d417b3d6218e37ae348a36d0376ea564bb46da1e47f427776741",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 2,
+      "last_action": {
+        "action": "read_reference",
+        "path": "references/memory-contract.md"
+      },
+      "last_prompt_chars": 22117,
+      "completed_response_count": 1,
+      "max_observed_completion_tokens": 25,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    },
+    {
+      "case": "memory-mcp-8-previous",
+      "trial_sha256": "da682f7b3d6b99313cbd4676bd9f6f3145ca7ee90bfeb5a556979be6c7d2c6ba",
+      "terminal": "error",
+      "error_type": "TimeoutError",
+      "turns": 2,
+      "last_action": {
+        "action": "read_reference",
+        "path": "references/memory-contract.md"
+      },
+      "last_prompt_chars": 22274,
+      "completed_response_count": 1,
+      "max_observed_completion_tokens": 25,
+      "terminal_completion_tokens": null,
+      "operation_pass": false,
+      "full_historical_metric": "unchanged"
+    }
+  ],
+  "interpretation": "Prompt size and repeated actions are observations; absent response generation/prefill timings remain unknown. No causal attribution to model, prompt length or generation limit."
+}

@@ -1,0 +1,292 @@
+{
+  "cases": {
+    "item-v3-neighbor": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Ship"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "ba534be36c08b1f0d803b6f1c335a63554a44bd897eed0560723d68d1655ab75",
+            "raw_range": [
+              0,
+              108
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-last": {
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "None"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "ba534be36c08b1f0d803b6f1c335a63554a44bd897eed0560723d68d1655ab75",
+            "raw_range": [
+              0,
+              108
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-list": {
+      "answer_kind": "list",
+      "accepted_answers": [
+        "Draft, Approve, Publish"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "bbc2275951357406e6c1e97a1dd9b0d1be1d062f82aaf86713819ffda2ec1804",
+            "raw_range": [
+              0,
+              107
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-nested": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Archive"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "a50ebc043c43ca843cdee89eba2386b38d25a718ff76d6113c32fe16f398b0c0",
+            "raw_range": [
+              0,
+              149
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-repeated-groups": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "d820f87771db29863e8afcd9046d9f129372ae65af269601122603cb62575944",
+            "raw_range": [
+              0,
+              138
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-repeated-anchor": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "0ce6788831c17cef8e2ac4f0ac94cb09e5184b639bc889e3cc94328409da92e5",
+            "raw_range": [
+              0,
+              118
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-role": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Archive"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "35a049eb91a77984c65d3026ab6475438149837559bc4a583be473a028803c7f",
+            "raw_range": [
+              0,
+              101
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-opaque": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "418b0eb5661ec299969faaef4f2e14f5c9a414408a4c70dfa2fa598f57fd239d",
+            "raw_range": [
+              0,
+              105
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-clipped": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "0abfc839b35a47455244ba11d073b65c70ee1395b4a1bc03e1a117b00c54cc36",
+            "raw_range": [
+              0,
+              65
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-unit": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "17 hours"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "2a72a840f411ab694e4de79866618bf0caca9335e4aee23c2842ae90d325cb19",
+            "raw_range": [
+              0,
+              28
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-source-choice": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "17 days"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 1,
+            "raw_sha256": "c54de33dc44adb11c27c86d3756ed7bdbcfcf746ff53820bcb25b665c93440be",
+            "raw_range": [
+              0,
+              37
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-unicode": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Fin"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "8f11e7d1523d014019309dd556e0d177adbe3813bee2524abcec56d4d389faa4",
+            "raw_range": [
+              0,
+              79
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-escaped": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "Sortie"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "38fe4c1072b2b2ae2b21bb1010b249fb72501f9821c2ff911f2932ba0f72ccb8",
+            "raw_range": [
+              1,
+              96
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-data-instruction": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "29 days"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "737385840c09c17ff0cc1f3c85e7bdc6ec41c9434b9e2f1122b814d722a12f84",
+            "raw_range": [
+              0,
+              27
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-single-last": {
+      "answer_kind": "false_premise",
+      "accepted_answers": [
+        "None"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "1a3f0eac0f8447cda7371cc1d15592bc956d69589461cd1d6c5d20fbb448745b",
+            "raw_range": [
+              0,
+              59
+            ]
+          }
+        ]
+      ]
+    },
+    "item-v3-time-source": {
+      "answer_kind": "single_value",
+      "accepted_answers": [
+        "42 days"
+      ],
+      "evidence_alternatives": [
+        [
+          {
+            "source_item_index": 0,
+            "raw_sha256": "314b597f82446fa3c87d0515d7bc58d59eaf9fd32ccbff40fe1c8a992eb561b7",
+            "raw_range": [
+              0,
+              70
+            ]
+          }
+        ]
+      ]
+    }
+  }
+}

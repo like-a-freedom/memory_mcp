@@ -1,0 +1,109 @@
+{
+  "schema": "memory-skill-completion-decision/v1",
+  "at_utc": "2026-11-27T19:20:47.089960+00:00",
+  "decision": "FAIL",
+  "criterion": "all22 current trials: actual finish, source/status/time correct, exact operations, no faults, all semantic checks pass",
+  "acceptance_sha256": "2549939b08c5a83abb47e93e26be4300e66d2c8df466c7a7aba6fa530e41de22",
+  "scheduled": 44,
+  "terminal": {
+    "answered": 37,
+    "turn_budget": 2,
+    "error": 5
+  },
+  "strict_full_pass": 20,
+  "operation_pass": 25,
+  "current": {
+    "scheduled": 22,
+    "strict_full_pass": 10
+  },
+  "previous": {
+    "scheduled": 22,
+    "strict_full_pass": 10
+  },
+  "cohorts": {
+    "legacy-regression": {
+      "scheduled": 32,
+      "terminal": {
+        "answered": 27,
+        "turn_budget": 2,
+        "error": 3
+      },
+      "strict_full_pass": 14,
+      "operation_pass": 19,
+      "semantic_answer_pass": 15,
+      "arms": {
+        "previous": {
+          "scheduled": 16,
+          "strict_full_pass": 7,
+          "answered": 14
+        },
+        "current": {
+          "scheduled": 16,
+          "strict_full_pass": 7,
+          "answered": 13
+        }
+      },
+      "runtime_seconds": {
+        "median": 22.86204152047867,
+        "max": 63.05127633397933
+      },
+      "inference_attempt_outcomes": {
+        "success": 123,
+        "invalid_response": 2
+      }
+    },
+    "fresh-native": {
+      "scheduled": 12,
+      "terminal": {
+        "answered": 10,
+        "error": 2
+      },
+      "strict_full_pass": 6,
+      "operation_pass": 6,
+      "semantic_answer_pass": 10,
+      "arms": {
+        "previous": {
+          "scheduled": 6,
+          "strict_full_pass": 3,
+          "answered": 5
+        },
+        "current": {
+          "scheduled": 6,
+          "strict_full_pass": 3,
+          "answered": 5
+        }
+      },
+      "runtime_seconds": {
+        "median": 43.40630422902177,
+        "max": 56.28268491703784
+      },
+      "inference_attempt_outcomes": {
+        "success": 60
+      }
+    }
+  },
+  "request_outcomes": {
+    "success": 183,
+    "invalid_response": 2
+  },
+  "invalid_model_alias_attempt": {
+    "excluded_from_valid_registration": true,
+    "retained_directory": "invalid-model-alias-attempt",
+    "http_404_requests": 9,
+    "scope": "Infrastructure correction only; all valid44 outcomes retained without retries."
+  },
+  "source_identity": {
+    "captured_runner_sha256": "e5ade88729cbdef9fcec213bac105469651b344507a7d3a4048789180c91ad5b",
+    "captured_mcp_binding_sha256": "520c2eabb0ad997a085f3c6656a520821c5f3b005f863834e6ad115c2313e108",
+    "note": "Captured sources archived before post-capture deterministic recovery fix. Old scores are not reinterpreted with changed runtime; any future inference must freeze new source identity."
+  },
+  "limits": [
+    "Development qualification, not unseen confirmation or causal instruction effect.",
+    "Primary non-blinded source-based semantic review, not independent adjudication.",
+    "Historical32 and fresh12 have different cases; never pool as a population estimate.",
+    "Only native Apple Silicon local offline MLX; no LM Studio service or remote inference.",
+    "Expected controlled reembed interruption is a tested handled outcome, not an inference timeout.",
+    "No full-history reader activation, no production default change, no C2 pilot or power calculation."
+  ],
+  "capture_seconds": 1305.3161326670088
+}

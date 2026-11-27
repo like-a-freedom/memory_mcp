@@ -1,0 +1,113 @@
+{
+  "scope": "16 authored development controls, never independent benefit confirmation",
+  "rows": [
+    {
+      "question_id": "item-v3-neighbor",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Ship",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-last",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "None",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-list",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Draft, Approve, Publish",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-nested",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Archive",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-repeated-groups",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "UNKNOWN",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-repeated-anchor",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "UNKNOWN",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-role",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Archive",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-opaque",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "UNKNOWN",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-clipped",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "UNKNOWN",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-unit",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "17 hours",
+      "proof_reason": "Explicit source policy value with exact unit and requested source/time"
+    },
+    {
+      "question_id": "item-v3-source-choice",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "17 days",
+      "proof_reason": "Explicit source policy value with exact unit and requested source/time"
+    },
+    {
+      "question_id": "item-v3-unicode",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Fin",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-escaped",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "Sortie",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-data-instruction",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "29 days",
+      "proof_reason": "Explicit source policy value with exact unit and requested source/time"
+    },
+    {
+      "question_id": "item-v3-single-last",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "None",
+      "proof_reason": "Closed scope including its boundary; unresolved scopes retain UNKNOWN"
+    },
+    {
+      "question_id": "item-v3-time-source",
+      "status": "source_reviewed_before_inference",
+      "expected_answer": "42 days",
+      "proof_reason": "Explicit source policy value with exact unit and requested source/time"
+    }
+  ],
+  "review": {
+    "reviewer": "source-only final review /root/whole_item_source_review",
+    "scope": "16 authored development controls; no independent benefit claim",
+    "critical_or_important_findings": 0,
+    "checks": [
+      "all literal answers and closure/role/hierarchy/source/time boundaries manually reviewed",
+      "raw hashes and reversible scalar spans checked",
+      "both response contracts feasible",
+      "gold fields excluded from prompts"
+    ],
+    "status": "approved_before_inference"
+  }
+}

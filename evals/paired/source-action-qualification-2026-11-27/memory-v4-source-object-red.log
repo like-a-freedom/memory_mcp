@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_source_only_object_binds_without_verifying_canonical_fact (evals.paired.test_skill_source_actions.SourceActionTests.test_source_only_object_binds_without_verifying_canonical_fact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 113, in test_source_only_object_binds_without_verifying_canonical_fact
+    self.assertTrue(grade['source_sufficient'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

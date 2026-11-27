@@ -1,0 +1,25 @@
+F
+======================================================================
+FAIL: test_earlier_workflow_replay_rejects_missing_request_evidence (evals.paired.test_capture_replay_integration.FrozenCaptureReplayTests.test_earlier_workflow_replay_rejects_missing_request_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_capture_replay_integration.py", line 55, in test_earlier_workflow_replay_rejects_missing_request_evidence
+    self.assertNotEqual(result.returncode,0,result.stdout)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0 : {
+  "scheduled_trials": 44,
+  "operation_grades_reproduced": 44,
+  "initial_prompts_reproduced": 44,
+  "strict_reviewed_pass": 20,
+  "operation_pass": 25,
+  "request_starts_and_terminals": 125,
+  "abandoned_requests": 0,
+  "inference_calls": 0,
+  "semantic_review_scope": "pinned primary non-blinded manual judgments, not new independent adjudication"
+}
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.499s
+
+FAILED (failures=1)

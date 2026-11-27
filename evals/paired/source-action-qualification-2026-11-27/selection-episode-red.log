@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_episode_source_read_is_sufficient_without_claiming_fact_verification (evals.paired.test_skill_source_actions.SourceActionTests.test_episode_source_read_is_sufficient_without_claiming_fact_verification)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 97, in test_episode_source_read_is_sufficient_without_claiming_fact_verification
+    self.assertTrue(grade['source_sufficient'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

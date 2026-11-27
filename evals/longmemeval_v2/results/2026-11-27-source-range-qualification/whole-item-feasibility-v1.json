@@ -1,0 +1,337 @@
+{
+  "schema": "whole-source-item-feasibility-audit/v1",
+  "scope": "Deterministic sizes only. Does not regrade captures, establish entailment, or qualify a future output protocol. Sources may already be clipped upstream; whole delivered item does not mean whole original episode.",
+  "budget_decoded_scalars": 8000,
+  "catalog_sha256": "09b3eb92461f44c8efecae4cf268de85e62006e6352f39bca901912dd0380071",
+  "reader_controls": [
+    {
+      "case_id": "middle-positive",
+      "items": 4,
+      "total_decoded_scalars": 4672,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "adjacent-negative",
+      "items": 4,
+      "total_decoded_scalars": 4668,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "terminal-negative",
+      "items": 4,
+      "total_decoded_scalars": 4663,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "button-count-mixed",
+      "items": 4,
+      "total_decoded_scalars": 4757,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "missing-anchor-unknown",
+      "items": 4,
+      "total_decoded_scalars": 4661,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "duplicate-anchor-unknown",
+      "items": 4,
+      "total_decoded_scalars": 4713,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "clipped-terminal-unknown",
+      "items": 4,
+      "total_decoded_scalars": 4568,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "heterogeneous-positive",
+      "items": 4,
+      "total_decoded_scalars": 4575,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "named-scope-positive",
+      "items": 4,
+      "total_decoded_scalars": 4660,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "complete-list-positive",
+      "items": 4,
+      "total_decoded_scalars": 4661,
+      "largest_item_scalars": 1466
+    },
+    {
+      "case_id": "ledger-conflicting-repeat",
+      "items": 4,
+      "total_decoded_scalars": 622,
+      "largest_item_scalars": 184
+    },
+    {
+      "case_id": "ledger-consistent-repeat",
+      "items": 4,
+      "total_decoded_scalars": 623,
+      "largest_item_scalars": 184
+    },
+    {
+      "case_id": "ledger-named-scope-repeat",
+      "items": 4,
+      "total_decoded_scalars": 651,
+      "largest_item_scalars": 209
+    },
+    {
+      "case_id": "ledger-role-selected-repeat",
+      "items": 4,
+      "total_decoded_scalars": 618,
+      "largest_item_scalars": 184
+    },
+    {
+      "case_id": "ledger-opaque-intervening",
+      "items": 4,
+      "total_decoded_scalars": 616,
+      "largest_item_scalars": 184
+    },
+    {
+      "case_id": "ledger-clipped-repeat",
+      "items": 4,
+      "total_decoded_scalars": 585,
+      "largest_item_scalars": 184
+    },
+    {
+      "case_id": "graph-equal-links",
+      "items": 1,
+      "total_decoded_scalars": 109,
+      "largest_item_scalars": 109
+    },
+    {
+      "case_id": "graph-conflicting-links",
+      "items": 1,
+      "total_decoded_scalars": 108,
+      "largest_item_scalars": 108
+    },
+    {
+      "case_id": "graph-opaque-repeat",
+      "items": 1,
+      "total_decoded_scalars": 164,
+      "largest_item_scalars": 164
+    },
+    {
+      "case_id": "graph-scope-count",
+      "items": 1,
+      "total_decoded_scalars": 181,
+      "largest_item_scalars": 181
+    },
+    {
+      "case_id": "graph-role-selection",
+      "items": 1,
+      "total_decoded_scalars": 115,
+      "largest_item_scalars": 115
+    },
+    {
+      "case_id": "graph-virtualized-last",
+      "items": 1,
+      "total_decoded_scalars": 96,
+      "largest_item_scalars": 96
+    },
+    {
+      "case_id": "graph-escaped-name",
+      "items": 1,
+      "total_decoded_scalars": 77,
+      "largest_item_scalars": 77
+    },
+    {
+      "case_id": "graph-single-closed-end",
+      "items": 1,
+      "total_decoded_scalars": 56,
+      "largest_item_scalars": 56
+    },
+    {
+      "case_id": "range-middle",
+      "items": 1,
+      "total_decoded_scalars": 100,
+      "largest_item_scalars": 100
+    },
+    {
+      "case_id": "range-adjacent",
+      "items": 1,
+      "total_decoded_scalars": 76,
+      "largest_item_scalars": 76
+    },
+    {
+      "case_id": "range-terminal",
+      "items": 1,
+      "total_decoded_scalars": 76,
+      "largest_item_scalars": 76
+    },
+    {
+      "case_id": "range-count",
+      "items": 1,
+      "total_decoded_scalars": 132,
+      "largest_item_scalars": 132
+    },
+    {
+      "case_id": "range-missing",
+      "items": 1,
+      "total_decoded_scalars": 76,
+      "largest_item_scalars": 76
+    },
+    {
+      "case_id": "range-conflict",
+      "items": 1,
+      "total_decoded_scalars": 124,
+      "largest_item_scalars": 124
+    },
+    {
+      "case_id": "range-consistent",
+      "items": 1,
+      "total_decoded_scalars": 125,
+      "largest_item_scalars": 125
+    },
+    {
+      "case_id": "range-opaque",
+      "items": 1,
+      "total_decoded_scalars": 131,
+      "largest_item_scalars": 131
+    },
+    {
+      "case_id": "range-clipped",
+      "items": 1,
+      "total_decoded_scalars": 84,
+      "largest_item_scalars": 84
+    },
+    {
+      "case_id": "range-virtualized",
+      "items": 1,
+      "total_decoded_scalars": 136,
+      "largest_item_scalars": 136
+    },
+    {
+      "case_id": "range-scope",
+      "items": 1,
+      "total_decoded_scalars": 142,
+      "largest_item_scalars": 142
+    },
+    {
+      "case_id": "range-role",
+      "items": 1,
+      "total_decoded_scalars": 122,
+      "largest_item_scalars": 122
+    },
+    {
+      "case_id": "range-list",
+      "items": 1,
+      "total_decoded_scalars": 96,
+      "largest_item_scalars": 96
+    },
+    {
+      "case_id": "range-unicode",
+      "items": 1,
+      "total_decoded_scalars": 78,
+      "largest_item_scalars": 78
+    },
+    {
+      "case_id": "range-numeric",
+      "items": 1,
+      "total_decoded_scalars": 70,
+      "largest_item_scalars": 70
+    },
+    {
+      "case_id": "range-two-sources",
+      "items": 2,
+      "total_decoded_scalars": 80,
+      "largest_item_scalars": 40
+    }
+  ],
+  "full_history_existing_v7": [
+    {
+      "case_id": "0c6b0c60",
+      "input_sha256": "6a6110afb43f80a0f5cffc75efa168e497ec2f248be0b1f04759ad608bd72930",
+      "items": 5,
+      "item_decoded_scalars": [
+        1765,
+        1798,
+        1747,
+        1861,
+        1791
+      ],
+      "total_decoded_scalars": 8962
+    },
+    {
+      "case_id": "6d975a08",
+      "input_sha256": "fdcfcbead3024f235261d31bb1d977584c61f574c367091a747f1bdc5b11458b",
+      "items": 5,
+      "item_decoded_scalars": [
+        1839,
+        1826,
+        1847,
+        1843,
+        1845
+      ],
+      "total_decoded_scalars": 9200
+    },
+    {
+      "case_id": "89a20f48",
+      "input_sha256": "51baa3e881a8fb29d7010cf15270ce6c9eef9e46f7e41ca99aa6b309bbda4755",
+      "items": 5,
+      "item_decoded_scalars": [
+        1765,
+        1861,
+        1886,
+        1863,
+        1878
+      ],
+      "total_decoded_scalars": 9253
+    },
+    {
+      "case_id": "922a0c56",
+      "input_sha256": "6c774acb5bf047a2494f4e83c1ec050156f666fdedddf4a0831de0ce8145e12b",
+      "items": 5,
+      "item_decoded_scalars": [
+        1843,
+        1872,
+        1821,
+        1807,
+        1869
+      ],
+      "total_decoded_scalars": 9212
+    },
+    {
+      "case_id": "d6da3938",
+      "input_sha256": "25613ad3e352f6e0703b26b07ae096d9754092509b038aea3762ccced8cf6263",
+      "items": 1,
+      "item_decoded_scalars": [
+        1862
+      ],
+      "total_decoded_scalars": 1862
+    },
+    {
+      "case_id": "f43926d9",
+      "input_sha256": "0a11f18bb05d3404f12c5b568872071824594105b0507c4c61b38461f51d078b",
+      "items": 4,
+      "item_decoded_scalars": [
+        1826,
+        1843,
+        1848,
+        1847
+      ],
+      "total_decoded_scalars": 7364
+    },
+    {
+      "case_id": "f61a096f",
+      "input_sha256": "913cd61b78ba1c59aa251fc8895c110ca0ccc5982e272890f35b79849c156363",
+      "items": 5,
+      "item_decoded_scalars": [
+        1843,
+        1881,
+        1819,
+        1836,
+        1800
+      ],
+      "total_decoded_scalars": 9179
+    }
+  ],
+  "finding": "All40 control catalogs total<=8000. Each existing V7 individual item<=8000. Select relevant items rather than automatically all context; no speculative chunk/bundle engine is required by these measured individual-item sizes."
+}

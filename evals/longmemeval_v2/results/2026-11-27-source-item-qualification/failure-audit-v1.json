@@ -1,0 +1,232 @@
+{
+  "scope": "all failed cases; no posthoc relabel or altered denominator",
+  "cases": [
+    {
+      "cohort": "shared40",
+      "variant": "source-item-final-first",
+      "question_id": "ledger-consistent-repeat",
+      "question": "In the Harbor toolbar, which action comes immediately after \"Release\"?",
+      "answer": "UNKNOWN",
+      "accepted_answers": [
+        "River"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "All repeated anchors are retained and agree in raw source; UNKNOWN is an unsupported ambiguity claim."
+    },
+    {
+      "cohort": "shared40",
+      "variant": "source-item-final-first",
+      "question_id": "graph-opaque-repeat",
+      "question": "In the Bay toolbar, which button follows Dock?",
+      "answer": "Lagoon",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "One matching occurrence has opaque intervening children; a successor from another occurrence does not resolve it."
+    },
+    {
+      "cohort": "shared40",
+      "variant": "source-item-final-first",
+      "question_id": "range-opaque",
+      "question": "In Studio, which button immediately follows Launch?",
+      "answer": "Granite",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "Opaque group cannot establish requested unique successor from the shown text."
+    },
+    {
+      "cohort": "shared40",
+      "variant": "source-item-final-first",
+      "question_id": "range-clipped",
+      "question": "In Studio, which button immediately follows Launch?",
+      "answer": "Granite",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "Clipped occurrence remains unresolved even if a complete occurrence suggests a successor."
+    },
+    {
+      "cohort": "shared40",
+      "variant": "source-item-final-first",
+      "question_id": "range-role",
+      "question": "In Studio, which action immediately follows the button Launch? The link Launch is a different anchor.",
+      "answer": "button 'Granite'",
+      "accepted_answers": [
+        "Granite"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "value_output_contract",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "Correct target label is embedded in an unregistered role-decorated answer; this is value-output-contract failure, not proof of choosing the wrong target."
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-neighbor",
+      "question": "Which button immediately follows Build in Commands?",
+      "answer": "Ship",
+      "accepted_answers": [
+        "Ship"
+      ],
+      "value_correct": true,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": false,
+      "failure_layer": "format_or_proof",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-nested",
+      "question": "Among same-level links in Left rail, which immediately follows Board?",
+      "answer": "History",
+      "accepted_answers": [
+        "Archive"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": false,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-repeated-groups",
+      "question": "Which button immediately follows Beta in Edit?",
+      "answer": null,
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "value_correct": false,
+      "format_valid": false,
+      "source_bound": false,
+      "proof_covered": false,
+      "failure_layer": "format_or_proof",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-repeated-anchor",
+      "question": "Which button immediately follows Blue in Paint?",
+      "answer": "UNKNOWN",
+      "accepted_answers": [
+        "UNKNOWN"
+      ],
+      "value_correct": true,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": false,
+      "failure_layer": "format_or_proof",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-unicode",
+      "question": "Which link follows \u00c9lan \ud83d\ude80 in Voyage?",
+      "answer": "Fin",
+      "accepted_answers": [
+        "Fin"
+      ],
+      "value_correct": true,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": false,
+      "failure_layer": "format_or_proof",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-range-final-first",
+      "question_id": "item-v3-escaped",
+      "question": "Which button immediately follows Entr\u00e9e in Caf\u00e9?",
+      "answer": "Sortie",
+      "accepted_answers": [
+        "Sortie"
+      ],
+      "value_correct": true,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": false,
+      "failure_layer": "format_or_proof",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication"
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-item-final-first",
+      "question_id": "item-v3-nested",
+      "question": "Among same-level links in Left rail, which immediately follows Board?",
+      "answer": "UNKNOWN",
+      "accepted_answers": [
+        "Archive"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "The question filters same-level links; raw source contains Board/Archive with a nested History group. Derived unfiltered adjacency does not encode that requested relation."
+    },
+    {
+      "cohort": "fresh16",
+      "variant": "source-item-final-first",
+      "question_id": "item-v3-single-last",
+      "question": "Which link follows Ready inside the closed Jobs group?",
+      "answer": "UNKNOWN",
+      "accepted_answers": [
+        "None"
+      ],
+      "value_correct": false,
+      "format_valid": true,
+      "source_bound": true,
+      "proof_covered": true,
+      "failure_layer": "semantic_value",
+      "source_review_status": "pre-output literal source review approved; not an independent model adjudication",
+      "source_based_diagnosis": "Raw closed Jobs group contains one Ready link and its closing boundary; no navigation group is emitted for a single non-SCOPED_ROLES parent."
+    }
+  ],
+  "design_risks": [
+    "Navigation is derived and explicitly non-authoritative, but its adjacency model does not express every requested filtered role/hierarchy relation. A raw-source-only intervention is a prospective hypothesis, not an established cause.",
+    "Single navigation groups can have no derived group entry; missing navigation is not missing raw evidence.",
+    "Do not pool shared40 and fresh16 as independent generalization evidence or infer a causal speed benefit from historical comparisons."
+  ],
+  "whole_item_failures": {
+    "reasoning_or_scope": 6,
+    "value_output_contract": 1,
+    "source_binding": 0,
+    "reviewed_proof_coverage": 0,
+    "note": "No causal attribution to derived navigation; raw-only comparison is a prospective test."
+  }
+}

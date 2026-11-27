@@ -1,0 +1,15 @@
+E
+======================================================================
+ERROR: test_minimal_api_selection_binds_without_incidental_ranking_fields (evals.paired.test_skill_source_actions.SourceActionTests.test_minimal_api_selection_binds_without_incidental_ranking_fields)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 84, in test_minimal_api_selection_binds_without_incidental_ranking_fields
+    grade = grade_observed(self.case,{'terminal':'answered'},self.trace)
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/skill_workflow.py", line 847, in grade_observed
+    raise ValueError('unregistered operation protocol')
+ValueError: unregistered operation protocol
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (errors=1)

@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_freeze_rejects_duplicate_answer_oracle_fields (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_freeze_rejects_duplicate_answer_oracle_fields)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 162, in test_freeze_rejects_duplicate_answer_oracle_fields
+    with self.assertRaisesRegex(ValueError,'duplicate JSON key'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.022s
+
+FAILED (failures=1)

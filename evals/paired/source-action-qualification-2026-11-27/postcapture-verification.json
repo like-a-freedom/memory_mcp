@@ -1,0 +1,21 @@
+{
+  "schema": "source-actions-postcapture-verification/v1",
+  "source_hashes": {
+    "evals/paired/skill_workflow.py": "2fbc5680ce06abd6622876eb17b3a23e32e8f1f1cd68e14c4a4265c9adc49a0a",
+    "evals/paired/skill_source_actions.py": "9475f9f899f720b6f3094d3900a2f25c83a97314ef5d57d4284336d8bc3ebcad",
+    "evals/paired/test_skill_source_actions.py": "62596c1b6122add749ef9bd6f162ceba46c5ba356057f5f0000a72b9f353d049"
+  },
+  "paired_tests": {
+    "scheduled": 127,
+    "passed": 127
+  },
+  "v3_grades_reproduced": 12,
+  "legacy44_grades_and_prompts_reproduced": 44,
+  "legacy44_full_unchanged": 20,
+  "v4_model_calls": 0,
+  "skill_metadata_validated": [
+    "memory-mcp",
+    "memory-cli"
+  ],
+  "qualification": "FAIL retained; new instructions unqualified"
+}

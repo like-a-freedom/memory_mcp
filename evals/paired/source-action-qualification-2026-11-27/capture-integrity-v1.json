@@ -1,0 +1,9 @@
+{
+  "schema": "source-action-capture-integrity/v1",
+  "scope": "Post-capture integrity pin; not a new inference or preregistration.",
+  "decision_sha256": "7dbc2fff7bb0a37a4ae99290f054664858f8011887b11fc8c7547984422d3c9c",
+  "request_accounting_hashes": {
+    "inference-events.jsonl": "af68f12d6c43c5b24b9c0fbed90e9e3b7e8a0360f339b70be63539aadc89690c",
+    "inference-attempts.jsonl": "9042cf129c801adc409c2ce2dba7c622d4e5cfae1369cd1ce0861071bcf9e3af"
+  }
+}

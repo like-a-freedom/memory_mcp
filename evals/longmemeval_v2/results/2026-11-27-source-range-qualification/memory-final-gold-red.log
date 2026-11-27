@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_scalar_answer_gold_is_rejected_before_any_answer_can_pass (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_scalar_answer_gold_is_rejected_before_any_answer_can_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 150, in test_scalar_answer_gold_is_rejected_before_any_answer_can_pass
+    with self.assertRaisesRegex(ValueError,'answer oracle'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (failures=1)

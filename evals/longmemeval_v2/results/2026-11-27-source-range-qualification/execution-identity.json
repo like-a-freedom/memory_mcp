@@ -1,0 +1,33 @@
+{
+  "schema": "source-range-local-execution/v1",
+  "frozen_at_utc": "2026-11-27T18:31:55.626768+00:00",
+  "architecture": "arm64",
+  "owned_server_pid": 40424,
+  "server_script_sha256": "ef04dc72d5d676f0cb13687f0e1dd33d7e6975b69b5a57c0b9940ceba42151ec",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "all_model_files_rehashed": 13,
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-lm": "0.32.2",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  },
+  "registration_sha256": "51c3baf2cabb47bf6ceda073ec21773804ffd47454ef6cc55aeca1440d7dcde7",
+  "acceptance_sha256": "b7c59ccf3f35887e09c7eb06e08e687619d3da1c61ae223e2fa1118003a86cf7",
+  "source_review_sha256": "45bd2f63bd94e79ec3a2da4bbfa6107d1d2dd46f1956b1f7c4a2c393c72c254d",
+  "source_reference_sha256": "e1bb0ada1bd720faa4def08877c1bf36520fbc335e2e815dda795aaca4e56ed4",
+  "answer_matcher_sha256": "12b65ee62dd77b74bf3db83caa10d7f8d5289c1b90aae68d2de49630fe48dd60",
+  "model_list_health_response": {
+    "object": "list",
+    "data": [
+      {
+        "id": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+        "object": "model",
+        "created": 1795804315
+      }
+    ]
+  },
+  "concurrency": "Local release HTTP tests active; no rustc observed before launch. An unrelated Docker build and system services also active. Resource isolation/cold cache not established; latency descriptive only, not a speedup comparison.",
+  "prior_reader_prompts_unchanged": 213
+}

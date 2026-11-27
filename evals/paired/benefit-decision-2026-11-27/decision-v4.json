@@ -1,0 +1,106 @@
+{
+  "schema": "memory-benefit-study-decision/v4",
+  "status": "NO_GO",
+  "pilot_executed": false,
+  "confirmation_executed": false,
+  "effect": null,
+  "power": null,
+  "reason_codes": [
+    "independent_autonomous_query_and_temporal_qualification_missing",
+    "formation_not_qualified_for_benefit_claim",
+    "pilot_discordance_unobserved",
+    "current_tool_workflow_fails_semantics_or_resource_gate"
+  ],
+  "evidence": [
+    "evals/longmemeval_v2/results/2026-11-27-reader-protocol/report.json",
+    "evals/paired/citation-usability-independent-2026-11-27/result.json",
+    "evals/paired/citation-usability-independent-2026-11-27-stored-v2/result.json",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-restore/snapshot-admission.json",
+    "evals/paired/skill-qualification-2026-11-27-dynamic-v3/adjudicated-summary-v1.json",
+    "evals/longmemeval_v2/results/2026-11-27-full-history-positional-v7/candidate-decision-v1.json",
+    "evals/longmemeval_v2/results/2026-11-27-source-ledger-qualification/candidate-decision-v1.json",
+    "evals/longmemeval_v2/results/2026-11-27-source-graph-qualification/candidate-decision-v1.json",
+    "evals/longmemeval_v2/results/2026-11-27-source-range-qualification/candidate-decision-v1.json",
+    "evals/paired/skill-completion-qualification-2026-11-27/candidate-decision-v1.json"
+  ],
+  "prospective_design": {
+    "status": "conditional_not_activated_not_a_complete_preregistration",
+    "paired_unit": "independently authored history family; aggregate within-family tasks before paired analysis",
+    "target_risk_difference": 0.1,
+    "minimum_point_effect": 0.05,
+    "one_sided_alpha": 0.025,
+    "target_power": 0.8,
+    "confidence_level": 0.95,
+    "pilot_families": 24,
+    "pilot_repeats_per_arm": 1,
+    "trial_deadline_seconds": 20,
+    "formation_deadline_seconds_per_arm_family": 30,
+    "pilot_worst_case_seconds": 2400,
+    "total_wall_budget_seconds": 7200,
+    "maximum_confirmatory_families_for_power_planning": 240,
+    "confirmation_worst_case_seconds": 24000,
+    "sample_size": null,
+    "sample_size_reason": "No qualifying pilot; use existing plan-paired-power only with a valid recorded exploratory pilot, never fabricate discordance. Worst-case confirmation exceeds the two-hour design budget.",
+    "feasibility_note": "20s end-to-end trial planning assumption is unqualified; current protocol has20s per request, not per whole trial. No pilot budget activated."
+  },
+  "stopping_rule": "Do not start pilot before two independent qualified autonomous captures and all safety gates. Before activation freeze unseen histories, exact treatment/control binaries, leakage exclusions, failure-inclusive paired estimand and full plan. Stop for qualification or resource failure; no replacement of failed trials or best-of retries. If exact power planning exceeds budget, retain NO_GO.",
+  "supersedes_sha256": "3f5fe396214543556e4e40a27c955ea34547d144e86a61c1983a829a306496c4",
+  "qualification": {
+    "source_history": "restored100 trajectories/151 segments, independently reopened and verified",
+    "dynamic_workflow": {
+      "full_pass": 8,
+      "scheduled": 32,
+      "native_pass": 5,
+      "native_scheduled": 14,
+      "controlled_pass": 3,
+      "controlled_scheduled": 18
+    },
+    "fresh_independent_autonomous_captures_qualified": 0,
+    "source_evidence_v7": {
+      "delivered": 7,
+      "independently_sufficient": 7,
+      "strict_original_span": 5,
+      "selected": 7,
+      "claim": "exposed source qualification only; not reader or autonomous-agent success"
+    },
+    "source_graph_reader": {
+      "completed_values": 22,
+      "strict_joint": 19,
+      "selected": 24,
+      "truncated": 1,
+      "transport_errors": 0,
+      "qualified": false,
+      "actual_full_history_reader_calls": 0
+    },
+    "bounded_progressive_workflow": {
+      "scheduled": 44,
+      "answered": 37,
+      "strict_full_pass": 20,
+      "current_pass": 10,
+      "current_scheduled": 22,
+      "fresh_native_pass": 6,
+      "fresh_native_scheduled": 12,
+      "qualified": false,
+      "review": "primary source-based non-blinded, not independent adjudication",
+      "inference_request_timeouts": 0,
+      "claim": "Finite development intervention; historical32 scores unchanged. No general or causal memory/skill benefit."
+    },
+    "source_range_reader": {
+      "selected": 40,
+      "completed_values": 35,
+      "source_bound": 39,
+      "proof_covered": 17,
+      "strict_joint": 16,
+      "qualified": false,
+      "transport_errors": 0,
+      "actual_full_history_reader_calls": 0
+    }
+  },
+  "updated_at_utc": "2026-11-27T19:22:13.243901+00:00",
+  "post_capture_runtime_fix": {
+    "scope": "Correlated tools/call JSON-RPC error reaches agent as denied observed receipt; original fault/operation failure retained. Process/initialization/malformed transport still terminal; subprocess pipes released.",
+    "evidence_type": "deterministic controlled subprocess tests only",
+    "new_model_capture_executed": false,
+    "admission_changed": false
+  }
+}

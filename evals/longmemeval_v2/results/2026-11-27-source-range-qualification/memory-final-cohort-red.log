@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_removed_cohort_label_cannot_bypass_fresh_case_identity (evals.paired.test_skill_disclosure.FreshQualificationTests.test_removed_cohort_label_cannot_bypass_fresh_case_identity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_disclosure.py", line 155, in test_removed_cohort_label_cannot_bypass_fresh_case_identity
+    with self.assertRaisesRegex(ValueError,'cohort registration'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.164s
+
+FAILED (failures=1)

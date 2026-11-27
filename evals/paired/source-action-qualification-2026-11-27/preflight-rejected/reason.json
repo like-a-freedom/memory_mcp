@@ -1,0 +1,5 @@
+{
+  "reason": "Existing controlled client-startup integration uses legacy plan without explicit operation_protocol; summary label fix initially broke it. Corrected through observed regression RED then GREEN before any inference.",
+  "inference_calls": 0,
+  "capture_started": false
+}

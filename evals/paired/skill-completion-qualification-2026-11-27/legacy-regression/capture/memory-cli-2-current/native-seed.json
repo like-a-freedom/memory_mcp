@@ -1,0 +1,12 @@
+[
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T19:10:56.221465Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:10:56.221500Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:10:56.221506Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:8c90974a77ca34d60351fbfd\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+  },
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T19:10:56.329029Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T19:10:56.329087Z  WARN surrealdb::core::kvs::ds: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:8c90974a77ca34d60351fbfd\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:2c39645721fbb65b2fef8041\",\n        \"type\": \"person\",\n        \"canonical_name\": \"The Cedar Index\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:32d8fb4d13b97c2e2a6cae96\",\n        \"type\": \"decision\",\n        \"statement\": \"The Cedar Index uses weekly incremental indexing.\",\n        \"source_quote\": \"The Cedar Index uses weekly incremental indexing.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:2c39645721fbb65b2fef8041\",\n        \"episode_id\": \"episode:8c90974a77ca34d60351fbfd\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+  }
+]

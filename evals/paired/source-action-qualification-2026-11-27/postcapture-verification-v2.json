@@ -1,0 +1,17 @@
+{
+  "schema": "source-actions-postcapture-verification/v2",
+  "source_hashes": {
+    "evals/paired/skill_workflow.py": "2fbc5680ce06abd6622876eb17b3a23e32e8f1f1cd68e14c4a4265c9adc49a0a",
+    "evals/paired/skill_source_actions.py": "cce998c777b71d5d53bc4c1f21c02e555deb6a3108f3dd78f25eadb795369dbf",
+    "evals/paired/test_skill_source_actions.py": "e40cea6b5fd5270cf3003a382bc7d1064e079d9f886916a65c2ffc0b887a4338"
+  },
+  "paired_tests": {
+    "scheduled": 129,
+    "passed": 129
+  },
+  "new_source_only_control": "actual accepted episode-ID source read may establish source_sufficient without canonical_fact_verified; foreign nonempty fact rejected",
+  "production_contract_inspected": "crates/memory-mcp/src/tools/parsers.rs:28",
+  "model_calls_after_v3_capture": 0,
+  "v3_grades_reproduced": 12,
+  "qualification": "FAIL unchanged; v4 and post-capture instructions dynamically unqualified"
+}

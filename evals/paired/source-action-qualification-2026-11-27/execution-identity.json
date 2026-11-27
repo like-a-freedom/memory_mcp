@@ -1,0 +1,20 @@
+{
+  "schema": "source-action-local-execution/v1",
+  "at_utc": "2026-11-27T20:01:28.037937+00:00",
+  "acceptance_sha256": "199190dc78e9a6853fa629c155eba5bf962b12965f672dc88068e7514a508442",
+  "model_bundle_sha256": "b58150a1b264367efb3346e56eeeeb681aa71d99ba574002cdc6a0b6ae62d772",
+  "all_model_files_rehashed": 13,
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "architecture": "arm64",
+  "owned_server_pid": 62977,
+  "owned_runtime_started_at_utc": "2026-11-27T19:58:18.461187+00:00",
+  "global_budget_seconds": 2460,
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-lm": "0.32.2",
+    "openai": "3.59.0",
+    "httpx": "0.28.1"
+  },
+  "scope": "native offline Apple Silicon MLX, loopback only; no LM Studio service or remote inference",
+  "latency_scope": "descriptive; no isolated or causal latency claim"
+}

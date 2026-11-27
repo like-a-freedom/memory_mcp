@@ -1,0 +1,13 @@
+...................................................................memory-mcp-1-previous
+  client_error operations=False
+memory-mcp-1-current
+  client_error operations=False
+memory-cli-1-previous
+  client_error operations=False
+memory-cli-1-current
+  client_error operations=False
+...........................
+----------------------------------------------------------------------
+Ran 94 tests in 22.101s
+
+OK

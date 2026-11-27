@@ -1,0 +1,21 @@
+{
+  "schema": "source-action-guidance-baseline/v1",
+  "scope": "Observed local44-capture failures before candidate reference edits; no no-skill effect estimate",
+  "baseline_capture_decision_sha256": "7517c7de40e256c09923d71c9f613f515333fa9ed4e8077987451bed1c581022",
+  "baseline_manual_review": "primary non-blinded",
+  "failures": [
+    "MCP fresh102 lost top-level source_episode in explain selection",
+    "MCP fresh103 invented time fields on explain",
+    "MCP note classification episode-only despite successful nonempty fact",
+    "CLI compact requested inline evidence omitted by that mode"
+  ],
+  "candidate_scope": "four reference-file clarifications only; main skills unchanged",
+  "new_development_cohort": "source-actions-native/v1",
+  "qualification_gate": "all6 current rows must finish and pass operation, source/status/time/final semantic review; no fault or regression on these six paired cases",
+  "global_budget_seconds": 2460,
+  "startup_cleanup_allowance_seconds": 300,
+  "planned_trials": 12,
+  "per_trial_seconds": 180,
+  "retries": 0,
+  "activation": "one capture only, no repeat selection; C2 independent-benefit admission is separate"
+}

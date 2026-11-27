@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_time_constrained_recall_rejects_a_different_returned_snapshot (evals.paired.test_skill_disclosure.FreshQualificationTests.test_time_constrained_recall_rejects_a_different_returned_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_disclosure.py", line 203, in test_time_constrained_recall_rejects_a_different_returned_snapshot
+    self.assertFalse(grade_observed(case,{'terminal':'answered'},trace)['operation_and_exact_arguments'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

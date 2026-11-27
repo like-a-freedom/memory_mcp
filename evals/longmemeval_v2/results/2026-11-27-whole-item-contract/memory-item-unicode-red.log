@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_whole_item_freeze_rejects_non_scalar_decoded_text (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_whole_item_freeze_rejects_non_scalar_decoded_text)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 78, in test_whole_item_freeze_rejects_non_scalar_decoded_text
+    with self.assertRaisesRegex(ValueError,'Unicode scalar'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.006s
+
+FAILED (failures=1)

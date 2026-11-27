@@ -1,0 +1,28 @@
+{
+  "schema": "source-action-qualification-acceptance/v1",
+  "frozen_at_utc": "2026-11-27T20:00:46.692351+00:00",
+  "frozen_plan_sha256": "60f2e1452746466e00a8b035e56f454ff3526060c10cfa8840552f1e55e4d384",
+  "baseline_and_stopping_sha256": "f50b3283ab8155716a9a76701c03f2be8c8b908092cf32f9372405609732fcfe",
+  "scheduled_trials": 12,
+  "current_trials": 6,
+  "cohort_scope": "six authored development scenarios, not independent families or C2 confirmation",
+  "gate": "all6 current: answered, operation evidence true, no denied/process/host/inference faults, source/status/time/final semantic clauses correct, <=60 words, and no lost passing previous case; failure stops inference",
+  "manual_review": "primary non-blinded source-based final-answer adjudication; no automated judge success inferred",
+  "global_budget_seconds": 2460,
+  "global_origin": "owned runtime process start from PID file mtime; startup/qualification/cleanup included",
+  "per_trial_budget": {
+    "turns": 9,
+    "max_tokens": 384,
+    "call_seconds": 20,
+    "case_seconds": 180,
+    "retries": 0,
+    "temperature": 0
+  },
+  "arms": [
+    "previous",
+    "current"
+  ],
+  "order": "skill then case ID, previous/current for odd cases and reversed for even cases",
+  "on_failure": "retain every attempted result and fixed12 denominator; no retries or regrade historical44",
+  "c2": "not admitted by this development cohort alone"
+}

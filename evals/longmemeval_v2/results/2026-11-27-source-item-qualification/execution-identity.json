@@ -1,0 +1,11 @@
+{
+  "at_utc": "2026-11-27T20:08:57.626397+00:00",
+  "acceptance_sha256": "729c2afa7cbbec3cc709d61f3bb2c803334f0dae319a86c52c82e09596235e07",
+  "runtime_identity_path": "/Users/solovey/Documents/dev/memory_mcp/evals/paired/source-action-qualification-2026-11-27/execution-identity.json",
+  "runtime_identity_sha256": "47d1cecdbddd72172551ec2eb951846926a20a05b5463d27e88244a9bf97647d",
+  "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+  "owned_server_pid": 62977,
+  "scope": "native local offline MLX; no LM Studio service; sequential calls",
+  "scheduled": 72,
+  "global_budget_seconds": 1800
+}

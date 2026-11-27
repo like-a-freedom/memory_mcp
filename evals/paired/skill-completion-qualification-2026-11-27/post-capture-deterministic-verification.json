@@ -1,0 +1,92 @@
+{
+  "schema": "post-capture-deterministic-recovery-verification/v1",
+  "source_hashes": {
+    "evals/paired/memory_quality_diagnostic.py": "d00dfeb73200f7f82bcdb2940128ae1f86cf81024a595a88750b8a8b94af4eff",
+    "evals/paired/skill_workflow.py": "c38c2a12f46751dbed65119114db62d6928153dead54ab9f84f00c6d8984542a",
+    "evals/paired/test_skill_mcp_recovery.py": "71ede35e5c605c71cf777f4cbdd961ed8fef02ef68520c1804cfe2df76de7d6d",
+    "evals/paired/skill-completion-qualification-2026-11-27/replay_capture.py": "0aa861d498b63b36eec4a0c91bec40068d1a948d16f86f2aab694871bb4faca8"
+  },
+  "red_green": [
+    "correlated MCP tool argument error reaches agent without upgrading failed grade",
+    "subprocess stdio pipes release",
+    "malformed RPC error remains terminal",
+    "invalid transport JSON is terminal",
+    "correlated envelope missing result/error is terminal",
+    "invalid tool-content JSON is terminal",
+    "tampered semantic review fails stored SHA linkage"
+  ],
+  "controlled_subprocess_controls": 9,
+  "paired_suite_passed": 103,
+  "inference_calls_after_fix": 0,
+  "scope": "New deterministic runtime behavior only; frozen44 source/grades unchanged.",
+  "logs": [
+    {
+      "path": "/tmp/memory-mcp-recovery-red.log",
+      "sha256": "8a0703ecc8af8536d0fee882975496e389dfecec97e332f50649ab012f65bfc8"
+    },
+    {
+      "path": "/tmp/memory-mcp-pipes-red.log",
+      "sha256": "8f2ae39d33ef1584f7731e3f05ea25211e6663c4c0b7a85eb368b889bc8914bd"
+    },
+    {
+      "path": "/tmp/memory-mcp-malformed-red.log",
+      "sha256": "1468bd2ef8247a6141c0dfe636c311031117f45073c53260db2ac8cb5ab7b856"
+    },
+    {
+      "path": "/tmp/memory-mcp-recovery-green.log",
+      "sha256": "1e33091002b13192284efab945c4febddeafa74f5bdda73b348c25d3d18cd35c"
+    },
+    {
+      "path": "/tmp/memory-progressive-post-capture-paired.log",
+      "sha256": "419728ea94cfae9a43afe78d84a5beaf03ca1ed157ebf8f7e13b19d4bb7f7d38"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-json-red.log",
+      "sha256": "3934325686bc240e68d79df15c900028a7d0e421a1eedbff98923fe9b40d715f"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-json-green.log",
+      "sha256": "38487a70f382763ffa0770c410f58bdad798e42a557d53506429b3ae06baad11"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-envelope-red.log",
+      "sha256": "3ee4496648c95283ad70ad4978e944cf63a82267ce0a3664d5ccb40e895ef5c8"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-envelope-green.log",
+      "sha256": "95eab8b7bae308d7ada5edc757311c2be9763f11aa518e8cb4a94ef8bef02501"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-content-red.log",
+      "sha256": "a394d3aa886e900546245b02296313a8f44a0614a97ace20f7475d928bcd9ba6"
+    },
+    {
+      "path": "/tmp/memory-mcp-review-content-green.log",
+      "sha256": "c7ece1a49d299b64dd21cf65ca3534c6d56cb14ecd783d26a5945257617cf8ae"
+    },
+    {
+      "path": "/tmp/memory-review-hash-red.log",
+      "sha256": "15b3d7c15b60a067bd50a7f923fb2a57d2b02bb2d035cf6bd7b19d250977c15c"
+    },
+    {
+      "path": "/tmp/memory-review-hash-green.log",
+      "sha256": "d1864af6a865e3716bfdd59a629405840ed13eb9db4e463487c407e6356bb951"
+    },
+    {
+      "path": "/tmp/memory-progressive-review-final-paired.log",
+      "sha256": "1fc0fe559afdba25915655e399cd85e4182e341f6ab194aa64f4ea5cd63cefab"
+    }
+  ],
+  "saved_capture_replay": {
+    "scheduled_trials": 44,
+    "operation_grades_reproduced": 44,
+    "initial_prompts_reproduced": 44,
+    "strict_reviewed_pass": 20,
+    "operation_pass": 25,
+    "request_starts_and_terminals": 185,
+    "abandoned_requests": 0,
+    "inference_calls": 0,
+    "semantic_review_scope": "pinned primary non-blinded manual judgments, not new independent adjudication"
+  },
+  "review_resolution": "One post-capture review: Important malformed transport classification fixed, Minor semantic review hash fixed; no second review."
+}

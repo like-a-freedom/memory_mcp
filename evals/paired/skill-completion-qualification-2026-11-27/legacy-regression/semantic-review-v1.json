@@ -1,0 +1,537 @@
+{
+  "schema": "bounded-workflow-source-review/v1",
+  "at_utc": "2026-11-27T19:16:16.701312+00:00",
+  "reviewer": "primary implementation agent; source-based non-blinded review, not independent adjudication",
+  "frozen_plan_sha256": "72e691f97d2f5f38cfb9d8a67edd4ef5c40e3d8996c4d75f4d1e5954af78ae96",
+  "rubric": "Frozen operation predicate retained unchanged. Every observed answer checked against substantive frozen expected_behavior and observed receipts. Missing answer is not a semantic pass; restrictive operation predicates and additional instruction-adherence findings are labeled, not silently regraded. Intentional controlled interruption can be a correctly handled outcome.",
+  "scheduled": 32,
+  "answered": 27,
+  "semantically_correct_observed_answers": 15,
+  "strict_full_pass": 14,
+  "rows": [
+    {
+      "identity": "memory-mcp-1-previous",
+      "trial_sha256": "5d1b2a179889c1ece012c0a196b566d5cd17fb74f695886d6a96708b09c53aea",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 1,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual ingest/extract preserve confirmed source; final source/episode/fact/t_ref and verified outcome match native receipts."
+      ]
+    },
+    {
+      "identity": "memory-mcp-1-current",
+      "trial_sha256": "d572dbfacbfea2a9c914c8f8ba2353c6b1cfb1076385db5ba59527c0b60f6230",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 1,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual ingest/extract preserve confirmed source; final source/episode/fact/t_ref and verified outcome match native receipts."
+      ]
+    },
+    {
+      "identity": "memory-mcp-2-previous",
+      "trial_sha256": "bc953b885798029bf996b1b882ae127f27fef29b6ae875411f6c61f32b3ae00f",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 2,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Initial explain uses unsupported fact_id argument and is denied before schema discovery and successful recovery.",
+        "Final fact/source decision is supported, but episode t_ref does not state the requested retrieval boundary. Unqualified zero-write wording ignores possible access-heat writes."
+      ]
+    },
+    {
+      "identity": "memory-mcp-2-current",
+      "trial_sha256": "8a9ff345f1b3647c52814d4616875944fb037f041da77a84fb79a1cf0b7116fc",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 2,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Initial explain uses unsupported fact_id argument and is denied before schema discovery and successful recovery.",
+        "Final fact/source decision is supported, but episode t_ref does not state the requested retrieval boundary. Unqualified zero-write wording ignores possible access-heat writes."
+      ]
+    },
+    {
+      "identity": "memory-mcp-3-previous",
+      "trial_sha256": "54be9db2df27195ed8d2610c81f34aa275186d2fd72980b974975ef945f7c81b",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 3,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual resolve confirms canonical person and alias with exact returned entity ID. Wording alias merged describes alias attachment; no unsupported claim of merging duplicate canonical records is inferred.",
+        "Additional instruction-adherence issue: memory-contract was not read before mutation. It is reported separately from the frozen case expected_behavior and is not silently added to its rubric."
+      ]
+    },
+    {
+      "identity": "memory-mcp-3-current",
+      "trial_sha256": "1039439337d27e15ecbf56f6b9f26a4a034e3393479ee5389c363f65f7a7e91f",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 3,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual resolve confirms canonical person and alias with exact returned entity ID, without an unsupported canonical-record merge claim.",
+        "Additional instruction-adherence issue: memory-contract was not read before mutation. It is reported separately from the frozen case expected_behavior and is not silently added to its rubric."
+      ]
+    },
+    {
+      "identity": "memory-mcp-4-previous",
+      "trial_sha256": "d481ddba2050e61c7b3e3e5a515f12b0d74516312d468b74926a10724dea3d89",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 4,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Literal original episode is captured correctly, but agent also ingests/extracts a synthesized structured second source not requested. Frozen operation gate rejects extra mutation; final description honestly distinguishes both episodes."
+      ]
+    },
+    {
+      "identity": "memory-mcp-4-current",
+      "trial_sha256": "1f6a7ce89f178dcc39424082e0ea8c493c44a8e5890adbf25e4042fbf2cfc3f3",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 4,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Literal source stored without URL/file fetch or caller t_ingested override; server-owned transaction time explained. Successful empty extraction correctly reported episode-only with actual episode/source/t_ref."
+      ]
+    },
+    {
+      "identity": "memory-mcp-5-previous",
+      "trial_sha256": "284c80ae1baa8ae2c373930780c0e8fd2f40406d1ed626f9655646aed5026d5a",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 5,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "One actual refinement preserves query/budget/type/view and returned valid_at/known_revision, omits known_at/as_of, retains partial/omitted-channel boundary and does not infer absence."
+      ]
+    },
+    {
+      "identity": "memory-mcp-5-current",
+      "trial_sha256": "1ece2bd79e48d92fb9787e4af56945001cb4f6a6a994d214194623ecb0dc3d63",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 5,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Advice-only final gives no registered refinement call and parenthetical known_at can confuse which selectors to send; frozen operation FAIL retained.",
+        "Task asks what to pass, so missing action is also a prospective advice/action ambiguity in the frozen evaluator, not proof of an unauthorized production omission."
+      ]
+    },
+    {
+      "identity": "memory-mcp-6-previous",
+      "trial_sha256": "a60e780a5082bdd17ec78cb6e20e872de5b7bc030a0ce649cd8de3a51a6cf0a0",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 6,
+      "binding": "controlled",
+      "terminal": "turn_budget",
+      "answer_reviewed": false,
+      "semantic_clauses": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Nine turns exhausted after repeated source windows/provenance pages. Last actual response succeeds, but there is no finish answer; no fabricated completion or upgraded operation grade."
+      ]
+    },
+    {
+      "identity": "memory-mcp-6-current",
+      "trial_sha256": "53a8d1e4bb535a57ad6c2d7e063f11c9c6b72b17eb8c4708943b52d54161417d",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 6,
+      "binding": "controlled",
+      "terminal": "turn_budget",
+      "answer_reviewed": false,
+      "semantic_clauses": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Nine turns exhausted after repeated source windows/provenance pages. Last actual response succeeds, but there is no finish answer; no fabricated completion or upgraded operation grade."
+      ]
+    },
+    {
+      "identity": "memory-mcp-7-previous",
+      "trial_sha256": "c745740b90e70dc9838bafb8a252d9f989e0ea201cb91b708d2ac94aace328ee",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 7,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": true,
+      "full_pass": false,
+      "observations": [
+        "Successful nonempty note is incorrectly called episode-only; successful empty second result is correctly episode-only. Rejection of universal free-form unsupported claim is correct but does not cure status error."
+      ]
+    },
+    {
+      "identity": "memory-mcp-7-current",
+      "trial_sha256": "57957fbdeb038bcc400a9dc372718183e65c7427b79df9e56516a6f99aea9eba",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 7,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": true,
+      "full_pass": false,
+      "observations": [
+        "Successful nonempty note is ambiguously called episode-only/verified, contrary to the frozen state distinction. Successful empty second result is correctly episode-only; fallback and heuristic limitation otherwise retained."
+      ]
+    },
+    {
+      "identity": "memory-mcp-8-previous",
+      "trial_sha256": "83553fddceb273a70ffb99e7e01c8ae51722bdeac0e431e8ad4ef459c52461f9",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 8,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Pending/partial, exact episode ID, incomplete warning and safe retry guidance retained; exit zero and empty facts are not treated as successful completion or absence."
+      ]
+    },
+    {
+      "identity": "memory-mcp-8-current",
+      "trial_sha256": "bc6e87aaa308ffc8cf5fec207379bde99dad6586be41216f10a548d9be20095c",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 8,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Pending/partial, exact episode ID, incomplete warning and safe retry guidance retained; exit zero and empty facts are not treated as successful completion or absence."
+      ]
+    },
+    {
+      "identity": "memory-cli-1-previous",
+      "trial_sha256": "bb6253f2e825225af1615708f8ab8da9f8e8864ba5f9e56dd48112909c80c103",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 1,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Actual confirmed-source ingest/extract followed by correct source-bound assemble/explain readback. Final persisted fact, episode and verified state match native receipts.",
+        "Frozen operation-v2 permits one assemble readback but not its additional valid explain call; operation FAIL retained and labeled restrictive sequence rather than incorrect persistence."
+      ]
+    },
+    {
+      "identity": "memory-cli-1-current",
+      "trial_sha256": "2603814822ed80b0c16e5727957d2840323cad7644290dfcc75d0e179dd59e53",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 1,
+      "binding": "native",
+      "terminal": "error",
+      "answer_reviewed": false,
+      "semantic_clauses": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "First response envelope has finish_reason=tool_calls with null content and null tool_calls. Registered text-JSON action protocol cannot execute it; terminal InvalidResponse, no product call or final answer. Not an HTTP timeout."
+      ]
+    },
+    {
+      "identity": "memory-cli-2-previous",
+      "trial_sha256": "89bcdc70b637344394af99cf714d3aacef860e7710181879827bae270f4a1916",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 2,
+      "binding": "native",
+      "terminal": "error",
+      "answer_reviewed": false,
+      "semantic_clauses": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "First observed text completion is not valid JSON; JSONDecodeError before any host action. No final answer and no source claims to grade."
+      ]
+    },
+    {
+      "identity": "memory-cli-2-current",
+      "trial_sha256": "7a575cd7816b724283a9e7dd45ea85f8ef1d9d1a681186acb84389f93f0e91f4",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 2,
+      "binding": "native",
+      "terminal": "error",
+      "answer_reviewed": false,
+      "semantic_clauses": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "First response envelope has finish_reason=tool_calls with null content and null tool_calls. Registered text-JSON action protocol cannot execute it; terminal InvalidResponse, no product call or final answer. Not an HTTP timeout."
+      ]
+    },
+    {
+      "identity": "memory-cli-3-previous",
+      "trial_sha256": "41e8f928359e0256c9cf4c02cc5b006017e7290fa9313bba6ca99d75e874ecb8",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 3,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual reembed uses max_failures=0 per preference; expected controlled exit130/interrupted and processed/failed counts are reported honestly as unfinished. Controlled intentional interruption is not an unplanned inference/host fault."
+      ]
+    },
+    {
+      "identity": "memory-cli-3-current",
+      "trial_sha256": "368d4dfda497cc3c1cf2a8c00f9b4b648c6b1f2660783e3828efb0a66855a323",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 3,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual reembed uses max_failures=0 per preference; expected controlled exit130/interrupted and processed/failed counts are reported honestly as unfinished. Controlled intentional interruption is not an unplanned inference/host fault."
+      ]
+    },
+    {
+      "identity": "memory-cli-4-previous",
+      "trial_sha256": "4158f69fe2bf58b3358cd1fb33b41bf06f186bf33e3510f5c430038f81703a1d",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 4,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual literal content-stdin ingest/extract preserve source/episode/event time; no transaction override or external fetch. Completed successful empty extraction honestly classified episode-only."
+      ]
+    },
+    {
+      "identity": "memory-cli-4-current",
+      "trial_sha256": "cb9a40fd48ffedcd18d8db5c8ad670166beb5d744751a72a484c966c1d2b77db",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 4,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Actual literal content-stdin ingest/extract preserve source/episode/event time; no transaction override or external fetch. Completed successful empty extraction honestly classified episode-only."
+      ]
+    },
+    {
+      "identity": "memory-cli-5-previous",
+      "trial_sha256": "1cd18a9bb9d45481d3e110b71813ede41cd722f6937cd5b1dc2e57f4468d7efe",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 5,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": true,
+      "full_pass": false,
+      "observations": [
+        "Correct authorized controlled file import then URL import and both separate extracts; actual IDs and verified outcome match receipts.",
+        "Final answer omits frozen required explanations of root confinement, public/no-redirect/no-credential destination and4MiB cap; operation pass alone is not full semantic pass."
+      ]
+    },
+    {
+      "identity": "memory-cli-5-current",
+      "trial_sha256": "fe6807943cda81575c7836baa569d07a0e55a2e41b9dc7b1df915ad1e2007ef4",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 5,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": true,
+      "full_pass": false,
+      "observations": [
+        "Correct authorized controlled file import then URL import and both separate extracts; actual IDs and verified outcome match receipts.",
+        "Final answer omits frozen required explanations of root confinement, public/no-redirect/no-credential destination and4MiB cap; operation pass alone is not full semantic pass."
+      ]
+    },
+    {
+      "identity": "memory-cli-6-previous",
+      "trial_sha256": "ae226a94754f25f1e98650be248d1c818bc0f70f49b7b3312066c60070ece7a8",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 6,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Actual historical recall preserves snapshot selectors and one source continuation returns exact verified quote, with provenance still partial truthfully reported.",
+        "Frozen predicate additionally requires provenance_offset20; agent stops without that call. Expected semantic clause possible access heat is omitted; source identifiers also missing from final answer. Frozen FAIL retained; a request only for source continuation may legitimately stop with explicit provenance partial, a future task/rubric distinction."
+      ]
+    },
+    {
+      "identity": "memory-cli-6-current",
+      "trial_sha256": "3ff5f30819f3912b48e65f8e0bdfdfa1eda801c68ce088b940231b367e08f419",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 6,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Actual historical recall preserves snapshot selectors and one source continuation returns exact verified quote, with provenance still partial truthfully reported and IDs bound.",
+        "Frozen predicate additionally requires provenance_offset20; agent stops without that call. Expected semantic clause possible access heat is omitted. Frozen FAIL retained; a request only for source continuation may legitimately stop with explicit provenance partial, a future task/rubric distinction."
+      ]
+    },
+    {
+      "identity": "memory-cli-7-previous",
+      "trial_sha256": "53f8432844b6c1e6b451ac3631cd8024c92fdfc6fadfb0ddff6e98d20b1e80ad",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 7,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": true,
+      "full_pass": false,
+      "observations": [
+        "Actual compact extraction returns nonempty successful facts with IDs and no warnings.",
+        "Answer omits shared4KiB evidence-budget and episode-fallback availability clauses. Nonempty facts/omitted evidence distinction alone does not satisfy the frozen full rubric."
+      ]
+    },
+    {
+      "identity": "memory-cli-7-current",
+      "trial_sha256": "43b75ecc80bb33e1138412bbde29380cb29dc0d36124c51ecdc5bb6ea9d4a2e9",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 7,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": false,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "No registered compact extraction call; advice/action ambiguity separately noted.",
+        "Answer incorrectly says compact includes evidence inline, while compact opts out of inline evidence. It also equates arbitrary empty facts with episode-only without the required successful/completed condition."
+      ]
+    },
+    {
+      "identity": "memory-cli-8-previous",
+      "trial_sha256": "75e88d5a37dbd769fafc6626c5326505dfa0bc7bcbc26ef7f54ccb5717ccf5b9",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 8,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Final pending/partial episode and safe retry guidance match controlled input; exit zero and empty facts do not establish completion."
+      ]
+    },
+    {
+      "identity": "memory-cli-8-current",
+      "trial_sha256": "d23ed1b726fed3eb9b7612611971d3bf84e7ef84b12fe8b701f32e0a6132eb13",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 8,
+      "binding": "controlled",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "semantic_clauses": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Final pending/partial episode and safe retry guidance match controlled input; exit zero and empty facts do not establish completion."
+      ]
+    }
+  ]
+}

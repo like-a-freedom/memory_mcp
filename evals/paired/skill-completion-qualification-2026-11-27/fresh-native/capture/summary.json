@@ -1,0 +1,1074 @@
+{
+  "operation_protocol": "memory-mcp-skill-operations/v2",
+  "rows": [
+    {
+      "answer": "Verified capture. Ingested source maple-schedule-reviewed-2026-11-12 (t_ref 2026-11-12T09:15:00Z) as episode:a7a14594a6a2ad1156ca3c51. Extraction returned 1 durable decision fact:60a02cda497576a5b142d90f (\"Maple Index publishes incremental updates every Thursday.\") plus entities Maple Index (entity:84709f2dd7e7c227cca075b5) and Thursday (entity:82483ae5f57b480e0bdf3948). No warnings; reconciliation complete.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 36.0422021659906,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 101,
+      "identity": "memory-mcp-101-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2126,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2141
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2946,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2141,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3025
+        },
+        {
+          "completion_tokens": 44,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3122,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3025,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3166
+        },
+        {
+          "completion_tokens": 187,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3567,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3166,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3754
+        }
+      ]
+    },
+    {
+      "answer": "Verified capture. Source maple-schedule-reviewed-2026-11-12 ingested as episode:a7a14594a6a2ad1156ca3c51 (t_ref 2026-11-12T09:15:00Z). Extraction succeeded: fact:60a02cda497576a5b142d90f (decision: “Maple Index publishes incremental updates every Thursday.”), entities entity:84709f2dd7e7c227cca075b5 (Maple Index) and entity:82483ae5f57b480e0bdf3948 (Thursday), no warnings, reconciliation complete. No supersession required.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 35.29745566699421,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 101,
+      "identity": "memory-mcp-101-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2027,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2042
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2893,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2042,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2972
+        },
+        {
+          "completion_tokens": 44,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3069,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2972,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3113
+        },
+        {
+          "completion_tokens": 189,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3514,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3113,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3703
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 27.492335749964695,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 102,
+      "identity": "memory-mcp-102-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1974,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1922,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1989
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2840,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1989,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2855
+        },
+        {
+          "completion_tokens": 26,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4416,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2855,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4442
+        },
+        {
+          "completion_tokens": 158,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4718,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4442,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4876
+        }
+      ]
+    },
+    {
+      "answer": null,
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 27.256210374995135,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 102,
+      "identity": "memory-mcp-102-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "error",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2073,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2021,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2088
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2893,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2088,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2908
+        },
+        {
+          "completion_tokens": 26,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4436,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2908,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4462
+        },
+        {
+          "completion_tokens": 158,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4738,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4462,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4896
+        }
+      ]
+    },
+    {
+      "answer": "Decision: “Juniper Index publishes incremental updates every Thursday” (fact:a2c28bd81fb7d4bb7f3f1d07). Source: juniper-schedule-reviewed-2026-11-12, episode:edd9b3a54d18f9e0defba4d9 (conversation, t_ref 2026-11-12T09:15:00Z). Boundary: valid_at 2026-11-13T12:00:00Z, known_at 2099-11-27T18:00:00Z. Limitation: recall was partial (omitted channels); explain returned a full source window but no verified quote (quote_verified=false).",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 51.111311416956596,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 103,
+      "identity": "memory-mcp-103-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2141,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2021,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2156
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2961,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2156,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2976
+        },
+        {
+          "completion_tokens": 74,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4504,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2976,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4578
+        },
+        {
+          "completion_tokens": 144,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5026,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4578,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5170
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5217,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5170,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5233
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5588,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5233,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5667
+        },
+        {
+          "completion_tokens": 188,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6283,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5667,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6471
+        }
+      ]
+    },
+    {
+      "answer": "Decision: “Juniper Index publishes incremental updates every Thursday” (fact:a2c28bd81fb7d4bb7f3f1d07). Source: juniper-schedule-reviewed-2026-11-12, episode:edd9b3a54d18f9e0defba4d9 (conversation, t_ref 2026-11-12T09:15:00Z). Explain verified the full 69-scalar source window. Limitation: recall was partial (omitted channels incl. alias expansion, graph/embeddings); no exact quote returned (quote_verified=false). Boundary: valid_at 2026-11-13T12:00:00Z, known_at 2099-11-27T18:00:00Z.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 51.435661208000965,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/mcp-tools.md"
+        ],
+        "source_binding_observed": null,
+        "unnecessary_reference_loading": false
+      },
+      "id": 103,
+      "identity": "memory-mcp-103-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2042,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1922,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2057
+        },
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2908,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2057,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2923
+        },
+        {
+          "completion_tokens": 74,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4484,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2923,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4558
+        },
+        {
+          "completion_tokens": 144,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5006,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4558,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5150
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5197,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5150,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5213
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5568,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5213,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5647
+        },
+        {
+          "completion_tokens": 202,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6263,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5647,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6465
+        }
+      ]
+    },
+    {
+      "answer": "Captured and extracted successfully. Episode: episode:a7a14594a6a2ad1156ca3c51 (source maple-schedule-reviewed-2026-11-12, t-ref 2026-11-12T09:15:00Z). Outcome: verified — 1 decision fact fact:60a02cda497576a5b142d90f, 2 entities, no warnings, reconciliation complete.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 37.13087233295664,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 101,
+      "identity": "memory-cli-101-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1769,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1784
+        },
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2736,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1784,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2750
+        },
+        {
+          "completion_tokens": 85,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3965,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2750,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4050
+        },
+        {
+          "completion_tokens": 42,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4174,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4050,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4216
+        },
+        {
+          "completion_tokens": 126,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4840,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4216,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4966
+        }
+      ]
+    },
+    {
+      "answer": "Verified. Ingested source maple-schedule-reviewed-2026-11-12 (conversation, t-ref 2026-11-12T09:15:00Z) as episode:a7a14594a6a2ad1156ca3c51. Extraction completed: 1 decision fact fact:60a02cda497576a5b142d90f, entities entity:84709f2dd7e7c227cca075b5 (Maple Index) and entity:82483ae5f57b480e0bdf3948 (Thursday), no warnings, reconciliation complete.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 39.96889016701607,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 101,
+      "identity": "memory-cli-101-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1821,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1836
+        },
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2884,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1836,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2898
+        },
+        {
+          "completion_tokens": 80,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4113,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2898,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4193
+        },
+        {
+          "completion_tokens": 42,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4317,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4193,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4359
+        },
+        {
+          "completion_tokens": 178,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4983,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4359,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5161
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Willow Index publishes incremental updates every Thursday. Source ID: willow-schedule-reviewed-2026-11-12 (conversation; episode:8301f65df17f6184b6da257c; t-ref 2026-11-12T09:15:00Z). Explain verified the full 68-scalar source window, but no quote was returned/verified; result is episode-fallback, so provenance is bounded to the episode text rather than a canonical extracted fact.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 51.1049072080059,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 102,
+      "identity": "memory-cli-102-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1768,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1716,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1793
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2841,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1793,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2865
+        },
+        {
+          "completion_tokens": 48,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4080,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2865,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4128
+        },
+        {
+          "completion_tokens": 249,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4903,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4128,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5152
+        },
+        {
+          "completion_tokens": 141,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6162,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5152,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6303
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Willow Index publishes incremental updates every Thursday. Source ID: willow-schedule-reviewed-2026-11-12 (conversation, episode:8301f65df17f6184b6da257c, t-ref 2026-11-12T09:15:00Z). Limitation: episode-fallback only; no verified canonical fact, quote unverified, semantic unavailable.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 46.84371829102747,
+      "grade": {
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 102,
+      "identity": "memory-cli-102-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1716,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1664,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1741
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2693,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1741,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2717
+        },
+        {
+          "completion_tokens": 48,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3932,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2717,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3980
+        },
+        {
+          "completion_tokens": 249,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4755,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3980,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5004
+        },
+        {
+          "completion_tokens": 119,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6014,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5004,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6133
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Juniper Index publishes incremental updates every Thursday. Source ID: juniper-schedule-reviewed-2026-11-12 (episode:edd9b3a54d18f9e0defba4d9, conversation, t-ref 2026-11-12T09:15:00Z). Verified via explain at valid_at 2026-11-13T12:00:00Z / known_at 2099-11-27T18:00:00Z. Limitation: recall was partial (omitted channels); quote not returned/verified, but citation context covers entire source.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 56.28268491703784,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "returned_snapshot_matches": true,
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 103,
+      "identity": "memory-cli-103-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 25,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1784,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1664,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1809
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2761,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1809,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2785
+        },
+        {
+          "completion_tokens": 108,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4000,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2785,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4108
+        },
+        {
+          "completion_tokens": 262,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5102,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4108,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5364
+        },
+        {
+          "completion_tokens": 173,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6564,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5364,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6737
+        }
+      ]
+    },
+    {
+      "answer": "Decision: “Juniper Index publishes incremental updates every Thursday.” (fact:a2c28bd81fb7d4bb7f3f1d07). Verified source ID: juniper-schedule-reviewed-2026-11-12 (conversation; episode:edd9b3a54d18f9e0defba4d9; t-ref 2026-11-12T09:15:00Z). Boundary: valid_at 2026-11-13T12:00:00Z, known_at 2099-11-27T18:00:00Z. Limitation: historical recall is partial (omitted channels include alias expansion, semantic ANN, graph edges); citation window is exact/complete but quote_verified is false.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 52.32446512498427,
+      "grade": {
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "returned_snapshot_matches": true,
+        "source_binding_observed": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 103,
+      "identity": "memory-cli-103-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1836,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1716,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1851
+        },
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2899,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1851,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2913
+        },
+        {
+          "completion_tokens": 76,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4128,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2913,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4204
+        },
+        {
+          "completion_tokens": 239,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5198,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4204,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5437
+        },
+        {
+          "completion_tokens": 197,
+          "completion_tokens_details": null,
+          "prompt_tokens": 6637,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5437,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 6834
+        }
+      ]
+    }
+  ],
+  "scheduled": 12
+}

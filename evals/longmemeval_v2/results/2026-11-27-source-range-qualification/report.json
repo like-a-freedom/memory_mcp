@@ -1,0 +1,1584 @@
+{
+  "schema": "memory-mcp-reader-protocol-result/v1",
+  "elapsed_seconds": 587.2798315830296,
+  "variants": {
+    "source-graph-final-first": {
+      "selected": 40,
+      "completed_correct": 35,
+      "value_correct": 35,
+      "format_valid": 39,
+      "quote_exact": 36,
+      "false_premise_selected": 5,
+      "false_premise_correct": 5,
+      "unobserved": 0,
+      "errors": 0,
+      "cases": {
+        "middle-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Lantern"
+        },
+        "adjacent-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "terminal-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "button-count-mixed": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "4"
+        },
+        "missing-anchor-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "duplicate-anchor-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "clipped-terminal-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "heterogeneous-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Help"
+        },
+        "named-scope-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Export"
+        },
+        "complete-list-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "April, June, October"
+        },
+        "ledger-conflicting-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "ledger-consistent-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "River"
+        },
+        "ledger-named-scope-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Port"
+        },
+        "ledger-role-selected-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "River"
+        },
+        "ledger-opaque-intervening": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "ledger-clipped-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": false,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "graph-equal-links": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Lagoon"
+        },
+        "graph-conflicting-links": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "graph-opaque-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "length",
+          "format_valid": false,
+          "truncated": true,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "completed_correct": false,
+          "answer": null
+        },
+        "graph-scope-count": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "4"
+        },
+        "graph-role-selection": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Lagoon"
+        },
+        "graph-virtualized-last": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "None"
+        },
+        "graph-escaped-name": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Cr\u00e8me"
+        },
+        "graph-single-closed-end": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "range-middle": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Slate"
+        },
+        "range-adjacent": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "range-terminal": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "None"
+        },
+        "range-count": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "2"
+        },
+        "range-missing": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "None"
+        },
+        "range-conflict": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "range-consistent": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Granite"
+        },
+        "range-opaque": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "Granite"
+        },
+        "range-clipped": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": false,
+          "answer": "Granite"
+        },
+        "range-virtualized": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "UNKNOWN"
+        },
+        "range-scope": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Marble"
+        },
+        "range-role": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Granite"
+        },
+        "range-list": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Lime, Plum, Pear"
+        },
+        "range-unicode": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "Cr\u00e8me"
+        },
+        "range-numeric": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "72 hours"
+        },
+        "range-two-sources": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": true,
+          "completed_correct": true,
+          "answer": "96 hours"
+        }
+      }
+    },
+    "source-range-final-first": {
+      "selected": 40,
+      "completed_correct": 16,
+      "value_correct": 35,
+      "format_valid": 39,
+      "quote_exact": 0,
+      "false_premise_selected": 5,
+      "false_premise_correct": 5,
+      "unobserved": 0,
+      "errors": 0,
+      "cases": {
+        "middle-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "f11f411d5bcf207594d7c798e2f3d8a1cdf3674cd8dc5de7cec40d031a2e6cf2",
+              "raw_range": [
+                31,
+                272
+              ],
+              "quote": "\t[2] list 'Waterfront', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'North Pier', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'Lantern', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'South Pier', visible\n"
+            }
+          ],
+          "answer": "Lantern",
+          "completed_correct": false
+        },
+        "adjacent-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "0ee45db496fa2b4792fe8059537c0ec2cf10bcc39c6f710fbc34e6cd2ac65b6d",
+              "raw_range": [
+                31,
+                268
+              ],
+              "quote": "\t[2] list 'Review stages', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'Staging', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'Review', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'Publish', visible\n"
+            }
+          ],
+          "answer": "None",
+          "completed_correct": false
+        },
+        "terminal-negative": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 2,
+              "raw_sha256": "3968d8b23b2f5f3a5eb921ce99921dadafae62b4dd093e37ce28c89685f39bf2",
+              "raw_range": [
+                31,
+                299
+              ],
+              "quote": "\t[2] list 'Records', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'Drafts', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'Approved', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'Archive', visible\n\t[990] heading 'Records', visible\n"
+            }
+          ],
+          "answer": "None",
+          "completed_correct": true
+        },
+        "button-count-mixed": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 3,
+              "raw_sha256": "006ed6d8b8e90e80e8e539ae17f92b4504a3f174dda154ab652cfe2ba58eb9e6",
+              "raw_range": [
+                29,
+                361
+              ],
+              "quote": "\t[2] toolbar 'Document controls', visible\n\t\t[71] button 'Version 84', visible\n\t\t\tStaticText 'Version 84'\n\t\t[8] link 'Support', visible\n\t\t[204] button 'Undo', visible\n\t\t\tStaticText 'Undo'\n\t\t[19] button 'Preview', visible\n\t\t\tStaticText 'Preview'\n\t\t[99] button 'Commit', visible\n\t\t\tStaticText 'Commit'\n"
+            }
+          ],
+          "answer": "4",
+          "completed_correct": false
+        },
+        "missing-anchor-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "76337a9eabcb1eb953d617573c773f616d6b9c71c6f59af7c75633547c18227a",
+              "raw_range": [
+                31,
+                261
+              ],
+              "quote": "\t[2] list 'Destinations', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'Hill', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'Valley', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'Port', visible\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": false
+        },
+        "duplicate-anchor-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "fb8989e6f3cf0eb57feb3694ae9131736abd5cd55b03a9e59071c1cb80932849",
+              "raw_range": [
+                31,
+                320
+              ],
+              "quote": "\t[2] list 'Actions', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'Open', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'North', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'Open', visible\n\t\t[31] listitem '', visible\n\t\t\t[32] link 'South', visible\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": false
+        },
+        "clipped-terminal-unknown": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 2,
+              "raw_sha256": "3e9f9c1970ffee35cefabd122f38ef514aa052b41b34c9682814aaa31c1dfbb4",
+              "raw_range": [
+                1,
+                194
+              ],
+              "quote": "[1] main 'Registry', visible\n\t[2] list 'Progress', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'Queued', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'Running', visible"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "heterogeneous-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 3,
+              "raw_sha256": "b1a15487c8dd652d862349d79ef1c802c80950fb30d22298357e0dfb679d7fc0",
+              "raw_range": [
+                30,
+                164
+              ],
+              "quote": "\t[2] toolbar 'Playback', visible\n\t\t[10] button 'Park', visible\n\t\t[11] link 'Help', visible\n\t\t[12] button 'Resume', visible\n"
+            }
+          ],
+          "answer": "Help",
+          "completed_correct": false
+        },
+        "named-scope-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "20887858a6653d1613e0d5fc722f4a4e913dfe2bf1b68c56332ed8000dc5f822",
+              "raw_range": [
+                135,
+                227
+              ],
+              "quote": "\t[5] list 'Footer', visible\n\t\t[6] link 'Open', visible\n\t\t[7] link 'Export', visible\n"
+            }
+          ],
+          "answer": "Export",
+          "completed_correct": false
+        },
+        "complete-list-positive": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "bb29db1498a2640a756bf3373ba71664bce651660d9b9f2412d8545144fbfee6",
+              "raw_range": [
+                31,
+                261
+              ],
+              "quote": "\t[2] list 'Categories', visible\n\t\t[10] listitem '', visible\n\t\t\t[11] link 'April', visible\n\t\t[17] listitem '', visible\n\t\t\t[18] link 'June', visible\n\t\t[24] listitem '', visible\n\t\t\t[25] link 'October', visible\n"
+            }
+          ],
+          "answer": "April, June, October",
+          "completed_correct": false
+        },
+        "ledger-conflicting-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "b72d650e9c1d7ed3be9cb46c2c27e1c7ab5d665f93d7d1346e174766e1b601fe",
+              "raw_range": [
+                1,
+                159
+              ],
+              "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n  [4] button 'Release', visible\n  [5] button 'Hill', visible\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "ledger-consistent-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "73db70dc728bea937f20623b8f21bcffc274d45523b5ced8bd26bdf83ab10257",
+              "raw_range": [
+                1,
+                160
+              ],
+              "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n  [4] button 'Release', visible\n  [5] button 'River', visible\n"
+            }
+          ],
+          "answer": "River",
+          "completed_correct": false
+        },
+        "ledger-named-scope-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 2,
+              "raw_sha256": "9a9b228004f5b4823c35b40669543659279fb49468d63f01293a20d224ceb95e",
+              "raw_range": [
+                95,
+                189
+              ],
+              "quote": "[4] toolbar 'Footer', visible\n  [5] button 'Release', visible\n  [6] button 'Port', visible\n"
+            }
+          ],
+          "answer": "Port",
+          "completed_correct": false
+        },
+        "ledger-role-selected-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 3,
+              "raw_sha256": "68c1199e5c9ff6e18778f4e4951502c736cb8d27d37f507e234bff05fd6e72e8",
+              "raw_range": [
+                1,
+                96
+              ],
+              "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n"
+            }
+          ],
+          "answer": "River",
+          "completed_correct": false
+        },
+        "ledger-opaque-intervening": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "73132e49e6806b5b575e4445aa9ecc675e8b02a6c5020d67b2561f8e88edc619",
+              "raw_range": [
+                1,
+                180
+              ],
+              "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] group 'More controls; children omitted', visible\n  [4] button 'River', visible\n[5] heading 'End', visible\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "ledger-clipped-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "96cc63080328ec3fa30dd07346586741752dd9c20b1f17feedc64ebd5d4247a9",
+              "raw_range": [
+                1,
+                148
+              ],
+              "quote": "[1] toolbar 'Harbor', visible\n  [2] button 'Release', visible\n  [3] button 'River', visible\n  [4] button 'Release', visible\n  [5] button 'Unfin"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "graph-equal-links": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "3de745fec8d250c6deab593d488282a336c6dea9b9ba4799160f63bed2f569fd",
+              "raw_range": [
+                1,
+                97
+              ],
+              "quote": "[1] menu 'Bay'\n  [2] link 'Dock'\n  [3] link 'Lagoon'\n  [4] link 'Dock'\n  [5] link 'Lagoon'\n"
+            }
+          ],
+          "answer": "Lagoon",
+          "completed_correct": false
+        },
+        "graph-conflicting-links": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "7dc61cd39864d7770189f9d0c7db79b718a686ebfd85d374c2991409e2f79b11",
+              "raw_range": [
+                1,
+                96
+              ],
+              "quote": "[1] menu 'Bay'\n  [2] link 'Dock'\n  [3] link 'Lagoon'\n  [4] link 'Dock'\n  [5] link 'Delta'\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "graph-opaque-repeat": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "75673688409ab9cd0535b45dcb1496003f5af5ece91fcefe25710f125ed54a19",
+              "raw_range": [
+                1,
+                64
+              ],
+              "quote": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n"
+            }
+          ],
+          "answer": "Lagoon",
+          "completed_correct": false
+        },
+        "graph-scope-count": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "b4ee2327c28df4eea2ae7698deeb17547bee6411c7d72cf561a1f7d9c7490bda",
+              "raw_range": [
+                1,
+                108
+              ],
+              "quote": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n  [4] button 'Dock'\n  [5] button 'Lagoon'\n"
+            }
+          ],
+          "answer": "4",
+          "completed_correct": false
+        },
+        "graph-role-selection": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "a6b595028c5b760958bd99bca8a303764c91ee8a2fb9d9ae75c2df4b644d99fc",
+              "raw_range": [
+                1,
+                64
+              ],
+              "quote": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n"
+            }
+          ],
+          "answer": "Lagoon",
+          "completed_correct": false
+        },
+        "graph-virtualized-last": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "fefd3db0c3c05c1e915325f807666a8760a2d009bc3dbee7b21ccc1127d39b87",
+              "raw_range": [
+                1,
+                101
+              ],
+              "quote": "[1] toolbar 'Bay', virtualized=true\n  [2] button 'Dock'\n  [3] button 'Lagoon'\n[4] heading 'End'\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "graph-escaped-name": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "defd37f1163265c246d993b591a5eed0d69e260f40c4cacf748e79a1a5916fe5",
+              "raw_range": [
+                1,
+                68
+              ],
+              "quote": "[1] toolbar 'Bay'\n  [2] button 'Quai'\n  [3] button 'Cr\u00e8me'\n"
+            }
+          ],
+          "answer": "Cr\u00e8me",
+          "completed_correct": false
+        },
+        "graph-single-closed-end": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "16df80655eecb4bfb759868d896f5d8f43d812a88ce375bcf86bdb728c5a854d",
+              "raw_range": [
+                1,
+                60
+              ],
+              "quote": "[1] toolbar 'Bay'\n  [2] button 'Dock'\n[3] heading 'End'\n"
+            }
+          ],
+          "answer": "None",
+          "completed_correct": true
+        },
+        "range-middle": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": false,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": false,
+          "proof_covered": false,
+          "resolved_evidence": [],
+          "answer": null,
+          "completed_correct": false
+        },
+        "range-adjacent": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+              "raw_range": [
+                0,
+                58
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Blue'\n\t[3] button 'Red'\n"
+            }
+          ],
+          "answer": "None",
+          "completed_correct": false
+        },
+        "range-terminal": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": true,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+              "raw_range": [
+                0,
+                76
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Blue'\n\t[3] button 'Red'\n[4] heading 'End'\n"
+            }
+          ],
+          "answer": "None",
+          "completed_correct": true
+        },
+        "range-count": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "43d880dc63466edf02156c6b93a9d41cec056e30ba65ff91dd9bef8d8e95f001",
+              "raw_range": [
+                0,
+                132
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Blue'\n\t\tStaticText 'Blue'\n\t[3] link 'Help'\n\t[4] button 'Red'\n\t\tStaticText 'Red'\n[5] heading 'End'\n"
+            }
+          ],
+          "answer": "2",
+          "completed_correct": true
+        },
+        "range-missing": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "d62388b93025a671b8cb0d5db9c106ad8c1dec9237162c5160359fb5a91a057c",
+              "raw_range": [
+                0,
+                76
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Blue'\n\t[3] button 'Red'\n[4] heading 'End'\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "range-conflict": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "253e9cd2e6562b3b2e22919b8940f4f4c1cb63a37d8161af6e5a6908e90cc71b",
+              "raw_range": [
+                0,
+                106
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] button 'Launch'\n\t[5] button 'Marble'\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "range-consistent": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "e41628ecfe6bfd891433feed52d862208298bbf884d49ec38eb728f97578ed5b",
+              "raw_range": [
+                0,
+                107
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n\t[4] button 'Launch'\n\t[5] button 'Granite'\n"
+            }
+          ],
+          "answer": "Granite",
+          "completed_correct": false
+        },
+        "range-opaque": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "f302a8ea4007cbe2f37f696e14268eb7bd1df7749fdb0a814c331aa6fe56a9ce",
+              "raw_range": [
+                0,
+                113
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] group ''\n\t\tStaticText 'unresolved controls'\n\t[4] button 'Granite'\n"
+            }
+          ],
+          "answer": "Granite",
+          "completed_correct": false
+        },
+        "range-clipped": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "2f47732dd923b7eb470f4a1f61a03f160d15afb2bc7f6612042bcfaf494e9685",
+              "raw_range": [
+                0,
+                64
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n"
+            }
+          ],
+          "answer": "Granite",
+          "completed_correct": false
+        },
+        "range-virtualized": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "19bb9c7d0bd5e5ae09d26e348d24d466a115eb33dc3ab315ab56bb9f0553cb14",
+              "raw_range": [
+                0,
+                136
+              ],
+              "quote": "[1] toolbar 'Studio', virtualized=true, setsize=12\n\t[2] button 'Launch', posinset=4\n\t[3] button 'Granite', posinset=5\n[4] heading 'End'\n"
+            }
+          ],
+          "answer": "UNKNOWN",
+          "completed_correct": true
+        },
+        "range-scope": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "41e99e4c72fc0be667bf16b896200c8115a3d8de2682367df9917d6b4cb0d2be",
+              "raw_range": [
+                61,
+                124
+              ],
+              "quote": "[4] toolbar 'Bottom'\n\t[5] button 'Launch'\n\t[6] button 'Marble'\n"
+            }
+          ],
+          "answer": "Marble",
+          "completed_correct": false
+        },
+        "range-role": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": false,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "2b5bfe49a3e42fd3e5e48040f9ecb56b17b37b1392adc7be04f8d5d50e255b98",
+              "raw_range": [
+                0,
+                64
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Launch'\n\t[3] button 'Granite'\n"
+            }
+          ],
+          "answer": "button 'Granite'",
+          "completed_correct": false
+        },
+        "range-list": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "80ec7b60d1e4d0884d42f19dfd3871eb4db62e231c41f8c8ec775906b08e86dd",
+              "raw_range": [
+                0,
+                96
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Lime'\n\t[3] button 'Plum'\n\t[4] button 'Pear'\n[5] heading 'End'\n"
+            }
+          ],
+          "answer": "Lime, Plum, Pear",
+          "completed_correct": true
+        },
+        "range-unicode": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": false,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "674f6a0a08fb5ab4ae8a7a28b3a4bafcc9c2b17ecf272bc96e881e68a82ef870",
+              "raw_range": [
+                0,
+                60
+              ],
+              "quote": "[1] toolbar 'Studio'\n\t[2] button 'Quay'\n\t[3] button 'Cr\u00e8me'\n"
+            }
+          ],
+          "answer": "Cr\u00e8me",
+          "completed_correct": false
+        },
+        "range-numeric": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 0,
+              "raw_sha256": "5118a4fb498d2e45d77b1fae5e0769d292880462d16828b0c8a62eb16694f342",
+              "raw_range": [
+                30,
+                70
+              ],
+              "quote": "Confirmed: Cedar retention is 72 hours.\n"
+            }
+          ],
+          "answer": "72 hours",
+          "completed_correct": true
+        },
+        "range-two-sources": {
+          "upstream_prompt_control_character": false,
+          "observed": true,
+          "error": null,
+          "finish_reason": "stop",
+          "format_valid": true,
+          "truncated": false,
+          "value_correct": true,
+          "refusal_correct": null,
+          "quote_exact": null,
+          "source_bound": true,
+          "proof_covered": true,
+          "resolved_evidence": [
+            {
+              "source_item_index": 1,
+              "raw_sha256": "ecd4be28b339e5ea60e48931a4b9933b0e258028f35c4050c4dcc01f696196f1",
+              "raw_range": [
+                0,
+                40
+              ],
+              "quote": "Confirmed: Birch retention is 96 hours.\n"
+            }
+          ],
+          "answer": "96 hours",
+          "completed_correct": true
+        }
+      },
+      "source_bound": 39,
+      "proof_covered": 17
+    }
+  }
+}

@@ -1,0 +1,24 @@
+.FE.....
+======================================================================
+ERROR: test_fresh_native_cohort_has_disjoint_sources_and_time_constrained_reads (evals.paired.test_skill_disclosure.FreshQualificationTests.test_fresh_native_cohort_has_disjoint_sources_and_time_constrained_reads)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_disclosure.py", line 94, in test_fresh_native_cohort_has_disjoint_sources_and_time_constrained_reads
+    plan = freeze(Path(directory)/'plan',Path(sys.executable),
+                  'http://127.0.0.1:9/v1','controlled',
+                  workflow_protocol='progressive-completion/v1',case_cohort='fresh-native/v1')
+TypeError: freeze() got an unexpected keyword argument 'case_cohort'
+
+======================================================================
+FAIL: test_fresh_capture_is_graded_against_registered_source_not_historical_cedar (evals.paired.test_skill_disclosure.FreshQualificationTests.test_fresh_capture_is_graded_against_registered_source_not_historical_cedar)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_disclosure.py", line 116, in test_fresh_capture_is_graded_against_registered_source_not_historical_cedar
+    self.assertTrue(result['operation_and_exact_arguments'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.387s
+
+FAILED (failures=1, errors=1)

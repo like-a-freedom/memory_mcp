@@ -1,0 +1,33 @@
+{
+  "schema": "memory-skill-completion-acceptance/v1",
+  "plans": [
+    {
+      "directory": "legacy-regression",
+      "sha256": "72e691f97d2f5f38cfb9d8a67edd4ef5c40e3d8996c4d75f4d1e5954af78ae96",
+      "cases": 16,
+      "scheduled": 32
+    },
+    {
+      "directory": "fresh-native",
+      "sha256": "53c4db5dff11ea3002997eabf26b52eb6c31dc458eb5619939cff6f2ef52e824",
+      "cases": 6,
+      "scheduled": 12
+    }
+  ],
+  "scheduled": 44,
+  "current_scheduled": 22,
+  "require": "all22 current trials: actual finish, source/status/time correct, exact operations, no faults, all semantic checks pass",
+  "retries": 0,
+  "budget": {
+    "turns": 9,
+    "max_tokens": 384,
+    "call_seconds": 20,
+    "case_seconds": 180,
+    "retries": 0,
+    "temperature": 0
+  },
+  "binary_version": "memory_mcp 2.1.0",
+  "binary_sha256": "42dbf4eded62a3e3d47cfe9b0868c4bd09c43cab3d1005947b1bac7632793121",
+  "limits": "exposed16 regression tasks plus6 new development tasks; not independent benefit evidence; previous arm descriptive; no repeat-until-green",
+  "infrastructure_correction": "Exact model ID from local /v1/models; all other frozen plan fields unchanged. Invalid HTTP404 receipts retained separately."
+}

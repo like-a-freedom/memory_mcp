@@ -1,0 +1,12 @@
+[
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T20:05:57.574924Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:05:57.574958Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:5ea8ca221d66a57cb21d512f\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+  },
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T20:05:57.672680Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T20:05:57.672738Z  WARN surrealdb::core::kvs::ds: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:5ea8ca221d66a57cb21d512f\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:3021cdb82681945efc33620c\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Birch\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:99a434135fa2fe721120697b\",\n        \"type\": \"decision\",\n        \"statement\": \"Birch deployment requires approval from two owners.\",\n        \"source_quote\": \"Birch deployment requires approval from two owners.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:3021cdb82681945efc33620c\",\n        \"episode_id\": \"episode:5ea8ca221d66a57cb21d512f\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+  }
+]

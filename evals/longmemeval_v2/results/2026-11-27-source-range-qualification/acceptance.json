@@ -1,0 +1,77 @@
+{
+  "schema": "source-range-qualification-acceptance/v1",
+  "frozen_at_utc": "2026-11-27T18:30:14.667532+00:00",
+  "before_outputs": true,
+  "scheduled": 80,
+  "candidate": "source-range-final-first",
+  "strict_joint_required": 40,
+  "required": [
+    "all values correct",
+    "valid source-reference JSON",
+    "actual delivered-source identity",
+    "all reviewed support spans covered",
+    "every citation relevant to one sufficient alternative",
+    "finish stop, no errors or length truncation"
+  ],
+  "shared24_value_regressions_allowed": 0,
+  "request_tokens": 256,
+  "request_seconds": 60,
+  "total_seconds": 1800,
+  "retries": 0,
+  "stop_rule": "One capture only. No protocol tuning on this frozen run. On FAIL do not activate seven-case full-history capture.",
+  "comparison_limit": "Graph literal-QUOTE and source-reference strictness are different output contracts. Report separately, not as isolated causal treatment. Authored development controls cannot establish independent memory benefit.",
+  "registration_sha256": "51c3baf2cabb47bf6ceda073ec21773804ffd47454ef6cc55aeca1440d7dcde7",
+  "source_review_sha256": "45bd2f63bd94e79ec3a2da4bbfa6107d1d2dd46f1956b1f7c4a2c393c72c254d",
+  "prior_prompts": [
+    {
+      "directory": "2026-11-27-full-history-reader-v4",
+      "prompts": 14,
+      "sha256": "57f3772db795f4ea6b0535a06c5971835e50edee61458ae63cb69eaa0dd7e5a7"
+    },
+    {
+      "directory": "2026-11-27-full-history-reader-v7",
+      "prompts": 14,
+      "sha256": "23ba1e032d221d584f82a3c10ffcbdddab431b7b419469d774d43205f2cd22f0"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-independent",
+      "prompts": 16,
+      "sha256": "bdfbdc8c854bdedcfd905a718b19af97470f2b4b861f0c260926c83fce67d32c"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-independent-v2",
+      "prompts": 16,
+      "sha256": "bdfbdc8c854bdedcfd905a718b19af97470f2b4b861f0c260926c83fce67d32c"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-long",
+      "prompts": 16,
+      "sha256": "d19eb3ec95fef650c291c84a5a7db1ba4ccb6ff4d46c512854e97bffea073cbe"
+    },
+    {
+      "directory": "2026-11-27-ordered-controls-long-v2",
+      "prompts": 16,
+      "sha256": "d19eb3ec95fef650c291c84a5a7db1ba4ccb6ff4d46c512854e97bffea073cbe"
+    },
+    {
+      "directory": "2026-11-27-ordered-relations-regression",
+      "prompts": 20,
+      "sha256": "3e4914ce1dd77ba9ffa980e1b475add523f57c1a1a7c470711f2d7087cb69962"
+    },
+    {
+      "directory": "2026-11-27-reader-protocol",
+      "prompts": 21,
+      "sha256": "063bd6425e065b5734104e03f06f24e2f1082dfc7d524982e16b6781b0a3f4e7"
+    },
+    {
+      "directory": "2026-11-27-source-graph-qualification",
+      "prompts": 48,
+      "sha256": "2d8c982a5946f15cf77c9d8e7fa553efadb752a84d35cc2718449e8cf104b31a"
+    },
+    {
+      "directory": "2026-11-27-source-ledger-qualification",
+      "prompts": 32,
+      "sha256": "dead33faa2116d577068b8c29423adcf307ebe60725b200bbc54978d5a3411be"
+    }
+  ]
+}

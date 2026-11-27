@@ -1,0 +1,24 @@
+{
+  "schema": "bounded-workflow-integrity/v1",
+  "cohorts": {
+    "legacy-regression": {
+      "scheduled_and_recorded": 32,
+      "request_starts": 125,
+      "request_terminals": 125,
+      "abandoned_requests": 0,
+      "duplicate_request_ids": 0,
+      "plan_sha256": "72e691f97d2f5f38cfb9d8a67edd4ef5c40e3d8996c4d75f4d1e5954af78ae96",
+      "review_sha256": "3cafc78e772f41214720a2ae8e1eff32b9b5cf9189a759cd377b3698a0bf8c4a"
+    },
+    "fresh-native": {
+      "scheduled_and_recorded": 12,
+      "request_starts": 60,
+      "request_terminals": 60,
+      "abandoned_requests": 0,
+      "duplicate_request_ids": 0,
+      "plan_sha256": "53c4db5dff11ea3002997eabf26b52eb6c31dc458eb5619939cff6f2ef52e824",
+      "review_sha256": "adb7d29d62594ee51a7bbeec902d07a170cad274004c1a9128a57f0110f5942b"
+    }
+  },
+  "old_scores_unchanged": true
+}

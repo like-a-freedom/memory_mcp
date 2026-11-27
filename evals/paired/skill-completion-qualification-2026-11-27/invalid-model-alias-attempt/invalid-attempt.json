@@ -1,0 +1,23 @@
+{
+  "schema": "invalid-infrastructure-attempt/v1",
+  "at_utc": "2026-11-27T18:52:27.402422+00:00",
+  "reason": "Short model alias was not an advertised MLX model ID; HTTP404 before inference. Correct full local model path required. No grading or protocol change.",
+  "completed_trial_receipts": 9,
+  "terminals": [
+    "error",
+    "error",
+    "error",
+    "error",
+    "error",
+    "error",
+    "error",
+    "error",
+    "error"
+  ],
+  "recorded_attempts": 9,
+  "aborted_before_remaining_schedule": true,
+  "policy": "preserved faults; excluded from valid model qualification, reported separately; no repeat-until-green",
+  "started_requests": 9,
+  "registered_final_attempts": 9,
+  "aborted_unobserved_requests": []
+}

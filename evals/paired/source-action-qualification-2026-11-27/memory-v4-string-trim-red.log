@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_episode_string_whitespace_is_normalized_like_public_parser (evals.paired.test_skill_source_actions.SourceActionTests.test_episode_string_whitespace_is_normalized_like_public_parser)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 129, in test_episode_string_whitespace_is_normalized_like_public_parser
+    self.assertTrue(grade_observed(self.case,{'terminal':'answered'},self.trace)['source_sufficient'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

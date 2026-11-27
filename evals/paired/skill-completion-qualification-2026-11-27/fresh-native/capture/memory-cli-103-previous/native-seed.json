@@ -1,0 +1,12 @@
+[
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T19:00:26.390366Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390394Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390399Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390403Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390407Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390410Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390414Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T19:00:26.390417Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:edd9b3a54d18f9e0defba4d9\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+  },
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T19:00:26.493108Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T19:00:26.493168Z  WARN surrealdb::core::kvs::ds: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:edd9b3a54d18f9e0defba4d9\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:5332d1d5090a54596ab25d62\",\n        \"type\": \"person\",\n        \"canonical_name\": \"Juniper Index\"\n      },\n      {\n        \"entity_id\": \"entity:82483ae5f57b480e0bdf3948\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Thursday\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:a2c28bd81fb7d4bb7f3f1d07\",\n        \"type\": \"decision\",\n        \"statement\": \"Juniper Index publishes incremental updates every Thursday.\",\n        \"source_quote\": \"Juniper Index publishes incremental updates every Thursday.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:5332d1d5090a54596ab25d62\",\n        \"episode_id\": \"episode:edd9b3a54d18f9e0defba4d9\"\n      },\n      {\n        \"entity_id\": \"entity:82483ae5f57b480e0bdf3948\",\n        \"episode_id\": \"episode:edd9b3a54d18f9e0defba4d9\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+  }
+]

@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_whole_item_response_from_another_question_does_not_bind (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_whole_item_response_from_another_question_does_not_bind)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 51, in test_whole_item_response_from_another_question_does_not_bind
+    self.assertFalse(score['source_bound'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

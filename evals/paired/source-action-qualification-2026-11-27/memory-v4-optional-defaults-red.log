@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_empty_optional_text_fields_keep_valid_identity_selection (evals.paired.test_skill_source_actions.SourceActionTests.test_empty_optional_text_fields_keep_valid_identity_selection)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 159, in test_empty_optional_text_fields_keep_valid_identity_selection
+    self.assertTrue(grade_observed(self.case,{'terminal':'answered'},self.trace)['source_sufficient'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

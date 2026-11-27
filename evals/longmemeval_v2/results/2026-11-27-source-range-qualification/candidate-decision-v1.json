@@ -1,0 +1,98 @@
+{
+  "schema": "source-range-qualification-decision/v1",
+  "created_at_utc": "2026-11-27T18:42:13.878228+00:00",
+  "decision": "FAIL",
+  "scheduled": 80,
+  "recorded_outputs": 80,
+  "dispatched_attempts": 80,
+  "shared24_value_regressions": [],
+  "cohorts": {
+    "previous24": {
+      "source-graph-final-first": {
+        "selected": 24,
+        "completed_correct": 22,
+        "value_correct": 22,
+        "format_valid": 23,
+        "quote_exact": 20,
+        "false_premise_selected": 3,
+        "false_premise_correct": 3,
+        "unobserved": 0,
+        "errors": 0,
+        "literal_quote_joint": 19
+      },
+      "source-range-final-first": {
+        "selected": 24,
+        "completed_correct": 8,
+        "value_correct": 23,
+        "format_valid": 24,
+        "quote_exact": 0,
+        "false_premise_selected": 3,
+        "false_premise_correct": 3,
+        "unobserved": 0,
+        "errors": 0,
+        "source_bound": 24,
+        "proof_covered": 8
+      }
+    },
+    "fresh_authored16": {
+      "source-graph-final-first": {
+        "selected": 16,
+        "completed_correct": 13,
+        "value_correct": 13,
+        "format_valid": 16,
+        "quote_exact": 16,
+        "false_premise_selected": 2,
+        "false_premise_correct": 2,
+        "unobserved": 0,
+        "errors": 0,
+        "literal_quote_joint": 13
+      },
+      "source-range-final-first": {
+        "selected": 16,
+        "completed_correct": 8,
+        "value_correct": 12,
+        "format_valid": 15,
+        "quote_exact": 0,
+        "false_premise_selected": 2,
+        "false_premise_correct": 2,
+        "unobserved": 0,
+        "errors": 0,
+        "source_bound": 15,
+        "proof_covered": 9
+      }
+    }
+  },
+  "metric_semantics": {
+    "source-graph-final-first.completed_correct": "legacy correct value and normal completion, without mandatory literal quotation",
+    "source-graph-final-first.literal_quote_joint": "legacy value, valid boxed format, actual single-item literal QUOTE and normal completion",
+    "source-range-final-first.completed_correct": "new strict value, JSON, source identity, reviewed support coverage and normal completion; not the old literal-QUOTE contract"
+  },
+  "latency_descriptive_only": {
+    "source-graph-final-first": {
+      "observed_calls": 40,
+      "median_seconds": 3.0875111045024823,
+      "p95_seconds": 9.8468874579994,
+      "max_seconds": 18.003470583993476,
+      "completion_tokens": 1010,
+      "faults": 0
+    },
+    "source-range-final-first": {
+      "observed_calls": 40,
+      "median_seconds": 8.440745021012845,
+      "p95_seconds": 14.54174429201521,
+      "max_seconds": 15.558828042005189,
+      "completion_tokens": 3916,
+      "faults": 0
+    }
+  },
+  "report_sha256": "1f28c7c62d466a19196361a58aad3c41a4a003bb50b1437e80d6fc934e36fab3",
+  "acceptance_sha256": "b7c59ccf3f35887e09c7eb06e08e687619d3da1c61ae223e2fa1118003a86cf7",
+  "registration_sha256": "51c3baf2cabb47bf6ceda073ec21773804ffd47454ef6cc55aeca1440d7dcde7",
+  "frozen_report_replay_equal": true,
+  "not_claimed": [
+    "independent memory benefit",
+    "isolated latency gain",
+    "equal output contracts for source-range and literal QUOTE",
+    "autonomous workflow qualification"
+  ]
+}

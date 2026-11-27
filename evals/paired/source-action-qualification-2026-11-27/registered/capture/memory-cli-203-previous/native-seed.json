@@ -1,0 +1,12 @@
+[
+  {
+    "exit_status": 0,
+    "stderr": "",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:9e9e88569cf96e11c9efe940\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+  },
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T20:07:16.974295Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T20:07:16.974341Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T20:07:17.163544Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163568Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163574Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163577Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163580Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163583Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163585Z ERROR surrealdb_core::kvs::tasks: [redacted]\n2026-11-27T20:07:17.163587Z ERROR surrealdb_core::kvs::tasks: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:9e9e88569cf96e11c9efe940\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:fc426c0ac75f5df938bba130\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Larch\"\n      },\n      {\n        \"entity_id\": \"entity:bd371829b1378353f6cba64f\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Monday\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:f6ff3e05b9d3a5aa6622f9eb\",\n        \"type\": \"decision\",\n        \"statement\": \"Larch schedules recovery drills every Monday.\",\n        \"source_quote\": \"Larch schedules recovery drills every Monday.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:fc426c0ac75f5df938bba130\",\n        \"episode_id\": \"episode:9e9e88569cf96e11c9efe940\"\n      },\n      {\n        \"entity_id\": \"entity:bd371829b1378353f6cba64f\",\n        \"episode_id\": \"episode:9e9e88569cf96e11c9efe940\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+  }
+]

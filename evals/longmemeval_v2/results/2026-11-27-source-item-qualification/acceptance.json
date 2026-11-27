@@ -1,0 +1,31 @@
+{
+  "schema": "whole-item-finite-qualification/v1",
+  "scope": "authored development qualification, no independent benefit or causal latency claim",
+  "scheduled_calls": 72,
+  "whole_item_denominator": 56,
+  "shared40": "whole-only; historical range comparison is nonconcurrent",
+  "fresh16": "range and whole; all32 outputs count",
+  "acceptance": {
+    "whole_item_strict_correct_required": 56,
+    "whole_value_regressions_allowed": 0,
+    "transport_faults_allowed": 0,
+    "missing_outputs_fail": true
+  },
+  "limits": {
+    "global_budget_seconds": 1800,
+    "max_completion_tokens": 256,
+    "timeout_seconds": 60,
+    "max_retries": 0,
+    "repetitions": 1
+  },
+  "full_history_activation": "only after strict gate passes; otherwise zero calls",
+  "registrations": {
+    "shared40": "d2923cb9ad113a7489c1015b39aac287fdf74ec48777468719ec519ce35b7d34",
+    "fresh16": "efc64e3a43a27d2aa05295fc08def18e3399f06ecd998cd5c1bdd52371d3070e"
+  },
+  "source_review_sha256": "f5eb747a8c521e89188572715548e935221789031996e60fae873b3fa920f303",
+  "historical_baseline": {
+    "path": "evals/longmemeval_v2/results/2026-11-27-source-range-qualification/outputs.json",
+    "sha256": "2f93506b10148a33952dbc6a3756845cef98068e883ef6db1a6bb671119a5fe0"
+  }
+}

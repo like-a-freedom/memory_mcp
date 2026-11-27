@@ -1,0 +1,50 @@
+{
+  "schema": "whole-item-deterministic-contract/v1",
+  "scope": "Portable public contract controls; no model qualification or production default change",
+  "new_model_calls": 0,
+  "source_hashes": {
+    "evals/longmemeval_v2/source_references.py": "cc02f9fad9080e38dc18f21ee911be7887b00673a65b73d579ce8aff9887bab7",
+    "evals/longmemeval_v2/reader_protocol.py": "91f78b5727c835c2e66d1c8ab508d9dcad5c481fa87a6d384f0b75f7056c96a4",
+    "evals/longmemeval_v2/test_source_references.py": "8665154db38923c2b777413eff1b747ff7dfb9dd7834b821c294b751fd611677"
+  },
+  "focused": {
+    "scheduled": 44,
+    "passed": 44
+  },
+  "portable": {
+    "scheduled": 171,
+    "passed": 160,
+    "skipped": 11
+  },
+  "installed_sdk": {
+    "scheduled": 171,
+    "passed": 166,
+    "skipped": 5
+  },
+  "legacy_range_capture_replay": {
+    "unchanged_prompts": 80,
+    "unchanged_grades": 80,
+    "inference_calls": 0
+  },
+  "review_resolution": {
+    "important": 3,
+    "fixed": [
+      "reject impossible whole-item gold, validate all selected protocols before freeze",
+      "reject non-scalar decoded inputs without affecting valid supplementary Unicode",
+      "question-specific source handles reject stale responses"
+    ],
+    "rounds": 1,
+    "followup_review": false
+  },
+  "logs": {
+    "memory-item-feasibility-red.log": "d5783d758a6974083614f03aec509d73cb364a13dd2727cb3046b08b7f5bb79b",
+    "memory-item-feasibility-green.log": "b70aaee4b98aed3c929b11d2edf077f243b297ed21e6fabbffb70bd38d82b0f9",
+    "memory-item-unicode-red.log": "6894ba30ec3aa9af9314274c1599c48e451de7a5426f49d49137b91b70a12fd3",
+    "memory-item-unicode-green.log": "24adda79e21044fef19cdc7f0606a9cd7770fc9a99c705a8622ee923c13bce5d",
+    "memory-item-scope-red.log": "79124fb3e5c017f5c8cbc9b2d4a2b1a0c6f3f00792301f40301280e4ca9d58c2",
+    "memory-item-scope-green.log": "fb184ea57734512b1f088f9181209901b9cd46df3eb7eaa2500ea9e48dde20b5",
+    "memory-item-review-controls.log": "c23ab7c06b398af42962c43d2cba6b2b6a52347edf897634bea0be9a2f07bd37",
+    "memory-item-review-reader-all.log": "2f8afb227afd0d047042e686d7a029993e6b27e947b5edb798da33a6f55b8736",
+    "memory-item-review-sdk-all.log": "d260405b2a229775c45e400a40dba7df1d316baecbe89d4f4e8107ec64270c8e"
+  }
+}

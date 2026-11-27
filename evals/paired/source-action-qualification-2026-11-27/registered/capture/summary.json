@@ -1,0 +1,1004 @@
+{
+  "operation_protocol": "memory-mcp-skill-source-actions/v3",
+  "rows": [
+    {
+      "answer": "Ingest succeeded: source_id alder-operating-decision-2026-11-14, episode:1bdc94777e9380a2b629a4e1. Extraction status success (verified): fact:49477552f9f7db61fd11ba05 (decision: Alder retains diagnostic logs for 23 days), entity:53896a4ecbcc91dca174304d (Alder). No warnings; reconciliation complete. t_ref 2026-11-14T10:30:00Z.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 33.72295812499942,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 201,
+      "identity": "memory-mcp-201-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2042,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2057
+        },
+        {
+          "completion_tokens": 83,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2908,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2057,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2991
+        },
+        {
+          "completion_tokens": 46,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3090,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2991,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3136
+        },
+        {
+          "completion_tokens": 158,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3438,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3136,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3596
+        }
+      ]
+    },
+    {
+      "answer": "Ingest succeeded: source_id alder-operating-decision-2026-11-14, episode:1bdc94777e9380a2b629a4e1. Extraction status success (verified): fact:49477552f9f7db61fd11ba05 (decision: Alder retains diagnostic logs for 23 days), entity:53896a4ecbcc91dca174304d (Alder). No warnings; reconciliation complete.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 27.342447916977108,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 201,
+      "identity": "memory-mcp-201-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2042,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2038,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2057
+        },
+        {
+          "completion_tokens": 83,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2942,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2057,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3025
+        },
+        {
+          "completion_tokens": 46,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3124,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3025,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3170
+        },
+        {
+          "completion_tokens": 134,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3472,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3170,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3606
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Birch deployment requires approval from two owners. Source ID: birch-operating-decision-2026-11-14; episode: episode:5ea8ca221d66a57cb21d512f (t_ref 2026-11-14T10:30:00Z, ingested 2026-11-27T20:02:37Z). Limitations: episode_fallback tier, not a canonical fact; no verified quote (quote_verified=false).",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 29.95193337503588,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "source_sufficient": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 202,
+      "identity": "memory-mcp-202-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 17,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1995,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1922,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2012
+        },
+        {
+          "completion_tokens": 30,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2487,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2012,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2517
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2791,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2517,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2807
+        },
+        {
+          "completion_tokens": 101,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3162,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2807,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3263
+        },
+        {
+          "completion_tokens": 135,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3741,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3263,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3876
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Birch deployment requires approval from two owners. Source ID: birch-operating-decision-2026-11-14; episode: episode:5ea8ca221d66a57cb21d512f (t_ref 2026-11-14T10:30:00Z, ingested 2026-11-27T20:03:07Z). Limitations: episode_fallback tier, semantic unavailable, quote not verified/anchored; not a canonical fact or verified quote.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 27.577689875033684,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "source_sufficient": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 202,
+      "identity": "memory-mcp-202-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 17,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1995,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1991,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2012
+        },
+        {
+          "completion_tokens": 30,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2487,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2483,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2517
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2791,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2787,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2807
+        },
+        {
+          "completion_tokens": 101,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3162,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3158,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3263
+        },
+        {
+          "completion_tokens": 140,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3741,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3263,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3881
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Larch schedules recovery drills every Monday (fact:f6ff3e05b9d3a5aa6622f9eb). Source: larch-operating-decision-2026-11-14; episode:9e9e88569cf96e11c9efe940 (t_ref 2026-11-14T10:30:00Z). Explain confirms exact source window (55/55 scalars) but quote_verified=false. Limitations: recall completeness partial; no verified quote receipt, so treat as extracted fact, not canonical quote.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 34.56131516699679,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "source_sufficient": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 203,
+      "identity": "memory-mcp-203-previous",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 17,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2065,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1922,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2082
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2557,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2082,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2636
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3090,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2636,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3106
+        },
+        {
+          "completion_tokens": 94,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3461,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3106,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3555
+        },
+        {
+          "completion_tokens": 151,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4176,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3555,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4327
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Larch schedules recovery drills every Monday (fact:f6ff3e05b9d3a5aa6622f9eb). Source: larch-operating-decision-2026-11-14; episode:9e9e88569cf96e11c9efe940 (t_ref 2026-11-14T10:30:00Z). Explain confirms exact source window (55/55 scalars) but quote_verified=false. Limitations: recall completeness partial; no verified quote receipt, so treat as source-backed fact, not canonical verified quote.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 31.298401625012048,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": false,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [],
+        "source_binding_observed": null,
+        "source_sufficient": false,
+        "unnecessary_reference_loading": false
+      },
+      "id": 203,
+      "identity": "memory-mcp-203-current",
+      "semantic_review": "pending",
+      "skill": "memory-mcp",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 17,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2065,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2061,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2082
+        },
+        {
+          "completion_tokens": 79,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2557,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2553,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2636
+        },
+        {
+          "completion_tokens": 16,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3090,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3086,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3106
+        },
+        {
+          "completion_tokens": 94,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3461,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3457,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3555
+        },
+        {
+          "completion_tokens": 153,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4176,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3555,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4329
+        }
+      ]
+    },
+    {
+      "answer": "Ingest succeeded: episode:1bdc94777e9380a2b629a4e1 (source alder-operating-decision-2026-11-14, t-ref 2026-11-14T10:30:00Z). Extraction status: success/verified — 1 fact (fact:49477552f9f7db61fd11ba05, decision: “Alder retains diagnostic logs for 23 days.”), 1 entity (entity:53896a4ecbcc91dca174304d, technology “Alder”), no warnings, evidence not omitted, reconciliation complete. Observed at 2026-11-27T20:05:01Z.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 41.68468654202297,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 201,
+      "identity": "memory-cli-201-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1836,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1851
+        },
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2899,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1851,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2913
+        },
+        {
+          "completion_tokens": 84,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4128,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2913,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4212
+        },
+        {
+          "completion_tokens": 44,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4338,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4212,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4382
+        },
+        {
+          "completion_tokens": 199,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5051,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4382,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5250
+        }
+      ]
+    },
+    {
+      "answer": "Ingest succeeded: episode:1bdc94777e9380a2b629a4e1 (source alder-operating-decision-2026-11-14, t-ref 2026-11-14T10:30:00Z). Extraction status success/verified: 1 fact fact:49477552f9f7db61fd11ba05 (decision: “Alder retains diagnostic logs for 23 days.”), entity:53896a4ecbcc91dca174304d (Alder), no warnings, evidence not omitted, reconciliation complete.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 35.58305420901161,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": "verified",
+        "process_faults": [],
+        "reference_reads": [
+          "references/memory-contract.md",
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 201,
+      "identity": "memory-cli-201-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 15,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1836,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1716,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1851
+        },
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 2925,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1851,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 2939
+        },
+        {
+          "completion_tokens": 84,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4234,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2939,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4318
+        },
+        {
+          "completion_tokens": 44,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4444,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4318,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4488
+        },
+        {
+          "completion_tokens": 166,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5241,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4488,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5407
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Birch deployment requires approval from two owners. Source ID: birch-operating-decision-2026-11-14; episode: episode:5ea8ca221d66a57cb21d512f; t_ref 2026-11-14T10:30:00Z. Labeled source-bound episode fallback (retrieval_tier=fallback, episode_fallback=true). Limitations: no verified quote (quote_verified=false, quote_complete=false); not a canonical fact; no independent valid/known time boundary supplied.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 40.05339333298616,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 202,
+      "identity": "memory-cli-202-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1789,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1716,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1803
+        },
+        {
+          "completion_tokens": 27,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3098,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1803,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3125
+        },
+        {
+          "completion_tokens": 227,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3898,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3125,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4125
+        },
+        {
+          "completion_tokens": 139,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5132,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4125,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5271
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Birch deployment requires approval from two owners. Source ID: birch-operating-decision-2026-11-14 (conversation); episode:5ea8ca221d66a57cb21d512f; t-ref 2026-11-14T10:30:00Z. Labeled source-bound episode fallback (retrieval_tier=fallback, episode_fallback=true). Limitations: no verified quote (quote_verified=false, quote_complete=false); not a canonical fact; confidence 0.84.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 39.09890262503177,
+      "grade": {
+        "canonical_fact_verified": false,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 202,
+      "identity": "memory-cli-202-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1789,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1785,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1803
+        },
+        {
+          "completion_tokens": 24,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3018,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1803,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3042
+        },
+        {
+          "completion_tokens": 224,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3815,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3042,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4039
+        },
+        {
+          "completion_tokens": 137,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5046,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4039,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5183
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Larch schedules recovery drills every Monday. Source ID: larch-operating-decision-2026-11-14; episode: episode:9e9e88569cf96e11c9efe940; fact: fact:f6ff3e05b9d3a5aa6622f9eb. Explain returned exact source window “Decision: Larch schedules recovery drills every Monday.” (entire source, 55/55 scalars). Limitations: assembly completeness partial; no verified quote receipt (quote_verified false), so this is a source-bound episode fallback, not a canonical verified quote.",
+      "arm": "previous",
+      "binding": "native",
+      "elapsed_seconds": 44.63860779098468,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "returned_snapshot_matches": true,
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 203,
+      "identity": "memory-cli-203-previous",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1859,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1716,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1873
+        },
+        {
+          "completion_tokens": 75,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3088,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1873,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3163
+        },
+        {
+          "completion_tokens": 245,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3911,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3163,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4156
+        },
+        {
+          "completion_tokens": 152,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5020,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4156,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5172
+        }
+      ]
+    },
+    {
+      "answer": "Decision: Larch schedules recovery drills every Monday. Source ID: larch-operating-decision-2026-11-14; episode:9e9e88569cf96e11c9efe940; fact:f6ff3e05b9d3a5aa6622f9eb. Exact source window: “Decision: Larch schedules recovery drills every Monday.” Time boundary: valid 2026-11-15T12:00:00Z, known 2099-11-27T18:00:00Z. Limitation: assembly completeness is partial; no verified quote receipt, so this is a source-bound episode fallback, not a canonical verified quote.",
+      "arm": "current",
+      "binding": "native",
+      "elapsed_seconds": 47.350611082976684,
+      "grade": {
+        "canonical_fact_verified": true,
+        "operation_and_exact_arguments": true,
+        "pending_vs_completed_oracle": null,
+        "process_faults": [],
+        "reference_reads": [
+          "references/commands.md"
+        ],
+        "returned_snapshot_matches": true,
+        "source_binding_observed": true,
+        "source_sufficient": true,
+        "unnecessary_reference_loading": false
+      },
+      "id": 203,
+      "identity": "memory-cli-203-current",
+      "semantic_review": "pending",
+      "skill": "memory-cli",
+      "terminal": "answered",
+      "tokens": [
+        {
+          "completion_tokens": 14,
+          "completion_tokens_details": null,
+          "prompt_tokens": 1859,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1855,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 1873
+        },
+        {
+          "completion_tokens": 75,
+          "completion_tokens_details": null,
+          "prompt_tokens": 3168,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1873,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 3243
+        },
+        {
+          "completion_tokens": 245,
+          "completion_tokens_details": null,
+          "prompt_tokens": 4243,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 3243,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 4488
+        },
+        {
+          "completion_tokens": 179,
+          "completion_tokens_details": null,
+          "prompt_tokens": 5688,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 4488,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "total_tokens": 5867
+        }
+      ]
+    }
+  ],
+  "scheduled": 12
+}

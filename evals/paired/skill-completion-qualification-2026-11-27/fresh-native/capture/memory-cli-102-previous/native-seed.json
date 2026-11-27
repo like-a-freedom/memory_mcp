@@ -1,0 +1,12 @@
+[
+  {
+    "exit_status": 0,
+    "stderr": "",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": \"episode:8301f65df17f6184b6da257c\",\n  \"guidance\": \"Call extract next to derive entities and facts. Pass the episode_id you just received back exactly as it appears, including the 'episode:' prefix — do not strip or re-add it.\"\n}\n"
+  },
+  {
+    "exit_status": 0,
+    "stderr": "2026-11-27T18:59:39.626734Z  WARN surrealdb::core::kvs::ds: [redacted]\n2026-11-27T18:59:39.626789Z  WARN surrealdb::core::kvs::ds: [redacted]\n",
+    "stdout": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"episode_id\": \"episode:8301f65df17f6184b6da257c\",\n    \"entities\": [\n      {\n        \"entity_id\": \"entity:82483ae5f57b480e0bdf3948\",\n        \"type\": \"technology\",\n        \"canonical_name\": \"Thursday\"\n      },\n      {\n        \"entity_id\": \"entity:6087c96ee37bbaa4dcc2bdf4\",\n        \"type\": \"person\",\n        \"canonical_name\": \"Willow Index\"\n      }\n    ],\n    \"facts\": [\n      {\n        \"fact_id\": \"fact:5ae056dae5c2e99be633b050\",\n        \"type\": \"decision\",\n        \"statement\": \"Willow Index publishes incremental updates every Thursday.\",\n        \"source_quote\": \"Willow Index publishes incremental updates every Thursday.\"\n      }\n    ],\n    \"links\": [\n      {\n        \"entity_id\": \"entity:82483ae5f57b480e0bdf3948\",\n        \"episode_id\": \"episode:8301f65df17f6184b6da257c\"\n      },\n      {\n        \"entity_id\": \"entity:6087c96ee37bbaa4dcc2bdf4\",\n        \"episode_id\": \"episode:8301f65df17f6184b6da257c\"\n      }\n    ],\n    \"warnings\": [],\n    \"fact_evidence_omitted\": false,\n    \"reconciliation\": {\n      \"status\": \"complete\",\n      \"claims_projected\": 1,\n      \"active_relations\": 0,\n      \"reason_codes\": []\n    }\n  },\n  \"guidance\": \"Resolve canonical entities for any ambiguous names before creating manual links.\"\n}\n"
+  }
+]

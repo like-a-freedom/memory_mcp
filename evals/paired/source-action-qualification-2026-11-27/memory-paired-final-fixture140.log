@@ -1,0 +1,37 @@
+...............................................................memory-mcp-201-previous
+  answered operations=False
+memory-mcp-201-current
+  answered operations=False
+memory-mcp-202-current
+  answered operations=False
+memory-mcp-202-previous
+  answered operations=False
+memory-mcp-203-previous
+  answered operations=False
+memory-mcp-203-current
+  answered operations=False
+memory-cli-201-previous
+  answered operations=False
+memory-cli-201-current
+  answered operations=False
+memory-cli-202-current
+  answered operations=False
+memory-cli-202-previous
+  answered operations=False
+memory-cli-203-previous
+  answered operations=False
+memory-cli-203-current
+  answered operations=False
+..................................................memory-mcp-1-previous
+  client_error operations=False
+memory-mcp-1-current
+  client_error operations=False
+memory-cli-1-previous
+  client_error operations=False
+memory-cli-1-current
+  client_error operations=False
+...........................
+----------------------------------------------------------------------
+Ran 140 tests in 22.807s
+
+OK

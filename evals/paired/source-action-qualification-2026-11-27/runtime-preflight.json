@@ -1,0 +1,29 @@
+{
+  "scope": "startup only, no task/gold score",
+  "elapsed_seconds": 0.9321795830037445,
+  "response": {
+    "id": "chatcmpl-0f07a641-395e-4e23-ad08-e023dc36d597",
+    "system_fingerprint": "0.32.2-0.32.4-macOS-27.2.1-arm64-arm-64bit-Mach-O-applegpu_g17s",
+    "object": "chat.completion",
+    "model": "/Users/solovey/.cache/lm-studio/models/lmstudio-community/Qwen3.8-27B-MLX-4bit",
+    "created": 1795809688,
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "length",
+        "message": {
+          "role": "assistant",
+          "content": "Hello! I'm ready to help."
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 15,
+      "completion_tokens": 8,
+      "total_tokens": 23,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

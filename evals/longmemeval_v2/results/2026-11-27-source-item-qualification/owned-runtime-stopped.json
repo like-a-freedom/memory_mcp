@@ -1,0 +1,8 @@
+{
+  "pid": 62977,
+  "owned_runtime_identity_sha256": "47d1cecdbddd72172551ec2eb951846926a20a05b5463d27e88244a9bf97647d",
+  "owned_actual_mlx_command_verified": true,
+  "signal": "SIGTERM",
+  "terminated": true,
+  "scope": "only the inference server launched for these captures"
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "source-workflow-review-resolution/v1",
+  "independent_read_only_review": true,
+  "critical": 0,
+  "important": 4,
+  "minor_regraded_important_for_fairness": 1,
+  "declined_to_judge": [],
+  "fixed": [
+    "Fresh recall/explain fact and episode identity, envelope/process status and actual returned snapshot",
+    "Nonempty answer string list and duplicate oracle JSON key rejection before freeze",
+    "Mandatory source-contract and exact-answer-matcher hashes before one-shot claim",
+    "Canonical cases checked for both fresh and default legacy cohort labels",
+    "One-to-eight reference and 8000 decoded-scalar limits disclosed before inference"
+  ],
+  "fix_passes": 1,
+  "reader_tests": {
+    "total": 150,
+    "passed": 139,
+    "skipped": 11
+  },
+  "paired_tests": {
+    "total": 94,
+    "passed": 94
+  },
+  "legacy_prompt_identity": {
+    "reader": 213,
+    "workflow": 32
+  },
+  "deferred_findings": [],
+  "qualification_outputs_reviewed": false,
+  "reader_sdk_verification": {
+    "total": 150,
+    "passed": 145,
+    "skipped": 5,
+    "skip_reason": "native upstream restore integration requires explicit binary; scheduled after v2.1.0 rebuild"
+  }
+}

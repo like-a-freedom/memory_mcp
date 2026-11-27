@@ -1,0 +1,30 @@
+F
+======================================================================
+FAIL: test_reader_replay_uses_archived_matcher_despite_live_matcher_drift (evals.paired.test_capture_replay_integration.FrozenCaptureReplayTests.test_reader_replay_uses_archived_matcher_despite_live_matcher_drift)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_capture_replay_integration.py", line 26, in test_reader_replay_uses_archived_matcher_despite_live_matcher_drift
+    self.assertEqual(result.returncode,0,result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import runpy; import evals.longmemeval_v2.exact_answer_quality as live; live.exact_phrase_set_match = lambda *args, **kwargs: False; runpy.run_path('/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py', run_name="__main__")
+                                                                                                                                         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen runpy>", line 292, in run_path
+  File "<frozen runpy>", line 97, in _run_module_code
+  File "<frozen runpy>", line 87, in _run_code
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py", line 112, in <module>
+    print(json.dumps(replay(),indent=2))
+                     ~~~~~~^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py", line 71, in replay
+    require(result==report['variants'][variant],'report replay '+cohort+variant)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py", line 21, in require
+    raise ValueError(message)
+ValueError: report replay shared40source-item-final-first
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.302s
+
+FAILED (failures=1)

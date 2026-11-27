@@ -1,0 +1,15 @@
+test_whole_item_freeze_rejects_gold_requiring_an_oversized_item (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_whole_item_freeze_rejects_gold_requiring_an_oversized_item) ... FAIL
+
+======================================================================
+FAIL: test_whole_item_freeze_rejects_gold_requiring_an_oversized_item (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_whole_item_freeze_rejects_gold_requiring_an_oversized_item)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 64, in test_whole_item_freeze_rejects_gold_requiring_an_oversized_item
+    with self.assertRaisesRegex(ValueError,'legal whole-item'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.011s
+
+FAILED (failures=1)

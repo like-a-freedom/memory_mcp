@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_non_string_optional_fields_follow_public_parser_defaults (evals.paired.test_skill_source_actions.SourceActionTests.test_non_string_optional_fields_follow_public_parser_defaults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 169, in test_non_string_optional_fields_follow_public_parser_defaults
+    self.assertTrue(grade['source_sufficient'])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

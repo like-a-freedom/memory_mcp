@@ -1,0 +1,253 @@
+{
+  "schema": "bounded-workflow-source-review/v1",
+  "at_utc": "2026-11-27T19:03:01.158564+00:00",
+  "reviewer": "primary implementation agent; source-based non-blinded review, not independent adjudication",
+  "frozen_plan_sha256": "53c4db5dff11ea3002997eabf26b52eb6c31dc458eb5619939cff6f2ef52e824",
+  "rubric": "Frozen operation predicate retained unchanged; every observed answer reviewed against expected_behavior and raw native receipts. Missing answer is not a semantic pass. No response or quote repair.",
+  "scheduled": 12,
+  "answered": 10,
+  "semantically_correct_observed_answers": 10,
+  "strict_full_pass": 6,
+  "rows": [
+    {
+      "identity": "memory-cli-101-current",
+      "trial_sha256": "848ecaf48e47604893e535f7821cc781983c1009cc16ba2b631e39bcf3ce6c19",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 101,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Exact confirmed source ingested then extracted; actual episode and decision fact reported with truthful verified status and no warnings."
+      ]
+    },
+    {
+      "identity": "memory-cli-101-previous",
+      "trial_sha256": "a91c4349c859773169312672f79fba62bbf89fdd9424528b925e5b5717c2d3ad",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 101,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Exact confirmed source ingested then extracted; actual episode and decision fact reported with truthful verified status and no warnings."
+      ]
+    },
+    {
+      "identity": "memory-cli-102-current",
+      "trial_sha256": "1ff0c48946bb34178a7e2488e2d6ac229268abfc502ee2b5d05cbf4fb8ba7e18",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 102,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Native recall returned episode_fallback, not a canonical fact. The whole returned item was forwarded unchanged to explain; exact full original source window and episode/source ID returned.",
+        "Final decision and source match receipts; answer explicitly retains fallback and quote-not-verified limitations.",
+        "The frozen fresh operation predicate requires a canonical fact: full FAIL is retained. This is a restrictive qualification contract, not an incorrect final decision or borrowed source."
+      ]
+    },
+    {
+      "identity": "memory-cli-102-previous",
+      "trial_sha256": "6000f6b1d4c6d9640687ee4e39384cdf3e3b86b588d8c9b295ac7ec6b5d1f024",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 102,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Native recall returned episode_fallback, not a canonical fact. The whole returned item was forwarded unchanged to explain; exact full original source window and episode/source ID returned.",
+        "Final decision and source match receipts; answer explicitly retains fallback and quote-not-verified limitations.",
+        "The frozen fresh operation predicate requires a canonical fact: full FAIL is retained. This is a restrictive qualification contract, not an incorrect final decision or borrowed source."
+      ]
+    },
+    {
+      "identity": "memory-cli-103-current",
+      "trial_sha256": "66963aedb93629da8fd9bae2aa19acd107bb0f80cf9026fef3e0aedbf2dcba7c",
+      "arm": "current",
+      "skill": "memory-cli",
+      "id": 103,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "CLI passed requested valid_at/known_at and actual returned snapshot matches. Recall\u2192explain returns matching canonical fact, episode, source and complete exact citation context.",
+        "Final decision/source/time and partial-coverage/quote-not-verified limitations match the receipts. No invented quote verification."
+      ]
+    },
+    {
+      "identity": "memory-cli-103-previous",
+      "trial_sha256": "6d4821428865b0fcf8d307016557e990f5305337d2f43cabff644d72547ebe0c",
+      "arm": "previous",
+      "skill": "memory-cli",
+      "id": 103,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": true,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "CLI passed requested valid_at/known_at and actual returned snapshot matches. Recall\u2192explain returns matching canonical fact, episode, source and complete exact citation context.",
+        "Final decision/source/time and partial-coverage/quote-not-verified limitations match the receipts. No invented quote verification."
+      ]
+    },
+    {
+      "identity": "memory-mcp-101-current",
+      "trial_sha256": "6a82e303d3717cd7393ac19b22589e2b652e2ba9cd7132da9b7c08d91ef7e795",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 101,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Exact confirmed source ingested then extracted; actual episode and decision fact reported with truthful verified status and no warnings."
+      ]
+    },
+    {
+      "identity": "memory-mcp-101-previous",
+      "trial_sha256": "8f915c4044cf4ca57ce64c1399f986117f7327ba7d984d46a9cdb5e6391053bd",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 101,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": null,
+      "registered_operation_pass": true,
+      "full_pass": true,
+      "observations": [
+        "Exact confirmed source ingested then extracted; actual episode and decision fact reported with truthful verified status and no warnings."
+      ]
+    },
+    {
+      "identity": "memory-mcp-102-current",
+      "trial_sha256": "79e4f34ec881ebd80541fbfe4add806431afeec5c5e6eafcbd1028992f8ea929",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 102,
+      "binding": "native",
+      "terminal": "error",
+      "answer_reviewed": false,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "semantic_clauses": null,
+      "time_report_correct": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Model omitted top-level source_episode while reconstructing the explain item; the native assembly response did provide that field.",
+        "MCP validation error terminated the harness play loop. No final answer; operation and completion FAIL. A tool validation error is not an HTTP inference timeout."
+      ]
+    },
+    {
+      "identity": "memory-mcp-102-previous",
+      "trial_sha256": "dcd8e2b2d244b1d5875301a2dae6309c3d67f6c60e40781db7c7e65476df0324",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 102,
+      "binding": "native",
+      "terminal": "error",
+      "answer_reviewed": false,
+      "source_report_correct": null,
+      "status_report_correct": null,
+      "semantic_clauses": null,
+      "time_report_correct": null,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Model omitted top-level source_episode while reconstructing the explain item; the native assembly response did provide that field.",
+        "MCP validation error terminated the harness play loop. No final answer; operation and completion FAIL. A tool validation error is not an HTTP inference timeout."
+      ]
+    },
+    {
+      "identity": "memory-mcp-103-current",
+      "trial_sha256": "a90e5907ac28b9a885869d6037243be45a991ac4a46cee64e071dbfe8328ffcb",
+      "arm": "current",
+      "skill": "memory-mcp",
+      "id": 103,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": true,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Returned valid_at and known_at exactly match requested boundaries; actual canonical fact, episode and source IDs match final answer.",
+        "Agent first supplied unsupported explain selectors/fields, then repaired them. The denied request remains an operation FAIL; no frozen regrade.",
+        "Final answer correctly reports historical partial coverage, full exact source window and quote_verified=false."
+      ]
+    },
+    {
+      "identity": "memory-mcp-103-previous",
+      "trial_sha256": "c1487ffbb549a743e8553717138662b577444a4b8f8d3f0fa35887043debaed8",
+      "arm": "previous",
+      "skill": "memory-mcp",
+      "id": 103,
+      "binding": "native",
+      "terminal": "answered",
+      "answer_reviewed": true,
+      "source_report_correct": true,
+      "status_report_correct": true,
+      "semantic_clauses": true,
+      "time_report_correct": true,
+      "registered_operation_pass": false,
+      "full_pass": false,
+      "observations": [
+        "Returned valid_at and known_at exactly match requested boundaries; actual canonical fact, episode and source IDs match final answer.",
+        "Agent first supplied unsupported explain selectors/fields, then repaired them. The denied request remains an operation FAIL; no frozen regrade.",
+        "Final answer correctly reports historical partial coverage, full exact source window and quote_verified=false."
+      ]
+    }
+  ]
+}

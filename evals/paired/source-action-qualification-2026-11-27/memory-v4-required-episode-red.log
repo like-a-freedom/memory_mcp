@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_matching_fact_without_required_episode_cannot_bind (evals.paired.test_skill_source_actions.SourceActionTests.test_matching_fact_without_required_episode_cannot_bind)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 122, in test_matching_fact_without_required_episode_cannot_bind
+    self.assertFalse(grade_observed(self.case,{'terminal':'answered'},self.trace)['source_sufficient'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

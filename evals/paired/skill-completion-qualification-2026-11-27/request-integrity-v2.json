@@ -1,0 +1,16 @@
+{
+  "schema": "bounded-workflow-request-integrity/v2",
+  "scope": "Post-capture request log integrity pin, preserving the v1 receipt and all grades.",
+  "previous_integrity_sha256": "ce12986d66271f0dcaee69a4b7340c12963fa1f06e9e11766ec73076d1206fdb",
+  "decision_sha256": "7517c7de40e256c09923d71c9f613f515333fa9ed4e8077987451bed1c581022",
+  "cohorts": {
+    "legacy-regression": {
+      "inference-events.jsonl": "545df1594c8efcaff589a871a410c4b0481df40494854ec8698106e2c118fb32",
+      "inference-attempts.jsonl": "81850aaf7a6ec8e4d53253a013f16609c2298a4aba8d7da2aeb90ae833ffcdb4"
+    },
+    "fresh-native": {
+      "inference-events.jsonl": "fd665bfcf9dc5bca261332be9ec7fc9d7cb4e2609293c0367b216f9086baddfd",
+      "inference-attempts.jsonl": "38071b7e58698c0b04058242214ec4274846baf939f91b1c512491112fd86f22"
+    }
+  }
+}

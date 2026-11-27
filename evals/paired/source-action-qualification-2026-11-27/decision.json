@@ -1,0 +1,35 @@
+{
+  "schema": "source-action-qualification-decision/v1",
+  "scheduled": 12,
+  "answered": 12,
+  "operation_passes_frozen_v3": 8,
+  "semantic_passes": 8,
+  "full_passes": 6,
+  "by_arm": {
+    "previous": {
+      "scheduled": 6,
+      "full": 3
+    },
+    "current": {
+      "scheduled": 6,
+      "full": 3
+    }
+  },
+  "requests": {
+    "started": 54,
+    "terminal": 54,
+    "outcomes": {
+      "success": 54
+    },
+    "retries": 0
+  },
+  "decision": "FAIL",
+  "minimum_required_current_full": 6,
+  "review_sha256": "be3aa8fe7b6036e147dbd0534ff3989844c4b3b02fb3f2fdb5c021847b562fe6",
+  "interpretation": [
+    "v3 incorrectly rejects minimal API-valid MCP selections in four trials; these frozen grades stay unchanged",
+    "all four timed final answers fail source status and/or snapshot claim requirements",
+    "new v4 predicate is deterministic-only; no model re-run or retroactive pass",
+    "no independent memory-benefit evidence; C2 remains NO_GO"
+  ]
+}

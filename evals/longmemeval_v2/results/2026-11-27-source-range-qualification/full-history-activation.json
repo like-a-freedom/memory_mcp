@@ -1,0 +1,7 @@
+{
+  "schema": "source-range-conditional-full-history/v1",
+  "activated": false,
+  "reason": "strict all40 qualification failed; seven-case inference not activated",
+  "conditional_cases": 7,
+  "actual_calls_so_far": 0
+}
