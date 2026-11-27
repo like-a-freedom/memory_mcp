@@ -1,0 +1,86 @@
+{
+  "schema_version": "memory-mcp-release-feature-recovery/v1",
+  "source_commit": "dab6bdd02dc02eae0e8faa1930a22e0c034cb026",
+  "parent_failed_run": 45940933092,
+  "cause": "PathBuf test import lacked fs-watch gate; CI denies warnings in no-default-feature builds.",
+  "change": "Gate import with the same feature as both consumers; no runtime or acceptance-rule change.",
+  "red": {
+    "command": "CARGO_BUILD_WARNINGS=deny cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http,test-fixtures --locked",
+    "exit_code": 101,
+    "log_sha256": "7cf2c622d8f81a2ae8d2ab8f14d5e4b8b8b0235dbd400fd97fa43c16fd6e83e2"
+  },
+  "green_http": {
+    "same_command_as_red": true,
+    "exit_code": 0,
+    "log_sha256": "3e2b8ecbda8db7a7363a13318bf0bc0aa61650093c0ff850dd6f47d17199fadb"
+  },
+  "remaining_checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "memory_mcp",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "control-plane,test-fixtures",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 0.8872582090261858,
+      "log_sha256": "3819f5a7ceecd9222e0fbd258fbc5b3461b920ebd412d521eff393866d195f71"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "memory_mcp",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "prometheus,test-fixtures",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 123.82323541698861,
+      "log_sha256": "3754072e90cf6570768aeb2d6c6cd1ee643affc058abf2d6969cc0b8362bd568"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 27.47195350000402,
+      "log_sha256": "7750d3960b82b75c154e9a7beb2e0748085f21252755e41c9e805ed83d8dea6b"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.6018264169979375,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_WARNINGS": "deny",
+    "platform": "native Apple Silicon"
+  },
+  "runtime_regression_evidence": "../release-2.0.1/local-preflight.json",
+  "public_gate": "../release-2.0.1/public-gate/current-regression.json",
+  "hosted_publication": "pending"
+}

@@ -1,0 +1,322 @@
+{
+  "conclusion": "failure",
+  "headSha": "6ef9634b746f1b76d3e3b80ca28b84a5f5f1e469",
+  "jobs": [
+    {
+      "name": "ref",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require the exact release tag",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / Validate manual release ref",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require the exact manual release ref",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / SurrealDB 3.3.5 remote compatibility",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start pinned SurrealDB server",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run remote compatibility and retrieval contracts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run remote local-admin transaction contracts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop SurrealDB server",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / SurrealDB 4.0.1 remote compatibility",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start pinned SurrealDB server",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run remote compatibility and retrieval contracts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run remote local-admin transaction contracts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop SurrealDB server",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / Lint, tests and evaluation",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo fmt --all --check",
+          "conclusion": "success"
+        },
+        {
+          "name": "Workspace and HTTP fixture lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require the image and CI to build on the pinned toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Control-plane UI WASM lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "Observability rules, alerts and dashboards",
+          "conclusion": "success"
+        },
+        {
+          "name": "SurrealDB 3.x embedded conversion and rollback",
+          "conclusion": "success"
+        },
+        {
+          "name": "Default workspace tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Filesystem-disabled process tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Optional feature tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Embedding mode and dimension transition tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Storage materialization allocation regressions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Storage memory evidence validators",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check the HTTP profile and its internal back-compat name",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Post Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / Evaluation and perf smoke",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Cache immutable evaluation models",
+          "conclusion": "success"
+        },
+        {
+          "name": "Prepare and verify native evaluation models",
+          "conclusion": "success"
+        },
+        {
+          "name": "Evaluation gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build public memory executable for deterministic decisions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Current deterministic memory regression",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Perf smoke",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Cache immutable evaluation models",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/setup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7.0.1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / CI passed",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require every check this event is supposed to run",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build / Docker linux/amd64",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "name": "build / matrix.target",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "name": "publish",
+      "conclusion": "skipped",
+      "steps": []
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/like-a-freedom/memory_mcp/actions/runs/45940933092",
+  "failure_log_sha256": "a3b8323237a9c2100981bc2f27d055892a8b0679cb7caf2531e8a6cab2c257d7"
+}

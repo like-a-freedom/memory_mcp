@@ -1,4 +1,4 @@
-# Release 2.0.1: recovery from the 2.0.0 pipeline failure
+# Release 2.0.2: recovery from the 2.0.0 pipeline failure
 
 The [initial v2.0.0 release pipeline](https://github.com/like-a-freedom/memory_mcp/actions/runs/45898634886)
 failed. Its native release profile passed 154/154 and response-size passed 62/62;
@@ -31,6 +31,26 @@ CI now accepts the exact dispatch tag when supplied by the release wrapper; dire
 CI preflight remains master-only. Four routing controls executed the actual YAML
 shell block, including rejection of mismatched tags and feature branches. These
 configuration controls are not counted as production scenario coverage.
+
+## Second hosted attempt
+
+The [v2.0.1 pipeline](https://github.com/like-a-freedom/memory_mcp/actions/runs/45940933092)
+passed release evaluation (154/154, all 12 gates), response size (62/62),
+the deterministic public gate (8/8, no regressions), perf smoke, both remote
+compatibility jobs, migration, default/optional tests and storage allocation
+regressions. It then failed the no-default HTTP profile check because a
+`PathBuf` test import was unconditional, while both consumers require `fs-watch`.
+CI correctly denies this warning. Packaging and publication were skipped again;
+no binary assets were published for v2.0.1.
+
+The missing feature combination was not run in the first local preflight.
+The warning was subsequently reproduced locally with `CARGO_BUILD_WARNINGS=deny`
+(exit 101), then the import was gated by the same feature as its consumers.
+No runtime code or test acceptance criterion changed. All three exact CI
+no-default-feature profiles subsequently passed locally with warnings denied,
+along with repeated workspace clippy and fmt. See the [feature preflight](../../evals/results/release-2.0.2/feature-preflight.json).
+The archived [v2.0.1 public gate](../../evals/results/release-2.0.1/public-gate/current-regression.json)
+contains all eight raw receipts with their canonical hashes.
 
 ## Verification boundaries
 
