@@ -1,0 +1,54 @@
+{
+  "schema": "source-action-v4-descriptive-cost/v1",
+  "attempts_sha256": "4f528db523416cf66c40ac420905482e4561f2195981ee29e27add34e6a64481",
+  "by_arm": {
+    "previous": {
+      "trials": 6,
+      "requests": 27,
+      "reported_prompt_tokens": 87429,
+      "reported_completion_tokens": 2183,
+      "reported_cached_prompt_tokens": 70351,
+      "observed_request_seconds_sum": 176.53873691731133,
+      "observed_trial_seconds_sum": 219.36498200002825,
+      "maximum_request_seconds": 16.828585000010207,
+      "maximum_trial_seconds": 45.25541058398085
+    },
+    "current": {
+      "trials": 6,
+      "requests": 27,
+      "reported_prompt_tokens": 89722,
+      "reported_completion_tokens": 2198,
+      "reported_cached_prompt_tokens": 76088,
+      "observed_request_seconds_sum": 168.99273366690613,
+      "observed_trial_seconds_sum": 212.17866620904533,
+      "maximum_request_seconds": 17.065982958010864,
+      "maximum_trial_seconds": 46.223145042022225
+    }
+  },
+  "request_scope": "54 study requests plus one separately retained startup request; health probes are not inference",
+  "study_inference_requests": 54,
+  "startup_inference_requests": 1,
+  "total_observed_inference_requests": 55,
+  "startup_preflight_sha256": "a622ba7129b45f64e6f4449b6534daf23b076e5d78c3973fa0154dbcf15e03cc",
+  "startup_preflight_seconds": 1.179160458035767,
+  "startup_reported_usage": {
+    "prompt_tokens": 15,
+    "completion_tokens": 8,
+    "total_tokens": 23,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "trials_exceeding_prospective_20_second_whole_trial_assumption": 12,
+  "scheduled_trials": 12,
+  "illustrative_24_family_pilot_bound_at_current_caps_seconds": 10080,
+  "bound_scope": "current180s whole-trial cap plus prospective30s formation; excludes startup/export; not an activated C2 registration or predicted cost",
+  "interpretation": [
+    "Request20s and whole-trial180s are different budgets. All12 observed trials exceed20s.",
+    "Do not use the prospective20s whole-trial assumption as measured feasibility.",
+    "Recorded trial-minus-request time includes tool/host/other gaps; it is not a measured storage stage.",
+    "Prefix-cache usage differs; bundled treatment and fixed execution order preclude a causal speed claim.",
+    "Reported prompt tokens include repeated cached context; no billing, engine-memory or uncached-token-cost inference.",
+    "No model calls, no changes to acceptance or historical outputs."
+  ]
+}
