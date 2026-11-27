@@ -199,7 +199,7 @@ jobs:
         run: cargo build -p memory_mcp --bin memory_mcp --features streamable-http --locked
       - name: Current deterministic memory regression
         env:
-          MEMORY_DECISIONS_SERVER_BIN: ${{ github.workspace }}/target/debug/memory_mcp
+          MEMORY_DECISIONS_SERVER_BIN: ${{ github.workspace }}/target/${{ env.CARGO_BUILD_TARGET }}/debug/memory_mcp
           MEMORY_QUALITY_GATE_OUTPUT: ${{ github.workspace }}/target/evals/deterministic-memory
         run: cargo test -p eval-harness --test deterministic_quality_gate --locked -- --ignored
       - uses: actions/upload-artifact@v7

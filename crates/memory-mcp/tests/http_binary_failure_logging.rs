@@ -45,6 +45,62 @@ fn serve_failed_is_structured() {
         command.env(key, value);
     }
 
+    let (status, stderr) = run_failure(command);
+    drop(listener);
+
+    assert!(!status.success(), "a bind failure must exit non-zero");
+    assert!(
+        stderr.contains("\"op\":\"http.serve_failed\""),
+        "the bind failure must be a structured event, not prose: {stderr}"
+    );
+    assert!(
+        stderr.contains("\"level\":\"error\""),
+        "the bind failure must be at ERROR: {stderr}"
+    );
+}
+
+#[test]
+fn maintenance_failure_preserves_safe_recovery_guidance_without_error_details() {
+    let config =
+        HttpServerConfig::default().with_tenant(TestTenant::new("conformance", BOOTSTRAP_KEY));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"));
+    command.env_clear();
+    for (key, value) in build_env(&config, "mem://") {
+        command.env(key, value);
+    }
+    command
+        .arg("surrealdb-v4-maintenance")
+        .env("RUST_LOG", "info")
+        .env("MEMORY_LOG_FORMAT", "json")
+        .env("MEMORY_MCP_HTTP_AUTH_METHODS", "private-error-canary")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let (status, stderr) = run_failure(command);
+    assert!(!status.success());
+    let event = stderr
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|event| event["op"] == "http.maintenance_failed")
+        .expect("structured maintenance failure");
+    assert_eq!(event["error"], "[redacted]");
+    assert!(!stderr.contains("private-error-canary"), "{stderr}");
+    let guidance = event["guidance"].as_str().expect("safe operator guidance");
+    assert!(guidance.contains("Keep HTTP offline"), "{guidance}");
+    assert!(
+        guidance.contains("partial conversion possible"),
+        "{guidance}"
+    );
+    assert!(
+        guidance.contains("SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true"),
+        "{guidance}"
+    );
+    assert!(
+        guidance.contains("restore") && guidance.contains("backup"),
+        "{guidance}"
+    );
+}
+
+fn run_failure(mut command: Command) -> (std::process::ExitStatus, String) {
     let mut child = command.spawn().expect("spawn memory_mcp_http");
     let mut stderr_pipe = child.stderr.take().expect("stderr piped");
     // Read on a thread with a bound: a regression that stops the server from
@@ -64,15 +120,6 @@ fn serve_failed_is_structured() {
         }
     };
     let status = child.wait().expect("reap memory_mcp_http");
-    drop(listener);
 
-    assert!(!status.success(), "a bind failure must exit non-zero");
-    assert!(
-        stderr.contains("\"op\":\"http.serve_failed\""),
-        "the bind failure must be a structured event, not prose: {stderr}"
-    );
-    assert!(
-        stderr.contains("\"level\":\"error\""),
-        "the bind failure must be at ERROR: {stderr}"
-    );
+    (status, stderr)
 }

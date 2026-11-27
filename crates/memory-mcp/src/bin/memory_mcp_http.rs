@@ -20,16 +20,29 @@ use memory_mcp::logging::StdoutLogger;
 /// failure — goes through the same sink, level and format as the rest of the
 /// process, and joins the stream an operator already collects.
 fn log_failure(op: &str, error: &dyn std::fmt::Display) {
-    memory_mcp::logging::emit(
-        std::collections::HashMap::from([
-            ("op".to_string(), serde_json::Value::String(op.to_string())),
-            (
-                "error".to_string(),
-                serde_json::Value::String(error.to_string()),
+    let mut event = std::collections::HashMap::from([
+        ("op".to_string(), serde_json::Value::String(op.to_string())),
+        (
+            "error".to_string(),
+            serde_json::Value::String(error.to_string()),
+        ),
+    ]);
+    if op == "http.maintenance_failed" {
+        // Static operator instructions survive redaction; backend details,
+        // credentials and caller-controlled values remain in the error field.
+        event.insert(
+            "guidance".to_string(),
+            serde_json::Value::String(
+                concat!(
+                    "Keep HTTP offline: partial conversion possible. Preserve the pre-upgrade backup. ",
+                    "Check upgrade preconditions; resume with SURREAL_EXPERIMENTAL_UPGRADE_FROM_3X=true ",
+                    "or restore the coordinated backup."
+                )
+                .to_string(),
             ),
-        ]),
-        memory_mcp::logging::LogLevel::Error,
-    );
+        );
+    }
+    memory_mcp::logging::emit(event, memory_mcp::logging::LogLevel::Error);
 }
 
 /// Record glibc's allocator tunables and this process's `mallinfo2` summary.

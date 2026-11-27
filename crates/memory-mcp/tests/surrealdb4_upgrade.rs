@@ -221,9 +221,10 @@ fn http_command(control_path: &Path, tenant_path: &Path, allow_upgrade: bool) ->
     command
 }
 
-fn interrupt_at_second_migration_checkpoint(mut command: Command) -> String {
+fn interrupt_at_second_migration_checkpoint(mut command: Command) -> Vec<u64> {
     command
         .env("RUST_LOG", "trace")
+        .env("MEMORY_LOG_FORMAT", "json")
         .env("MEMORY_LOG_TARGETS", "surrealdb::core::kvs::migration=info");
     let mut child = command
         .stdout(Stdio::piped())
@@ -241,15 +242,23 @@ fn interrupt_at_second_migration_checkpoint(mut command: Command) -> String {
     });
     let deadline = Instant::now() + PROCESS_TIMEOUT;
     let mut observed = Vec::new();
-    let mut migrations = 0;
+    let mut migrations = Vec::new();
 
     loop {
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(line) => {
-                if line.contains("Applying data migration") {
-                    migrations += 1;
+                // The dependency's message and migration name are intentionally
+                // redacted. Its structured numeric ID identifies the checkpoint.
+                let event = serde_json::from_str::<serde_json::Value>(&line).ok();
+                let migration_id = event.as_ref().and_then(|event| {
+                    (event["target"] == "surrealdb::core::kvs::migration")
+                        .then(|| event["fields"]["id"].as_u64())
+                        .flatten()
+                });
+                if let Some(migration_id) = migration_id {
+                    migrations.push(migration_id);
                     observed.push(line);
-                    if migrations == 2 {
+                    if migrations.len() == 2 {
                         child
                             .kill()
                             .expect("interrupt at second conversion checkpoint");
@@ -260,7 +269,7 @@ fn interrupt_at_second_migration_checkpoint(mut command: Command) -> String {
                             !status.success(),
                             "conversion unexpectedly completed at the interruption checkpoint"
                         );
-                        return observed.join("\n");
+                        return migrations;
                     }
                 }
             }
@@ -404,7 +413,8 @@ async fn assert_interrupted_primary_conversion(engine: LegacyEngine) {
     copy_tree(&store, &backup).expect("make cold backup copy");
 
     let checkpoint = interrupt_at_second_migration_checkpoint(primary_command(&store, true));
-    assert!(checkpoint.contains("Applying data migration"));
+    // The pinned 3.3.5 fixture has already applied IDs 1-3.
+    assert_eq!(checkpoint, [4, 6]);
     let resumed = run_bounded(primary_command(&store, true), PROCESS_TIMEOUT);
     assert_success(resumed, "resume interrupted primary conversion");
     let restart = run_bounded(primary_command(&store, false), PROCESS_TIMEOUT);
@@ -438,7 +448,8 @@ async fn assert_interrupted_http_conversion(engine: LegacyEngine) {
 
     let checkpoint =
         interrupt_at_second_migration_checkpoint(http_command(&control, &tenant, true));
-    assert!(checkpoint.contains("Applying data migration"));
+    // The pinned 3.3.5 fixture has already applied IDs 1-3.
+    assert_eq!(checkpoint, [4, 6]);
     let resumed = run_bounded(http_command(&control, &tenant, true), PROCESS_TIMEOUT);
     assert_success(resumed, "resume interrupted HTTP conversion");
     let restart = run_bounded(http_command(&control, &tenant, false), PROCESS_TIMEOUT);
