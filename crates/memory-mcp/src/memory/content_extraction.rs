@@ -446,6 +446,7 @@ pub(crate) fn watch_reference_time(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "fs-watch")]
     use std::path::PathBuf;
 
     #[tokio::test]
