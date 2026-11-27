@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from evals.longmemeval_v2.reader_protocol import classify, protocol_messages, freeze
 
 VARIANT = 'source-range-final-first'
-ITEM_VARIANT = 'source-item-final-first'
+ITEM_VARIANT = 'source-item-raw-final-first'
 
 
 def item_handles(row):
@@ -25,6 +25,18 @@ class SourceReferenceTests(unittest.TestCase):
         self.truth = {'answer_kind':'single_value','accepted_answers':['42 days'],
                       'evidence_alternatives':[[{'source_item_index':0,'raw_sha256':self.sha,
                                                  'raw_range':[0,19]}]]}
+
+    def test_raw_item_protocol_delivers_source_without_an_interpretation_graph(self):
+        self.row['memory_context'] = [{'type':'text','value':
+            "[1] navigation 'Menu'\n  [2] link 'Archive'\n"}]
+        try:
+            messages = protocol_messages(self.row,'source-item-raw-final-first')
+        except ValueError as error:
+            self.fail(f'raw-only source delivery must be registered: {error}')
+
+        self.assertEqual([message['role'] for message in messages],['system','user'])
+        self.assertEqual(messages[-1]['content'].split('):\n',1)[1],
+            "[1] navigation 'Menu'\n  [2] link 'Archive'\n")
 
     def test_whole_item_selects_existing_text_without_copying_hashes_or_line_ranges(self):
         messages = protocol_messages(self.row,ITEM_VARIANT)
@@ -66,6 +78,51 @@ class SourceReferenceTests(unittest.TestCase):
             catalog = json.loads((root/'capture/item-reference-catalog.json').read_text())
             self.assertEqual(catalog['numeric'][item_handles(self.row)[0]]['raw_sha256'],self.sha)
             self.assertEqual(catalog['numeric'][item_handles(self.row)[0]]['text'],self.raw)
+
+    def test_raw_item_freeze_stores_only_direct_source_projection(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows,truth = root/'rows.jsonl',root/'truth.json'
+            rows.write_text(json.dumps(self.row)+'\n')
+            truth.write_text(json.dumps({'cases':{'numeric':self.truth}}))
+
+            freeze(root/'capture',rows,truth,'controlled','http://127.0.0.1:9999/v1',variants=[ITEM_VARIANT])
+
+            projection = json.loads((root/'capture/projection.json').read_text())
+            self.assertNotIn('graph',projection['numeric'][0])
+            plan = json.loads((root/'capture/registration.json').read_text())
+            self.assertEqual(plan['variant_treatments'][ITEM_VARIANT],
+                ['whole_item_response_contract','source_identity','reviewed_support_coverage',
+                 'whole_delivered_source','raw_source_only'])
+
+    def test_mixed_freeze_retains_navigation_for_the_range_protocol(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows,truth = root/'rows.jsonl',root/'truth.json'
+            rows.write_text(json.dumps(self.row)+'\n')
+            truth.write_text(json.dumps({'cases':{'numeric':self.truth}}))
+
+            freeze(root/'capture',rows,truth,'controlled','http://127.0.0.1:9999/v1',
+                   variants=[VARIANT,ITEM_VARIANT])
+
+            projection = json.loads((root/'capture/projection.json').read_text())
+            self.assertIn('graph',projection['numeric'][0])
+            prompts = json.loads((root/'capture/prompts.json').read_text())['numeric']
+            self.assertEqual(len(prompts[VARIANT]),3)
+            self.assertEqual(len(prompts[ITEM_VARIANT]),2)
+
+    def test_retired_whole_item_registration_is_rejected_before_capture_creation(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows,truth = root/'rows.jsonl',root/'truth.json'
+            rows.write_text(json.dumps(self.row)+'\n')
+            truth.write_text(json.dumps({'cases':{'numeric':self.truth}}))
+
+            with self.assertRaises(ValueError):
+                freeze(root/'capture',rows,truth,'controlled','http://127.0.0.1:9999/v1',
+                       variants=['source-item-final-first'])
+
+            self.assertFalse((root/'capture').exists())
 
     def test_whole_item_freeze_rejects_gold_requiring_an_oversized_item(self):
         raw = 'A'*8001

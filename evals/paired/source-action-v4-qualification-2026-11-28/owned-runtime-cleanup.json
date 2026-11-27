@@ -1,0 +1,7 @@
+{
+  "pid": 77208,
+  "returncode": -15,
+  "elapsed_seconds": 444.5894297499908,
+  "at_utc": "2026-11-27T21:36:04.189684+00:00",
+  "scope": "only the child process created by this coordinator was stopped; no LM Studio service used"
+}

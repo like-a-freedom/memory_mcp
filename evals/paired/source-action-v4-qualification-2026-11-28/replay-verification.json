@@ -1,0 +1,8 @@
+{
+  "trials_reproduced": 12,
+  "operation_passes": 12,
+  "full_passes": 10,
+  "requests_started_and_terminal": 54,
+  "inference_calls": 0,
+  "review": "linked primary manual judgments, not independent re-adjudication"
+}

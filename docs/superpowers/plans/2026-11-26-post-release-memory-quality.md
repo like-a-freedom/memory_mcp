@@ -12,7 +12,7 @@
 
 ## Execution status — 27 November 2026
 
-See [new results and action plan](../../evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md). Checkboxes below indicate observed steps, not general correctness. No commits/push are made in this delivery; commit instructions are explicitly deferred.
+See [new results and action plan](../../evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md). Checkboxes below indicate observed steps, not general correctness. The user subsequently authorized commits and a minor2.1.0 release directly from master. Verified production work is committed; the new source-bound reader/workflow continuation is separate from that release candidate.
 
 | Task | Status | Evidence / limit |
 | --- | --- | --- |
@@ -175,8 +175,21 @@ The plan remains until testing and user acceptance. Full source restoration, phy
 
 - [x] Run affected deterministic tests, native memory gates and required clippy/fmt after owning code changes. Final Rust guard12+5, native8/37, required clippy/fmt and latest Python116+80+6 passed;11 optional LongMem tests skipped.
 - [x] Obtain independent final review and fix substantive findings through RED→GREEN. Final physical readiness finding fixed12+5; graph review found zero Important/Critical defects and validated243 raw ranges. Actual reader FAIL19/24 and skill FAIL8/32 retained.
-- [x] Reassess C2 qualification: versioned decision-v3 retains NO-GO after V7 source7/7 and graph19/24 FAIL; fresh qualified autonomous captures0, pilot/power/effect unobserved. No commits or publication in this delivery.
+- [x] Reassess C2 qualification: versioned decision-v5 retains NO-GO after V7 source7/7, source-range16/40 FAIL, progressive workflow current10/22 FAIL, source-action current3/6 and whole-item49/56 FAIL; fresh qualified autonomous captures0, pilot/power/effect unobserved. Historical capture delivery did not include publication; the authorized v2.1.0 candidate is now6740421e/run46058402331 after the failed96998c43/run46048168019 exposed a stale HTTP error-prose packaging assertion. Publication still requires exact green qualification.
 
 ## Final verification and retention
 
 Run smallest affected targets during each task; before shipping run required workspace clippy, fmt, affected crate/harness suites and deterministic memory gate. Use immutable product binaries for captures so concurrent Cargo builds cannot replace an evaluated executable. Archive compact command/outcome/hash receipts; keep generated weights, stores and caches outside tracked evidence. Preserve this plan until implementation, testing and user acceptance.
+
+
+## Source-bound continuation
+
+See [source-bound implementation plan](2026-11-27-source-bound-reader.md). Source-range80/80 calls completed; value35/40, actual binding39/40, proof17/40, strict16/40 FAIL. All40 gate failed, so conditional full7 calls0 and production defaults unchanged. This is not a new official LongMemEval score. The new44-trial progressive capture completed:37 answers,20 full,current10/22 FAIL under the unchanged22-current all-case gate. Historical32 outcomes and nine invalid model-alias HTTP404 receipts remain separate. Final source-based review is primary/non-blinded; deterministic post-capture recovery does not change scores.
+
+Continuation execution complete:44 trials/37 answers/20 full, current10/22 FAIL; no inference request timeouts in valid185 requests, distinct tool/response/turn faults retained. Primary source review is non-blinded. Post-capture correlated MCP argument errors now reach the agent as denied actual receipts, keeping failed operation grades; process/initialization/malformed errors remain terminal and subprocess pipes close. Six runtime RED→GREEN cycles,9 subprocess integration controls,103 paired tests; all44 saved operation grades/prompts and185 request starts/terminals replay. At that historical checkpoint no new inference had followed this deterministic fix; subsequent captures are reported below, and the earlier decision-v4 remains immutable. See the continuation plan/report for next measured actions.
+
+27 November UTC continuation: source-action v3 sole12-trial capture completed FAIL,6/12 full/current3/6, with54/54 requests and no retries. An API-valid minimal-selection evaluator defect is fixed only in v4; all140 affected paired controls pass after the final review fix and historical grades remain unchanged. Four timed answer claim errors remain qualification failures. Post-capture instructions are not yet dynamically qualified. Whole-item sole72-call capture completed319s: format/binding/proof56/56,values/strict49/56,2 value regressions,FAIL; full7 NOT_ACTIVATED0calls. Both captures replay without inference; owned native server stopped. C2 decision-v5 remainsNO_GO. See the current report for the concrete semantic/claim/cost/extraction action plan.
+
+Final replay hardening: archived matcher import order is isolated from live code; both workflow captures require hash-bound request logs plus their fixed counts/outcomes. Empty logs reproduced the defect through public subprocess replay and now fail. All140 paired controls and160 portable reader controls pass (171 scheduled,11 explicit SDK/native skips);44/12/72 frozen outcomes and185/54/72 requests reproduce without inference. See the current source-bound plan and `postcapture-verification-v3.json`; failed acceptance and C2NO_GO remain unchanged.
+
+Latest continuation checkpoint28 November: source-action v4 on newly authored development inputs current6/6 full versus previous4/6, operation12/12, no previous pass lost; finite gatePASS,54/54 successful requests,0retry/fault. Old failures remain. Reader49/56 stillFAIL; raw-only deterministic contract unqualified. C2decision-v6NO_GO; independent-family/reader qualification, pilot and confirmation remain unactivated. See source-bound Task10 and its linked replayable capture.

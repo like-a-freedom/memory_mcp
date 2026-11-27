@@ -1,0 +1,26 @@
+{
+  "schema": "source-action-v4-qualification-acceptance/v1",
+  "frozen_at_utc": "2026-11-27T21:26:54.742675+00:00",
+  "frozen_plan_sha256": "2858cb32f825ef917b8b798005cede69deed922db32c238190618d3c51d311b4",
+  "scheduled_trials": 12,
+  "current_trials": 6,
+  "cohort_scope": "newly authored development sources and explicit final-snapshot task; not independent history families or C2 confirmation",
+  "justification": "first application of already registered v4 evaluator after demonstrated v3 false negatives and source-derived quote/snapshot skill clarifications; old captures not repeated or regraded",
+  "gate": "all6 current answered; operation evidence true; all source/status/time/quote claims correct against observed receipts; no denied/process/host/inference fault; <=60 words; no passing previous case lost",
+  "semantic_review": "primary non-blinded source adjudication, every clause reviewed, unreviewed never pass",
+  "global_budget_seconds": 2460,
+  "global_origin": "owned runtime process start; startup and cleanup included",
+  "per_trial_budget": {
+    "turns": 9,
+    "max_tokens": 384,
+    "call_seconds": 20,
+    "case_seconds": 180,
+    "retries": 0,
+    "temperature": 0
+  },
+  "on_failure": "preserve fixed12 denominator, all attempts/faults; stop workflow inference, no repeat-until-green; old v3 FAIL6/12 remains",
+  "reader": "no reader inference in this task; raw-only contract remains unqualified",
+  "c2": "no admission from this development cohort alone; reader and independent-family gates still required",
+  "contrast": "frozen captured44 current baseline vs current candidate; bundled differences, no causal instruction-effect claim",
+  "source_review": "must complete and be hash-bound before runtime start"
+}

@@ -1,0 +1,23 @@
+F
+======================================================================
+FAIL: test_raw_item_protocol_delivers_source_without_an_interpretation_graph (evals.longmemeval_v2.test_source_references.SourceReferenceTests.test_raw_item_protocol_delivers_source_without_an_interpretation_graph)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 33, in test_raw_item_protocol_delivers_source_without_an_interpretation_graph
+    messages = protocol_messages(self.row,'source-item-raw-final-first')
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/reader_protocol.py", line 232, in protocol_messages
+    raise ValueError('unregistered protocol variant')
+ValueError: unregistered protocol variant
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/longmemeval_v2/test_source_references.py", line 35, in test_raw_item_protocol_delivers_source_without_an_interpretation_graph
+    self.fail(f'raw-only source delivery must be registered: {error}')
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: raw-only source delivery must be registered: unregistered protocol variant
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

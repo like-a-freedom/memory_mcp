@@ -1,0 +1,19 @@
+F
+======================================================================
+FAIL: test_first_selection_capture_uses_new_sources_and_requests_actual_snapshot (evals.paired.test_skill_source_actions.SourceActionTests.test_first_selection_capture_uses_new_sources_and_requests_actual_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/solovey/Documents/dev/memory_mcp/evals/paired/test_skill_source_actions.py", line 217, in test_first_selection_capture_uses_new_sources_and_requests_actual_snapshot
+    self.assertEqual(plan['cases'][0]['source']['content'],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     'Decision: Sable retains incident summaries for 19 days.')
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Decision: Alder retains diagnostic logs for 23 days.' != 'Decision: Sable retains incident summaries for 19 days.'
+- Decision: Alder retains diagnostic logs for 23 days.
++ Decision: Sable retains incident summaries for 19 days.
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.027s
+
+FAILED (failures=1)

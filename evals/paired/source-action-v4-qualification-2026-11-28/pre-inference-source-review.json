@@ -1,0 +1,13 @@
+{
+  "schema": "source-action-pre-inference-review/v1",
+  "at_utc": "2026-11-27T21:28:35.154001+00:00",
+  "reviewer": "independent agent v4_fresh_source_review",
+  "accepted": true,
+  "critical": 0,
+  "important": 0,
+  "frozen_plan_sha256": "2858cb32f825ef917b8b798005cede69deed922db32c238190618d3c51d311b4",
+  "acceptance_sha256": "b6d459d5887419413dacfcfafec55a3fd4deaecc843f0c7ab9e16009ed5ce6e0",
+  "findings": "new sources clear/answerable; recall prompts do not expose gold; arms share tasks; previous skill matches captured44; v1 cases unchanged; supplied-quote/source/canonical/snapshot distinctions match current code",
+  "limits": "authored development, bundled differences, no independent C2 or causal effect; reviewer ran no tests or inference",
+  "capture_launcher_sha256": "04df647bc4dd8092e0786c698ade7970a6b1f0c6dab66b92c04f110617d1e26e"
+}

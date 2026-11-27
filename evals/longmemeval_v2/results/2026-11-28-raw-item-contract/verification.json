@@ -1,0 +1,59 @@
+{
+  "schema": "raw-item-deterministic-verification/v1",
+  "protocol": "source-item-raw-final-first",
+  "scope": "deterministic contract simplification only; model accuracy and latency unmeasured",
+  "source_hashes": {
+    "evals/longmemeval_v2/source_references.py": "0e3380e3fd35c969dfa2d3db62072cb8c5a29797188856196366c116e124f9dc",
+    "evals/longmemeval_v2/reader_protocol.py": "4c639ef5324758141286fa4fd8bf0c9bcb0944e45169574575c5c2410712fd46",
+    "evals/longmemeval_v2/test_source_references.py": "f3207d8548e6d23fbadce997dd3762963dcc325e510f612d071ad3608c0fa5dc"
+  },
+  "tests": {
+    "scheduled": 175,
+    "passed": 164,
+    "skipped": 11,
+    "scope": "portable SDK/native-only skips remain explicit"
+  },
+  "comparison": {
+    "cohorts": {
+      "shared40": {
+        "cases": 40,
+        "old_content_utf8_bytes": 159882,
+        "new_content_utf8_bytes": 99151,
+        "reduction_fraction": 0.3798488885553095
+      },
+      "fresh16": {
+        "cases": 16,
+        "old_content_utf8_bytes": 28373,
+        "new_content_utf8_bytes": 18805,
+        "reduction_fraction": 0.3372220068374864
+      }
+    },
+    "legacy_prompts_equal": 96,
+    "old_output_classifications_equal": 56,
+    "inference_calls": 0
+  },
+  "comparison_method": "sum of UTF-8 message content bytes, excluding wire framing, tokenizer and inference",
+  "review": {
+    "agent": "raw_item_final_review",
+    "critical": 0,
+    "important": 0,
+    "scope": "new Task9 only",
+    "tests_run_by_reviewer": false,
+    "fix_passes": 0
+  },
+  "qualification": "UNQUALIFIED; old whole-item strict49/56 FAIL and workflow6/12 FAIL unchanged; C2 NO_GO",
+  "logs": {
+    "memory-raw-reader-red.log": "59d0b31ad765afff42016d62bc0a437404604d9be4b7fdd3cba8946c09ae42cf",
+    "memory-raw-reader-green.log": "e64159882cb4472ab4886cf2f747341453812628036bedb5dd23dabc52ad4ae3",
+    "memory-raw-freeze-red.log": "c05b6ddaa63f341612d5d24658c793a383167d2a043427e7970719a6abd17f1c",
+    "memory-raw-freeze-green.log": "8ada676a5e54ce530bfe344db7bca7584e60338dca8c54fb777b56c51e81aae6",
+    "memory-raw-reader-all-green.log": "c693e211971e3baafe87e8a5edd5204567287907b2afd6d49632cadbb753853b",
+    "paired140.log": "f51dbd9c3123e91bc98dc85b90f9fccde3976934016c51b590075ed87e40828c"
+  },
+  "paired_regressions": {
+    "scheduled": 140,
+    "passed": 140,
+    "scope": "before new Task10 control; no inference"
+  },
+  "verification_script_sha256": "d3a0cc9e948d113c59d76e9ea58fb68301a26b524ef2f8f1381d553e65b65ecc"
+}

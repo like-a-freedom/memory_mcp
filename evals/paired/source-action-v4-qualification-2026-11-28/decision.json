@@ -1,0 +1,41 @@
+{
+  "schema": "source-action-v4-qualification-decision/v1",
+  "scheduled": 12,
+  "answered": 12,
+  "operation_passes_frozen_v4": 12,
+  "semantic_passes": 10,
+  "full_passes": 10,
+  "by_arm": {
+    "previous": {
+      "scheduled": 6,
+      "full": 4
+    },
+    "current": {
+      "scheduled": 6,
+      "full": 6
+    }
+  },
+  "requests": {
+    "started": 54,
+    "terminal": 54,
+    "outcomes": {
+      "success": 54
+    },
+    "retries": 0
+  },
+  "decision": "PASS",
+  "minimum_required_current_full": 6,
+  "lost_passing_previous": [],
+  "review_sha256": "3c28ddd6e51e88b1c3812c18189c3dc75a7305457c76d577e39b69cbad503a04",
+  "acceptance_sha256": "b6d459d5887419413dacfcfafec55a3fd4deaecc843f0c7ab9e16009ed5ce6e0",
+  "pre_inference_source_review_sha256": "60055e01251b3310c736e11f6c7f6d0d03579b675ed753d8acc990af6fa03422",
+  "elapsed_seconds": 431.67367404099787,
+  "owned_runtime_including_cleanup_seconds": 444.5894297499908,
+  "interpretation": [
+    "First finite v4 application, newly authored development sources, bundled runtime/skill contrast; not isolated causal skill effect.",
+    "All source/status/time/quote claims reviewed against actual native receipts by primary non-blinded reviewer.",
+    "Previous canonical/fallback status errors remain failures; no lost passing previous scenario.",
+    "Old v3 six-of12 FAIL and whole-item49-of56 FAIL unchanged. Raw-only reader still unqualified.",
+    "No general memory-benefit claim; independent-family and reader gates remain missing. C2 NO_GO."
+  ]
+}

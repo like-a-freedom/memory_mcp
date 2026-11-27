@@ -1,0 +1,9 @@
+{
+  "schema": "source-action-v4-capture-integrity/v1",
+  "decision_sha256": "342f34ecf8d93ca5ac996ff20e1964da9d083cfb9eb8a193c5a3de360721adfc",
+  "request_accounting_hashes": {
+    "inference-events.jsonl": "7eabb3b71bdd1a5889ed00f6354ecc87d166fdf9ece14f401578660adcb208b7",
+    "inference-attempts.jsonl": "4f528db523416cf66c40ac420905482e4561f2195981ee29e27add34e6a64481"
+  },
+  "scope": "postcapture integrity; acceptance and source review were frozen before inference"
+}

@@ -207,6 +207,19 @@ class SourceActionTests(unittest.TestCase):
             self.assertEqual(plan['operation_protocol'],'memory-mcp-skill-source-actions/v4')
             self.assertEqual(len(plan['cases']),6)
 
+    def test_first_selection_capture_uses_new_sources_and_requests_actual_snapshot(self):
+        from evals.paired.skill_workflow import freeze
+        with TemporaryDirectory() as directory:
+            plan = freeze(Path(directory)/'plan',Path(sys.executable),'http://127.0.0.1:9/v1',
+                          'controlled',workflow_protocol='progressive-completion/v1',
+                          case_cohort='source-actions-native/v2')
+
+            self.assertEqual(plan['cases'][0]['source']['content'],
+                             'Decision: Sable retains incident summaries for 19 days.')
+            self.assertEqual(plan['cases'][2]['required_selectors'],
+                             {'valid_at':'2026-11-22T12:00:00Z','known_at':'2099-11-28T18:00:00Z'})
+            self.assertIn('Report the actual returned snapshot in your final answer.',plan['cases'][2]['prompt'])
+
     def test_correct_source_cannot_rescue_a_different_returned_snapshot(self):
         selectors = {'valid_at':'2026-11-12T10:00:00Z','known_at':'2099-11-27T18:00:00Z'}
         self.case['required_selectors'] = selectors

@@ -451,14 +451,21 @@ def source_action_skills():
 
 def source_action_cases(protocol=skill_source_actions.PROTOCOL):
     cases = []
+    fresh = protocol == skill_source_actions.SELECTION_PROTOCOL
     examples = [('Alder',1,'Decision: Alder retains diagnostic logs for 23 days.',False),
                 ('Birch',2,'Decision: Birch deployment requires approval from two owners.',False),
                 ('Larch',2,'Decision: Larch schedules recovery drills every Monday.',True)]
+    if fresh:
+        examples = [('Sable',1,'Decision: Sable retains incident summaries for 19 days.',False),
+                    ('Tern',2,'Decision: Tern publishes review notes every Wednesday.',False),
+                    ('Cinder',2,'Decision: Cinder requires three reviewers for emergency changes.',True)]
     for skill in ('memory-mcp','memory-cli'):
         for offset,(name,objective,content,timed) in enumerate(examples,1):
-            source = {'source_type':'conversation','source_id':f'{name.lower()}-operating-decision-2026-11-14',
-                      't_ref':'2026-11-14T10:30:00Z','content':content}
-            selectors = {'valid_at':'2026-11-15T12:00:00Z','known_at':'2099-11-27T18:00:00Z'} if timed else {}
+            date = '2026-11-21' if fresh else '2026-11-14'
+            source = {'source_type':'conversation','source_id':f'{name.lower()}-operating-decision-{date}',
+                      't_ref':date+'T10:30:00Z','content':content}
+            selectors = ({'valid_at':'2026-11-22T12:00:00Z','known_at':'2099-11-28T18:00:00Z'} if fresh else
+                         {'valid_at':'2026-11-15T12:00:00Z','known_at':'2099-11-27T18:00:00Z'}) if timed else {}
             inputs = {'confirmed_source_message':source} if objective==1 else {
                 'topic_name':name,**({'required_time_boundary':selectors} if timed else {})}
             prompt = ('Store this exact confirmed source and perform extraction. Report the observed episode and '
@@ -467,6 +474,8 @@ def source_action_cases(protocol=skill_source_actions.PROTOCOL):
                       + ('Use exactly the supplied valid and known time selectors for recall. ' if timed else '')
                       + 'Report the decision, source ID, episode and limitations. Source-bound episode fallback '
                       'is acceptable when labeled; do not claim a canonical fact or verified quote without its receipt.')
+            if fresh and timed:
+                prompt += ' Report the actual returned snapshot in your final answer.'
             cases.append({'skill':skill,'id':200+offset,'objective_id':objective,'binding':'native',
                           'operation_protocol':protocol,'source':source,'fixture':inputs,
                           'prompt':prompt,'required_selectors':selectors,

@@ -231,7 +231,8 @@ def protocol_messages(row, variant):
     if variant not in VARIANTS:
         raise ValueError('unregistered protocol variant')
     if variant in source_references.VARIANTS:
-        return source_references.messages(row, project_sources(row['memory_context'],source_graph=True),
+        return source_references.messages(row, project_sources(row['memory_context'],
+                                          source_graph=variant == source_references.VARIANT),
                                           whole_items=variant == source_references.ITEM_VARIANT)
     if variant == SOURCE_GRAPH_VARIANT:
         sources = project_sources(row['memory_context'], source_graph=True)
@@ -396,7 +397,7 @@ def freeze(path, rows_path, truth_path, model, endpoint, *, variants=None):
                   SOURCE_LEDGER_VARIANT:['evidence_structure','ordered_peer_relations','anchor_occurrences',
                                          'quote_channel_separation','reasoning_instruction'],
                   SOURCE_GRAPH_VARIANT:['source_graph','typed_source_locations','quote_channel_separation','reasoning_instruction']}
-    treatments[source_references.ITEM_VARIANT] = ['whole_item_response_contract','source_identity','reviewed_support_coverage','whole_delivered_source','source_graph']
+    treatments[source_references.ITEM_VARIANT] = ['whole_item_response_contract','source_identity','reviewed_support_coverage','whole_delivered_source','raw_source_only']
     if referenced:
         treatments[source_references.VARIANT] = ['source_range_response_contract','source_identity','reviewed_support_coverage','numbered_source_text','source_graph']
         plan['source_reference_sha256'] = hashlib.sha256(Path(source_references.__file__).read_bytes()).hexdigest()
@@ -409,7 +410,7 @@ def freeze(path, rows_path, truth_path, model, endpoint, *, variants=None):
     projection = {r['question_id']:project_sources(r['memory_context'], structured=STRUCTURED_VARIANT in variants,
                                                    ordered_relations=RELATIONS_VARIANT in variants,
                                                    anchor_ledger=SOURCE_LEDGER_VARIANT in variants,
-                                                   source_graph=SOURCE_GRAPH_VARIANT in variants or referenced)
+                                                   source_graph=SOURCE_GRAPH_VARIANT in variants or source_references.VARIANT in variants)
                   for r in rows}
     (path / 'projection.json').write_text(json.dumps(projection))
     if source_references.VARIANT in variants:

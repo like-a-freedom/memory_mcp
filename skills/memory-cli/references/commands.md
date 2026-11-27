@@ -91,7 +91,12 @@ provenance continuations need exactly one selected item. The envelope is bounded
 to 32 KiB, default source context to 1200 Unicode scalars, provenance pages to 20
 sources. Follow response `next_offset`, `citation_context_next_offset` and
 `provenance_next_offset`; offsets count Unicode scalars for source text.
-Check quote verification/completeness and entire-source flags before quoting.
+`quote_*` flags describe the selected item's supplied `quote`: when
+`quote_supplied=false`, `quote_verified=false` is not a failed comparison.
+`citation_context_exact=true` identifies an exact source window; quote only text
+actually present in it, preserving its scope and completeness limits. For a
+supplied quote inspect `quote_verified`, `quote_contained_in_window` and
+`quote_complete`. Exact text alone does not prove a claim or whole-source coverage.
 Keep fact identity separate from quote verification: `quote_verified=false`
 does not turn a `fact:…` into an episode fallback. Report fallback only when
 the returned item identifies it. In a historical final answer include the

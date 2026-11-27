@@ -1,0 +1,109 @@
+{
+  "schema": "recorded-final-claims-diagnostic/v1",
+  "scope": "source receipt diagnostic, not new semantic scoring or inference",
+  "rows": [
+    {
+      "identity": "memory-cli-203-current",
+      "trace_path": "evals/paired/source-action-qualification-2026-11-27/registered/capture/memory-cli-203-current/trial.json",
+      "trace_sha256": "5f37020cff25fea5c4156debd23beb00f26576942f087e2bdca799d0658484c6",
+      "observed_snapshot": {
+        "valid_at": "2026-11-15T12:00:00Z",
+        "known_at": "2099-11-27T18:00:00Z",
+        "known_revision": 6
+      },
+      "observed_source_t_ref": "2026-11-14T10:30:00Z",
+      "fact_id": "fact:f6ff3e05b9d3a5aa6622f9eb",
+      "source_episode": "episode:9e9e88569cf96e11c9efe940",
+      "episode_fallback": false,
+      "quote_and_source_flags": {
+        "quote_supplied": false,
+        "quote_verified": false,
+        "citation_context_exact": true,
+        "citation_context_covers_entire_source": true
+      },
+      "source_window": "Decision: Larch schedules recovery drills every Monday."
+    },
+    {
+      "identity": "memory-cli-203-previous",
+      "trace_path": "evals/paired/source-action-qualification-2026-11-27/registered/capture/memory-cli-203-previous/trial.json",
+      "trace_sha256": "0b03c45a22b71eeae1da1e6db7068a16af5c31660ca4e17744bcbf3495587bea",
+      "observed_snapshot": {
+        "valid_at": "2026-11-15T12:00:00Z",
+        "known_at": "2099-11-27T18:00:00Z",
+        "known_revision": 6
+      },
+      "observed_source_t_ref": "2026-11-14T10:30:00Z",
+      "fact_id": "fact:f6ff3e05b9d3a5aa6622f9eb",
+      "source_episode": "episode:9e9e88569cf96e11c9efe940",
+      "episode_fallback": false,
+      "quote_and_source_flags": {
+        "quote_supplied": false,
+        "quote_verified": false,
+        "citation_context_exact": true,
+        "citation_context_covers_entire_source": true
+      },
+      "source_window": "Decision: Larch schedules recovery drills every Monday."
+    },
+    {
+      "identity": "memory-mcp-203-current",
+      "trace_path": "evals/paired/source-action-qualification-2026-11-27/registered/capture/memory-mcp-203-current/trial.json",
+      "trace_sha256": "7a9a10bb86e228c3defca650266048dd21c9ce4de79cce220f73ea291ec93491",
+      "observed_snapshot": {
+        "known_at": "2099-11-27T18:00:00Z",
+        "known_revision": 6,
+        "valid_at": "2026-11-15T12:00:00Z"
+      },
+      "observed_source_t_ref": "2026-11-14T10:30:00Z",
+      "fact_id": "fact:f6ff3e05b9d3a5aa6622f9eb",
+      "source_episode": "episode:9e9e88569cf96e11c9efe940",
+      "episode_fallback": false,
+      "quote_and_source_flags": {
+        "quote_supplied": false,
+        "quote_verified": false,
+        "citation_context_exact": true,
+        "citation_context_covers_entire_source": true
+      },
+      "source_window": "Decision: Larch schedules recovery drills every Monday."
+    },
+    {
+      "identity": "memory-mcp-203-previous",
+      "trace_path": "evals/paired/source-action-qualification-2026-11-27/registered/capture/memory-mcp-203-previous/trial.json",
+      "trace_sha256": "31cb0012f5f8079d0c35d38d530e3287e01de909f6674d7b3f115dfa4c86d2a8",
+      "observed_snapshot": {
+        "known_at": "2099-11-27T18:00:00Z",
+        "known_revision": 6,
+        "valid_at": "2026-11-15T12:00:00Z"
+      },
+      "observed_source_t_ref": "2026-11-14T10:30:00Z",
+      "fact_id": "fact:f6ff3e05b9d3a5aa6622f9eb",
+      "source_episode": "episode:9e9e88569cf96e11c9efe940",
+      "episode_fallback": false,
+      "quote_and_source_flags": {
+        "quote_supplied": false,
+        "quote_verified": false,
+        "citation_context_exact": true,
+        "citation_context_covers_entire_source": true
+      },
+      "source_window": "Decision: Larch schedules recovery drills every Monday."
+    }
+  ],
+  "code_source": "crates/memory-mcp/src/memory/explanation.rs",
+  "code_sha256": "1a8b0d7c60ac2200fa057cd4138c139951f048400197643e8a1957440a386f4c",
+  "finding": "all4 canonical facts have exact whole source windows and no supplied quote; false quote_verified is not a failed quote comparison. Source t_ref differs from requested/returned retrieval snapshot. Original source-action gate stays FAIL6/12.",
+  "inference_calls": 0,
+  "qualified_skill_behavior": false,
+  "candidate_reference_hashes": {
+    "skills/memory-mcp/references/mcp-tools.md": "1c730f1ec010aabf5c1d62cf9bcda4bcc707192652f29a6baa3f6f2b5e8f61b7",
+    "skills/memory-cli/references/commands.md": "b44af16deee98741a91611ca8084510e44bb6cc2ed0ce2ba2fad629db0cbd631"
+  },
+  "before_reference_hashes": {
+    "skills/memory-mcp/references/mcp-tools.md": "cf1310b49a23c562a8af85164171a97cb1c7f442bda4c27ac371e8947194ea26",
+    "skills/memory-cli/references/commands.md": "3f8a6d50983437ab5c939d2c591f1b489a8c69d1343f422783f06b1f9833b787"
+  },
+  "static_validation": {
+    "memory-mcp": "quick_validate passed",
+    "memory-cli": "quick_validate passed",
+    "dynamic_qualification": "not run; behavior unqualified"
+  },
+  "interpretation": "Two CLI finals conflate quote receipt with fallback; two MCP finals omit snapshot; previous CLI additionally omits it. Source/IDs/decision value are correct in all4. These are primary source observations, not a new independent semantic score."
+}
