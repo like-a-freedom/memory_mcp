@@ -87,8 +87,36 @@ empirical question requires it.
 
 ## Current memory-quality evidence
 
-The [November 26 repair report](MEMORY_QUALITY_REPAIRS_2026-11-26.md)
-is the current consolidated interpretation. Matched extraction on the same v2
+The [November27–28 follow-up](MEMORY_QUALITY_FOLLOWUP_2026-11-27.md)
+is the current consolidated interpretation. Restored source histories and the
+native temporal/retrieval gates are verified; the whole-item reader development
+gate remains49/56 strict FAIL with conditional full7 inference not activated.
+The first source-action v4 development capture qualifies current6/6 versus
+previous4/6, with no previously passing case lost. This is a small bundled
+workflow comparison with primary non-blinded semantic review, not a general
+memory benefit result. C2 decision-v6 remainsNO_GO: independent families and
+reader qualification are missing. A20s request timeout is not a20s whole-task
+budget; the observed capture does not validate that planning assumption.
+
+Frozen outcomes can be replayed without a model host, API key or native binary:
+
+```sh
+python3 -B evals/paired/source-action-v4-qualification-2026-11-28/replay_capture.py
+python3 -B evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py
+```
+
+Replay verifies saved operation/proof grades, trace identities and request
+accounting; it is not a new model evaluation or independent re-adjudication.
+New research/model evaluations for this work remain native local Apple Silicon;
+portable deterministic tests and the normal release-CI platform matrix remain
+separate. The [v4 capture](../../evals/paired/source-action-v4-qualification-2026-11-28/README.md)
+retains54 study requests and one startup request, exact sources and finite budgets.
+Do not repeat exposed failures until success.
+
+### Historical November26 repair slice
+
+The [November26 repair report](MEMORY_QUALITY_REPAIRS_2026-11-26.md)
+retains the earlier slice. Matched extraction on the same v2
 labels improved from 5/9 to 9/9 cases (precision .65 to 1.00, recall 1.00 in
 both). The source-linked packing reproductions improved from 0/2 to 2/2 complete
 blocks. These are finite development repairs, not benchmark-wide gains. Stronger

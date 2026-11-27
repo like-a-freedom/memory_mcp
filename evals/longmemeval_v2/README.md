@@ -58,6 +58,27 @@ LongMemEval-V2 reports five abilities separately:
 - environment gotchas;
 - premise awareness.
 
+## Current local development qualification
+
+The [November27–28 quality report](../../docs/evals/MEMORY_QUALITY_FOLLOWUP_2026-11-27.md)
+separates restored source sufficiency from reader performance. The frozen
+whole-item development capture is49/56 strict FAIL, despite56/56 source/proof
+binding. Its conditional full7 reader capture was not activated. The subsequent
+raw-only item contract removes redundant derived navigation; it has deterministic
+regression coverage but no new model qualification. These are local diagnostic
+results, not official LongMemEval-V2 aggregate scores.
+
+Replay saved grades with no model/server/product binary:
+
+```sh
+python3 -B evals/longmemeval_v2/results/2026-11-27-source-item-qualification/replay_capture.py
+```
+
+Archived scorers own their historical captures. Live protocol changes never
+reinterpret old grades, alter frozen labels or authorize repeat-until-green.
+Research/model captures for this work run only on native local Apple Silicon;
+deterministic tests remain provider-neutral and portable.
+
 ## Limitations
 
 Do not copy an external leaderboard percentage into the release gate. Compare
