@@ -427,6 +427,10 @@ jobs:
           {
             echo "SURREALDB_USERNAME=ci-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
             echo "SURREALDB_PASSWORD=$(hex64)"
+            # This job owns a fresh disposable v4 database with no older
+            # writers. Explicitly acknowledge its catalog maintenance; keep
+            # the operator-facing Compose default fail-closed.
+            echo "SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true"
             echo "MEMORY_MCP_API_KEY_PEPPER=$(hex64)"
             echo "MEMORY_MCP_HTTP_SESSION_KEY=$(hex64)"
             echo "MEMORY_MCP_HTTP_CSRF_KEY=$(hex64)"

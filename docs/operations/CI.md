@@ -57,6 +57,16 @@ monotonic update protects publishers using this workflow, not external manual
 tag overwrites. Do not bypass its lock and policy. Pushing a tag or publishing
 a draft by hand does not dispatch **Release** automatically.
 
+The Docker smoke owns a fresh disposable SurrealDB 4 instance and explicitly
+sets `SURREALDB_ALLOW_REMOTE_V4_INDEX_REBUILD=true` in its private generated
+environment file. Without that acknowledgement the server refuses remote v4
+catalog changes, including a fresh control database. This is not an operator
+default: existing deployments must satisfy the documented maintenance
+preconditions before enabling it. The 2.1.0 candidate exposed this missing smoke
+configuration; a native 2.1.0 process against an isolated local 4.0.1 instance
+reproduced exit 2 without the acknowledgement and liveness with it. Hosted
+image/startup/UI qualification is still required.
+
 Manual **Release** must select the existing release tag under **Run workflow**
 and supply the same tag as input. Old tags retain their old workflows: rerunning
 an old release does not retroactively use this design. Create a new version/tag
