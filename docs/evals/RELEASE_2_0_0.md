@@ -1,5 +1,9 @@
 # Release 2.0.0 qualification
 
+> Hosted release CI subsequently failed before packaging; v2.0.0 has no binary
+> assets. See [the 2.0.1 recovery report](RELEASE_2_0_1.md). Local results below
+> remain valid within their stated scope.
+
 ## Native evaluation
 
 The final frozen native executable passed **154/154 cases**, all **12 gates**,

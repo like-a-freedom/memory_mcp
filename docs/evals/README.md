@@ -1,6 +1,6 @@
 # Evaluation profiles
 
-Latest release qualification: [2.0.0 native results and evidence limits](RELEASE_2_0_0.md).
+Release recovery: [2.0.1](RELEASE_2_0_1.md). Previous native qualification and evidence limits: [2.0.0](RELEASE_2_0_0.md).
 
 ## Fast deterministic development
 

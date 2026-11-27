@@ -1,0 +1,250 @@
+{
+  "schema_version": "memory-mcp-release-recovery/v1",
+  "original_release": "v2.0.0",
+  "original_run": 45898634886,
+  "original_revision": "766a8d11ff90af48abe8694922a9fd877bf23d98",
+  "original_conclusion": "failure",
+  "original_assets_published": 0,
+  "original_successful_quality": {
+    "release_cases_passed": 154,
+    "response_size_passed": 62,
+    "remote_surrealdb_versions": [
+      "3.3.5",
+      "4.0.1"
+    ]
+  },
+  "causes": [
+    "CI binary path omitted configured Cargo target triple.",
+    "Migration checkpoints depended on redacted dependency message text.",
+    "HTTP maintenance error redaction also removed safe recovery instructions."
+  ],
+  "additional_manual_recovery_defect": "Release wrapper required an exact tag but called CI required master for the same dispatch. Exact-tag routing repaired; direct preflight remains master-only.",
+  "local_source_commit": "ca89f79a8077a3c45e980fe4deea5d2417430fec",
+  "local_checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--test",
+        "http_binary_failure_logging",
+        "--features",
+        "streamable-http,test-fixtures",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 4.526977083005477,
+      "output_sha256": "6f54fc68682fce39f101722e376f54b81bc3e381275076327b58b038f72f9c1b"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 28.3516195420234,
+      "output_sha256": "146163d91f8ea13f25a69fbcedb1ca8a02d8370152045331728307e89e53eb0a"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.5649624160141684,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "full_checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--lib",
+        "--bins",
+        "--tests",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 498.8654612090031,
+      "output_sha256": "bff54be5ca55882861b74770b53015e65d0e96aaf042826c325c4133752f239a"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "memory_mcp",
+        "--lib",
+        "--bins",
+        "--tests",
+        "--features",
+        "fs-watch,mcp-apps,streamable-http,test-fixtures",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 931.287589250016,
+      "output_sha256": "7e1c9a225679cc00c7e8d27879565301fd5618cad9b975dda099944f14f95157"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "ui",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 1.860725000005914,
+      "output_sha256": "0d707651b43ea56568afdd7995ec009e553853e59aa1f2f42d297290a8d5437d"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-observability"
+      ],
+      "exit_code": 0,
+      "seconds": 1.3805756250221748,
+      "output_sha256": "d4e5c038e0e4f6d766dc5142061ff212009f545b74950823c299933516c591b6"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-toolchain-pin"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3984914589964319,
+      "output_sha256": "c61ef8f6a3794de42817c826d33037d9229344da43445b92f5129710c164fbbe"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--",
+        "check-dioxus-pin"
+      ],
+      "exit_code": 0,
+      "seconds": 0.38093375001335517,
+      "output_sha256": "efab477382863212085e7100067297c6cb1bcf9adf9d90ec74264c3490728945"
+    }
+  ],
+  "http_tdd_red": {
+    "output_sha256": "454d48f39ad9cec6268b30843c419c503b6cc6b00d270a91c3222c0c22022eca",
+    "test_summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.74s"
+    ]
+  },
+  "http_green": {
+    "output_sha256": "6f54fc68682fce39f101722e376f54b81bc3e381275076327b58b038f72f9c1b",
+    "test_summaries": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s"
+    ]
+  },
+  "conversion_attempts": [
+    {
+      "output_sha256": "53f512a4154d3ce6712c7a7eb43829988761af7913fa9994fb1e7a57c76e1113",
+      "test_summaries": [
+        "test result: FAILED. 7 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.54s"
+      ]
+    },
+    {
+      "output_sha256": "bd5c145f51c1e6421468a35e04409feac4079f84da3afeb7fbc559cc98880d64",
+      "test_summaries": [
+        "test result: FAILED. 7 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.39s"
+      ]
+    },
+    {
+      "output_sha256": "4a250f96eb9f696f249d6f58468a14926539425f4d568e5500be052fc12e050d",
+      "test_summaries": [
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 292.05s"
+      ]
+    }
+  ],
+  "intermediate_failure_note": "First local attempts used incorrect checkpoint IDs 1/2 instead of outstanding 4/6 for the pinned 3.3.5 fixture, and long guidance lost restore to the 200-byte human formatting budget. Final conversion run passed 12/12 without relaxing interruption, state or backup checks.",
+  "manual_ref_controls": {
+    "red": {
+      "script_sha256": "de8a4d9678be073ecf4d87763364eff671e923e9191a5ef54cfc31cd254fb63e",
+      "cases": [
+        {
+          "case": "master",
+          "expected_success": true,
+          "actual_success": true
+        },
+        {
+          "case": "release-tag",
+          "expected_success": true,
+          "actual_success": false
+        },
+        {
+          "case": "wrong-tag",
+          "expected_success": false,
+          "actual_success": false
+        },
+        {
+          "case": "branch",
+          "expected_success": false,
+          "actual_success": false
+        }
+      ]
+    },
+    "green": {
+      "script_sha256": "c5abd60c3b3d6de6216f10f7af6ff9f9729211bc028f04cacfc00e1bce47923d",
+      "cases": [
+        {
+          "case": "master",
+          "expected_success": true,
+          "actual_success": true
+        },
+        {
+          "case": "release-tag",
+          "expected_success": true,
+          "actual_success": true
+        },
+        {
+          "case": "wrong-tag",
+          "expected_success": false,
+          "actual_success": false
+        },
+        {
+          "case": "branch",
+          "expected_success": false,
+          "actual_success": false
+        }
+      ]
+    }
+  },
+  "scope": "Local native Apple Silicon checks; full-suite totals include existing architecture lints and intentional ignores. Hosted publication and artifact hashes are verified separately after release."
+}
