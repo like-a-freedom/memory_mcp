@@ -126,16 +126,8 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     .await
     .expect("invalidate fact");
 
-    db_client
-        .update(
-            &fact_id,
-            json!({
-                "access_count": 5,
-                "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
-            }),
-            "org",
-            memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
-        )
+    memory_mcp::memory::fact_access_store::FactAccessStore::new(db_client.clone(), "org")
+        .record_fact_access(&fact_id, 5)
         .await
         .expect("touch fact");
 

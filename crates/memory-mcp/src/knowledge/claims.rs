@@ -1225,7 +1225,7 @@ mod tests {
         // catalog entry is chosen by position, not by count.
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "056_knowledge_revisions.surql");
+        assert_eq!(last.file_name, "057_fact_access_isolation.surql");
     }
 
     #[test]

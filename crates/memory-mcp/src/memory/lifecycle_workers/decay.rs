@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::LifecycleHandles;
 use crate::error::MemoryError;
-use crate::storage::value_helpers::{json_f64, json_i64};
+use crate::storage::value_helpers::json_f64;
 
 /// Spawns the decay worker background task.
 ///
@@ -112,6 +112,20 @@ pub(crate) async fn run_decay_pass(
         .select_decay_candidates(DECAY_BATCH_LIMIT)
         .await?;
 
+    // Read every bounded batch before any invalidation. A failed heat read is
+    // not a cold fact and must abort the entire pass without retracting facts.
+    let ids = facts
+        .iter()
+        .map(|record| {
+            record
+                .get("fact_id")
+                .and_then(|value| value.as_str())
+                .map(str::to_owned)
+                .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let heat = service.fact_access_store().read_fact_accesses(&ids).await?;
+
     for record in facts {
         if record
             .get("t_invalid")
@@ -128,12 +142,15 @@ pub(crate) async fn run_decay_pass(
             .unwrap_or(now);
 
         let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
-        let access_count = record.get("access_count").and_then(json_i64).unwrap_or(0);
-        let last_accessed = record
-            .get("last_accessed")
-            .and_then(|value| value.as_str())
-            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
-            .map(|dt| dt.with_timezone(&Utc));
+        let stats = record
+            .get("fact_id")
+            .and_then(|id| id.as_str())
+            .and_then(|id| heat.get(id));
+        let access_count = stats.map_or(0, |stats| stats.access_count);
+        let last_accessed = stats
+            .map(|stats| stats.parsed_last_accessed())
+            .transpose()?
+            .flatten();
 
         let delta = now - t_valid;
         let days_since_valid = ChronoDuration::num_days(&delta) as f64;

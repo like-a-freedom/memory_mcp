@@ -80,7 +80,7 @@ impl EntityExtractor for AnnoEntityExtractor {
     }
 
     fn fingerprint(&self) -> super::ExtractorFingerprint {
-        super::ExtractorFingerprint::new("anno|identity-admission=v2")
+        super::ExtractorFingerprint::new("anno|identity-admission=v3")
     }
 
     fn max_input_bytes(&self) -> Option<usize> {
@@ -139,7 +139,15 @@ impl EntityExtractor for AnnoEntityExtractor {
 /// Keep the span grammar local to the original occurrence; a genuine named
 /// occurrence elsewhere in the same text can still establish the entity.
 fn is_metric_dimension(entity: &anno::Entity, entities: &[anno::Entity], content: &str) -> bool {
+    // French determiners can be part of the heuristic backend's span. They
+    // do not make an otherwise uppercase measure label a named actor.
+    // Unknown phrases stay identities; this is a finite predicate grammar.
     let name = entity.text.trim();
+    let name = name
+        .strip_prefix("Le ")
+        .or_else(|| name.strip_prefix("La "))
+        .or_else(|| name.strip_prefix("Les "))
+        .unwrap_or(name);
     if name.chars().count() < 2 || !name.chars().all(char::is_uppercase) {
         return false;
     }
@@ -157,7 +165,9 @@ fn is_metric_dimension(entity: &anno::Entity, entities: &[anno::Entity], content
         .skip(entity.end())
         .take(value.start() - entity.end())
         .collect::<String>();
-    predicate.trim().eq_ignore_ascii_case("is") || predicate.trim().eq_ignore_ascii_case("grew to")
+    ["is", "grew to", "est de", "составляет"]
+        .iter()
+        .any(|known| predicate.trim().eq_ignore_ascii_case(known))
 }
 
 fn map_label(label: &str) -> &'static str {

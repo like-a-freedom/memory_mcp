@@ -55,6 +55,15 @@ async fn losing_lexical_pool_retains_source_without_native_fts_provenance() {
         serde_json::to_string(&capture.stages).unwrap()
     );
     let pools = observer.candidates().unwrap();
+    let fetched = pools
+        .iter()
+        .find(|pool| pool.stage == "facts.term_groups_fetched")
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(fetched).unwrap()["tracked_source_fact_ids"],
+        serde_json::json!(["fact:competing_toolbar7"]),
+        "fetch receipts must bind observed candidates to the tracked source, not infer it from aggregate counts"
+    );
     assert_eq!(
         pools
             .iter()
@@ -463,6 +472,30 @@ async fn substantive_qualifiers_after_a_question_remain_admission_constraints() 
 }
 
 #[tokio::test]
+async fn number_words_in_a_format_clause_do_not_hide_substantive_requirements() {
+    let service = common::make_service().await;
+    let episode = common::ingest_episode(
+        &service,
+        "format-with-qualifiers",
+        "The archive controls available are Export and Validate.",
+    )
+    .await;
+    let request = serde_json::from_value(serde_json::json!({
+        "query":"Which archive controls are available? Your final answer should be in English one two three and include independently audited encrypted Canadian deployments approved after security review.",
+        "budget":5,"compact":false
+    })).unwrap();
+    let capture = memory_mcp::eval_support::retrieval::assemble_context_with_evidence(
+        &service, request, &episode,
+    )
+    .await
+    .unwrap();
+    assert!(
+        capture.items.is_empty(),
+        "a mixed clause must retain its substantive requirements"
+    );
+}
+
+#[tokio::test]
 async fn compound_when_question_requires_event_time_from_the_source() {
     let service = common::make_service().await;
     common::ingest_episode(
@@ -560,6 +593,135 @@ async fn replacement_quote_is_not_reported_as_a_requested_control_label() {
         item.provenance.get("control_label_coverage").is_none(),
         "a quoted former control is not a requested membership identity"
     );
+}
+
+const POSITIONAL_TOOLBAR_SOURCE: &str = "Project Orchid operations dashboard toolbar actions:\n\t[10] button 'Pause dispatch', clickable, visible\n\t[11] button 'Synchronize routes', clickable, visible\n\t[12] button 'Resume dispatch', clickable, visible\n\tStaticText 'Operations dashboard'\n";
+
+#[tokio::test]
+async fn quoted_positional_toolbar_anchors_survive_fact_candidate_bounding() {
+    use memory_mcp::storage::DbClient;
+
+    let (service, db) = common::make_service_with_client().await;
+    let cutoff: chrono::DateTime<chrono::Utc> = "2026-01-01T00:00:00Z".parse().unwrap();
+    let target = "episode:orchid_position_32";
+    for number in 0..=32 {
+        let episode = format!("episode:orchid_position_{number}");
+        let fact = format!("fact:orchid_position_{number}");
+        let (content, keys, confidence) = if episode == target {
+            (POSITIONAL_TOOLBAR_SOURCE.to_owned(), Vec::new(), 0.8)
+        } else {
+            (
+                format!(
+                    "{}\nProject Orchid operations dashboard reference {number}.",
+                    "Project Orchid operations dashboard toolbar action appears between shifts. Pause dispatchCopy and Resume dispatchCopy appear in the toolbar actions. ".repeat(24)
+                ),
+                vec!["Pause dispatch", "Resume dispatch"],
+                1.0,
+            )
+        };
+        db.create(
+            &episode,
+            serde_json::json!({"episode_id":episode,"source_type":"document","source_id":episode,"content":content,"t_ref":cutoff,"t_ingested":cutoff,"scope":"org","policy_tags":[]}),
+            "org",
+            &["t_ref", "t_ingested"],
+        )
+        .await
+        .unwrap();
+        db.create(
+            &fact,
+            serde_json::json!({"fact_id":fact,"fact_type":"note","content":content,"quote":content,"source_episode":episode,"t_valid":cutoff,"t_ingested":cutoff,"confidence":confidence,"index_keys":keys,"entity_links":[],"provenance":{"source":"manual"},"scope":"org","policy_tags":[]}),
+            "org",
+            &["t_valid", "t_ingested"],
+        )
+        .await
+        .unwrap();
+    }
+
+    let request = serde_json::from_value(serde_json::json!({
+        "query": "On the Project Orchid operations dashboard, what action appears between \"Pause dispatch\" and \"Resume dispatch\" in the toolbar?",
+        "budget": 1,
+        "compact": false,
+        "as_of": "2026-05-01T00:00:00Z"
+    }))
+    .unwrap();
+    let result = memory_mcp::eval_support::retrieval::assemble_context_with_evidence(
+        &service, request, target,
+    )
+    .await
+    .unwrap();
+    let stage = |name| {
+        result
+            .stages
+            .iter()
+            .find(|stage| stage.stage == name)
+            .unwrap()
+    };
+    let admitted = stage("admitted_fact_candidates")
+        .items
+        .iter()
+        .find(|item| item.source_episode == target)
+        .expect("the common source must reach admission before testing the rank bound");
+    let admitted_rank = &admitted.provenance["eval_candidate_position"]["candidate_rank"];
+    assert!(
+        stage("bounded_fact_candidates")
+            .items
+            .iter()
+            .any(|item| item.fact_id == admitted.fact_id),
+        "the sole carrier with both whole control labels disappeared at the candidate bound, admitted rank {admitted_rank}"
+    );
+    assert_eq!(result.items.len(), 1);
+    let item = &result.items[0];
+    assert_eq!(item.source_episode, target);
+    assert!(item.content.contains(POSITIONAL_TOOLBAR_SOURCE));
+    assert!(item.content.len() <= 2048);
+}
+
+async fn assert_positional_control_priority_absent(query: &str) {
+    let service = common::make_service().await;
+    let episode = common::ingest_episode(
+        &service,
+        "orchid-reference",
+        "Project Orchid operations dashboard toolbar action between shifts. During migration the Pause dispatch button was replaced by Resume dispatch. The Pause dispatch and Resume dispatch buttons are described in the dispatch notes.",
+    )
+    .await;
+    let request = serde_json::from_value(serde_json::json!({
+        "query": query,
+        "budget": 1,
+        "compact": false
+    }))
+    .unwrap();
+    let items = AssembleContextCapability::assemble_context_from_service(&service, request)
+        .await
+        .unwrap();
+    let item = items
+        .iter()
+        .find(|item| item.source_episode == episode)
+        .expect("the ordinary-relevance source must remain available");
+    assert!(item.provenance.get("control_label_coverage").is_none());
+}
+
+#[tokio::test]
+async fn explicit_exclusion_does_not_gain_positional_control_priority() {
+    assert_positional_control_priority_absent(
+        "Which Project Orchid toolbar action does not appear between \"Pause dispatch\" and \"Resume dispatch\"?",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn unrelated_between_phrase_does_not_turn_migration_quotes_into_control_anchors() {
+    assert_positional_control_priority_absent(
+        "Between shifts, which Project Orchid toolbar action replaced \"Pause dispatch\" or \"Resume dispatch\" during migration?",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn quoted_dispute_participants_do_not_gain_positional_control_priority() {
+    assert_positional_control_priority_absent(
+        "What action settled the dispute between \"Pause dispatch\" and \"Resume dispatch\" during the Project Orchid toolbar review?",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -1136,5 +1298,47 @@ async fn role_only_list_does_not_displace_neighboring_directory_tabs() {
         &content[range["start_byte"].as_u64().unwrap() as usize
             ..range["end_byte"].as_u64().unwrap() as usize],
         item.content
+    );
+}
+
+#[tokio::test]
+async fn exploratory_32_source_control_fetch_preserves_exact_membership() {
+    use memory_mcp::storage::DbClient;
+    let input: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../evals/longmemeval_v2/fixtures/independent-control-source-fetch-v1.json"
+    ))
+    .unwrap();
+    let (service, db) = common::make_service_with_client().await;
+    for row in input["records"].as_array().unwrap() {
+        let episode = row["source_id"].as_str().unwrap();
+        let fact = row["fact_id"].as_str().unwrap();
+        let content = row["content"].as_str().unwrap();
+        db.create(episode, serde_json::json!({"episode_id":episode,"source_type":"document","source_id":episode,"content":content,"t_ref":input["t_ref"],"t_ingested":input["t_ref"],"scope":"org","policy_tags":[]}), "org", &["t_ref","t_ingested"]).await.unwrap();
+        db.create(fact, serde_json::json!({"fact_id":fact,"fact_type":"note","content":content,"quote":content,"source_episode":episode,"t_valid":input["t_ref"],"t_ingested":input["t_ref"],"confidence":0.9,"index_keys":[],"entity_links":[],"provenance":{"source":"manual"},"scope":"org","policy_tags":[]}), "org", &["t_valid","t_ingested"]).await.unwrap();
+    }
+    let capture = memory_mcp::eval_support::retrieval::ContextEvidenceCapture::new(
+        input["source_id"].as_str().unwrap(),
+    );
+    let request = serde_json::from_value(serde_json::json!({"query":input["query"],"budget":5,"compact":false,"as_of":input["as_of"]})).unwrap();
+    let observed = memory_mcp::eval_support::retrieval::assemble_context_recording_evidence(
+        &service, request, &capture,
+    )
+    .await
+    .unwrap();
+    println!(
+        "EXPLORATORY32_POOLS {}",
+        serde_json::to_string(&capture.candidates().unwrap()).unwrap()
+    );
+    println!(
+        "EXPLORATORY32_STAGES {}",
+        serde_json::to_string(&observed.stages).unwrap()
+    );
+    assert!(
+        observed.items.iter().any(|item| item.source_episode
+            == input["source_id"].as_str().unwrap()
+            && item
+                .content
+                .contains(input["required_span"].as_str().unwrap())),
+        "the complete exact source must survive; stage receipts distinguish fetch loss from later loss"
     );
 }

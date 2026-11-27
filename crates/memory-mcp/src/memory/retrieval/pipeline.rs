@@ -1991,8 +1991,48 @@ async fn retrieve_fact_channels(
 async fn rank_fact_channels(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
-    channels: RetrievedFactChannels,
+    mut channels: RetrievedFactChannels,
 ) -> Result<Vec<RankedContextFact>, MemoryError> {
+    // Knowledge owns immutable fact candidates; Memory overlays its mutable
+    // heat once, after channel policy checks and before the first ranking.
+    let candidates = channels
+        .direct_facts
+        .iter_mut()
+        .chain(channels.temporal_facts.iter_mut())
+        .chain(channels.expanded_facts.iter_mut())
+        .chain(channels.source_facts.iter_mut())
+        .chain(
+            channels
+                .graph_facts
+                .iter_mut()
+                .map(|candidate| &mut candidate.fact),
+        )
+        .chain(
+            channels
+                .community_facts
+                .iter_mut()
+                .map(|candidate| &mut candidate.fact),
+        )
+        .chain(
+            channels
+                .semantic_facts
+                .iter_mut()
+                .map(|candidate| &mut candidate.fact),
+        )
+        .collect::<Vec<_>>();
+    let ids = candidates
+        .iter()
+        .map(|fact| fact.fact_id.clone())
+        .collect::<Vec<_>>();
+    let heat = service.fact_access_store.read_fact_accesses(&ids).await?;
+    for fact in candidates {
+        let stats = heat.get(&fact.fact_id);
+        fact.access_count = stats.map_or(0, |stats| stats.access_count);
+        fact.last_accessed = stats
+            .map(|stats| stats.parsed_last_accessed())
+            .transpose()?
+            .flatten();
+    }
     let RetrievedFactChannels {
         direct_facts,
         temporal_facts,

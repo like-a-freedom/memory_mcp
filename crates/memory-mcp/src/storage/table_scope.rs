@@ -117,7 +117,8 @@ impl ReleaseOwnedTable for KnowledgeTables {
 pub struct MemoryTables;
 
 impl TableOwner for MemoryTables {
-    const OWNED_TABLES: &'static [&'static str] = &["episode", "inbox_revision", "memory_event"];
+    const OWNED_TABLES: &'static [&'static str] =
+        &["episode", "inbox_revision", "memory_event", "fact_access"];
 }
 
 impl ReleaseOwnedTable for MemoryTables {

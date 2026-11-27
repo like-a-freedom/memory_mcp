@@ -534,7 +534,7 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
     assert_eq!(result.len(), 1);
 
     let stored = db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .expect("select fact")
         .expect("stored fact");

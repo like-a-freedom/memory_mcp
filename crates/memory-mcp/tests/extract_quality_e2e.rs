@@ -800,3 +800,54 @@ async fn metric_spelling_in_a_named_actor_occurrence_remains_an_entity() {
         result.entities
     );
 }
+
+#[tokio::test]
+async fn french_article_metric_dimension_does_not_create_an_identity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "Le GCV est de 92.0%.").await;
+    assert!(result.entities.is_empty(), "{:?}", result.entities);
+    assert!(result.links.is_empty());
+}
+
+#[tokio::test]
+async fn russian_metric_predicate_does_not_create_an_identity() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(&tm.service, "GCV составляет 92.0%.").await;
+    assert!(result.entities.is_empty(), "{:?}", result.entities);
+    assert!(result.links.is_empty());
+}
+
+#[tokio::test]
+async fn french_named_actor_occurrence_is_not_a_global_metric_blacklist() {
+    let tm = common::TestMemory::new(false).await;
+    let result = extract(
+        &tm.service,
+        "Le GCV a annoncé une livraison. Le GCV est de 92.0%.",
+    )
+    .await;
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|entity| entity.canonical_name == "Le GCV"),
+        "{:?}",
+        result.entities
+    );
+}
+
+#[tokio::test]
+async fn automatic_metric_filter_does_not_remove_manual_identity() {
+    let tm = common::TestMemory::new(false).await;
+    let original = common::resolve_entity(&tm.service, "concept", "GCV")
+        .await
+        .unwrap();
+    let result = extract(&tm.service, "GCV составляет 92.0%.").await;
+    assert!(result.entities.is_empty(), "{:?}", result.entities);
+    let current = common::resolve_entity(&tm.service, "concept", "GCV")
+        .await
+        .unwrap();
+    assert_eq!(
+        current, original,
+        "automatic admission does not delete manual identities"
+    );
+}

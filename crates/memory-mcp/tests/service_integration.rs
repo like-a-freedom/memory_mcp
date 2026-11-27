@@ -141,7 +141,7 @@ async fn extractor_fingerprint_projection() {
     );
     assert_eq!(
         row["fingerprint"]["token"].as_str(),
-        Some("anno|identity-admission=v2|candidate-policy=scalar-grammar-v1"),
+        Some("anno|identity-admission=v3|candidate-policy=scalar-grammar-v1"),
         "the projection must record the extractor token; the fingerprint          is an opaque token now (ADR-0068)"
     );
     let entity_ids = row["entity_ids"].as_array().expect("entity_ids array");
@@ -836,7 +836,7 @@ async fn test_service_assemble_context_records_fact_access_heat() {
     assert!(items.iter().any(|item| item.fact_id == fact_id));
 
     let stored = db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .unwrap()
         .expect("stored fact");
@@ -888,7 +888,7 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
     assert!(first_items.iter().any(|item| item.fact_id == fact_id));
 
     let stored_after_first = db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .unwrap()
         .expect("stored fact after fresh retrieval");
@@ -907,7 +907,7 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
     assert!(second_items.iter().any(|item| item.fact_id == fact_id));
 
     let stored_after_second = db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .unwrap()
         .expect("stored fact after cache-hit retrieval");
@@ -2134,7 +2134,7 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
     assert_eq!(first.len(), second.len());
 
     let stored = db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .unwrap()
         .expect("stored fact");

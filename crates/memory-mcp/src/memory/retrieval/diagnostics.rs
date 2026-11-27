@@ -33,6 +33,9 @@ pub struct CandidateInventory {
     pub max_index_key_bytes: usize,
     pub unique_contents: usize,
     pub unique_sources: usize,
+    /// Exact identities observed in this fetched pool for the requested source.
+    /// An empty list describes this boundary only, never an unobserved stage.
+    pub tracked_source_fact_ids: Vec<String>,
 }
 
 /// Actual dictionary construction counts in one completed lexical operation.
@@ -197,6 +200,10 @@ pub(super) fn record_candidates(
     use std::collections::HashSet;
     let mut contents = HashSet::new();
     let mut sources = HashSet::new();
+    let tracked_source = trace
+        .lock()
+        .ok()
+        .map(|recorder| recorder.source_episode.clone());
     let mut inventory = CandidateInventory {
         stage: stage.to_owned(),
         elapsed_ms: 0.0,
@@ -208,6 +215,7 @@ pub(super) fn record_candidates(
         max_index_key_bytes: 0,
         unique_contents: 0,
         unique_sources: 0,
+        tracked_source_fact_ids: Vec::new(),
     };
     for record in records {
         let Some(map) = raw_object(record) else {
@@ -224,6 +232,13 @@ pub(super) fn record_candidates(
             .and_then(json_string)
         {
             sources.insert(source);
+            if tracked_source.as_deref() == Some(source)
+                && let Some(id) = map
+                    .get("fact_id")
+                    .and_then(crate::storage::value_helpers::unwrap_record_string)
+            {
+                inventory.tracked_source_fact_ids.push(id);
+            }
         }
         for key in map
             .get("index_keys")
@@ -265,7 +280,7 @@ pub(super) fn record_work(trace: EvidenceRecorder<'_>, mut work: LexicalWork) {
     }
 }
 
-/// Flush only a completed phase name and read-relative clock; never source data.
+/// Flush only a phase boundary name and read-relative clock; never source data.
 pub(super) fn record_phase(trace: EvidenceRecorder<'_>, stage: &str) {
     if let Some(trace) = trace {
         let observation = trace.lock().ok().map(|recorder| {

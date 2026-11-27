@@ -442,11 +442,14 @@ docker compose --env-file <env> config --quiet
 host. Its data is stored in the `surrealdb-data` volume. The image is built from
 source with Cargo and its final stage is `gcr.io/distroless/cc-debian13:nonroot`.
 
-Release runs publish the image to GitHub Container Registry as
-`ghcr.io/like-a-freedom/memory_mcp:latest`, `sha-<commit>` and the release
-tag; a manual run started from `master` refreshes `latest` and `sha-<commit>`.
-CI runs on pull requests, manual runs, and releases; the `push` trigger is
-disabled, so pushes to `master` start no workflow. To deploy a published image
+The manually dispatched Release workflow publishes the qualified image under
+its release and `sha-<commit>` tags. A newer stable release advances
+`ghcr.io/like-a-freedom/memory_mcp:latest` only after its draft release assets
+have been uploaded, downloaded and verified. Ordinary manual CI runs publish
+nothing; release-mode CI on `master` can prepare a reusable candidate. Follow
+the [release runbook](docs/operations/CI.md) for draft creation, candidate reuse
+and recovery. CI runs on pull requests, manual dispatch and Release workflow
+calls; the `push` trigger is disabled. To deploy a published image
 instead of building locally, log in to GHCR and pull it before starting
 Compose:
 
@@ -1118,7 +1121,11 @@ restored copy.
 
 ### Remote servers and v4 index maintenance
 
-The v1.40.0 SDK remains compatible with stable SurrealDB 3.x and 4.x servers; the
+For 2.x, remote release qualification tests SurrealDB 4.0.1 only; SurrealDB 3.x
+is outside the supported CI matrix. The following describes the historical
+v1.40.0 migration, not a 2.x compatibility guarantee.
+
+The v1.40.0 SDK was compatible with stable SurrealDB 3.x and 4.x servers; the
 release was tested against 3.3.5 and 4.0.1. You do not need to upgrade a remote
 server for SDK compatibility. Remote v3 servers do not use the embedded
 conversion setting.
@@ -1143,6 +1150,14 @@ reports an ambiguous interruption, keep the application offline and follow its
 recovery instructions. Do not authorize recovery until every earlier submitter
 has stopped and no server-side rebuild can still resume. Remote server upgrades
 remain the remote operator's responsibility.
+
+### Fact access statistics upgrade
+
+Migration `057_fact_access_isolation` moves mutable access statistics to a
+separate table while retaining the fact fields for rollback. Before upgrading an
+existing database, stop older writers and workers, verify a closed-store backup,
+and follow the [fact access upgrade and rollback runbook](docs/operations/FACT_ACCESS_UPGRADE.md).
+Switch readers and writers together; mixed old and new writers are unsupported.
 
 ## Configuration
 

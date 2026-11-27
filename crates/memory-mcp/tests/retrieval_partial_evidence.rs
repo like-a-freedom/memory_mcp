@@ -185,6 +185,125 @@ impl memory_mcp::eval_support::retrieval::CandidateObserver for Inventories {
     }
 }
 
+async fn read_url_admission(
+    facts: &[(&str, &str, &str, &[&str])],
+) -> (
+    memory_mcp::eval_support::retrieval::ContextEvidence,
+    memory_mcp::eval_support::retrieval::LexicalWork,
+) {
+    use memory_mcp::eval_support::retrieval::{
+        ContextEvidenceCapture, assemble_context_recording_evidence,
+    };
+    let (service, db) = common::make_service_with_client().await;
+    for (id, fact_type, content, keys) in facts {
+        db.create(
+            &format!("fact:{id}"),
+            json!({
+                "fact_id":format!("fact:{id}"),"fact_type":fact_type,"content":content,"quote":content,
+                "source_episode":format!("episode:{id}"),"t_valid":"2026-01-01T00:00:00Z",
+                "t_ingested":"2026-01-01T00:00:00Z","confidence":0.9,"index_keys":keys,
+                "scope":"org","policy_tags":[],"entity_links":[],"provenance":{"source":"manual"}
+            }),
+            "org",
+            &["t_valid", "t_ingested"],
+        )
+        .await
+        .unwrap();
+    }
+    let sink = Arc::new(Inventories {
+        phases: Default::default(),
+        rows: Default::default(),
+        work: Default::default(),
+    });
+    let capture = ContextEvidenceCapture::with_candidate_observer("episode:probe", sink.clone());
+    let request = serde_json::from_value(json!({
+        "query":"archive source","budget":5,"compact":false,"as_of":"2026-05-01T00:00:00Z"
+    }))
+    .unwrap();
+    let actual = assemble_context_recording_evidence(&service, request, &capture)
+        .await
+        .unwrap();
+    let admission = sink
+        .work
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|work| work.stage == "admission.topics")
+        .expect("the public read must report completed admission work")
+        .clone();
+    (actual, admission)
+}
+
+#[tokio::test]
+async fn public_url_admission_builds_one_view_for_observations_with_repeated_topics() {
+    let keys = &["archive", "https://example.invalid/source/frostline"];
+    let (read, work) = read_url_admission(&[
+        (
+            "probe",
+            "observation",
+            "Archive source logged frostline attendance.",
+            keys,
+        ),
+        (
+            "control",
+            "observation",
+            "Archive source updated frostline capacity.",
+            keys,
+        ),
+    ])
+    .await;
+    assert_eq!(read.items.len(), 2);
+    assert_eq!(
+        read.items[0].provenance["retrieval_admission"]["matched_index_key_terms"],
+        json!(["archive"])
+    );
+    assert_eq!(work.records, 2);
+    assert_eq!(work.index_dictionaries, 1);
+}
+
+#[tokio::test]
+async fn public_url_admission_uses_raw_view_for_repeated_topic_experience() {
+    let (read, work) = read_url_admission(&[
+        (
+            "directa",
+            "observation",
+            "Archive source logged frostline attendance.",
+            &[],
+        ),
+        (
+            "directb",
+            "observation",
+            "Archive source updated frostline capacity.",
+            &[],
+        ),
+        (
+            "probe",
+            "experience",
+            "Reserve a quiet corner for rehearsals.",
+            &["https://example.invalid/archive/frostline"],
+        ),
+    ])
+    .await;
+    let probe = read
+        .items
+        .iter()
+        .find(|item| item.fact_id == "fact:probe")
+        .expect("raw URL evidence admits the experience");
+    let evidence = &probe.provenance["retrieval_admission"];
+    assert_eq!(evidence["basis"], "repeated_topic");
+    assert_eq!(evidence["matched_index_key_terms"], json!([]));
+    assert_eq!(
+        evidence["repeated_topic"],
+        json!({
+            "matched_query_index_terms":["archive"],
+            "matched_repeated_topics":["frostline"],
+            "supporting_fact_ids":["fact:directa","fact:directb"]
+        })
+    );
+    assert_eq!(work.records, 3);
+    assert_eq!(work.index_dictionaries, 3);
+}
+
 #[tokio::test]
 async fn public_read_observes_actual_time_visible_candidate_payload_without_source_text() {
     use memory_mcp::eval_support::retrieval::{
@@ -240,7 +359,9 @@ async fn public_read_observes_actual_time_visible_candidate_payload_without_sour
             "topics.completed",
             "fusion.completed",
             "admission.completed",
-            "selection.completed"
+            "selection.completed",
+            "access_heat.started",
+            "access_heat.settled"
         ]
     );
     let observed = sink.rows.lock().unwrap();

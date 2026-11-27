@@ -267,6 +267,20 @@ fn is_presentation_directive(clause: &str) -> bool {
                         | "explanation"
                         | "code"
                         | "block"
+                        // Spelled-out examples are rendering instructions only
+                        // inside the closed presentation grammar above. Any
+                        // substantive qualifier still keeps the entire clause.
+                        | "zero"
+                        | "one"
+                        | "two"
+                        | "three"
+                        | "four"
+                        | "five"
+                        | "six"
+                        | "seven"
+                        | "eight"
+                        | "nine"
+                        | "ten"
                 )
         })
 }
@@ -388,9 +402,13 @@ pub(super) fn resolve_view_mode(
 // retain their existing relevance ordering. It never grants admission or changes
 // temporal/access rules, and independent reranker evidence keeps precedence.
 pub(super) fn control_query_labels(query: &str) -> Vec<String> {
-    // Require an explicit control-membership question, not an arbitrary quoted
-    // contextual phrase that happens to mention a toolbar elsewhere.
-    let outside_quotes = query.split('"').step_by(2).collect::<Vec<_>>().join(" ");
+    let quote_parts = query.split('"').collect::<Vec<_>>();
+    let outside_quotes = quote_parts
+        .iter()
+        .step_by(2)
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ");
     // A quoted excluded label is not positive membership evidence. Keep
     // ambiguous or negated questions on the ordinary relevance path.
     let outside_words = outside_quotes.to_lowercase();
@@ -417,20 +435,48 @@ pub(super) fn control_query_labels(query: &str) -> Vec<String> {
     if !terms
         .iter()
         .any(|term| matches!(term.as_str(), "toolbar" | "dropdown" | "button"))
-        || !terms.iter().any(|term| {
-            matches!(
-                term.as_str(),
-                "include"
-                    | "including"
-                    | "contains"
-                    | "contain"
-                    | "named"
-                    | "labelled"
-                    | "labeled"
-                    | "called"
-            )
-        })
     {
+        return Vec::new();
+    }
+    let asks_membership = terms.iter().any(|term| {
+        matches!(
+            term.as_str(),
+            "include"
+                | "including"
+                | "contains"
+                | "contain"
+                | "named"
+                | "labelled"
+                | "labeled"
+                | "called"
+        )
+    });
+    // Bind the relation to the control noun before the first quoted anchor.
+    let asks_between_controls = if let [before, _, connector, _, _] = quote_parts.as_slice()
+        && connector.trim().eq_ignore_ascii_case("and")
+    {
+        let mut words = before.split_whitespace().rev();
+        let between = words
+            .next()
+            .is_some_and(|word| word.eq_ignore_ascii_case("between"));
+        let role = match words.next() {
+            Some(word)
+                if word.eq_ignore_ascii_case("is") || word.eq_ignore_ascii_case("appears") =>
+            {
+                words.next()
+            }
+            role => role,
+        };
+        between
+            && role.is_some_and(|role| {
+                ["action", "button", "control", "option", "tab"]
+                    .iter()
+                    .any(|candidate| role.eq_ignore_ascii_case(candidate))
+            })
+    } else {
+        false
+    };
+    if !asks_membership && !asks_between_controls {
         return Vec::new();
     }
     let mut labels = Vec::new();
@@ -446,7 +492,11 @@ pub(super) fn control_query_labels(query: &str) -> Vec<String> {
         }
         rest = &rest[end + 1..];
     }
-    labels
+    if asks_membership || labels.len() == 2 {
+        labels
+    } else {
+        Vec::new()
+    }
 }
 
 pub(super) fn control_label_coverage(content: &str, labels: &[String]) -> f64 {

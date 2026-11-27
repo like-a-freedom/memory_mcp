@@ -300,7 +300,11 @@ async fn assemble_context_inner(
     // --- Cache check ---
     let cache_generation = match pipeline::check_cache(ctx, &params.cache_key).await {
         crate::platform::context_cache::ContextCacheLookup::Hit(cached) => {
+            #[cfg(feature = "eval-support")]
+            diagnostics::record_phase(trace, "access_heat.started");
             track_fact_accesses(ctx, &cached, &params.access).await;
+            #[cfg(feature = "eval-support")]
+            diagnostics::record_phase(trace, "access_heat.settled");
 
             ctx.logger.log(
                 log_event(
@@ -506,7 +510,11 @@ async fn assemble_context_inner(
         LogLevel::Trace,
     );
 
+    #[cfg(feature = "eval-support")]
+    diagnostics::record_phase(trace, "access_heat.started");
     track_fact_accesses(ctx, &results, &params.access).await;
+    #[cfg(feature = "eval-support")]
+    diagnostics::record_phase(trace, "access_heat.settled");
     let cache_insert =
         pipeline::store_cache(ctx, cache_generation, params.cache_key.clone(), &results).await;
     let cache_status = match cache_insert {
@@ -621,12 +629,21 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::service::EmbeddingProvider;
+    use crate::service::mock_db::MockDbClient;
     use crate::storage::DbClient;
     use async_trait::async_trait;
     use chrono::{TimeZone, Utc};
     use serde_json::{Value, json};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
+
+    fn reads_fact_access(sql: &str) -> bool {
+        sql.starts_with("SELECT ") && sql.contains("type::record('fact_access', $key)")
+    }
+
+    fn mock_db_without_access_history() -> MockDbClient {
+        MockDbClient::new().expect_query_with(reads_fact_access, |_, _| Ok(json!([])))
+    }
 
     fn grouped_rows(sql: &str, mut rows_for_index: impl FnMut(usize) -> Vec<Value>) -> Value {
         if sql.contains("array::min([term_rank") {
@@ -813,36 +830,34 @@ mod tests {
     #[tokio::test]
     async fn assemble_context_marks_term_fallback_results_with_fallback_tier() {
         let service = crate::service::MemoryService::new(
-            Arc::new(
-                crate::service::mock_db::MockDbClient::new().expect_query_with(
-                    // The fallback is one ordered group per term. Return the
-                    // same row only for terms the original per-term query
-                    // would match.
-                    |sql| sql.contains("search::score"),
-                    |sql, vars| {
-                        if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
-                            return Ok(grouped_fts_rows(sql, |term| match term {
-                                "atlas" | "launch" | "checklist" => vec![json!({
-                                    "fact_id": "fact:fallback",
-                                    "fact_type": "note",
-                                    "content": "Atlas launch is scheduled.",
-                                    "quote": "Atlas launch is scheduled.",
-                                    "source_episode": "episode:1",
-                                    "t_valid": "2026-01-10T10:30:00Z",
-                                    "t_ingested": "2026-01-10T10:30:00Z",
-                                    "scope": "org"
-                                })],
-                                _ => vec![],
-                            }));
-                        }
-                        let query = vars
-                            .and_then(|vars| vars.get("query").cloned())
-                            .and_then(|v| v.as_str().map(str::to_string));
-                        assert_eq!(query.as_deref(), Some("atlas launch checklist"));
-                        Ok(Value::Array(Vec::new()))
-                    },
-                ),
-            ),
+            Arc::new(mock_db_without_access_history().expect_query_with(
+                // The fallback is one ordered group per term. Return the
+                // same row only for terms the original per-term query
+                // would match.
+                |sql| sql.contains("search::score"),
+                |sql, vars| {
+                    if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
+                        return Ok(grouped_fts_rows(sql, |term| match term {
+                            "atlas" | "launch" | "checklist" => vec![json!({
+                                "fact_id": "fact:fallback",
+                                "fact_type": "note",
+                                "content": "Atlas launch is scheduled.",
+                                "quote": "Atlas launch is scheduled.",
+                                "source_episode": "episode:1",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org"
+                            })],
+                            _ => vec![],
+                        }));
+                    }
+                    let query = vars
+                        .and_then(|vars| vars.get("query").cloned())
+                        .and_then(|v| v.as_str().map(str::to_string));
+                    assert_eq!(query.as_deref(), Some("atlas launch checklist"));
+                    Ok(Value::Array(Vec::new()))
+                },
+            )),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -1005,6 +1020,9 @@ mod tests {
                 if sql.starts_with("RETURN [") || sql.contains("array::min([term_rank") {
                     return Ok(grouped_rows(sql, |_| Vec::new()));
                 }
+                if reads_fact_access(sql) {
+                    return Ok(json!([]));
+                }
                 // The context store now runs the indexed community lookup and the
                 // entity-link fact expansion through the core `query` op; serve
                 // both here so the test can assert the DB-side paths are used.
@@ -1145,7 +1163,7 @@ mod tests {
     async fn assemble_context_rejects_one_term_graph_expansion_for_content_query() {
         let service = crate::service::MemoryService::new(
             Arc::new(
-                crate::service::mock_db::MockDbClient::new()
+                mock_db_without_access_history()
                     // The entity-link fact expansion runs through the core
                     // `query` op; serve the community-linked fact here. The
                     // `entity_links` assertion moves into the responder, which
@@ -1241,7 +1259,7 @@ mod tests {
     async fn assemble_context_orders_community_facts_by_matching_summary_relevance() {
         let service = crate::service::MemoryService::new(
             Arc::new(
-                crate::service::mock_db::MockDbClient::new()
+                mock_db_without_access_history()
                     // The indexed community lookup runs through the core
                     // `query` op; serve ranked communities so the ranking
                     // pipeline can order their member facts by summary
@@ -1352,7 +1370,7 @@ mod tests {
     async fn assemble_context_prefers_extracted_community_paths_over_higher_ranked_inferred_ones() {
         let service = crate::service::MemoryService::new(
             Arc::new(
-                crate::service::mock_db::MockDbClient::new()
+                mock_db_without_access_history()
                     .expect_query_with(
                         |sql| sql.contains("FROM fact") && sql.contains("CONTAINSANY"),
                         |_sql, vars| {
@@ -1488,7 +1506,7 @@ mod tests {
         // end to end. `expect_select_table_panic` carries the second half of
         // the old fake's contract: semantic retrieval must not fall back to
         // scanning the whole `fact` table.
-        let semantic_db = crate::service::mock_db::MockDbClient::new()
+        let semantic_db = mock_db_without_access_history()
             .expect_select_table_panic("fact")
             .expect_query_with(
                 |sql| sql.contains("vector::similarity"),
@@ -1573,7 +1591,7 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_preserves_timeline_order_after_reranking() {
-        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+        let db = mock_db_without_access_history().expect_query_with(
             |sql| sql.contains("search::score"),
             |sql, _vars| {
                 let rows = json!([

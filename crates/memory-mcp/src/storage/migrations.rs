@@ -17,19 +17,6 @@ use crate::logging::LogLevel;
 use crate::storage::DbClient;
 use crate::storage::client::SurrealDbClient;
 
-/// The datetime columns a migration-state row carries.
-///
-/// A migration row is the platform's own bookkeeping, so it names its own
-/// columns here rather than borrowing a domain's list.
-///
-/// Empty, and that is the accurate answer: `script_migration` is
-/// `SCHEMAFULL` over `script_name`, `executed_at` and `checksum`, and every
-/// value `mark_migration_failed` writes is either `Value::Null` — which
-/// `build_update_query` turns into `= NONE` before the temporal list is
-/// consulted — or a plain string. The list earns its keep only when a
-/// datetime string is written, and no such write exists here.
-const MIGRATION_STATE_TEMPORAL_FIELDS: &[&str] = &[];
-
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationScript {
     pub file_name: &'static str,
@@ -179,6 +166,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "056_knowledge_revisions.surql",
             sql: include_str!("../../migrations/056_knowledge_revisions.surql"),
         },
+        MigrationScript {
+            file_name: "057_fact_access_isolation.surql",
+            sql: include_str!("../../migrations/057_fact_access_isolation.surql"),
+        },
         // NOTE: SaaS-specific migrations (040+) are NOT registered here.
         // They are applied separately by the HTTP profile's provisioning
         // path (SurrealRegistryStore::connect / connect_in_memory).
@@ -218,6 +209,7 @@ pub(crate) fn ready_schema_catalog_digest() -> String {
                 | "054_query_index_coverage.surql"
                 | "055_episode_source_context.surql"
                 | "056_knowledge_revisions.surql"
+                | "057_fact_access_isolation.surql"
         )
     }) {
         hasher.update(migration.file_name.as_bytes());
@@ -432,6 +424,7 @@ pub const EXPECTED_SCHEMA_TABLES: &[&str] = &[
     "inbox_revision",
     "knowledge_revision_clock",
     "knowledge_revision",
+    "fact_access",
 ];
 
 const EXPECTED_SCHEMA_ANALYZERS: &[&str] = &["memory_fts", "memory_fts_ru"];
@@ -558,7 +551,12 @@ async fn verify_schema_postconditions(
                         "schema readiness failed in namespace `{namespace}`: missing field definition `{field}` on table `{table}`"
                     ))
                 })?;
-            if !optional_field_type_matches(actual, expected_type) {
+            let compatible = if *table == "episode" {
+                optional_field_type_matches(actual, expected_type)
+            } else {
+                required_field_type_matches(actual, expected_type)
+            };
+            if !compatible {
                 return Err(MemoryError::Storage(format!(
                     "schema readiness failed in namespace `{namespace}`: field `{field}` on table `{table}` has an incompatible definition"
                 )));
@@ -629,6 +627,10 @@ pub(crate) async fn verify_schema_readiness(
 
 fn required_context_index_definitions(table: &str) -> &'static [(&'static str, &'static str)] {
     match table {
+        "fact_access" => &[(
+            "fact_access_source_recent",
+            "fields source_episode, last_accessed",
+        )],
         "episode" => &[
             ("episode_episode_id", "fields episode_id"),
             ("episode_t_ref", "fields t_ref"),
@@ -651,6 +653,11 @@ fn required_context_index_definitions(table: &str) -> &'static [(&'static str, &
 fn required_context_field_types(table: &str) -> &'static [(&'static str, &'static str)] {
     match table {
         "episode" => &[("source_group", "string"), ("source_position", "int")],
+        "fact_access" => &[
+            ("source_episode", "string"),
+            ("access_count", "int"),
+            ("last_accessed", "option<datetime>"),
+        ],
         _ => &[],
     }
 }
@@ -661,6 +668,15 @@ fn schema_definition_matches(
     index: &str,
     expected_selector: &str,
 ) -> bool {
+    if table == "fact_access" {
+        // INFO renders the complete column list and appends any non-default
+        // index kind before the optional comment.
+        let definition = schema_text(definition);
+        let statement = definition
+            .split_once(" comment ")
+            .map_or(definition.as_str(), |(statement, _)| statement);
+        return statement == format!("define index {index} on {table} {expected_selector}");
+    }
     let actual = compact_schema_text(definition);
     let table_token = format!("ontable{}", compact_schema_token(table));
     let short_table_token = format!("on{}", compact_schema_token(table));
@@ -676,6 +692,42 @@ fn schema_text(value: &Value) -> String {
         .map(str::to_owned)
         .unwrap_or_else(|| value.to_string())
         .to_ascii_lowercase()
+}
+
+fn required_field_type_matches(definition: &Value, expected_type: &str) -> bool {
+    let text = schema_text(definition);
+    let mut tokens = text.split_whitespace();
+    if tokens.find(|token| *token == "type").is_none() {
+        return false;
+    }
+    // SurrealDB may display option<T> as `none | T`. Compare the entire
+    // declared type, excluding field clauses, rather than a substring that
+    // could come from an additional union member or an assertion literal.
+    let declared: String = tokens
+        .take_while(|token| {
+            !matches!(
+                *token,
+                "assert"
+                    | "default"
+                    | "value"
+                    | "readonly"
+                    | "reference"
+                    | "flexible"
+                    | "computed"
+                    | "permissions"
+                    | "comment"
+            )
+        })
+        .collect();
+    if declared == expected_type {
+        return true;
+    }
+    expected_type
+        .strip_prefix("option<")
+        .and_then(|inner| inner.strip_suffix('>'))
+        .is_some_and(|inner| {
+            declared == format!("none|{inner}") || declared == format!("{inner}|none")
+        })
 }
 
 fn optional_field_type_matches(definition: &Value, inner_type: &str) -> bool {
@@ -762,13 +814,19 @@ async fn apply_versioned_migration(
         tokio::time::sleep(Duration::from_millis(MIGRATION_POLL_INTERVAL_MS)).await;
     }
 
-    let execution = if migration_has_statements(&rendered_sql) {
-        client
-            .execute_migration_script(&rendered_sql, namespace)
-            .await
-    } else {
+    let execution = async {
+        if migration_has_statements(&rendered_sql) {
+            client
+                .execute_migration_script(&rendered_sql, namespace)
+                .await?;
+        }
+        if migration.file_name == "057_fact_access_isolation.surql" {
+            backfill_fact_access(client, namespace, &record_id, &owner).await?;
+            reconcile_fact_access(client, namespace, &record_id, &owner).await?;
+        }
         Ok(())
-    };
+    }
+    .await;
     if let Err(error) = execution {
         if replaying
             && migration.file_name == "055_episode_source_context.surql"
@@ -787,12 +845,13 @@ async fn apply_versioned_migration(
                 &record_id,
                 migration.file_name,
                 &checksum,
+                &owner,
                 namespace,
             )
             .await;
         }
         if let Err(mark_error) =
-            mark_migration_failed(client, &record_id, &error.to_string(), namespace).await
+            mark_migration_failed(client, &record_id, &owner, &error.to_string(), namespace).await
         {
             crate::logging::emit_best_effort_failure("db.migration_mark_failed", &mark_error);
         }
@@ -804,6 +863,7 @@ async fn apply_versioned_migration(
         &record_id,
         migration.file_name,
         &checksum,
+        &owner,
         namespace,
     )
     .await
@@ -814,6 +874,140 @@ fn is_schema_definition_already_present(error: &MemoryError) -> bool {
     message.contains("already exists")
         || message.contains("already defined")
         || message.contains("duplicate definition")
+}
+
+/// The namespace must be offline to older writers during this upgrade. New
+/// workers are admitted only after this lease-protected, resumable copy settles.
+/// Neither a replay nor a conflicting existing side row overwrites newer heat.
+async fn backfill_fact_access(
+    client: &SurrealDbClient,
+    namespace: &str,
+    migration_id: &str,
+    owner: &str,
+) -> Result<(), MemoryError> {
+    let key = migration_record_body(migration_id)?;
+    loop {
+        let state = client
+            .select_one(migration_id, namespace)
+            .await?
+            .ok_or_else(|| {
+                MemoryError::Storage("fact access migration lease disappeared".into())
+            })?;
+        let cursor = state.get("fact_access_cursor").and_then(Value::as_str);
+        let rows = fact_access_legacy_batch(client, namespace, cursor).await?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let last_key = rows
+            .last()
+            .and_then(|row| row.get("record_key"))
+            .cloned()
+            .ok_or_else(|| MemoryError::Storage("fact access backfill has no cursor".into()))?;
+        // The lease guard, exact copy, and progress cursor share one commit.
+        // Exact assignments let the adapter replay a batch on retry.
+        client.transaction_query(
+            "LET $lease = SELECT owner, status FROM type::record('script_migration', $migration_key); \
+             IF $lease[0].owner != $owner OR $lease[0].status != 'applying' { THROW 'fact access migration lease lost'; }; \
+             FOR $row IN $rows { \
+               LET $stamp = IF $row.last_accessed IS NONE OR $row.last_accessed IS NULL THEN NONE ELSE type::datetime($row.last_accessed) END; \
+               LET $existing = SELECT source_episode, access_count, last_accessed FROM type::record('fact_access', $row.record_key); \
+               IF array::len($existing) > 0 { \
+                 IF $existing[0].source_episode != $row.source_episode OR $existing[0].access_count != $row.access_count OR $existing[0].last_accessed != $stamp { THROW 'fact access migration found conflicting heat'; }; \
+               } ELSE { \
+                 CREATE type::record('fact_access', $row.record_key) SET source_episode = $row.source_episode, access_count = $row.access_count, last_accessed = $stamp RETURN NONE; \
+               }; \
+             }; \
+             UPDATE type::record('script_migration', $migration_key) SET fact_access_cursor = $last_key, lease_expires_at = type::datetime($lease_until) RETURN NONE;",
+            Some(json!({"migration_key":key,"owner":owner,"rows":rows,"last_key":last_key,"lease_until":(chrono::Utc::now()+chrono::Duration::seconds(MIGRATION_LEASE_SECS)).to_rfc3339()})),
+            namespace,
+        ).await?;
+    }
+}
+
+/// Check the entire eligible source again, including batches committed before a
+/// failed attempt. This never repairs a conflict or advances the copy cursor.
+async fn reconcile_fact_access(
+    client: &SurrealDbClient,
+    namespace: &str,
+    migration_id: &str,
+    owner: &str,
+) -> Result<(), MemoryError> {
+    let key = migration_record_body(migration_id)?;
+    let mut cursor: Option<String> = None;
+    loop {
+        let rows = fact_access_legacy_batch(client, namespace, cursor.as_deref()).await?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let last_key = rows
+            .last()
+            .and_then(|row| row.get("record_key"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| MemoryError::Storage("fact access reconciliation has no cursor".into()))?
+            .to_owned();
+        client.transaction_query(
+            "LET $lease = SELECT owner, status FROM type::record('script_migration', $migration_key); \
+             IF $lease[0].owner != $owner OR $lease[0].status != 'applying' { THROW 'fact access migration lease lost'; }; \
+             FOR $row IN $rows { \
+               LET $stamp = IF $row.last_accessed IS NONE OR $row.last_accessed IS NULL THEN NONE ELSE type::datetime($row.last_accessed) END; \
+               LET $existing = SELECT source_episode, access_count, last_accessed FROM type::record('fact_access', $row.record_key); \
+               IF array::len($existing) != 1 { THROW 'fact access reconciliation found missing heat'; }; \
+               IF $existing[0].source_episode != $row.source_episode OR $existing[0].access_count != $row.access_count OR $existing[0].last_accessed != $stamp { THROW 'fact access reconciliation found conflicting heat'; }; \
+             }; \
+             UPDATE type::record('script_migration', $migration_key) SET lease_expires_at = type::datetime($lease_until) RETURN NONE;",
+            Some(json!({"migration_key":key,"owner":owner,"rows":rows,"lease_until":(chrono::Utc::now()+chrono::Duration::seconds(MIGRATION_LEASE_SECS)).to_rfc3339()})),
+            namespace,
+        ).await?;
+        cursor = Some(last_key);
+    }
+}
+
+async fn fact_access_legacy_batch(
+    client: &SurrealDbClient,
+    namespace: &str,
+    cursor: Option<&str>,
+) -> Result<Vec<Value>, MemoryError> {
+    const BATCH: usize = 128;
+    let range = if cursor.is_some() {
+        "AND id > type::record('fact', $cursor)"
+    } else {
+        ""
+    };
+    let sql = format!(
+        "SELECT id, record::id(id) AS record_key, fact_id, source_episode, access_count, last_accessed FROM fact WHERE (access_count != 0 OR last_accessed IS NOT NONE) {range} ORDER BY id LIMIT {BATCH}"
+    );
+    let rows = client
+        .query(&sql, Some(json!({"cursor":cursor})), namespace)
+        .await?;
+    let mut rows = rows
+        .as_array()
+        .cloned()
+        .ok_or_else(|| MemoryError::Storage("fact access backfill returned no row array".into()))?;
+    for row in &mut rows {
+        let record_key = row
+            .get("record_key")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                MemoryError::Storage("fact access backfill requires string fact keys".into())
+            })?;
+        let expected = format!("fact:{record_key}");
+        crate::storage::require_record_kind(&expected, "fact")?;
+        if row.get("fact_id").and_then(Value::as_str) != Some(expected.as_str())
+            || row.get("source_episode").and_then(Value::as_str).is_none()
+        {
+            return Err(MemoryError::Storage(
+                "fact access backfill found inconsistent fact identity".into(),
+            ));
+        }
+        if row.get("access_count").is_none_or(Value::is_null) {
+            row["access_count"] = json!(0);
+        } else if row["access_count"].as_i64().is_none() {
+            return Err(MemoryError::Storage(
+                "fact access backfill found an invalid counter".into(),
+            ));
+        }
+    }
+    Ok(rows)
 }
 
 async fn create_migration_lease(
@@ -886,23 +1080,27 @@ async fn claim_existing_migration(
 async fn mark_migration_failed(
     client: &SurrealDbClient,
     record_id: &str,
+    owner: &str,
     error: &str,
     namespace: &str,
 ) -> Result<(), MemoryError> {
-    client
-        .update(
-            record_id,
-            json!({
-                "status": "failed",
-                "owner": Value::Null,
-                "lease_expires_at": Value::Null,
-                "last_error": error,
-            }),
+    let body = migration_record_body(record_id)?;
+    let sql = format!(
+        "UPDATE script_migration:⟨{body}⟩ SET status = 'failed', owner = NONE, lease_expires_at = NONE, last_error = $error WHERE status = 'applying' AND owner = $owner RETURN AFTER"
+    );
+    let changed = client
+        .query(
+            &sql,
+            Some(json!({"owner": owner, "error": error})),
             namespace,
-            MIGRATION_STATE_TEMPORAL_FIELDS,
         )
-        .await
-        .map(|_| ())
+        .await?;
+    if changed.as_array().is_none_or(Vec::is_empty) {
+        return Err(MemoryError::Storage(
+            "migration lost its applying lease before failure transition".into(),
+        ));
+    }
+    Ok(())
 }
 
 async fn mark_migration_applied(
@@ -910,28 +1108,36 @@ async fn mark_migration_applied(
     record_id: &str,
     file_name: &str,
     checksum: &str,
+    owner: &str,
     namespace: &str,
 ) -> Result<(), MemoryError> {
     let body = migration_record_body(record_id)?;
     let sql = format!(
-        "UPDATE script_migration:⟨{body}⟩ SET script_name = $script_name, checksum = $checksum, status = 'applied', owner = NONE, lease_expires_at = NONE, last_error = NONE, executed_at = type::datetime($executed_at) RETURN *"
+        "UPDATE script_migration:⟨{body}⟩ SET script_name = $script_name, checksum = $checksum, status = 'applied', owner = NONE, lease_expires_at = NONE, last_error = NONE, executed_at = type::datetime($executed_at) WHERE status = 'applying' AND owner = $owner RETURN AFTER"
     );
-    client
+    let changed = client
         .query(
             &sql,
             Some(json!({
+                "owner": owner,
                 "script_name": file_name,
                 "checksum": checksum,
                 "executed_at": chrono::Utc::now().to_rfc3339(),
             })),
             namespace,
         )
-        .await
-        .map(|_| ())
+        .await?;
+    if changed.as_array().is_none_or(Vec::is_empty) {
+        return Err(MemoryError::Storage(format!(
+            "migration `{file_name}` lost its applying lease before completion"
+        )));
+    }
+    Ok(())
 }
 
 fn required_schema_fields(table: &str) -> &'static [&'static str] {
     match table {
+        "fact_access" => &["source_episode", "access_count", "last_accessed"],
         "episode" => &[
             "episode_id",
             "source_type",
@@ -1186,6 +1392,7 @@ fn required_schema_fields(table: &str) -> &'static [&'static str] {
 
 fn required_schema_indexes(table: &str) -> &'static [&'static str] {
     match table {
+        "fact_access" => &["fact_access_source_recent"],
         "episode" => &[
             "episode_source_id",
             "episode_project",
@@ -1407,6 +1614,168 @@ fn render_sql_template(template: &str, embedding_dimension: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Integration regression: a reclaimed lease must fence the stale runner's
+    /// terminal transition even when its backfill found an empty tail.
+    #[tokio::test]
+    async fn stale_migration_owner_cannot_mark_applied() {
+        let namespace = "migration_stale_applied";
+        let client = SurrealDbClient::connect_in_memory("memory", namespace, "error")
+            .await
+            .expect("in-memory migration store");
+        ensure_migration_runner_schema(&client, namespace)
+            .await
+            .expect("runner schema");
+        let id = migration_record_id("057_fact_access_isolation.surql");
+        create_migration_lease(
+            &client,
+            &id,
+            "057_fact_access_isolation.surql",
+            "checksum",
+            "old-owner",
+            namespace,
+        )
+        .await
+        .expect("initial lease");
+        client
+            .query(
+                "UPDATE script_migration SET owner = 'new-owner' WHERE owner = 'old-owner'",
+                None,
+                namespace,
+            )
+            .await
+            .expect("deterministic lease takeover");
+
+        let result = mark_migration_applied(
+            &client,
+            &id,
+            "057_fact_access_isolation.surql",
+            "checksum",
+            "old-owner",
+            namespace,
+        )
+        .await;
+
+        assert!(result.is_err(), "stale runner must not report readiness");
+        let ledger = client
+            .select_one(&id, namespace)
+            .await
+            .expect("read ledger")
+            .expect("ledger exists");
+        assert_eq!(ledger["status"], "applying");
+        assert_eq!(ledger["owner"], "new-owner");
+    }
+
+    #[tokio::test]
+    async fn stale_migration_owner_cannot_mark_failed() {
+        let namespace = "migration_stale_failed";
+        let client = SurrealDbClient::connect_in_memory("memory", namespace, "error")
+            .await
+            .expect("in-memory migration store");
+        ensure_migration_runner_schema(&client, namespace)
+            .await
+            .expect("runner schema");
+        let id = migration_record_id("057_fact_access_isolation.surql");
+        create_migration_lease(
+            &client,
+            &id,
+            "057_fact_access_isolation.surql",
+            "checksum",
+            "old-owner",
+            namespace,
+        )
+        .await
+        .expect("initial lease");
+        client
+            .query(
+                "UPDATE script_migration SET owner = 'new-owner' WHERE owner = 'old-owner'",
+                None,
+                namespace,
+            )
+            .await
+            .expect("deterministic lease takeover");
+        let before = client
+            .select_one(&id, namespace)
+            .await
+            .expect("ledger before");
+
+        let result =
+            mark_migration_failed(&client, &id, "old-owner", "stale failure", namespace).await;
+
+        assert!(result.is_err(), "stale failure must report lost ownership");
+        assert_eq!(
+            client
+                .select_one(&id, namespace)
+                .await
+                .expect("ledger after"),
+            before
+        );
+    }
+
+    // Real-store integration cases: IF NOT EXISTS must not make an
+    // incompatible pre-existing field definition appear ready.
+    macro_rules! incompatible_fact_access_field {
+        ($name:ident, $field:literal, $wrong_type:literal) => {
+            #[tokio::test]
+            async fn $name() {
+                let namespace = stringify!($name);
+                let client = SurrealDbClient::connect_in_memory("memory", namespace, "error")
+                    .await
+                    .expect("in-memory migration store");
+                run_migrations(&client, namespace)
+                    .await
+                    .expect("valid schema");
+                client
+                    .query(
+                        concat!(
+                            "DEFINE FIELD OVERWRITE ",
+                            $field,
+                            " ON fact_access TYPE ",
+                            $wrong_type
+                        ),
+                        None,
+                        namespace,
+                    )
+                    .await
+                    .expect("install incompatible field");
+
+                let error = verify_schema_postconditions(&client, namespace)
+                    .await
+                    .expect_err("incompatible field must block readiness");
+
+                assert!(
+                    error.to_string().contains(concat!("field `", $field, "`")),
+                    "{error}"
+                );
+            }
+        };
+    }
+
+    incompatible_fact_access_field!(
+        fact_access_readiness_rejects_string_counter,
+        "access_count",
+        "string"
+    );
+    incompatible_fact_access_field!(
+        fact_access_readiness_rejects_optional_source,
+        "source_episode",
+        "option<string>"
+    );
+    incompatible_fact_access_field!(
+        fact_access_readiness_rejects_string_timestamp,
+        "last_accessed",
+        "string"
+    );
+    incompatible_fact_access_field!(
+        fact_access_readiness_rejects_union_timestamp,
+        "last_accessed",
+        "option<datetime> | string"
+    );
+    incompatible_fact_access_field!(
+        fact_access_readiness_rejects_type_named_in_assertion,
+        "last_accessed",
+        "string ASSERT $value != 'option<datetime>'"
+    );
 
     #[test]
     fn versioned_migrations_includes_embedding_rebuild_maintenance() {

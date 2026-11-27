@@ -53,6 +53,31 @@ async fn connect_snapshot() -> Arc<SurrealDbClient> {
     Arc::new(SurrealDbClient::connect(&config).await.unwrap())
 }
 
+/// Upgrade only a disposable closed-store clone, outside steady-read timing.
+#[tokio::test]
+#[ignore = "registered local snapshot upgrade; MEMORY_FULL_HISTORY_STORE must be a disposable clone"]
+async fn full_history_upgrade_fact_access_statistics() {
+    use memory_mcp::storage::DbClient;
+    let db = connect_snapshot().await;
+    let started = Instant::now();
+    db.apply_migrations("main")
+        .await
+        .expect("fenced clone upgrade");
+    let rows = db
+        .query(
+            "SELECT count() AS rows FROM fact_access GROUP ALL",
+            None,
+            "main",
+        )
+        .await
+        .unwrap();
+    println!(
+        "FULL_HISTORY_UPGRADE {}",
+        serde_json::json!({"elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"heat_counts":rows})
+    );
+    std::io::stdout().flush().unwrap();
+}
+
 async fn observe(case_id: &str) {
     let input: serde_json::Value = serde_json::from_slice(
         &std::fs::read(std::env::var("MEMORY_FULL_HISTORY_INPUT").expect("registered input path"))
@@ -91,7 +116,7 @@ async fn observe(case_id: &str) {
     .unwrap();
     println!(
         "FULL_HISTORY_START {}",
-        serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"formation_complete":true})
+        serde_json::json!({"case_id":case_id,"source_episode":episode,"episode_count":episodes.count_episodes().await.unwrap(),"carrier_span_present":true})
     );
     let capture =
         memory_mcp::eval_support::retrieval::ContextEvidenceCapture::with_candidate_observer(
@@ -272,4 +297,51 @@ async fn full_history_first_fact_payload() {
         serde_json::json!({"kind":"first_fact_payload","elapsed_ms":started.elapsed().as_secs_f64()*1000.0,"rows":rows})
     );
     std::io::stdout().flush().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "requires registered full snapshot clone and input; local diagnostic only"]
+async fn full_history_between_controls_retains_reviewed_source() {
+    observe("922a0c56").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "requires registered case and disposable complete snapshot clone; local diagnostic only"]
+async fn full_history_registered_case_retains_reviewed_source() {
+    observe(&std::env::var("MEMORY_FULL_HISTORY_CASE").expect("registered question ID")).await;
+}
+
+#[tokio::test]
+#[ignore = "requires registered full snapshot clone; exact source-content audit, not answer quality"]
+async fn full_history_formation_inventory() {
+    use sha2::{Digest, Sha256};
+
+    let input: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(std::env::var("MEMORY_FULL_HISTORY_INPUT").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let db = connect_snapshot().await;
+    let episodes = memory_mcp::memory::episode_store::EpisodeStoreClient::new(db, "main");
+    let mut rows = Vec::new();
+    for expected in input["segments"].as_array().unwrap() {
+        let source_id = expected["source_id"].as_str().unwrap();
+        let found = episodes
+            .select_by_source_identity("other", source_id, "2000-01-01T00:00:00Z", 2)
+            .await
+            .unwrap();
+        assert_eq!(found.len(), 1, "source identity {source_id}");
+        let content = found[0]["content"].as_str().unwrap();
+        rows.push(serde_json::json!({
+            "source_id": source_id,
+            "episode_id": found[0]["episode_id"],
+            "content_sha256": hex::encode(Sha256::digest(content.as_bytes())),
+            "content_bytes": content.len(),
+            "t_ref": found[0]["t_ref"],
+            "t_ingested": found[0]["t_ingested"],
+        }));
+    }
+    println!(
+        "FULL_HISTORY_FORMATION {}",
+        serde_json::json!({"episode_count":episodes.count_episodes().await.unwrap(),"episodes":rows})
+    );
 }

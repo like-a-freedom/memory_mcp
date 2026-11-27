@@ -8,15 +8,39 @@
 //!
 //! Heat-only writes do not return the immutable source payload.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
-use serde_json::json;
+use chrono::{DateTime, Utc};
+use serde::Deserialize;
+use serde_json::{Value, json};
 
 use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 
 const MAX_ARCHIVAL_EPISODES_PER_RPC: usize = 64;
+const MAX_FACT_KEYS_PER_RPC: usize = 64;
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct FactAccessStats {
+    pub access_count: i64,
+    pub last_accessed: Option<String>,
+}
+
+impl FactAccessStats {
+    pub(crate) fn parsed_last_accessed(&self) -> Result<Option<DateTime<Utc>>, MemoryError> {
+        self.last_accessed
+            .as_deref()
+            .map(|value| {
+                DateTime::parse_from_rfc3339(value)
+                    .map(|timestamp| timestamp.with_timezone(&Utc))
+                    .map_err(|_| {
+                        MemoryError::Storage("fact access row has an invalid timestamp".into())
+                    })
+            })
+            .transpose()
+    }
+}
 
 /// Read-side store for the fact access log.
 #[derive(Clone)]
@@ -38,33 +62,35 @@ impl FactAccessStore {
     /// Increments fact access metadata without exposing record mutation details
     /// to retrieval or explanation orchestration.
     ///
-    /// The access count changes in the statement itself. A read-modify-write
-    /// here would both lose concurrent increments and restore a stale vector
-    /// from the whole-record snapshot.
+    /// The existing side row is updated atomically. Only the first access
+    /// projects the fact's source identity, within the same transaction.
     pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
-        crate::storage::require_record_kind(fact_id, "fact")?;
-        let record_id = fact_id.strip_prefix("fact:").ok_or_else(|| {
-            MemoryError::Validation(format!("invalid fact id for access write: {fact_id}"))
-        })?;
-        if record_id.is_empty() {
-            return Err(MemoryError::Validation(format!(
-                "fact id carries no record id for access write: {fact_id}"
-            )));
-        }
+        let record_id = fact_key(fact_id)?;
         let last_accessed = crate::shared::temporal::normalize_dt(crate::shared::temporal::now());
 
         self.db
             .query(
-                "UPDATE type::record('fact', $fact_id) SET \
-                 access_count = IF access_count IS NONE OR access_count IS NULL THEN $boost \
-                 ELSE IF $boost > 0 THEN \
-                   IF access_count > $int_max - $boost THEN $int_max \
-                   ELSE access_count + $boost END \
-                 ELSE IF $boost < 0 THEN \
-                   IF access_count < $int_min - $boost THEN $int_min \
-                   ELSE access_count + $boost END \
-                 ELSE access_count END, \
-                 last_accessed = type::datetime($last_accessed) RETURN NONE",
+                "BEGIN TRANSACTION; \
+                 LET $existing = SELECT VALUE id FROM type::record('fact_access', $fact_id); \
+                 IF array::len($existing) > 0 { \
+                   UPDATE type::record('fact_access', $fact_id) SET \
+                   access_count = IF $boost > 0 THEN \
+                     IF access_count > $int_max - $boost THEN $int_max \
+                     ELSE access_count + $boost END \
+                   ELSE IF $boost < 0 THEN \
+                     IF access_count < $int_min - $boost THEN $int_min \
+                     ELSE access_count + $boost END \
+                   ELSE access_count END, \
+                   last_accessed = type::datetime($last_accessed) RETURN NONE; \
+                 } ELSE { \
+                   LET $source = SELECT VALUE source_episode FROM type::record('fact', $fact_id); \
+                   IF array::len($source) > 0 { \
+                     CREATE type::record('fact_access', $fact_id) SET \
+                     source_episode = $source[0], access_count = $boost, \
+                     last_accessed = type::datetime($last_accessed) RETURN NONE; \
+                   }; \
+                 }; \
+                 COMMIT TRANSACTION;",
                 Some(json!({
                     "fact_id": record_id,
                     "boost": boost,
@@ -77,6 +103,43 @@ impl FactAccessStore {
             .map(|_| ())
     }
 
+    /// Read the stored heat for the supplied facts. A fact with no access row
+    /// is omitted, and a failed storage read is returned to the caller.
+    pub async fn read_fact_accesses(
+        &self,
+        fact_ids: &[String],
+    ) -> Result<HashMap<String, FactAccessStats>, MemoryError> {
+        let mut keys = fact_ids
+            .iter()
+            .map(|id| fact_key(id))
+            .collect::<Result<Vec<_>, _>>()?;
+        keys.sort_unstable();
+        keys.dedup();
+
+        let mut records = HashMap::new();
+        for batch in keys.chunks(MAX_FACT_KEYS_PER_RPC) {
+            let rows = self
+                .query_access_rows(
+                    "SELECT record::id(id) AS fact_key, access_count, last_accessed \
+                     FROM array::map($fact_keys, |$key| type::record('fact_access', $key))",
+                    json!({ "fact_keys": batch }),
+                )
+                .await?;
+            for row in rows {
+                let key = row["fact_key"].as_str().ok_or_else(|| {
+                    MemoryError::Storage("fact access row has an invalid record key".to_string())
+                })?;
+                let id = format!("fact:{key}");
+                let stats: FactAccessStats = serde_json::from_value(row).map_err(|_| {
+                    MemoryError::Storage("fact access row has invalid statistics".to_string())
+                })?;
+                stats.parsed_last_accessed()?;
+                records.insert(id, stats);
+            }
+        }
+        Ok(records)
+    }
+
     /// Whether any fact linked to `episode_id` was accessed at or after
     /// `hot_cutoff`.
     pub async fn has_recent_fact_access(
@@ -85,13 +148,12 @@ impl FactAccessStore {
         hot_cutoff: &str,
     ) -> Result<bool, MemoryError> {
         let rows = self
-            .db
-            .query_rows(
-                "SELECT fact_id FROM fact \
+            .query_access_rows(
+                "SELECT id FROM fact_access \
                  WHERE source_episode = $episode_id \
                  AND last_accessed IS NOT NONE \
                  AND last_accessed >= type::datetime($hot_cutoff) LIMIT 1",
-                Some(json!({ "episode_id": episode_id, "hot_cutoff": hot_cutoff })),
+                json!({ "episode_id": episode_id, "hot_cutoff": hot_cutoff }),
             )
             .await?;
         Ok(!rows.is_empty())
@@ -107,14 +169,13 @@ impl FactAccessStore {
         let mut hot_episode_ids = BTreeSet::new();
         for batch in episode_ids.chunks(MAX_ARCHIVAL_EPISODES_PER_RPC) {
             let rows = self
-                .db
-                .query_rows(
-                    "SELECT source_episode FROM fact \
+                .query_access_rows(
+                    "SELECT source_episode FROM fact_access \
                      WHERE source_episode IN $episode_ids \
                      AND last_accessed IS NOT NONE \
                      AND last_accessed >= type::datetime($hot_cutoff) \
                      GROUP BY source_episode",
-                    Some(json!({ "episode_ids": batch, "hot_cutoff": hot_cutoff })),
+                    json!({ "episode_ids": batch, "hot_cutoff": hot_cutoff }),
                 )
                 .await?;
             for row in rows {
@@ -128,13 +189,34 @@ impl FactAccessStore {
         }
         Ok(hot_episode_ids.into_iter().collect())
     }
+
+    async fn query_access_rows(
+        &self,
+        sql: &str,
+        bindings: Value,
+    ) -> Result<Vec<Value>, MemoryError> {
+        match self.db.query(sql, Some(bindings)).await? {
+            Value::Array(rows) => Ok(rows),
+            _ => Err(MemoryError::Storage(
+                "fact access query did not return rows".to_string(),
+            )),
+        }
+    }
+}
+
+fn fact_key(fact_id: &str) -> Result<&str, MemoryError> {
+    crate::storage::require_record_kind(fact_id, "fact")?;
+    fact_id
+        .strip_prefix("fact:")
+        .filter(|key| !key.is_empty())
+        .ok_or_else(|| MemoryError::Validation("expected a fact id with its table prefix".into()))
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use super::FactAccessStore;
+    use super::{FactAccessStats, FactAccessStore};
     use crate::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
     use crate::storage::{DbClient, SurrealDbClient};
@@ -182,6 +264,26 @@ mod tests {
 
     async fn seed_fact(db: &Arc<SurrealDbClient>, fact_id: &str, access_count: serde_json::Value) {
         seed_fact_with_vector(db, fact_id, access_count, "sig-old").await
+    }
+
+    async fn seed_access(db: &SurrealDbClient, fact_id: &str, access_count: i64) {
+        let key = fact_id.strip_prefix("fact:").expect("test fact id");
+        db.create(
+            &format!("fact_access:{key}"),
+            serde_json::json!({"source_episode": "episode:seed", "access_count": access_count}),
+            NAMESPACE,
+            &[],
+        )
+        .await
+        .expect("seed heat");
+    }
+
+    async fn access_count(store: &FactAccessStore, fact_id: &str) -> i64 {
+        store
+            .read_fact_accesses(&[fact_id.to_string()])
+            .await
+            .expect("read heat")[fact_id]
+            .access_count
     }
 
     async fn seed_fact_with_vector(
@@ -242,6 +344,128 @@ mod tests {
             .unwrap_or_else(|| panic!("{fact_id} must exist"))
     }
 
+    #[tokio::test]
+    async fn first_access_persists_heat_without_mutating_the_fact_record() {
+        let db = make_db().await;
+        let id = "fact:access_first";
+        seed_fact(&db, id, serde_json::json!(0)).await;
+        let before = db.select_one(id, NAMESPACE).await.unwrap().unwrap();
+        let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
+
+        store
+            .record_fact_access(id, 3)
+            .await
+            .expect("record access");
+
+        let after = db.select_one(id, NAMESPACE).await.unwrap().unwrap();
+        assert_eq!(after["access_count"], 0, "heat is stored separately");
+        assert_eq!(after, before);
+        let stats = db
+            .query(
+                "SELECT access_count, last_accessed, source_episode FROM fact_access:access_first",
+                None,
+                NAMESPACE,
+            )
+            .await
+            .expect("read persisted heat");
+        assert_eq!(stats[0]["access_count"], 3);
+        assert_eq!(stats[0]["source_episode"], "episode:seed");
+        assert!(stats[0]["last_accessed"].is_string());
+    }
+
+    #[tokio::test]
+    async fn read_fact_accesses_only_returns_requested_existing_heat() {
+        let db = make_db().await;
+        seed_fact(&db, "fact:cold", serde_json::json!(0)).await;
+        seed_fact(&db, "fact:hot", serde_json::json!(0)).await;
+        seed_access(&db, "fact:hot", 7).await;
+        seed_access(&db, "fact:unrequested", 16).await;
+        let store = FactAccessStore::new(db, NAMESPACE);
+
+        let stats = store
+            .read_fact_accesses(&[
+                "fact:hot".into(),
+                "fact:cold".into(),
+                "fact:nonexistent".into(),
+                "fact:hot".into(),
+            ])
+            .await
+            .expect("read heat");
+
+        assert_eq!(stats.len(), 1);
+        assert_eq!(
+            stats["fact:hot"],
+            FactAccessStats {
+                access_count: 7,
+                last_accessed: None
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn read_fact_accesses_propagates_storage_failure_without_empty_fallback() {
+        let db = MockDbClient::new().expect_query_with(
+            |sql| sql.contains("fact_access"),
+            |_, _| Err(MemoryError::Storage("controlled heat read failure".into())),
+        );
+        let store = FactAccessStore::new(Arc::new(db), NAMESPACE);
+
+        let result = store.read_fact_accesses(&["fact:a".into()]).await;
+
+        assert!(
+            matches!(result, Err(MemoryError::Storage(message)) if message == "controlled heat read failure")
+        );
+    }
+
+    #[tokio::test]
+    async fn read_fact_accesses_binds_at_most_sixty_four_distinct_keys_per_request() {
+        let batches = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = batches.clone();
+        let db = MockDbClient::new().expect_query_with(
+            |sql| sql.contains("fact_access"),
+            move |_, args| {
+                let bindings = args.expect("exact key bindings");
+                seen.lock()
+                    .expect("query batches")
+                    .push(bindings["fact_keys"].clone());
+                Ok(serde_json::json!([]))
+            },
+        );
+        let store = FactAccessStore::new(Arc::new(db), NAMESPACE);
+        let keys = (0..65).map(|n| format!("heat_{n:02}")).collect::<Vec<_>>();
+        let mut ids = keys
+            .iter()
+            .map(|key| format!("fact:{key}"))
+            .collect::<Vec<_>>();
+        ids.push("fact:heat_29".into());
+
+        let result = store.read_fact_accesses(&ids).await.expect("read heat");
+
+        assert!(result.is_empty());
+        assert_eq!(
+            *batches.lock().expect("query batches"),
+            vec![
+                serde_json::json!(&keys[..64]),
+                serde_json::json!(&keys[64..])
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn read_fact_accesses_returns_an_error_for_a_malformed_timestamp() {
+        let db = MockDbClient::new().expect_query_with(
+            |sql| sql.contains("fact_access"),
+            |_, _| Ok(serde_json::json!([{"fact_key": "a", "access_count": 1, "last_accessed": "not a timestamp"}])),
+        );
+        let store = FactAccessStore::new(Arc::new(db), NAMESPACE);
+
+        let result = store.read_fact_accesses(&["fact:a".into()]).await;
+
+        assert!(
+            matches!(result, Err(MemoryError::Storage(message)) if message.contains("invalid timestamp"))
+        );
+    }
+
     /// Commits competing count/vector changes immediately before the access
     /// write, after a legacy whole-record read would have captured stale fields.
     struct RacingVectorWriter {
@@ -273,14 +497,8 @@ mod tests {
                     NAMESPACE,
                 )
                 .await?;
-            self.inner
-                .query(
-                    "UPDATE type::record('fact', $fact_id) SET access_count = access_count + 1",
-                    Some(serde_json::json!({
-                        "fact_id": fact_id.trim_start_matches("fact:"),
-                    })),
-                    NAMESPACE,
-                )
+            FactAccessStore::new(self.inner.clone(), NAMESPACE)
+                .record_fact_access(&fact_id, 1)
                 .await?;
             Ok(())
         }
@@ -368,7 +586,8 @@ mod tests {
             "the access write must not restore the vector its snapshot carried"
         );
         assert_eq!(
-            stored["access_count"], 2,
+            access_count(&store, fact_id).await,
+            2,
             "the external increment and this access must both land"
         );
     }
@@ -388,6 +607,13 @@ mod tests {
                 .is_none(),
             "a no-op read must not create the record"
         );
+        assert!(
+            store
+                .read_fact_accesses(&["fact:never_created".into()])
+                .await
+                .expect("read heat")
+                .is_empty()
+        );
     }
 
     /// The count accumulates from what is stored, including under simultaneous
@@ -396,13 +622,14 @@ mod tests {
     async fn record_fact_access_accumulates_from_the_stored_count() {
         let db = make_db().await;
         let fact_id = "fact:access_coercion";
-        seed_fact(&db, fact_id, serde_json::json!(4)).await;
+        seed_fact(&db, fact_id, serde_json::json!(0)).await;
+        seed_access(&db, fact_id, 4).await;
         let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
 
         store.record_fact_access(fact_id, 3).await.expect("first");
         store.record_fact_access(fact_id, 2).await.expect("second");
 
-        assert_eq!(read_fact(&db, fact_id).await["access_count"], 9);
+        assert_eq!(access_count(&store, fact_id).await, 9);
     }
 
     #[tokio::test]
@@ -436,14 +663,15 @@ mod tests {
         .expect("concurrent updates complete within the bound")
         .expect("all access updates succeed");
 
-        assert_eq!(read_fact(&db, fact_id).await["access_count"], 4);
+        assert_eq!(access_count(&store, fact_id).await, 4);
     }
 
     #[tokio::test]
     async fn record_fact_access_saturates_instead_of_wrapping() {
         let db = make_db().await;
         let fact_id = "fact:access_saturation";
-        seed_fact(&db, fact_id, serde_json::json!(1)).await;
+        seed_fact(&db, fact_id, serde_json::json!(0)).await;
+        seed_access(&db, fact_id, 1).await;
         let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
 
         store
@@ -452,14 +680,15 @@ mod tests {
             .expect("first");
         store.record_fact_access(fact_id, 10).await.expect("second");
 
-        assert_eq!(read_fact(&db, fact_id).await["access_count"], i64::MAX);
+        assert_eq!(access_count(&store, fact_id).await, i64::MAX);
     }
 
     #[tokio::test]
     async fn record_fact_access_saturates_at_the_lower_bound() {
         let db = make_db().await;
         let fact_id = "fact:access_lower_saturation";
-        seed_fact(&db, fact_id, serde_json::json!(i64::MIN)).await;
+        seed_fact(&db, fact_id, serde_json::json!(0)).await;
+        seed_access(&db, fact_id, i64::MIN).await;
         let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
 
         store
@@ -467,7 +696,7 @@ mod tests {
             .await
             .expect("lower bound");
 
-        assert_eq!(read_fact(&db, fact_id).await["access_count"], i64::MIN);
+        assert_eq!(access_count(&store, fact_id).await, i64::MIN);
     }
 
     #[tokio::test]
@@ -486,5 +715,12 @@ mod tests {
             .expect("a non-existent id is a no-op, not SQL");
 
         assert_eq!(read_fact(&db, innocent).await["access_count"], 0);
+        assert!(
+            store
+                .read_fact_accesses(&[innocent.to_string(), forged])
+                .await
+                .expect("read heat")
+                .is_empty()
+        );
     }
 }

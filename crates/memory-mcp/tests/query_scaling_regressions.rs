@@ -606,8 +606,7 @@ async fn batched_archival_signals_match_bitemporal_and_heat_checks() {
                  t_valid = type::datetime($t_valid), \
                  t_ingested = type::datetime($t_ingested), \
                  t_invalid = type::datetime($t_invalid), \
-                 t_invalid_ingested = type::datetime($t_invalid_ingested), \
-                 last_accessed = type::datetime($last_accessed)",
+                 t_invalid_ingested = type::datetime($t_invalid_ingested)",
                 Some(json!({
                     "fact_key": fact_id.strip_prefix("fact:").expect("fact record id"),
                     "t_valid": "2026-01-01T00:00:00Z",
@@ -620,6 +619,11 @@ async fn batched_archival_signals_match_bitemporal_and_heat_checks() {
             )
             .await
             .expect("set archival temporal signals");
+        memory.db_client.create(
+            &fact_id.replacen("fact:", "fact_access:", 1),
+            json!({"source_episode":episode_by_case[source_id],"access_count":0,"last_accessed":last_accessed}),
+            "org", &["last_accessed"],
+        ).await.expect("set separate archival heat");
     }
     let active_fact_id = &fact_by_case["active"];
     memory
@@ -895,7 +899,7 @@ async fn duplicate_fact_accesses_each_increment_and_saturate_at_i64_max() {
     .await;
     memory
         .db_client
-        .update(&fact_id, json!({"access_count": i64::MAX - 2}), "org", &[])
+        .create(&fact_id.replacen("fact:", "fact_access:", 1), json!({"access_count": i64::MAX - 2,"source_episode":"episode:duplicate-access-saturation"}), "org", &[])
         .await
         .expect("set count close to upper bound");
 
@@ -910,7 +914,7 @@ async fn duplicate_fact_accesses_each_increment_and_saturate_at_i64_max() {
         .expect("duplicate result access");
     let fact = memory
         .db_client
-        .select_one(&fact_id, "org")
+        .select_one(&fact_id.replacen("fact:", "fact_access:", 1), "org")
         .await
         .expect("read accessed fact")
         .expect("fact remains present");

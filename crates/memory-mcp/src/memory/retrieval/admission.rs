@@ -863,9 +863,35 @@ fn content_topic_matches(query: &QueryEvidence, content: &str) -> Vec<String> {
 struct IndexTopicFeatures {
     references: Vec<String>,
     matches: Vec<String>,
-    repeated_topic: Option<super::types::RepeatedTopicAdmissionEvidence>,
+    // None defers the separate raw view. Some(None) caches absent evidence.
+    repeated_topic: Option<Option<super::types::RepeatedTopicAdmissionEvidence>>,
     #[cfg(feature = "eval-support")]
     dictionary_builds: usize,
+}
+
+impl IndexTopicFeatures {
+    fn repeated_topic_for(
+        &mut self,
+        query: &QueryEvidence,
+        fact: &crate::models::Fact,
+        tokens: &mut crate::shared::search::IndexTokenVocabulary,
+    ) -> Option<super::types::RepeatedTopicAdmissionEvidence> {
+        if fact.fact_type != crate::models::FactType::Experience.as_str()
+            || query.repeated_topics.is_empty()
+        {
+            return None;
+        }
+        self.repeated_topic
+            .get_or_insert_with(|| {
+                let raw_terms = tokens.vocabulary(fact.index_keys.iter().map(String::as_str));
+                #[cfg(feature = "eval-support")]
+                {
+                    self.dictionary_builds += 1;
+                }
+                repeated_topic_admission_evidence(query, &raw_terms)
+            })
+            .clone()
+    }
 }
 
 fn index_topic_features(
@@ -887,15 +913,18 @@ fn index_topic_features(
     if query.content_terms.is_empty() {
         return IndexTopicFeatures {
             references,
+            repeated_topic: Some(None),
             ..IndexTopicFeatures::default()
         };
     }
-    let raw_terms = tokens.vocabulary(keys.iter().map(String::as_str));
     let contains_urls = keys.iter().any(|key| key.contains("://"));
     // Topic admission excludes URLs; repeated-topic evidence historically uses
     // the complete key vocabulary. Share the dictionary only when they agree.
-    let without_urls = contains_urls.then(|| index_vocabulary_without_urls(keys, tokens));
-    let topic_terms = without_urls.as_ref().unwrap_or(&raw_terms);
+    let topic_terms = if contains_urls {
+        index_vocabulary_without_urls(keys, tokens)
+    } else {
+        tokens.vocabulary(keys.iter().map(String::as_str))
+    };
     IndexTopicFeatures {
         references,
         matches: query
@@ -904,9 +933,13 @@ fn index_topic_features(
             .filter(|term| topic_terms.contains(*term))
             .cloned()
             .collect(),
-        repeated_topic: repeated_topic_admission_evidence(query, &raw_terms),
+        repeated_topic: if contains_urls {
+            None
+        } else {
+            Some(repeated_topic_admission_evidence(query, &topic_terms))
+        },
         #[cfg(feature = "eval-support")]
-        dictionary_builds: 1 + usize::from(contains_urls),
+        dictionary_builds: 1,
     }
 }
 
@@ -916,18 +949,14 @@ fn evaluate_candidate(
     candidate: &RankedContextFact,
     policy: &AdmissionPolicy<'_>,
 ) -> AdmissionDecision {
-    let index = index_topic_features(
-        query,
-        &candidate.fact.index_keys,
-        &mut crate::shared::search::IndexTokenVocabulary::default(),
-    );
+    let mut tokens = crate::shared::search::IndexTokenVocabulary::default();
+    let mut index = index_topic_features(query, &candidate.fact.index_keys, &mut tokens);
+    let repeated_topic = index.repeated_topic_for(query, &candidate.fact, &mut tokens);
     let topics = CandidateTopicMatches {
         references: candidate_references(&candidate.fact),
         content: content_topic_matches(query, &candidate.fact.content),
         index: index.matches,
-        repeated_topic: (candidate.fact.fact_type == crate::models::FactType::Experience.as_str())
-            .then_some(index.repeated_topic)
-            .flatten(),
+        repeated_topic,
     };
     evaluate_candidate_with_topics(query, candidate, policy, &topics)
 }
@@ -1609,6 +1638,9 @@ fn repeated_topic_admission_evidence(
     query: &QueryEvidence,
     index_terms: &HashSet<String>,
 ) -> Option<super::types::RepeatedTopicAdmissionEvidence> {
+    if query.repeated_topics.is_empty() {
+        return None;
+    }
     let matched_query_index_terms = query
         .content_terms
         .iter()
@@ -1785,13 +1817,7 @@ pub(super) fn admit_ranked_candidates(
                     .or_insert_with_key(|content| content_topic_matches(query, content))
                     .clone(),
                 index: index.matches.clone(),
-                repeated_topic: if candidate.fact.fact_type
-                    == crate::models::FactType::Experience.as_str()
-                {
-                    index.repeated_topic.clone()
-                } else {
-                    None
-                },
+                repeated_topic: index.repeated_topic_for(query, &candidate.fact, &mut index_tokens),
             }
         })
         .collect::<Vec<_>>();
